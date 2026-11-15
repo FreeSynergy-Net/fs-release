@@ -1,0 +1,141 @@
+# Rule: while working only the changed parts are tested (`-p <crate>` and `--test <file>`); the full workspace run is only an end gate or CI,
+# runs in the background, is timed, and only its summary is read (never the whole log). All cargo calls go through build-slot.sh (at most 3 slots).
+# Input: repo, branch, head, delta, scope (`gezielt` = only targeted, `end` = targeted, then the full run as end gate).
+# Order: `Workflow testlauf, step <id>, parameters repo, branch, head, delta, scope`. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: testlauf
+  version: 0.0.6
+  title: "Targeted tests while working, the full workspace run only as an end gate, in the background and timed"
+do:
+  - geaendert:
+      call: changed-parts:0.0.6@fs
+      with:
+        repo: ${ .input.repo }
+        delta: ${ .input.delta }
+      export:
+        as: '${ $context + { ziel: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script without AI: from the delta the changed crates (-p) and the test files of them (--test) are listed; nothing else is tested while working."
+  - slot:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: slot-check
+          version: 0.0.6
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Checks that a build slot is free (build-slot.sh, at most 3 slots at the same time); orphans are ended."
+  - gezielt:
+      call: targeted-test:0.0.6@fs
+      with:
+        repo: ${ .input.repo }
+        ziel: ${ $context.ziel }
+        via: build-slot.sh
+      export:
+        as: '${ $context + { gezielt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Runs for the changed parts only: build-slot.sh cargo test -p <crate> --test <file>; the time of each run is measured. Carries red, runde and seconds."
+  - gezielt-again:
+      switch:
+        - runden:
+            when: '${ ($context.gezielt.red and ($context.gezielt.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.gezielt.red }'
+            then: fix
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes to fix, from the third red round to eskalation."
+  - fix:
+      call: build-ai:0.0.6@fs
+      with:
+        task: fix the red test ${ $context.gezielt }
+      then: gezielt
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent fixes the red test in its own worktree and commits locally; then the targeted tests run again."
+  - end-weiche:
+      switch:
+        - end-gate:
+            when: '${ .input.scope == "end" }'
+            then: voll
+        - sonst:
+            then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only the scope end goes on to the full run; `gezielt` ends the flow here, green."
+  - voll:
+      call: workspace-test-background:0.0.6@fs
+      with:
+        repo: ${ .input.repo }
+        via: build-slot.sh
+        background: true
+      export:
+        as: '${ $context + { voll: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The full workspace run as an end gate: build-slot.sh cargo test --workspace in the BACKGROUND with the start and end time into zeit.log; nobody waits in a loop (the end is a notification). Only the summary line and the exit code are read, never the whole log."
+  - zeit:
+      call: record-timing:0.0.6@fs
+      with:
+        voll: ${ $context.voll }
+        gezielt: ${ $context.gezielt }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Appends the measured times (targeted and full) to testlauf-zeiten.tsv and compares them with the last run; the state changes to recorded, whatever the figures are."
+  - voll-again:
+      switch:
+        - runden:
+            when: '${ ($context.voll.red and ($context.voll.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.voll.red }'
+            then: fix
+        - green:
+            then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes to fix (then the targeted tests first), from the third red round to eskalation; green ends the flow."
+  - eskalation:
+      set:
+        todo: test-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The tests were red for the third time: the flow stops and the person decides. The report names the last red lines. This flow ends."

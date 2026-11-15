@@ -1,0 +1,307 @@
+# Conveyor belt (ADR 0087 item 7): every program gets the basics - it starts, does simple things and ends; the frontends come with it.
+# Stage 1 in parallel: (a) dossier and documentation (model apps, menus, workflows), (b) research (standards, data model, crates, licence, state of care;
+# Haiku, read and write of notes only). Stage 2: Opus plan with a FIXED trait (hash locked), then the gate `strategie-ok`.
+# Stage 3 in parallel (Sonnet): core (trait, typed storage after ADR 0086, CLI) and frontend (block assignment first, test data against the trait).
+# Stage 4: Opus review, picture gate, `doku-mitziehen`. A change of the trait after the lock is a new plan and a new `strategie-ok`.
+# Relation to `programm-neu` (decision of bundle 0.0.7, ADR 0087 item 7): this flow does NOT replace a part of `programm-neu`; it is the basics belt for every
+# program, also existing ones. `programm-neu` stays the only entry for NEW programs; it calls this flow as its component for the steps after the
+# interface in a later bundle (not wired in 0.0.7). Agents never push, tag or merge; the release goes through `release-flow` of the caller.
+# Input: programm, vorbild, tag, dossier, model, bestand, blinc, contract, dump, exceptions, repo, branch, head, delta, docs, docs_base, old, new, allow.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: programm-grundgeruest
+  version: 0.0.6
+  title: "Conveyor belt for the basics of a program: dossier and research, fixed trait, core and frontend, review, pictures, docs"
+do:
+  - stufe-1:
+      fork:
+        compete: false
+        branches:
+          - dossier-doku:
+              call: dossier-ai:0.0.6@fs
+              with:
+                programm: ${ .input.programm }
+                vorbild: ${ .input.vorbild }
+                dossier: ${ .input.dossier }
+          - recherche:
+              call: research-haiku:0.0.6@fs
+              with:
+                programm: ${ .input.programm }
+                topics: standards, data model, crates, licence, state of care
+                mode: read-and-write-notes-only
+      export:
+        as: '${ $context + { stufe1: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Two branches at the same time. (a) dossier-doku (Sonnet): dossier with states, menus and workflows of the model apps, documentation. (b) recherche (Haiku, only reading and writing notes, never code): standards, data model, crates, licence, state of care. Both write into the dossier folder."
+  - stufe-1-check:
+      call: grundgeruest-stufe1-check:0.0.6@fs
+      with:
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { stufe1check: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check without AI: the dossier has states, menus and workflows of the model apps; the research file names standards, data model, crates, licence and state of care with a source each. Carries red and runde."
+  - stufe-1-again:
+      switch:
+        - runden:
+            when: '${ ($context.stufe1check.red and ($context.stufe1check.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.stufe1check.red }'
+            then: stufe-1
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to stufe-1, from the third red round to eskalation."
+  - adr-suche:
+      call: adr-search:0.0.6@fs
+      with:
+        docs: ${ .input.docs }
+        terms: 0086, 0087, 0085, ${ .input.programm }
+      export:
+        as: '${ $context + { adrs: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/adr-search on fs-documentation origin/main (conventions/decisions) for the terms of the program, at least ADR 0086 (typed storage), 0087 (generic names), 0085 (normalisation); the hits are input of the plan."
+  - plan:
+      call: plan-ai:0.0.6@fs
+      with:
+        dossier: ${ .input.dossier }
+        adrs: ${ $context.adrs }
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { plan: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Opus writes the plan with a FIXED trait (the public interface of the program as a Rust trait file, signatures final), the data model as typed tables (ADR 0086) and the split into core and frontend. Model: Opus."
+  - plan-check:
+      call: grundgeruest-plan-check:0.0.6@fs
+      export:
+        as: '${ $context + { plancheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check: the trait file exists and compiles as a signature check; the name follows ADR 0087 (a capability or data, not a kind of app); no JSON or blob column except `original` (ADR 0086); every ADR of the hits is named. Carries red and runde."
+  - plan-again:
+      switch:
+        - runden:
+            when: '${ ($context.plancheck.red and ($context.plancheck.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.plancheck.red }'
+            then: plan
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to plan, from the third red round to eskalation."
+  - strategie-ok:
+      call: await-approval:0.0.6@fs
+      with:
+        what: plan and trait of ${ .input.programm }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Approval gate: the strategy (or the user) approves the plan and the fixed trait. Without this approval stage 3 does not start."
+  - trait-sperre:
+      call: trait-lock:0.0.6@fs
+      export:
+        as: '${ $context + { sperre: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Writes the SHA-256 of the trait file into trait.sha256 of the dossier folder; from now on stage 3 may use the trait, not change it."
+  - stufe-3:
+      fork:
+        compete: false
+        branches:
+          - kern:
+              call: core-ai:0.0.6@fs
+              with:
+                programm: ${ .input.programm }
+                trait: ${ $context.sperre.trait }
+                storage: typed tables after ADR 0086
+                cli: start, simple commands, stop
+          - frontend:
+              call: frontend-ai:0.0.6@fs
+              with:
+                programm: ${ .input.programm }
+                vorbild: ${ .input.vorbild }
+                first: block assignment (baustein-zuordnung)
+                test_data: against the trait
+      export:
+        as: '${ $context + { stufe3: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Two Sonnet branches at the same time, each in its own worktree. (a) kern: the trait, typed storage after ADR 0086 (no JSON, no blob), the CLI. (b) frontend: first the block assignment (scripts/baustein-zuordnung), then test data against the trait, no own data model. Neither branch changes the trait."
+  - trait-unveraendert:
+      call: trait-verify:0.0.6@fs
+      export:
+        as: '${ $context + { traitcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Compares the SHA-256 of the trait file with trait.sha256; a changed trait is red (a new plan and a new strategie-ok are needed). Carries red."
+  - trait-again:
+      switch:
+        - red:
+            when: '${ $context.traitcheck.red }'
+            then: plan
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a changed trait goes back to plan (and so to a new strategie-ok); the belt does not go on with a moved trait."
+  - gates:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: testlauf
+          version: 0.0.6
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          head: ${ .input.head }
+          delta: ${ .input.delta }
+          scope: gezielt
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Targeted tests of the changed crates and test files through the flow testlauf (the full workspace run only as an end gate)."
+  - speicher-check:
+      call: storage-typed-check:0.0.6@fs
+      with:
+        repo: ${ .input.repo }
+      export:
+        as: '${ $context + { speicher: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check (ADR 0086): no JSON and no blob column in the schema except `original`; every field of the trait has a typed column; round trip import - store - export loses nothing. Carries red and runde."
+  - lauf-check:
+      call: lifecycle-smoke:0.0.6@fs
+      with:
+        repo: ${ .input.repo }
+      export:
+        as: '${ $context + { lauf: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check of the goal: the program starts, does simple things (the CLI commands of the plan) and ends cleanly; the frontend test data run against the trait. Carries red and runde."
+  - stufe-3-again:
+      switch:
+        - runden:
+            when: '${ (($context.speicher.red or $context.lauf.red) and (($context.lauf.runde // 0) >= 3 or ($context.speicher.runde // 0) >= 3)) }'
+            then: eskalation
+        - red:
+            when: '${ $context.speicher.red or $context.lauf.red }'
+            then: stufe-3
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to stufe-3, from the third red round to eskalation."
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.6
+        input:
+          head: ${ .input.head }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Opus review of the finished head (the delta and the file list only), one review per head."
+  - bilder:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: picture-acceptance
+          version: 0.0.6
+        input:
+          programm: ${ .input.programm }
+          model: ${ .input.model }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Picture gate: the model and our picture side by side; the strategy and the user give their verdict. Without a picture OK no release follows."
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.6
+        input:
+          repo: ${ .input.repo }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen): documentation of the program in de and en, links, manifest and catalog texts; without a matching docs change the gate is RED."
+  - eskalation:
+      set:
+        todo: grundgeruest-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time: the belt stops and the person decides. The report names the last red lines. This flow ends."
