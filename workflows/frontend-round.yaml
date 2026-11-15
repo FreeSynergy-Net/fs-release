@@ -2,7 +2,7 @@
 # Fixed order for every Frontend (wave 1 included): (1) BLOCK ANALYSIS - every area of the model is assigned to a block family and id, existing blocks first
 # (dossier, bausteine.md, check baustein-zuordnung; source order family block, Blinc widget through an adapter, new block with reason); (2) LOOK - style analysis, tokens and style rules per block (ADR 0074; step stil-analyse);
 # (3) COMPOSITION - the arrangement in the Frontend (step build). Agents never push, tag or merge. FS profile: see README.md.
-# Input: vorbild (the model program the dossier is about), frontend (OUR program that is built; gap list, style analysis, images and build are about it), bestand (family inventory), blinc (Blinc widget inventory), dossier (folder of the dossier), model (pictures of the model), dump, exceptions,
+# Input: contract (the theme contract file), vorbild (the model program the dossier is about), frontend (OUR program that is built; gap list, style analysis, images and build are about it), bestand (family inventory), blinc (Blinc widget inventory), dossier (folder of the dossier), model (pictures of the model), dump, exceptions,
 # repo, branch, head, delta, release (true or missing = the flow ends with release-flow; `false` = no release here, the caller releases later, e.g. programm-neu).
 document:
   dsl: 1.0.3
@@ -106,7 +106,7 @@ do:
   - stil-vollstaendigkeit:
       call: stil-vollstaendigkeit:0.0.6@fs
       with:
-        contract: contract
+        contract: ${ .input.contract }
       export:
         as: '${ $context + { vollstaendig: . } }'
       metadata:
@@ -114,7 +114,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: scripts/stil-vollstaendigkeit (no network, no AI; self test with counter-checks like baustein-zuordnung) - theme contract times ALL styles - every style has an explicit entry for every block, part and state of the contract; a missing entry is `red`, no release (mandatory rule, ADR 0074). Result `red` and `runde`. Order - contract, completeness, then zwei-stile.
+        freesynergy.net:summary: scripts/stil-vollstaendigkeit (no network, no AI; self test with counter-checks like baustein-zuordnung) - theme contract times ALL styles - every style has an explicit entry for every block, part and state of the contract; a missing entry is `red`, no release (mandatory rule, draft of the addendum to ADR 0074, not yet in the ADR). Result `red` and `runde`. Order - contract, completeness, then zwei-stile.
   - stil-sichern-again:
       switch:
         - runden:

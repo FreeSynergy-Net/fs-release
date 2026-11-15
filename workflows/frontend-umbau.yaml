@@ -1,7 +1,7 @@
 # Convert existing building blocks and Frontends to the layers of ADR 0074: theme contract with fixed block names, DTCG tokens, no fixed colors or spacings in blocks or Frontends, arrangement separate. Goal: new Frontends are built quickly from blocks.
 # The ADR is conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md in fs-documentation.
 # Gate before replacing painted copies by Blinc blocks: bruecke, alle-stile-erweitern, stil-vollstaendigkeit, zwei-stile (plan-theme-bruecke.md).
-# One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters repo,
+# One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters contract, repo,
 # branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -106,7 +106,7 @@ do:
   - stil-vollstaendigkeit:
       call: stil-vollstaendigkeit:0.0.6@fs
       with:
-        contract: contract
+        contract: ${ .input.contract }
       export:
         as: '${ $context + { vollstaendig: . } }'
       metadata:
@@ -117,6 +117,9 @@ do:
         freesynergy.net:summary: scripts/stil-vollstaendigkeit - theme contract times all styles, every block with all parts and states has an explicit entry in every style; a missing one is `red`, no release.
   - vollstaendig-again:
       switch:
+        - runden:
+            when: '${ $context.vollstaendig.red and ($context.vollstaendig.runde // 0) >= 3 }'
+            then: umbau-eskalation
         - red:
             when: '${ $context.vollstaendig.red }'
             then: alle-stile-erweitern
@@ -127,7 +130,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - a missing entry goes back to alle-stile-erweitern, otherwise on to zwei-stile.
+        freesynergy.net:summary: Control flow - a missing entry goes back to alle-stile-erweitern (from the third red round, `runde` >= 3, to the person in `umbau-eskalation`), otherwise on to zwei-stile.
   - zwei-stile:
       call: zwei-stile:0.0.6@fs
       with:
@@ -139,9 +142,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script scripts/zwei-stile (no network, no AI) - the gate BEFORE the painted copies are replaced (convert) - every block of the group (own and Blinc through the adapter) is drawn once in two styles (Craft and a second one, light and dark); a block whose picture does not change is RED (it does not hang on the style); the exception list only holds reasons of content (e.g. icons). Order - contract, stil-vollstaendigkeit, zwei-stile. Self test with counter-checks. Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md section 4.
+        freesynergy.net:summary: Script scripts/zwei-stile (no network, no AI) - the gate BEFORE the painted copies are replaced (convert) - every block of the contract names of the group that is already reached through an adapter (Blinc blocks; own blocks still carry fixed values before `convert` and are not drawn here) is drawn once in two styles (Craft and a second one, light and dark); a block whose picture does not change is RED (it does not hang on the style); the exception list only holds reasons of content (e.g. icons). Order - contract, stil-vollstaendigkeit, zwei-stile. Self test with counter-checks. Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md section 4.
   - zwei-stile-again:
       switch:
+        - runden:
+            when: '${ $context.stile2.red and ($context.stile2.runde // 0) >= 3 }'
+            then: umbau-eskalation
         - red:
             when: '${ $context.stile2.red }'
             then: bruecke
@@ -152,7 +158,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - a block that does not follow the style goes back to bruecke, otherwise on to the images before the change and to convert.
+        freesynergy.net:summary: Control flow - a block that does not follow the style goes back to bruecke (from the third red round, `runde` >= 3, to the person in `umbau-eskalation`), otherwise on to the images before the change and to convert.
   - before:
       call: render-images:0.0.6@fs
       with:
@@ -227,6 +233,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - fixed values left, red gates or a changed picture go back to convert, otherwise on to the release.
   - release:
+      then: end
       run:
         workflow:
           namespace: freesynergy.net
@@ -238,3 +245,13 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja; NEIN goes back to convert with the findings as the order), then CI; the person merges and releases, agents never do. There is no second review here.
+  - umbau-eskalation:
+      set:
+        todo: umbau-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The completeness check or the two-style gate was red three times (`runde` >= 3); the person decides what is wrong, the contract, the styles or the adapter. This flow ends.
