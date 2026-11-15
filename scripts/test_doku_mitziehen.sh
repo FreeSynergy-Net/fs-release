@@ -123,4 +123,12 @@ expect 2 "bad input" "bad base hash" "$d" -- --docs-base nothere
 out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" 2>&1)"; rc=$?
 if [ "$rc" -eq 2 ]; then echo "ok   --code without --code-base"; else echo "FAIL code-base pairing rc=$rc"; fails=$((fails + 1)); fi
 
+# the default state file (in the git folder of docs) is never written through a symlink
+fresh sym; code_change; docs_both
+sf="$(g -C "$d/docs" rev-parse --absolute-git-dir)/doku-mitziehen-runde"
+: >"$tmp/victim"; ln -s "$tmp/victim" "$sf"
+PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --json "$d/sym.json" >/dev/null 2>&1; rc=$?
+if [ "$rc" -eq 2 ] && [ ! -s "$tmp/victim" ] && grep -qF '"status": "skipped"' "$d/sym.json"; then echo "ok   a symlinked state file is refused (skipped, never green)"; else
+  echo "FAIL symlink state: rc=$rc"; fails=$((fails + 1)); fi
+
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

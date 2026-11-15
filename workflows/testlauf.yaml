@@ -1,6 +1,7 @@
 # Rule: while working only the changed parts are tested (`-p <crate>` and `--test <file>`); the full workspace run is only an end gate or CI,
 # runs in the background, is timed, and only its summary is read (never the whole log). All cargo calls go through build-slot.sh (at most 3 slots).
 # Input: repo, branch, head, delta, scope (`gezielt` = only targeted, `end` = targeted, then the full run as end gate).
+# Output (to the caller): `status` (green | escalated | skipped), `red`, `runde`, `eskaliert`, `head`. Only `status == "green"` is green; a missing result is `skipped`.
 # Order: `Workflow testlauf, step <id>, parameters repo, branch, head, delta, scope`. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -54,40 +55,43 @@ do:
             when: '${ ($context.gezielt.red and ($context.gezielt.runde // 0) >= 3) }'
             then: eskalation
         - red:
-            when: '${ $context.gezielt.red }'
+            when: '${ $context.gezielt.red == true }'
             then: fix
         - green:
-            then: continue
+            when: '${ $context.gezielt.red == false }'
+            then: end-weiche
+        - ohne-ergebnis:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red goes to fix, from the third red round to eskalation."
+        freesynergy.net:summary: "Control flow - red goes to fix, from the third red round to eskalation; only `red == false` goes on to end-weiche (never on into `fix`), a missing result (null) is NOT green and goes to eskalation."
   - fix:
       call: build-ai:0.0.6@fs
       with:
         task: fix the red test ${ $context.gezielt }
-      then: gezielt
+      then: slot
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The agent fixes the red test in its own worktree and commits locally; then the targeted tests run again."
+        freesynergy.net:summary: "The agent fixes the red test in its own worktree and commits locally; then the slot is checked and the targeted tests run again."
   - end-weiche:
       switch:
         - end-gate:
             when: '${ .input.scope == "end" }'
             then: voll
         - sonst:
-            then: end
+            then: gruen
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - only the scope end goes on to the full run; `gezielt` ends the flow here, green."
+        freesynergy.net:summary: "Control flow - only the scope end goes on to the full run; `gezielt` ends the flow here with `gruen`."
   - voll:
       call: workspace-test-background:0.0.6@fs
       with:
@@ -102,6 +106,21 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The full workspace run as an end gate: build-slot.sh cargo test --workspace in the BACKGROUND with the start and end time into zeit.log; nobody waits in a loop (the end is a notification). Only the summary line and the exit code are read, never the whole log."
+  - voll-ende:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.test.done
+              subject: ${ .input.head }
+      export:
+        as: '${ $context + { voll: .data } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Waits for the END EVENT of the background run (net.freesynergy.test.done) with the subject = exactly this head - nobody polls, nobody reads a result that is not there yet. The event data carry `red`, `runde`, `seconds` and the summary line. An event for another head does not count."
   - zeit:
       call: record-timing:0.0.6@fs
       with:
@@ -119,23 +138,44 @@ do:
             when: '${ ($context.voll.red and ($context.voll.runde // 0) >= 3) }'
             then: eskalation
         - red:
-            when: '${ $context.voll.red }'
+            when: '${ $context.voll.red == true }'
             then: fix
         - green:
-            then: end
+            when: '${ $context.voll.red == false }'
+            then: gruen
+        - ohne-ergebnis:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red goes to fix (then the targeted tests first), from the third red round to eskalation; green ends the flow."
+        freesynergy.net:summary: "Control flow - red goes to fix (then the targeted tests first), from the third red round to eskalation; only `red == false` ends the flow green (`gruen`); a missing result (null) is NOT green and goes to eskalation."
+  - gruen:
+      set:
+        status: green
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The only way to a green result: targeted tests `red == false` (and, with scope end, the end event of the full run `red == false` for this head). Sets `status: green`."
   - eskalation:
       set:
         todo: test-eskalation
+        status: escalated
+        eskaliert: true
+      export:
+        as: '${ $context + { ergebnis: . } }'
       then: end
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The tests were red for the third time: the flow stops and the person decides. The report names the last red lines. This flow ends."
+        freesynergy.net:summary: "The tests were red for the third time or a run gave no result: the flow stops and the person decides. The report names the last red lines. This flow ends with `eskaliert: true`; the caller stops there."
+output:
+  as: '${ { status: ($context.ergebnis.status // "skipped"), red: (($context.ergebnis.status // "skipped") != "green"), runde: ($context.voll.runde // $context.gezielt.runde // 0), eskaliert: ($context.ergebnis.eskaliert // false), head: $workflow.input.head } }'

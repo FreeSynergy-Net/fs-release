@@ -48,7 +48,7 @@ do:
       switch:
         - eskaliert:
             when: '${ $context.doku.eskaliert == true or $context.doku.status != "green" }'
-            then: end
+            then: eskalation
         - weiter:
             then: continue
       metadata:
@@ -56,7 +56,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review. Only green goes on."
+        freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review (`eskalation` ends it with `eskaliert: true` for the caller). Only green goes on."
   - gates:
       call: gates:0.0.6@fs
       metadata:
@@ -146,7 +146,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release).
+        freesynergy.net:summary: "release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release). MANDATORY after the merge into main of a program or of fs-release itself: the SHA of `FreeSynergy/fs-release/...@<sha>` in release.yml, ci.yml and check.yml is raised to the merge commit in a second reviewed commit (scripts/pin-refs.sh; a commit cannot contain its own SHA), otherwise the signing job still runs the refs of the older commit (docs/usage.md)."
   - announce:
       emit:
         event:
@@ -189,3 +189,30 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Waits for the sign and test runs of the catalog (see catalog-bump.yaml); the flow only describes this wait, it does not poll yet.
+  - fertig:
+      set:
+        status: released
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The flow reached its end (the sign and test events of the catalog are in); sets `status: released`."
+  - eskalation:
+      set:
+        status: escalated
+        eskaliert: true
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The docs gate escalated (red three times or a check skipped): this flow ends before the review with `eskaliert: true`; the person decides."
+output:
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false) } }'

@@ -314,13 +314,16 @@ do:
   - speicher-again:
       switch:
         - runden:
-            when: '${ ($context.speicher.red and ($context.speicher.runde // 0) >= 3) }'
+            when: '${ ($context.speicher.red == true and ($context.speicher.runde // 0) >= 3) }'
             then: eskalation
         - red:
-            when: '${ $context.speicher.red }'
+            when: '${ $context.speicher.red == true }'
             then: datenmodell
         - green:
+            when: '${ $context.speicher.red == false }'
             then: continue
+        - ohne-ergebnis:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -328,7 +331,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:phase: P2
         freesynergy.net:adr: '0086'
-        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell (typed columns, no JSON or blob)."
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell (typed columns, no JSON or blob); only `red == false` goes on, a missing result goes to eskalation."
   - schnittstelle:
       call: interface-ai:0.0.6@fs
       with:

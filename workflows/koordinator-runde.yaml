@@ -1,10 +1,15 @@
 # One round of the coordinator session (the short-lived coordinator the strategy starts). FS profile: see README.md.
 # Start: the handoffs (fs-documentation todo/handoff-*.md) and the inbox are read, strands and priorities are taken over.
-# Work: ONE agent per work step, in the background (Sonnet builds and tests, Opus reviews, Haiku searches and never codes);
-# the messages of the agents go to the COORDINATOR, not to the strategy. The results are collected, the gates are checked, and
-# the strategy gets ONE bundled report (only final states, red, approval gates). End: secure what is running (WIP commit, push
-# unreviewed/*), handoff-update, one report. Rule check (RED on a breach): the coordinator does not build or test itself, does not
-# wait in loops (sleep, pgrep) and does not read big logs. Calls `doku-mitziehen`. Agents never push, tag or merge; no main, no tag.
+# Work: ONE agent per work step, in the BACKGROUND (Sonnet builds and tests, Opus reviews, Haiku searches and never codes).
+# Why background (binding, instruction of the strategy of 2026-11-15, evening): the coordinator runs in its OWN session; its agents run in the
+# background and their messages go to the coordinator. The coordinator itself builds nothing, tests nothing and waits in no loop. The earlier rule
+# "start agents in the foreground and end only when all are done" applied only to coordinators that ran as a sub-agent INSIDE the strategy session
+# (there background messages would land at the strategy); it does not apply here. The coordinator still ends only when ALL agents have reported:
+# step `einsammeln` waits event driven for every started agent, `einsammeln-weiche` sends an incomplete round to `eskalation`, which still secures and reports.
+# The results are collected, the gates are checked, and the strategy gets ONE bundled report (only final states, red, approval gates).
+# End: secure what is running (WIP commit, push unreviewed/*), handoff-update, one report. Rule check (RED on a breach): the coordinator does not build
+# or test itself, does not wait in loops (sleep, pgrep) and does not read big logs. Calls `doku-mitziehen`. Agents never push, tag or merge; no main, no tag.
+# Every result (gates, docs, review, rule check) is green only when it says so; a missing result is never green.
 # Input: repo, branch, head, delta, docs, docs_base, old, new, allow (as for doku-mitziehen), handoffs (folder, default todo/), inbox.
 document:
   dsl: 1.0.3
@@ -89,6 +94,9 @@ do:
         freesynergy.net:summary: "Starts ONE agent per work step, each in the background (model by role: Sonnet builds and tests, Opus reviews, Haiku searches and never writes code). The messages of every agent go to the coordinator (report_to: coordinator), never to the strategy. The coordinator starts them and does not do the step itself."
   - einsammeln:
       call: collect-agent-reports:0.0.6@fs
+      with:
+        erwartet: ${ $context.plan.schritte }
+        wait: all
       export:
         as: '${ $context + { berichte: . } }'
       metadata:
@@ -96,7 +104,20 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Collects the finished reports by the notifications of the agents (event driven; no sleep, no pgrep, no polling loop) and reads only the report and the commit list of each run, never a big log."
+        freesynergy.net:summary: "Waits event driven (the notifications of the agents go to the coordinator; no sleep, no pgrep, no polling loop) until EVERY started agent has reported (`wait: all`), then reads only the report and the commit list of each run, never a big log. The result carries `alle` (true only when every expected report is in)."
+  - einsammeln-weiche:
+      switch:
+        - komplett:
+            when: '${ $context.berichte.alle == true }'
+            then: auswerten
+        - unvollstaendig:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only a complete set of reports (`alle == true`) goes on; a missing or incomplete result goes to `eskalation`, which still secures the running work and sends the one report (the coordinator does not end while agents still run unsecured)."
   - auswerten:
       call: read-run-result:0.0.6@fs
       with:
@@ -124,52 +145,76 @@ do:
       export:
         as: '${ $context + { gates: . } }'
       metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Checks the gates of every finished head through the flow testlauf (targeted tests of the changed parts; the full workspace run is only an end gate). The coordinator builds and tests nothing itself; the result carries red and runde."
+        freesynergy.net:summary: "Checks the gates of every finished head through the flow testlauf (targeted tests of the changed parts; the full workspace run is only an end gate). The flow contains the AI step `fix`. The coordinator builds and tests nothing itself; the result carries `status`, `red`, `runde`, `eskaliert`."
   - gates-again:
       switch:
         - runden:
-            when: '${ ($context.gates.red and ($context.gates.runde // 0) >= 3) }'
+            when: '${ ($context.gates.red == true and ($context.gates.runde // 0) >= 3) }'
             then: eskalation
         - red:
-            when: '${ $context.gates.red }'
+            when: '${ $context.gates.red == true }'
             then: korrektur
         - green:
-            then: continue
+            when: '${ $context.gates.status == "green" and $context.gates.red == false }'
+            then: doku
+        - ohne-ergebnis:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red goes to korrektur, from the third red round the round ends in eskalation. No way past a red gate."
+        freesynergy.net:summary: "Control flow - red goes to korrektur, from the third red round the round ends in eskalation; only `status == green` with `red == false` goes on to `doku`; a missing result (flow without output) is NOT green and goes to eskalation. No way past a red gate."
   - korrektur:
       run:
         workflow:
           namespace: freesynergy.net
-          name: bugfix
+          name: agent-run
           version: 0.0.6
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
-          head: ${ .input.head }
           delta: ${ .input.delta }
-          finding: ${ $context.gates }
-          docs: ${ .input.docs }
-          docs_base: ${ .input.docs_base }
-          old: ${ .input.old }
-          new: ${ .input.new }
-          allow: ${ .input.allow }
-          tag: ${ .input.tag }
-      then: gates-pruefen
+          task: "fix exactly the findings of the last red gate (${ $context.gates }) or of the last review (BERICHT.md of the reviewed head) in your own worktree, local commits, no push, no tag, no release"
+          model: sonnet
+          background: true
+          report_to: coordinator
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "A red gate is fixed by an agent through bugfix.yaml for exactly this run (never by the coordinator), then the gates run again."
+        freesynergy.net:summary: "A red gate or a NO of the review is fixed by ONE agent through agent-run for exactly this finding (never by the coordinator, and never through bugfix.yaml: that flow ends in release-flow with review, tag, push and release, which a round must not start). Background, its message goes to the coordinator; then `korrektur-einsammeln`, then the gates run again on the new heads."
+  - korrektur-einsammeln:
+      call: collect-agent-reports:0.0.6@fs
+      with:
+        erwartet: 1
+        wait: all
+      export:
+        as: '${ $context + { berichte: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Waits event driven for the report of the fixing agent (no sleep, no pgrep)."
+  - korrektur-weiche:
+      switch:
+        - komplett:
+            when: '${ $context.berichte.alle == true }'
+            then: gates-pruefen
+        - unvollstaendig:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the gates run again only after the fixing agent has reported; otherwise eskalation."
   - doku:
       run:
         workflow:
@@ -184,26 +229,89 @@ do:
           old: ${ .input.old }
           new: ${ .input.new }
           allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen, before the review): the documentation moves with every change of the round; without a matching docs change the gate is RED. The sub-workflow contains an AI step (`schreiben`); its result `status` and `eskaliert` is read by `doku-weiter`."
+  - doku-weiter:
+      switch:
+        - eskaliert:
+            when: '${ $context.doku.eskaliert == true or $context.doku.status != "green" }'
+            then: eskalation
+        - weiter:
+            then: pruefung
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen): the documentation moves with every change of the round; without a matching docs change the gate is RED."
+        freesynergy.net:summary: "Control flow - doku-mitziehen ended with `eskaliert` or without `status == green`: the round goes to `eskalation` (which secures and reports), never on to the review. Only green goes on."
   - pruefung:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: review
-          version: 0.0.6
-        input:
-          head: ${ .input.head }
+      for:
+        each: schritt
+        in: ${ $context.plan.schritte }
+      do:
+        - kopf:
+            call: resolve-head:0.0.6@fs
+            with:
+              repo: ${ $schritt.repo }
+              branch: ${ $schritt.branch }
+            export:
+              as: '${ $context + { kopf: . } }'
+        - review:
+            run:
+              workflow:
+                namespace: freesynergy.net
+                name: review
+                version: 0.0.6
+              input:
+                repo: ${ $schritt.repo }
+                branch: ${ $schritt.branch }
+                head: ${ $context.kopf.head }
+                delta: ${ $schritt.delta }
+            export:
+              as: '${ $context + { urteil: . } }'
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Opus reviews the finished heads (the delta and the file list of the order only). One review per head."
+        freesynergy.net:summary: "Opus reviews every finished head: per work step the head is resolved NOW (`resolve-head`, read only, after the agents, the gates and the docs - never the head of the round start), and the review runs for exactly this hash with repo, branch and delta of that step (the delta and the file list only). The results of the last reviews are collected per branch by `urteile-sammeln` (verdict, runde, head); a new commit makes a new head and a new review."
+  - urteile-sammeln:
+      call: collect-verdicts:0.0.6@fs
+      with:
+        schritte: ${ $context.plan.schritte }
+      export:
+        as: '${ $context + { urteile: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Collects the verdict of every reviewed head (`verdict`, `runde`, `head` from the review output and the verdict command) into one object keyed by branch; a branch without a verdict is missing from it, so it is never counted as a JA by `pruefung-again`."
+  - pruefung-again:
+      switch:
+        - runden:
+            when: '${ (($context.urteile // {}) | [.[] | select(.verdict != "JA" and (.runde // 0) >= 3)] | length) > 0 }'
+            then: eskalation
+        - nein:
+            when: '${ (($context.urteile // {}) | [.[] | select(.verdict == "NEIN")] | length) > 0 }'
+            then: korrektur
+        - ja:
+            when: '${ (($context.urteile // {}) | length) == ($context.plan.schritte | length) and (($context.urteile // {}) | [.[] | .verdict == "JA"] | all) }'
+            then: regel-check
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO of any head goes back through `korrektur` (and so through gates, docs and a new head), from the third NO (`runde >= 3`) the round ends in `eskalation`; only a JA for EVERY head goes on to the rule check; a missing or incomplete verdict is NOT a JA and goes to eskalation."
   - regel-check:
       call: coordinator-rule-check:0.0.6@fs
       export:
@@ -216,17 +324,17 @@ do:
         freesynergy.net:summary: "Rule check of the round, RED on a breach - the coordinator built or tested itself (cargo, build-slot.sh in its own process list), waited in loops (sleep, pgrep) or read big logs. Reads the command log of the round; the verdict is a script, not the coordinator's word."
   - regel-weiche:
       switch:
-        - rot:
-            when: '${ $context.regel.red }'
-            then: regel-rot
         - gruen:
-            then: continue
+            when: '${ $context.regel.red == false }'
+            then: sichern
+        - rot:
+            then: regel-rot
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a breach of the rules turns the one report red; it does not stop the securing."
+        freesynergy.net:summary: "Control flow - only `red == false` goes straight on; a breach or a missing result (null) turns the one report red (`regel-rot`); it does not stop the securing."
   - regel-rot:
       set:
         todo: regel-verstoss
@@ -278,6 +386,9 @@ do:
         input:
           workflow: koordinator-runde
           run: ${ .input.head }
+          eskaliert: ${ $context.ergebnis.eskaliert // false }
+          regel: ${ $context.regel }
+      then: end
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -287,10 +398,13 @@ do:
   - eskalation:
       set:
         todo: runde-eskalation
-      then: end
+        eskaliert: true
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: sichern
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The gates were red for the third time: the round stops and the person decides. The report names the last red lines. This flow ends."
+        freesynergy.net:summary: "A gate was red for the third time, a result was missing or an agent did not report: the round does not simply stop - it goes on to `sichern` (WIP commit of everything that runs), `push-unreviewed`, `handoff` and the one `bericht`, which names the last red lines and says `eskaliert`; the person decides."

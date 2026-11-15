@@ -144,7 +144,7 @@ def state_path(a):
     try:
         gitdir = git(a.docs, "rev-parse", "--absolute-git-dir").strip()
     except ValueError:
-        gitdir = tempfile.gettempdir()
+        gitdir = private_state_dir()
     return a.state or os.path.join(gitdir, "doku-mitziehen-runde")
 
 
@@ -154,13 +154,27 @@ def write_json(a, status, red, runde, problems, skipped):
             json.dump({"status": status, "red": red, "runde": runde, "problems": problems, "skipped": skipped}, f)
 
 
+def private_state_dir():
+    """A per-user folder (mode 0700) for state files, never the shared /tmp with a predictable name."""
+    base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+    d = os.path.join(base, "freesynergy")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    return d
+
+
 def counter(path, red):
+    """Round counter in a state file; it never follows a symlink (O_NOFOLLOW), a refused file raises OSError."""
     try:
-        n = int(open(path).read().strip() or 0)
-    except (OSError, ValueError):
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd) as f:
+            n = int(f.read().strip() or 0)
+    except FileNotFoundError:
+        n = 0
+    except ValueError:
         n = 0
     n = n + 1 if red else 0
-    with open(path, "w") as f:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w") as f:
         f.write(f"{n}\n")
     return n
 
@@ -202,7 +216,12 @@ def main(argv):
         print("skipped: not green because a check did not run")
         write_json(a, "skipped", False, 0, problems, skipped)
         return 2
-    runde = counter(state_path(a), red)
+    try:
+        runde = counter(state_path(a), red)
+    except OSError as e:
+        print(f"skipped: the state file cannot be used ({e}); never green without a counter")
+        write_json(a, "skipped", False, 0, problems, [f"state file: {e}"])
+        return 2
     print(f"runde={runde}")
     write_json(a, "red" if red else "green", red, runde, problems, skipped)
     if not red:

@@ -137,4 +137,16 @@ if python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if
 if python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["red"] is None else 1)' "$js"; then
   echo "ok   bad input: the JSON has red = null (never green)"; else echo "FAIL bad input JSON"; fails=$((fails + 1)); fi
 
+# --- state file: the default is a private per-user folder (never a predictable name in /tmp), and a symlink is never followed
+xs="$tmp/xdg"; mkdir -p "$xs"
+nostate=(--old fs-wiki --new fs-text --repos "$v/fs-wiki" "$v/fs-app" --catalog "$v/fs-catalog" --docs "$v/fs-documentation" --retired "$v/retired.txt")
+XDG_STATE_HOME="$xs" "${tool[@]}" after "${nostate[@]}" >/dev/null 2>&1
+if [ -f "$xs/freesynergy/umbenennen-fs-wiki-fs-text-runde" ] && [ "$(stat -c %a "$xs/freesynergy")" = 700 ]; then
+  echo "ok   default state file lies in the private state folder (0700)"; else echo "FAIL default state folder"; fails=$((fails + 1)); fi
+victim="$tmp/victim"; : >"$victim"; rm -f "$xs/freesynergy/umbenennen-fs-wiki-fs-text-runde"
+ln -s "$victim" "$xs/freesynergy/umbenennen-fs-wiki-fs-text-runde"
+out="$(XDG_STATE_HOME="$xs" "${tool[@]}" after "${nostate[@]}" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && [ ! -s "$victim" ]; then echo "ok   a symlinked state file is refused (rc 2) and the target stays untouched"; else
+  echo "FAIL symlink state: rc=$rc"; fails=$((fails + 1)); fi
+
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
