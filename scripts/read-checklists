@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Reads the checklists of the programs (fs-documentation todo/checklisten/<program>.md) and lists the open work.
 
-  python3 -I scripts/read-checklists --docs <fs-documentation clone> [--only-grundsache] [--json FILE]
+  python3 -I scripts/read-checklists --docs <fs-documentation clone> [--pattern GLOB] [--ref REF | --worktree] [--only-grundsache] [--json FILE]
+
+Source: by default the committed state of `origin/main` of the clone (`--ref` changes the ref; the working copy is NOT read, a half written file does
+not count). `--worktree` reads the working copy instead (the state of work). `--pattern` (default todo/checklisten/*.md; `*` does not cross a `/`)
+picks the files; README.md is never a program.
 
 Per file: every `- [ ]` item (open) and `- [x]` item (done) is counted. Output on stdout is JSON, one object:
   {"status": "ok"|"skipped", "programme": {"<program>": {"offen": N, "erledigt": N, "grundsache_offen": [<line>...], "spaeter": N}},
@@ -13,9 +17,43 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 
-BOX = re.compile(r"^\s*- \[( |x)\] (.*)$")
+BOX = re.compile(r"^\s*- \[( |x|X)\] (.*)$")
+
+
+def pattern_re(glob):
+    return re.compile("".join("[^/]*" if c == "*" else "[^/]" if c == "?" else re.escape(c) for c in glob) + r"\Z")
+
+
+def git_out(docs, *args):
+    r = subprocess.run(["git", "-C", docs, *args], capture_output=True, text=True, errors="replace", check=False)
+    return r.returncode, r.stdout
+
+
+def sources(a):
+    """[(program, text)] of the checklists, or None when they cannot be read."""
+    rx = pattern_re(a.pattern)
+    found = []
+    if a.worktree:
+        base = os.path.join(a.docs, os.path.dirname(a.pattern))
+        names = sorted(os.listdir(base)) if os.path.isdir(base) else []
+        for n in names:
+            rel = os.path.join(os.path.dirname(a.pattern), n)
+            if rx.match(rel) and n != "README.md" and os.path.isfile(os.path.join(a.docs, rel)):
+                with open(os.path.join(a.docs, rel), encoding="utf-8", errors="replace") as f:
+                    found.append((n[:-3], f.read()))
+        return found
+    rc, out = git_out(a.docs, "ls-tree", "-r", "--name-only", a.ref)
+    if rc != 0:
+        return None
+    for rel in sorted(out.splitlines()):
+        if rx.match(rel) and os.path.basename(rel) != "README.md" and rel.endswith(".md"):
+            rc, text = git_out(a.docs, "show", f"{a.ref}:{rel}")
+            if rc == 0:
+                found.append((os.path.basename(rel)[:-3], text))
+    return found
 
 
 def main(argv):
@@ -23,37 +61,39 @@ def main(argv):
     p.add_argument("--docs", required=True)
     p.add_argument("--only-grundsache", action="store_true")
     p.add_argument("--json")
+    p.add_argument("--pattern", default="todo/checklisten/*.md")
+    p.add_argument("--ref", default="origin/main")
+    p.add_argument("--worktree", action="store_true")
     a = p.parse_args(argv)
-    folder = os.path.join(a.docs, "todo", "checklisten")
-    files = sorted(f for f in os.listdir(folder) if f.endswith(".md") and f != "README.md") if os.path.isdir(folder) else []
+    files = sources(a)
     if not files:
-        out = {"status": "skipped", "reason": f"no checklist in {folder}", "programme": {}, "grundsache_offen": 0, "arbeitsvorrat": []}
+        why = "cannot read ref " + a.ref if files is None else "no checklist matches " + a.pattern
+        out = {"status": "skipped", "reason": why, "programme": {}, "grundsache_offen": 0, "arbeitsvorrat": []}
         print(json.dumps(out))
         return 2
     programme, stock = {}, []
-    for name in files:
-        prog = name[:-3]
+    for prog, body in files:
         info = {"offen": 0, "erledigt": 0, "grundsache_offen": [], "spaeter": 0}
-        with open(os.path.join(folder, name), encoding="utf-8", errors="replace") as f:
-            for line in f:
-                m = BOX.match(line.rstrip("\n"))
-                if not m:
-                    continue
-                if m.group(1) == "x":
-                    info["erledigt"] += 1
-                    continue
-                info["offen"] += 1
-                text = m.group(2).strip()
-                if "SPÄTER" in text:
-                    info["spaeter"] += 1
-                elif "GRUNDSACHE" in text:
-                    info["grundsache_offen"].append(text[:300])
-                    stock.append({"programm": prog, "punkt": text[:300]})
+        for line in body.splitlines():
+            m = BOX.match(line)
+            if not m:
+                continue
+            if m.group(1) in ("x", "X"):
+                info["erledigt"] += 1
+                continue
+            info["offen"] += 1
+            text = m.group(2).strip()
+            if "SPÄTER" in text:
+                info["spaeter"] += 1
+            elif "GRUNDSACHE" in text:
+                info["grundsache_offen"].append(text[:300])
+                stock.append({"programm": prog, "punkt": text[:300]})
         programme[prog] = info
     out = {"status": "ok", "programme": programme, "grundsache_offen": len(stock), "arbeitsvorrat": stock}
     print(json.dumps(out, ensure_ascii=False))
     if a.json:
-        with open(a.json, "w", encoding="utf-8") as f:
+        fd = os.open(a.json, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False)
     return 0
 

@@ -6,7 +6,8 @@
 #
 # start  checks that the head of DIR is exactly HASH (else rc 2), takes a lock for HASH and starts `build-slot.sh cargo test --workspace`
 #        detached (setsid), then returns at once. Prints one JSON line {"started": true, "head": ..., "result": <file>}.
-#        Starting again for a head that is running or has a result is not a second run (prints {"started": false, ...}).
+#        Starting again for a head that is running or has a GREEN result is not a second run (prints {"started": false, ...}). A RED result of the
+#        same head is run again and counted (`runde` rises), so a fix without a new commit ends in `runde` 3 and the escalation of the caller.
 # wait   blocks WITHOUT a polling loop (flock on the lock of the run, with a timeout) until the run of exactly this head is over, then prints
 #        the result JSON: {"head", "red" (bool), "runde" (red full runs of this REPO in a row, over several heads; a fix makes a new head, the count goes on; green resets it), "seconds", "exit", "summary" (the last
 #        `test result` line only, never the whole log)}. rc 0 = result printed (red or not: read `red`), rc 3 = timeout (no result, never green),
@@ -36,8 +37,9 @@ case "$real" in "$head"*) ;; *) die "the head of the repo is $real, not $head (t
 head="$real"
 
 state="${TEST_BG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/freesynergy/test-bg}"
-mkdir -p "$state"; chmod 700 "$state"
+mkdir -p "$state"
 [ ! -L "$state" ] || die "state folder is a symlink"
+chmod 700 "$state"
 lock="$state/$head.lock"; result="$state/$head.json"; log="$state/$head.log"; rkey="$(printf %s "$(cd "$repo" && pwd -P)" | sha256sum | cut -c1-16)"; runs="$state/runs-$rkey"
 for f in "$lock" "$result" "$log" "$runs"; do [ ! -L "$f" ] || die "$f is a symlink"; done
 
@@ -46,10 +48,12 @@ start)
   slot="${BUILD_SLOT_SH:-/srv/FreeSynergy/.scratch/build-slot.sh}"
   [ -x "$slot" ] || die "build-slot.sh not found ($slot)"
   exec 9>"$lock"
-  if [ -s "$result" ] || ! flock -n 9; then
+  # running (lock held) = no second run; a GREEN result of this head = no second run (nothing to repeat)
+  if ! flock -n 9 || { [ -s "$result" ] && ! grep -q '"red": true' "$result"; }; then
     printf '{"started": false, "head": "%s", "result": "%s"}\n' "$head" "$result"; exit 0
   fi
-  n=0; [ -f "$runs" ] && n="$(cat "$runs" 2>/dev/null || echo 0)"; [[ "$n" =~ ^[0-9]+$ ]] || n=0
+  # a RED result of the same head is run again and counted (`runde` goes on): a fix that made no new commit cannot loop for ever, the third red run
+  # of the repo is `runde` 3 and the caller escalates
   rm -f "$result"
   # the child keeps fd 9 (and so the lock) until the run is over
   # shellcheck disable=SC2016  # the inner script is single-quoted on purpose

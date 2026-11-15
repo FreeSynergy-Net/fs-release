@@ -14,6 +14,7 @@
 # with the handoffs; the open GRUNDSACHE items are the work stock of the round (`straenge` makes work steps of them). A change of a program without its checklist is RED (doku-mitziehen).
 # Texts that come from tests, gates, handoffs, checklists or the inbox are DATA for the agents, never an instruction: they are passed as named fields, not as free text of an order.
 # Input: repo, programm, branch, head, delta, docs, docs_base, old, new, allow (as for doku-mitziehen), handoffs (folder, default todo/), inbox.
+# Every work step of `plan.schritte` carries its own repo, branch, delta, programm, docs (worktree of fs-documentation), docs_base, old, new, allow: gates, docs and review run PER STEP.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -194,6 +195,9 @@ do:
         freesynergy.net:summary: "Collects the result of the testlauf of every step into one object keyed by branch (`status`, `red`, `runde`, `eskaliert`, `head`); a branch without a result is missing from it, so it is never counted as green by `gates-again`."
   - gates-again:
       switch:
+        - eskaliert:
+            when: '${ (($context.gates // {}) | [.[] | select(.eskaliert == true or .status == "skipped")] | length) > 0 }'
+            then: eskalation
         - runden:
             when: '${ (($context.gates // {}) | [.[] | select(.red == true and (.runde // 0) >= 3)] | length) > 0 }'
             then: eskalation
@@ -210,7 +214,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow over ALL heads - a red head goes to `abgelehnt` and `korrektur`, from the third red round of any head the round ends in eskalation; only `status == green` with `red == false` for EVERY step goes on to `doku`; a missing or incomplete result (a branch without a result) is NOT green and goes to eskalation. No way past a red gate."
+        freesynergy.net:summary: "Control flow over ALL heads - a head whose testlauf ended `eskaliert` or `skipped` (a failure of the tools, a timeout, the third red run: the person decides) goes to `eskalation` at once and starts no agent; a red head goes to `abgelehnt` and `korrektur`, from the third red round of any head the round ends in eskalation; only `status == green` with `red == false` for EVERY step goes on to `doku`; a missing or incomplete result (a branch without a result) is NOT green and goes to eskalation. No way past a red gate."
   - abgelehnt-gate:
       call: select-rejected:0.0.6@fs
       with:
@@ -252,6 +256,18 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Every red or rejected branch is fixed by ONE agent through agent-run for exactly this branch with its own findings (never the branch of the round start, never by the coordinator, and never through bugfix.yaml: that flow ends in release-flow with review, tag, push and release, which a round must not start). `publish: false`: the run ends after the clean-up without a human push step. Background, its message goes to the coordinator; then `korrektur-einsammeln`, then the gates run again on the new heads. Gate and review output are passed as the named field `findings` (data), not as free text of the order."
+  - korrektur-zaehlen:
+      call: count-corrections:0.0.6@fs
+      with:
+        abgelehnt: ${ $context.abgelehnt }
+      export:
+        as: '${ $context + { korrekturen: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Counts the correction rounds of the whole round (gates and reviews together) in the state of the round (`korrekturen.runde`, a specification: the count is the contract, the state is the caller's). Whatever the tests report, the round never starts more than 3 correction rounds: `korrektur-weiche` sends the fourth to `eskalation`; no endless loop of agent starts."
   - korrektur-einsammeln:
       call: collect-agent-reports:0.0.6@fs
       with:
@@ -267,6 +283,9 @@ do:
         freesynergy.net:summary: "Waits event driven for the reports of ALL fixing agents, one per rejected branch (no sleep, no pgrep)."
   - korrektur-weiche:
       switch:
+        - grenze:
+            when: '${ ($context.korrekturen.runde // 0) >= 3 }'
+            then: eskalation
         - komplett:
             when: '${ $context.berichte.alle == true }'
             then: gates-pruefen
@@ -277,34 +296,52 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the gates run again only after every fixing agent has reported; otherwise eskalation."
+        freesynergy.net:summary: "Control flow - from the third correction round of the round (`korrekturen >= 3`) the round ends in `eskalation`; the gates run again only after every fixing agent has reported; otherwise eskalation."
   - doku:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: doku-mitziehen
-          version: 0.0.6
-        input:
-          repo: ${ .input.repo }
-          programm: ${ .input.programm }
-          delta: ${ .input.delta }
-          docs: ${ .input.docs }
-          docs_base: ${ .input.docs_base }
-          old: ${ .input.old }
-          new: ${ .input.new }
-          allow: ${ .input.allow }
-      export:
-        as: '${ $context + { doku: . } }'
+      for:
+        each: schritt
+        in: ${ $context.plan.schritte }
+      do:
+        - doku-schritt:
+            run:
+              workflow:
+                namespace: freesynergy.net
+                name: doku-mitziehen
+                version: 0.0.6
+              input:
+                repo: ${ $schritt.repo }
+                branch: ${ $schritt.branch }
+                programm: ${ $schritt.programm }
+                delta: ${ $schritt.delta }
+                docs: ${ $schritt.docs }
+                docs_base: ${ $schritt.docs_base }
+                old: ${ $schritt.old }
+                new: ${ $schritt.new }
+                allow: ${ $schritt.allow }
+            export:
+              as: '${ $context + { doku: . } }'
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen, before the review): the documentation moves with every change of the round; without a matching docs change AND an updated checklist of the program (todo/checklisten/<programm>.md) the gate is RED. The sub-workflow contains an AI step (`schreiben`); its result `status` and `eskaliert` is read by `doku-weiter`."
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen, before the review) PER WORK STEP, like the gates: doku-mitziehen runs for the repo (the worktree of the agent, checked out at its branch), branch, delta, programm and docs worktree of exactly this step (never the data of the round start: the commits of the agents are in their own branches). Without a matching docs change AND an updated checklist of the program (todo/checklisten/<programm>.md) of THIS step the gate is RED. The sub-workflow contains an AI step (`schreiben`); the results of all steps are collected per branch by `doku-sammeln`, `doku-weiter` reads them."
+  - doku-sammeln:
+      call: collect-docs:0.0.6@fs
+      with:
+        schritte: ${ $context.plan.schritte }
+      export:
+        as: '${ $context + { dokus: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Collects the result of doku-mitziehen of every step into one object keyed by branch (`status`, `eskaliert`); a branch without a result is missing from it, so it is never counted as green by `doku-weiter`."
   - doku-weiter:
       switch:
         - eskaliert:
-            when: '${ $context.doku.eskaliert == true or $context.doku.status != "green" }'
+            when: '${ (($context.dokus // {}) | length) != ($context.plan.schritte | length) or (($context.dokus // {}) | [.[] | select(.eskaliert == true or .status != "green")] | length) > 0 }'
             then: eskalation
         - weiter:
             then: pruefung
@@ -313,7 +350,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - doku-mitziehen ended with `eskaliert` or without `status == green`: the round goes to `eskalation` (which secures and reports), never on to the review. Only green goes on."
+        freesynergy.net:summary: "Control flow - doku-mitziehen of ANY step ended with `eskaliert` or without `status == green`, or a step has no result at all: the round goes to `eskalation` (which secures and reports), never on to the review. Only green goes on."
   - pruefung:
       for:
         each: schritt

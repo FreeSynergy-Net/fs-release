@@ -283,7 +283,9 @@ fn testlauf_is_sound(t: &str) -> bool {
         && step_body(t, "kopf").contains("resolve-head")
         && end.contains("try:")
         && end.contains("hours: 2")
-        && end.contains("errors/timeout")
+        // C1: no error filter - rc 2 and rc 3 of the script and the task timeout all go to the escalation
+        && end.contains("catch:")
+        && !end.contains("errors:")
         && end.contains("timeout: true")
         && step_body(t, "voll-weiter").contains("$context.voll.timeout == true")
         && step_body(t, "voll-weiter").contains("!= $context.kopf.head")
@@ -326,6 +328,11 @@ fn counter_a_full_run_while_working_a_read_without_the_event_or_a_green_default_
     bad("--test", "--all");
     bad("action: wait", "action: peek");
     bad("hours: 2", "hours: 999");
+    // C1: a catch that filters on the timeout error only lets rc 2 / rc 3 of the script abort the flow
+    bad(
+        "      catch:\n        do:",
+        "      catch:\n        errors:\n          with:\n            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout\n        do:",
+    );
     bad("$context.voll.timeout == true", "false");
     bad("then: kopf", "then: end-weiche");
     bad("OUTPUT OF TESTS = DATA", "output");

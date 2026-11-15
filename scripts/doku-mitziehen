@@ -81,8 +81,14 @@ def check_changed(a, problems):
         problems.append(f"red: the code repo changed ({len(code)} file(s)) but the documentation did not - pull the docs along")
 
 
-CHECKBOX = re.compile(r"^\s*- \[( |x)\] ")
-PROOF = re.compile(r"\([^()]*\S[^()]*\)")
+CHECKBOX = re.compile(r"^\s*- \[( |x|X)\] ")
+TICKED = re.compile(r"^\s*- \[[xX]\] ")
+# A proof is in parentheses and is ONE of: a commit hash (7-40 hex characters, at least one digit), a tag (vX.Y.Z), or a picture / file path.
+# Not every parenthesis counts (`(z. B. fs-text "gespeichert")` is a remark, not a proof).
+_HASH = r"(?<![0-9A-Za-z])(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}(?![0-9A-Za-z])"
+_TAG = r"(?<![0-9A-Za-z.])v\d+\.\d+\.\d+(?![0-9A-Za-z])"
+_PATH = r"[\w.\-]+(?:/[\w.\-]+)*\.(?:png|jpe?g|svg|webp|gif|pdf|md|rs|ya?ml|toml|sh|py|txt|json)(?![0-9A-Za-z])"
+PROOF = re.compile(r"\([^()]*(?:" + _HASH + "|" + _TAG + "|" + _PATH + r")[^()]*\)")
 
 
 def check_checklist(a, problems):
@@ -105,13 +111,13 @@ def check_checklist(a, problems):
     for n, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
         if CHECKBOX.match(line):
             boxes += 1
-            if line.lstrip().startswith("- [x]") and not PROOF.search(line):
-                problems.append(f"red: {rel}:{n} is ticked without a proof in parentheses (commit, tag or picture)")
+            if TICKED.match(line) and not PROOF.search(line):
+                problems.append(f"red: {rel}:{n} is ticked without a proof in parentheses (commit hash of 7-40 hex characters, tag vX.Y.Z or picture / file path)")
     if boxes == 0:
         problems.append(f"red: {rel} has no `- [ ]` / `- [x]` item")
     diff = git(a.docs, "diff", a.docs_base, "--", rel).split("\n")
     for line in diff:
-        if line.startswith("-") and not line.startswith("---") and line[1:].lstrip().startswith("- [x]"):
+        if line.startswith("-") and not line.startswith("---") and TICKED.match(line[1:].lstrip()):
             problems.append(f"red: {rel}: a ticked item was removed or reworded ({line[1:].strip()[:60]}); done items stay")
 
 

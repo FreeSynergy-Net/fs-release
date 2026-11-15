@@ -64,6 +64,23 @@ fresh noproof; code_change; docs_both
 (cd "$d/docs" && echo '- [x] **GRUNDSACHE** fourth without proof' >>todo/checklisten/fs-test.md && g commit -q -am p)
 expect 1 "ticked without a proof" "red: ticked without a proof" "$d" --
 
+# C3: the proof must be a real one - a remark in parentheses, a short hex word or a capital [X] without a proof is RED
+fresh remark; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** fifth (z. B. fs-text "gespeichert")' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: a remark in parentheses is no proof" "$d" --
+
+fresh shorthex; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** sixth (abc12)' >>todo/checklisten/fs-test.md && echo '- [x] **GRUNDSACHE** seventh (defaced)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: 5 hex characters and a hex-only word are no proof" "$d" --
+
+fresh bigx; code_change; docs_both
+(cd "$d/docs" && echo '- [X] **GRUNDSACHE** eighth' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: capital [X] without a proof is checked like [x]" "$d" --
+
+fresh goodproofs; code_change; docs_both
+(cd "$d/docs" && printf '%s\n' '- [x] **GRUNDSACHE** tag (tag v0.0.7)' '- [X] **GRUNDSACHE** picture (Bild bilder/start.png)' '- [x] **GRUNDSACHE** hash (commit 0123abcdef0123abcdef0123abcdef0123abcdef)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 0 "green" "green: tag, picture path and long commit hash are proofs" "$d" --
+
 fresh dropped; code_change; docs_both
 (cd "$d/docs" && sed -i '/first (commit abc1234)/d' todo/checklisten/fs-test.md && g commit -q -am p)
 expect 1 "a ticked item was removed" "red: a ticked item was removed" "$d" --

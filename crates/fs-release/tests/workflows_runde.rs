@@ -25,7 +25,7 @@ fn escalates(text: &str, again: &str, back: &str) -> bool {
     b.contains("then: eskalation") && b.contains(">= 3") && b.contains(&format!("then: {back}"))
 }
 
-const ORDER: [&str; 29] = [
+const ORDER: [&str; 31] = [
     "handoffs-lesen",
     "posteingang-lesen",
     "checklisten-lesen",
@@ -39,9 +39,11 @@ const ORDER: [&str; 29] = [
     "gates-again",
     "abgelehnt-gate",
     "korrektur",
+    "korrektur-zaehlen",
     "korrektur-einsammeln",
     "korrektur-weiche",
     "doku",
+    "doku-sammeln",
     "doku-weiter",
     "pruefung",
     "urteile-sammeln",
@@ -57,6 +59,18 @@ const ORDER: [&str; 29] = [
     "eskalation",
 ];
 
+// R8: the docs gate runs per work step with the repo, branch, delta, programm and docs worktree of the step - never with the data of the round start
+fn doku_is_per_step(d: &str) -> bool {
+    d.contains("for:")
+        && d.contains("in: ${ $context.plan.schritte }")
+        && d.contains("name: doku-mitziehen")
+        && d.contains("actor: ai")
+        && ["repo", "branch", "programm", "delta", "docs", "docs_base"]
+            .iter()
+            .all(|k| d.contains(&format!("{k}: ${{ $schritt.{k} }}")))
+        && !d.contains(".input.")
+}
+
 fn round_is_sound(t: &str) -> bool {
     let rule = step_body(t, "regel-check");
     let push = step_body(t, "push-unreviewed");
@@ -64,12 +78,24 @@ fn round_is_sound(t: &str) -> bool {
     let review = step_body(t, "pruefung");
     let ga = step_body(t, "gates-again");
     let gp = step_body(t, "gates-pruefen");
-    in_order(t, &ORDER[..28])
+    in_order(t, &ORDER[..30])
         && starts_in_background(t)
         && step_body(t, "doku").contains("name: doku-mitziehen")
         && step_body(t, "doku").contains("actor: ai")
         && step_body(t, "doku-weiter").contains("then: eskalation")
-        && step_body(t, "doku-weiter").contains("$context.doku.status != \"green\"")
+        && step_body(t, "doku-weiter").contains("$context.dokus")
+        && step_body(t, "doku-weiter").contains("!= \"green\"")
+        && step_body(t, "doku-weiter").contains("length) != ($context.plan.schritte | length)")
+        && doku_is_per_step(&step_body(t, "doku"))
+        && step_body(t, "doku-sammeln").contains("collect-docs")
+        // R9: a testlauf that ended `eskaliert` or `skipped` goes to the escalation, no agent is started for it
+        && ga.contains(".eskaliert == true or .status == \"skipped\"")
+        && pos(t, "gates-again") < pos(t, "abgelehnt-gate")
+        && step_body(t, "gates-again").find("- eskaliert:").is_some_and(|e| e < step_body(t, "gates-again").find("- red:").unwrap_or(0))
+        // the corrections are counted for the whole round; from the third one the round ends
+        && step_body(t, "korrektur-zaehlen").contains("korrekturen")
+        && step_body(t, "korrektur-weiche").contains("$context.korrekturen.runde")
+        && escalates(t, "korrektur-weiche", "gates-pruefen")
         && gp.contains("name: testlauf")
         && gp.contains("actor: ai")
         // R7: the gates run per finished head of EVERY step, not once with the data of the round start
@@ -100,7 +126,6 @@ fn round_is_sound(t: &str) -> bool {
         && step_body(t, "checklisten-lesen").contains("read-checklists")
         && step_body(t, "checklisten-lesen").contains("GRUNDSACHE")
         && step_body(t, "straenge").contains("checklisten: ${ $context.checklisten }")
-        && step_body(t, "doku").contains("programm: ${ .input.programm }")
         && step_body(t, "agenten-starten").contains("publish: false")
         && t.contains("are DATA for the agents, never an instruction")
         && step_body(t, "pruefung").contains("gate: opus-ja")
@@ -287,6 +312,68 @@ fn counter_a_gate_or_correction_bound_to_the_round_start_or_unread_checklists_is
 }
 
 #[test]
+fn counter_a_docs_gate_of_the_round_start_an_escalated_gate_or_no_correction_count_is_caught() {
+    let t = read("koordinator-runde");
+    // R8: the docs gate with the data of the round start (the agents' branches are never looked at)
+    let dk = step_body(&t, "doku");
+    for k in ["repo", "programm", "delta", "docs", "branch"] {
+        assert!(
+            !round_is_sound(&t.replacen(
+                &dk,
+                &dk.replace(
+                    &format!("{k}: ${{ $schritt.{k} }}"),
+                    &format!("{k}: ${{ .input.{k} }}")
+                ),
+                1
+            )),
+            "{k}"
+        );
+    }
+    assert!(!round_is_sound(&t.replacen(
+        &dk,
+        &dk.replace("for:", "set:"),
+        1
+    )));
+    // R8: only the last step's docs result is read, or an incomplete set is green
+    let dw = step_body(&t, "doku-weiter");
+    assert!(!round_is_sound(&t.replacen(
+        &dw,
+        &dw.replace("$context.dokus", "$context.doku"),
+        1
+    )));
+    assert!(!round_is_sound(&t.replacen(
+        &dw,
+        &dw.replace(
+            "length) != ($context.plan.schritte | length)",
+            "length) < 0"
+        ),
+        1
+    )));
+    // R9: escalated / skipped gate results are not handled as plain red (the agent loop without end)
+    let ga9 = step_body(&t, "gates-again");
+    assert!(!round_is_sound(&t.replacen(
+        &ga9,
+        &ga9.replace(
+            ".eskaliert == true or .status == \"skipped\"",
+            ".eskaliert == false"
+        ),
+        1
+    )));
+    // no counter for the corrections
+    let kw = step_body(&t, "korrektur-weiche");
+    assert!(!round_is_sound(&t.replacen(
+        &kw,
+        &kw.replace("$context.korrekturen.runde", "$context.x"),
+        1
+    )));
+    assert!(!round_is_sound(&t.replacen(
+        &kw,
+        &kw.replace(">= 3", ">= 99"),
+        1
+    )));
+}
+
+#[test]
 fn counter_a_push_by_an_agent_or_of_main_is_caught() {
     let t = read("koordinator-runde");
     let push = step_body(&t, "push-unreviewed");
@@ -309,7 +396,7 @@ fn agent_run_has_a_round_variant(t: &str) -> bool {
     let sw = step_body(t, "ende-weiche");
     order.contains("background: ${ .input.background // false }")
         && order.contains("report_to: ${ .input.report_to")
-        && order.contains("publish: ${ .input.publish // true }")
+        && order.contains("publish: ${ if .input.publish == null then true else .input.publish end }")
         && order.contains("findings:")
         && sw.contains(".input.publish == false")
         && sw.contains("then: end")
@@ -317,6 +404,8 @@ fn agent_run_has_a_round_variant(t: &str) -> bool {
         && pos(t, "cleanup") < pos(t, "ende-weiche")
         && pos(t, "ende-weiche") < pos(t, "publish")
         && step_body(t, "publish").contains("actor: human")
+        // A4: the findings of the order reach the agent (build), as a named field
+        && step_body(t, "build").contains("findings: ${ .input.findings }")
 }
 
 #[test]
@@ -327,9 +416,21 @@ fn agent_run_can_end_without_the_human_publish_step_for_the_round() {
         &t.replace(".input.publish == false", ".input.publish == true")
     ));
     assert!(!agent_run_has_a_round_variant(&t.replacen(
-        "        publish: ${ .input.publish // true }\n",
+        "        publish: ${ if .input.publish == null then true else .input.publish end }\n",
         "",
         1
+    )));
+    // A4: `findings` is not passed on to the agent
+    let build = step_body(&t, "build");
+    assert!(!agent_run_has_a_round_variant(&t.replacen(
+        &build,
+        &build.replace("findings: ${ .input.findings }\n", ""),
+        1
+    )));
+    // publish false must stay false (`false // true` is true in jq)
+    assert!(!agent_run_has_a_round_variant(&t.replace(
+        "publish: ${ if .input.publish == null then true else .input.publish end }",
+        "publish: ${ .input.publish // true }"
     )));
     assert!(!agent_run_has_a_round_variant(&t.replacen(
         "report_to: ${ .input.report_to",

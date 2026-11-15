@@ -3,7 +3,7 @@
 # Input: repo, branch, head, delta, scope (`gezielt` = only targeted, `end` = targeted, then the full run as end gate).
 # Output (to the caller): `status` (green | escalated | skipped), `red`, `runde`, `eskaliert`, `timeout`, `head` (the head that was really tested last). Only `status == "green"` is green; a missing result is `skipped`.
 # The full run is `scripts/workspace-test-background` (self test: scripts/test_workspace_test_background.sh): `start` returns at once, `wait` blocks on a lock (no
-# polling loop) with a timeout of 2 hours and returns the result file contract {head, red, runde, seconds, exit, summary}; a timeout or no result goes to `eskalation`.
+# polling loop) with a timeout of 2 hours and returns the result file contract {head, red, runde, seconds, exit, summary}; a timeout, a failed wait or no result goes to `eskalation`. A red head started again is run again and counted (`runde`), so a fix without a new commit ends in `runde` 3 and `eskalation`.
 # Every full run is bound to the CURRENT head (resolved right before the run, after any `fix` commit), never to the head of the start.
 # Order: `Workflow testlauf, step <id>, parameters repo, branch, head, delta, scope`. FS profile: see README.md.
 document:
@@ -139,9 +139,6 @@ do:
               after:
                 hours: 2
       catch:
-        errors:
-          with:
-            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
         do:
           - voll-ohne-ergebnis:
               set:
@@ -153,7 +150,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Waits for the result file of the background run of exactly this head: `scripts/workspace-test-background wait` blocks on the lock of the run (no sleep loop, nobody polls) and prints {head, red, runde, seconds, exit, summary}. The wait has a timeout of 2 hours (task timeout and script rc 3, caught by `try`/`catch` like in upstream-update); a timeout or a run that died without a result sets `voll.timeout` and `voll-weiter` sends the flow to `eskalation`. A result for another head does not count (`voll-weiter`)."
+        freesynergy.net:summary: "Waits for the result file of the background run of exactly this head: `scripts/workspace-test-background wait` blocks on the lock of the run (no sleep loop, nobody polls) and prints {head, red, runde, seconds, exit, summary}. The wait has a timeout of 2 hours (task timeout and script rc 3). `catch` has NO error filter on purpose: EVERY error of the wait - the timeout, rc 3, rc 2 (run died without a result, head changed) - is caught; it sets `voll.timeout` and `voll-weiter` sends the flow to `eskalation`. A result for another head does not count (`voll-weiter`)."
   - voll-weiter:
       switch:
         - zeit:

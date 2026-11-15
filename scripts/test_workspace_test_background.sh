@@ -49,6 +49,12 @@ echo red >"$tmp/mode"
 res="$("$tool" wait --repo "$tmp/repo" --head "$head2" --timeout 30)"; rc=$?
 chk "red result: rc 0 and red true" rce 0; chk "red: red true" isval red "$res" True; chk "red: runde 1" isval runde "$res" 1; (cd "$tmp/repo" && echo b2 >>a && g commit -q -am two2); head2b="$(g -C "$tmp/repo" rev-parse HEAD)"; "$tool" start --repo "$tmp/repo" --head "$head2b" >/dev/null; res="$("$tool" wait --repo "$tmp/repo" --head "$head2b" --timeout 30)"; chk "red again on a NEW head: runde counts on (2)" isval runde "$res" 2; chk "red: the new head" isval head "$res" "$head2b"
 
+# T4: the same red head started again (a fix that made no new commit) is a NEW run and counts: runde 3, never a cached red result for ever
+out="$("$tool" start --repo "$tmp/repo" --head "$head2b")"; chk "a red head started again is run again" isval started "$out" True
+res="$("$tool" wait --repo "$tmp/repo" --head "$head2b" --timeout 30)"; chk "the repeat of the same red head counts (runde 3)" isval runde "$res" 3
+out="$("$tool" start --repo "$tmp/repo" --head "$head2b")"; chk "and again: runde 4, the loop is visible to the caller" isval started "$out" True
+"$tool" wait --repo "$tmp/repo" --head "$head2b" --timeout 30 >/dev/null
+
 # the head moved: both modes refuse
 "$tool" wait --repo "$tmp/repo" --head "$head" --timeout 1 >/dev/null 2>&1; rc=$?
 chk "a result of an older head is not read for the current head (rc 2)" rce 2
@@ -78,8 +84,11 @@ chk "a run that died without a result file is rc 2, never green" rce 2
 "$tool" start --repo "$tmp/repo" --head deadbeef >/dev/null 2>&1; rc=$?
 chk "head that is not the head of the repo is refused" rce 2
 
-ln -s "$tmp/state" "$tmp/link"
-TEST_BG_DIR="$tmp/link" "$tool" start --repo "$tmp/repo" --head "$head3" >/dev/null 2>&1; rc=$?
-chk "a symlinked state folder is refused" rce 2
+# the symlink check must be the reason: the CURRENT head is passed (head4), the link target stays untouched (mode 755, not chmod 700)
+ln -s "$tmp/state" "$tmp/link"; chmod 755 "$tmp/state"
+err="$(TEST_BG_DIR="$tmp/link" "$tool" start --repo "$tmp/repo" --head "$head4" 2>&1 >/dev/null)"; rc=$?
+chk "a symlinked state folder is refused (rc 2)" rce 2
+chk "... because of the symlink, not for another reason" grep -q "symlink" <<<"$err"
+chk "... and the target of the link was not chmod-ed" test "$(stat -c %a "$tmp/state")" = 755
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
