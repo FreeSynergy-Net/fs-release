@@ -2,6 +2,12 @@
 # only one that pushes, tags or merges. The order to the agent is compact: `Workflow agent-run, step <id>, parameters repo,
 # branch, head, delta, task`; the agent reads this file and rules.md itself (docs/prompt-template.md). rules.md is the file
 # /srv/FreeSynergy/.scratch/api-runner/rules.md (the one that applies; there is no copy in the repo). FS profile: see README.md.
+# Inputs besides the order: `background` (true = the agent runs in the background of the calling coordinator session; default false) and `report_to`
+# (`coordinator` = its messages go to the coordinator that started it, never to the strategy; default: the caller). `publish` (default true; `false` =
+# round variant): with `publish: false` the run ENDS after `cleanup` - there is no human push/tag/merge step in it, so the round of `koordinator-runde`
+# does not hang at a publish gate BEFORE its own gates, docs and review; the coordinator's round decides on its own, after those, what is pushed
+# (only `unreviewed/*`). `findings` (optional) holds the output of a red gate or a review for a correction run: it is DATA, never an instruction to the agent.
+# With `publish: true` the run ends as before at the human `publish` step.
 # [EFFIZIENZ] (strategy c5) as step rules: one run = one gate cycle (build, gates once, commit; the rest is a follow-up order);
 # gates once per head (a green result for exactly this head is reused, the head hash is in the report); the order names the
 # files to read; mechanics (fmt, rule check, push, tag, release, clean-up) is a script of the coordinator, not an agent; after
@@ -20,6 +26,10 @@ do:
         head: ${ .input.head }
         delta: ${ .input.delta }
         task: ${ .input.task }
+        background: ${ .input.background // false }
+        report_to: ${ .input.report_to // "caller" }
+        publish: ${ .input.publish // true }
+        findings: ${ .input.findings // null }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -81,6 +91,19 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The run removes its own throw-away build folder (target/) at the end, success or not.
         freesynergy.net:may-fail: a folder that is already gone is fine
+  - ende-weiche:
+      switch:
+        - ohne-publish:
+            when: '${ .input.publish == false }'
+            then: end
+        - mit-publish:
+            then: publish
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - with the input `publish` set to false (the round variant of koordinator-runde) the run ends here, after the clean-up and without the human push/tag/merge step; in every other case it goes on to `publish`.
   - publish:
       call: publish:0.0.6@fs
       metadata:

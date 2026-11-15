@@ -1,8 +1,8 @@
 # Conveyor belt (ADR 0087 item 7): every program gets the basics - it starts, does simple things and ends; the frontends come with it.
 # Stage 1 in parallel: (a) dossier and documentation (model apps, menus, workflows), (b) research (standards, data model, crates, licence, state of care;
-# Haiku, read and write of notes only). Stage 2: Opus plan with a FIXED trait (hash locked), then the gate `strategie-ok`.
+# Haiku, read and write of notes only). Stage 2: Opus plan with a FIXED trait (hash locked), then the gate `strategie-ok` (counts only from an authorised sender, step `absender`).
 # Stage 3 in parallel (Sonnet): core (trait, typed storage after ADR 0086, CLI) and frontend (block assignment first, test data against the trait).
-# Stage 4: `doku-mitziehen` FIRST (the doc commits are part of the head), then the head is resolved and Opus reviews exactly it, then the picture gate. A change of the trait after the lock is a new plan and a new `strategie-ok`.
+# Stage 4: `doku-mitziehen` FIRST (the doc commits are part of the head), then the head is resolved and Opus reviews exactly it, then the picture gate (`bilder-again`: accepted = green, not accepted = back to stufe-3, no verdict = eskalation, never green without a verdict). A change of the trait after the lock is a new plan and a new `strategie-ok`.
 # Relation to `programm-neu` (decision of bundle 0.0.7, ADR 0087 item 7): this flow does NOT replace a part of `programm-neu`; it is the basics belt for every
 # program, also existing ones. `programm-neu` stays the only entry for NEW programs; it calls this flow as its component for the steps after the
 # interface in a later bundle (not wired in 0.0.7). Agents never push, tag or merge; the release goes through `release-flow` of the caller.
@@ -146,12 +146,27 @@ do:
             with:
               type: net.freesynergy.approval
               subject: ${ $context.sperre.sha256 }
+      export:
+        as: '${ $context + { freigabe: . } }'
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: strategie-ok
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Approval gate: the strategy (or the user) approves the plan and the fixed trait; the approval event must carry the subject = the SHA-256 of the locked trait (`$context.sperre.sha256`), an approval for another plan or trait does not open the gate. The lock lies BEFORE this gate, so what is approved is what is locked. Without this approval stage 3 does not start."
+        freesynergy.net:summary: "Approval gate: the strategy (or the user) approves the plan and the fixed trait; the approval event must carry the subject = the SHA-256 of the locked trait (`$context.sperre.sha256`), an approval for another plan or trait does not open the gate. The lock lies BEFORE this gate, so what is approved is what is locked. The event is kept as `freigabe`; WHO sent it is checked by the next step `absender` (the hash alone is readable by agents, so it proves nothing about the sender). Without this approval stage 3 does not start."
+  - absender:
+      switch:
+        - berechtigt:
+            when: '${ ($context.freigabe.subject == $context.sperre.sha256) and (($context.freigabe.source // "") == "net.freesynergy.strategie" or ($context.freigabe.source // "") == "net.freesynergy.nutzer") and (($context.freigabe.data.actor // "") == "human") }'
+            then: stufe-3
+        - fremd:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the approval counts only from an authorised sender: `source` is `net.freesynergy.strategie` or `net.freesynergy.nutzer` and `data.actor` is `human`, and the subject is the locked hash. An event from any other source (an agent, a worktree, a CI job) or without `data.actor: human` never opens stage 3: the flow goes to `eskalation` (the person decides). Who may send `net.freesynergy.approval` is fixed in the event catalog of README.md."
   - stufe-3:
       fork:
         compete: false
@@ -364,16 +379,31 @@ do:
             when: '${ $context.review.verdict == "NEIN" and ($context.review.runde // 0) >= 3 }'
             then: eskalation
         - nein:
-            when: '${ $context.review.verdict != "JA" }'
+            when: '${ $context.review.verdict == "NEIN" }'
             then: stufe-3
         - ja:
-            then: bilder
+            when: '${ $context.review.verdict == "JA" }'
+            then: bilder-erzeugen
+        - ohne-ergebnis:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a NO (or no clear JA, or no result) goes back to stufe-3 with the findings as the order (new commits mean new gates, new docs, a new head and a new review); from the third NO (`runde`) the belt ends in `eskalation`; only a JA goes on to the picture gate."
+        freesynergy.net:summary: "Control flow - a NO goes back to stufe-3 with the findings as the order (new commits mean new gates, new docs, a new head and a new review); from the third NO (`runde`) the belt ends in `eskalation`; only a JA goes on to the picture gate; a missing verdict (null) or any other value is NOT a JA and goes to `eskalation` - never an endless loop back to stufe-3."
+  - bilder-erzeugen:
+      call: render-images:0.0.6@fs
+      with:
+        frontend: ${ .input.programm }
+      export:
+        as: '${ $context + { images: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Renders our pictures of the frontend (as in frontend-round `images`); whatever they look like, the state changes to shown."
   - bilder:
       run:
         workflow:
@@ -383,12 +413,31 @@ do:
         input:
           programm: ${ .input.programm }
           model: ${ .input.model }
+          ours: ${ $context.images }
+      export:
+        as: '${ $context + { bild: . } }'
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Picture gate: the model and our picture side by side; the strategy and the user give their verdict. Without a picture OK no release follows."
+        freesynergy.net:summary: "Picture gate: the model and our picture side by side; the strategy and the user give their verdict. The result `accepted` is read by `bilder-again`; without `accepted == true` nothing is green and no release follows."
+  - bilder-again:
+      switch:
+        - ja:
+            when: '${ $context.bild.accepted == true }'
+            then: fertig
+        - nein:
+            when: '${ $context.bild.accepted == false }'
+            then: stufe-3
+        - ohne-urteil:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only `accepted == true` ends the belt green (`fertig`); `accepted == false` goes back to stufe-3 with the words of the verdict as the order (correction, then new gates, docs, head, review and pictures); a missing verdict is NOT green and goes to `eskalation`."
   - fertig:
       set:
         status: green

@@ -110,7 +110,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - only the scope end goes on to the full run; `gezielt` ends the flow here with `gruen`."
   - voll:
-      call: workspace-test-background:0.0.7@fs
+      call: workspace-test-background:0.0.6@fs
       with:
         action: start
         repo: ${ .input.repo }
@@ -127,7 +127,7 @@ do:
   - voll-ende:
       try:
         - warten:
-            call: workspace-test-background:0.0.7@fs
+            call: workspace-test-background:0.0.6@fs
             with:
               action: wait
               repo: ${ .input.repo }
@@ -224,4 +224,4 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The tests were red for the third time, the full run timed out or a run gave no result: the flow stops and the person decides. The report names the last red lines. This flow ends with `eskaliert: true`; the caller stops there."
 output:
-  as: '${ { status: ($context.ergebnis.status // "skipped"), red: (($context.ergebnis.status // "skipped") != "green"), runde: ($context.voll.runde // $context.gezielt.runde // 0), eskaliert: ($context.ergebnis.eskaliert // false), timeout: ($context.voll.timeout // false), head: ($context.kopf.head // $workflow.input.head) } }'
+  as: '${ { status: ($context.ergebnis.status // "skipped"), red: (($context.ergebnis.status // "skipped") != "green"), runde: ($context.voll.runde // $context.gezielt.runde // 0), eskaliert: ($context.ergebnis.eskaliert // false), timeout: ($context.voll.timeout // false), head: ($context.kopf.head // null) } }'

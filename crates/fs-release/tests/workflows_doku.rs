@@ -137,8 +137,13 @@ fn counter_a_gate_by_the_agent_or_without_escalation_is_caught() {
     ));
     assert!(!gate_is_sound(&t.replace(">= 3", ">= 99")));
     // checklist rule: the gate without the program (no checklist check) or without the author's duty is caught
-    assert!(!gate_is_sound(&t.replace("        program: ${ .input.programm", "        zz: ${ .input.programm")));
-    assert!(!gate_is_sound(&t.replace("never delete a ticked item", "delete as you like")));
+    assert!(!gate_is_sound(&t.replace(
+        "        program: ${ .input.programm",
+        "        zz: ${ .input.programm"
+    )));
+    assert!(!gate_is_sound(
+        &t.replace("never delete a ticked item", "delete as you like")
+    ));
     assert!(!gate_is_sound(&t.replace("then: suchen", "then: continue")));
     // B2: a skipped result (rc 2, no JSON) must not be green - the green case needs `status == "green"`, the default case escalates
     assert!(!gate_is_sound(
@@ -324,4 +329,14 @@ fn the_doku_gate_script_passes_its_self_test() {
 #[test]
 fn the_rename_script_passes_its_self_test() {
     run_self_test("test_umbenennen.sh");
+}
+
+#[test]
+fn the_background_test_script_passes_its_self_test() {
+    run_self_test("test_workspace_test_background.sh");
+}
+
+#[test]
+fn the_checklist_reader_passes_its_self_test() {
+    run_self_test("test_read_checklists.sh");
 }
