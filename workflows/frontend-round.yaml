@@ -1,5 +1,9 @@
 # One round on a Frontend: dossier, gap list, images, the user's verdict, build, acceptance by clicking through the working flows, release.
-# Agents never push, tag or merge. FS profile: see README.md.
+# Fixed order for every Frontend (wave 1 included): (1) BLOCK ANALYSIS - every area of the model is assigned to a block family and id, existing blocks first
+# (dossier, bausteine.md, check baustein-zuordnung; source order family block, Blinc widget through an adapter, new block with reason); (2) LOOK - style analysis, tokens and style rules per block (ADR 0074; step stil-analyse);
+# (3) COMPOSITION - the arrangement in the Frontend (step build). Agents never push, tag or merge. FS profile: see README.md.
+# Input: vorbild (the model program the dossier is about), frontend (OUR program that is built; gap list, style analysis, images and build are about it), bestand (family inventory), blinc (Blinc widget inventory), dossier (folder of the dossier), model (pictures of the model), dump, exceptions,
+# repo, branch, head, delta, release (true or missing = the flow ends with release-flow; `false` = no release here, the caller releases later, e.g. programm-neu).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -14,13 +18,18 @@ do:
           name: dossier
           version: 0.0.6
         input:
-          frontend: ${ .input.frontend }
+          vorbild: ${ .input.vorbild }
+          bestand: ${ .input.bestand }
+          blinc: ${ .input.blinc }
+          dossier: ${ .input.dossier }
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml, research by the agent, check-docs by the machine); repeat until it does. The sub-workflow ends with the human publish into the docs main branch, so the step carries that gate.
+        freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml, research by the agent, check-docs by the machine); repeat until it does. The sub-workflow holds block analysis (bausteine.md, objective check baustein-zuordnung with the share of new blocks, red goes back to research). It ends with the human publish into the docs main branch, so the step carries that gate.
   - gap-list:
       call: gap-list:0.0.6@fs
       with:
@@ -32,6 +41,96 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Compares dossier (states, dialogs, menus, shortcuts, workflows, gaps) with our Frontend and writes the list of what is missing.
+  - stil-analyse:
+      call: stil-analyse:0.0.6@fs
+      with:
+        frontend: ${ .input.frontend }
+        dossier: ${ .input.dossier }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Step 2 of the fixed order (after the block analysis of the dossier, before the composition) - the style analysis of the model gives tokens and style rules per block id of bausteine.md (ADR 0074, DTCG tokens, rules per named part and state); no fixed colours or spaces in the block or the Frontend; repeat until every block id of the table has its rules.
+  - stil-check:
+      call: style-check:0.0.6@fs
+      with:
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { stil: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script (no network, no AI) - every block id of the `## Baustein-Zuordnung` table of bausteine.md has style rules and tokens (a rule per named part and state, DTCG tokens, ADR 0074) in the style files; no fixed colour or space in a rule. The result carries `red` (true = back) and `runde`; the red rounds are counted by the script, from the third one the flow ends in `stil-eskalation`.
+  - stil-again:
+      switch:
+        - runden:
+            when: '${ $context.stil.red and ($context.stil.runde // 0) >= 3 }'
+            then: stil-eskalation
+        - red:
+            when: '${ $context.stil.red }'
+            then: stil-analyse
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a block id without rules goes back to stil-analyse (from the third red round to the person), green goes on to the images.
+  - stil-sichern:
+      call: style-save-ai:0.0.6@fs
+      with:
+        frontend: ${ .input.frontend }
+        dossier: ${ .input.dossier }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Every model that is rebuilt yields a style, saved as a style file (DTCG tokens plus the rule entries of the theme contract) when it does not exist yet, English name (Calm, Office, Craft ...), fair reference to the model named in the description (what it is based on), source and licence of the reference named, nothing copied (ADR 0013, ADR 0074 section 3). Own worktree, local commits, no push, no tag. Whenever a style exists or is added it styles EVERY block of the theme contract with all parts and states (an explicit entry each, no silent gaps).
+  - stil-sichern-check:
+      call: style-save-check:0.0.6@fs
+      with:
+        frontend: ${ .input.frontend }
+      export:
+        as: '${ $context + { gesichert: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script (no network, no AI) - the style file of the model exists (or the style already existed), the name is English, source and licence of the reference are named; result `red` and `runde`.
+  - stil-vollstaendigkeit:
+      call: stil-vollstaendigkeit:0.0.6@fs
+      with:
+        contract: contract
+      export:
+        as: '${ $context + { vollstaendig: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/stil-vollstaendigkeit (no network, no AI; self test with counter-checks like baustein-zuordnung) - theme contract times ALL styles - every style has an explicit entry for every block, part and state of the contract; a missing entry is `red`, no release (mandatory rule, ADR 0074). Result `red` and `runde`. Order - contract, completeness, then zwei-stile.
+  - stil-sichern-again:
+      switch:
+        - runden:
+            when: '${ ($context.gesichert.red or $context.vollstaendig.red) and (($context.vollstaendig.runde // 0) >= 3 or ($context.gesichert.runde // 0) >= 3) }'
+            then: stil-eskalation
+        - red:
+            when: '${ $context.gesichert.red or $context.vollstaendig.red }'
+            then: stil-sichern
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a missing style file, an unnamed reference or a missing contract entry goes back to stil-sichern (from the third red round to the person), green goes on to the images.
   - images:
       call: render-images:0.0.6@fs
       with:
@@ -86,7 +185,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent builds the gaps in its own worktree and commits locally ([COMMIT]); repeat until the gates are green ([GATES], commands one at a time per [BASH]), no push, no tag; report per [BERICHT]. Order - `Workflow frontend-round, step build, parameters repo, branch, head, delta, frontend` (docs/prompt-template.md).
+        freesynergy.net:summary: Step 3 of the fixed order (composition) - the agent builds the gaps in its own worktree, composing only from the block ids of bausteine.md (a new block first, in the crate of its family, with the reason of the table; one block with modules instead of a second copy, ADR 0084 pattern) and the rules of stil-analyse; and commits locally ([COMMIT]); repeat until the gates are green ([GATES], commands one at a time per [BASH]), no push, no tag; report per [BERICHT]. Order - `Workflow frontend-round, step build, parameters repo, branch, head, delta, frontend` (docs/prompt-template.md).
   - gates:
       call: gates:0.0.6@fs
       export:
@@ -110,6 +209,33 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - red gates go back to build, green ones go on to the acceptance.
+  - menue-vergleich:
+      call: menue-vergleich:0.0.6@fs
+      with:
+        dossier: ${ .input.dossier }
+        dump: ${ .input.dump }
+        exceptions: ${ .input.exceptions }
+      export:
+        as: '${ $context + { menus: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/menue-vergleich (no network, no AI) compares the menu tree and the dialog list of the Frontend (dump of the program, schema fs-menu-dump/1) with the lists in the dossier (menus.md, dialogs.md; R2 - menus, dialogs and flows equal or similar to the model, extensions later). Deviations are listed as fehlt, zusaetzlich, anders-benannt, kuerzel; each is allowed only with a reason in the exception list of the Frontend, without it the result is `red` (rc 1; rc 2 = bad input). Applies to every Frontend of wave 1 (store, tasks, wiki, files, people, calendar, maps, groups). Format and dump - docs/menue-vergleich.md.
+  - menue-vergleich-again:
+      switch:
+        - red:
+            when: '${ $context.menus.red }'
+            then: build
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a deviation without a reason goes back to build (the step that builds the Frontend; the agent either builds the missing entry or writes the reason into the exception list), otherwise on to the acceptance.
   - acceptance:
       call: click-through:0.0.6@fs
       with:
@@ -144,7 +270,21 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a failed flow goes back to build with the order of acceptance-red, otherwise on to the release.
+  - release-weiche:
+      switch:
+        - kein-release:
+            when: '${ .input.release == false }'
+            then: end
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - with the input `release` false this flow ends here (the caller releases after its later steps), otherwise it goes on to the release. A `switch` and not an `if` on the release step, because a skipped step would fall through to the next step (`stil-eskalation`) in Serverless Workflow 1.0.
   - release:
+      then: end
       run:
         workflow:
           namespace: freesynergy.net
@@ -155,4 +295,14 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge.
+        freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge. Not reached when the input `release` is false (see `release-weiche`).
+  - stil-eskalation:
+      set:
+        todo: stil-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The style analysis was red three times (`runde` >= 3); the person decides what is wrong, the table or the rules. This flow ends.

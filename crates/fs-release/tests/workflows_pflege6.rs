@@ -149,6 +149,8 @@ fn the_jumps_back_that_were_only_in_the_summary_are_switch_with_then() {
     for (f, step, target) in [
         ("frontend-round", "picture-again", "then: gap-list"),
         ("frontend-round", "gates-again", "then: build"),
+        ("frontend-round", "menue-vergleich-again", "then: build"),
+        ("dossier", "baustein-zuordnung-again", "then: research"),
         ("frontend-round", "acceptance-again", "then: build"),
         ("bugfix", "red-back", "then: fix"),
         ("frontend-umbau", "texts-again", "then: texte"),
@@ -170,4 +172,118 @@ fn counter_a_jump_to_a_missing_step_is_red() {
     assert_red("frontend-round", "no step of this flow", |t| {
         t.replacen("then: gap-list", "then: gap-lst", 1)
     });
+}
+
+/// The fixed order of a Frontend round as a rule: block analysis (dossier), look (stil-analyse and its check), composition (build).
+fn block_look_composition(text: &str) -> bool {
+    position(text, "dossier") < position(text, "stil-analyse")
+        && position(text, "stil-analyse") < position(text, "stil-check")
+        && position(text, "stil-check") < position(text, "stil-again")
+        && position(text, "stil-again") < position(text, "build")
+}
+
+#[test]
+fn block_analysis_comes_before_the_look_before_the_composition() {
+    let text = read("frontend-round");
+    assert!(block_look_composition(&text));
+    let dossier = read("dossier");
+    assert!(position(&dossier, "research") < position(&dossier, "baustein-zuordnung"));
+    assert!(position(&dossier, "baustein-zuordnung-again") < position(&dossier, "publish"));
+    assert!(step_body(&dossier, "baustein-zuordnung").contains("kind: objective"));
+}
+
+#[test]
+fn counter_composition_before_the_look_is_caught() {
+    let text = read("frontend-round");
+    // a rule recognises the swap (not only: the swap happened)
+    assert!(!block_look_composition(&swapped(
+        &text,
+        "stil-analyse",
+        "build"
+    )));
+    assert!(!block_look_composition(&swapped(
+        &text,
+        "dossier",
+        "stil-analyse"
+    )));
+    assert!(!block_look_composition(&swapped(
+        &text,
+        "stil-check",
+        "stil-again"
+    )));
+}
+
+#[test]
+fn the_style_analysis_has_a_script_check_that_jumps_back() {
+    let text = read("frontend-round");
+    let check = step_body(&text, "stil-check");
+    assert!(check.contains("actor: machine") && check.contains("kind: objective"));
+    let again = step_body(&text, "stil-again");
+    assert!(
+        again.contains("switch:")
+            && again.contains("then: stil-analyse")
+            && again.contains("then: stil-eskalation")
+    );
+    // counter-test: a jump to a missing step is red
+    assert_red("frontend-round", "no step of this flow", |t| {
+        t.replacen("then: stil-analyse", "then: stil-analyze", 1)
+    });
+}
+
+#[test]
+fn bad_input_of_the_block_check_goes_to_the_person_not_back_to_research() {
+    let text = read("dossier");
+    let again = step_body(&text, "baustein-zuordnung-again");
+    let first: Vec<&str> = again.lines().filter(|l| l.contains("then:")).collect();
+    assert_eq!(first[0].trim(), "then: eingabe-fehler");
+    assert!(again.contains("$context.bausteine.fehler") && again.contains("then: research"));
+    let stop = step_body(&text, "eingabe-fehler");
+    assert!(stop.contains("actor: human") && stop.contains("then: end"));
+    assert!(step_body(&text, "publish").contains("then: end"));
+    assert!(step_body(&text, "baustein-zuordnung").contains("${ .input.dossier }/bausteine.md"));
+}
+
+/// The release of `frontend-round` is skipped by a `switch` step in front of it (case `release == false` goes to `end`), not by an `if` on the
+/// release step: a skipped step falls into the next step (`stil-eskalation`) in Serverless Workflow 1.0.
+fn release_is_skipped_by_a_switch(text: &str) -> bool {
+    let r = position(text, "release");
+    let weiche = step_body(text, "release-weiche");
+    position(text, "release-weiche") + 1 == r
+        && weiche.contains("      switch:\n")
+        && weiche.contains("when: '${ .input.release == false }'\n            then: end")
+        && weiche.contains("then: continue")
+        && !step_body(text, "release").contains("      if:")
+        && step_body(text, "release").contains("      then: end\n")
+}
+
+#[test]
+fn the_release_of_frontend_round_is_skipped_by_a_switch_and_not_by_an_if() {
+    let text = read("frontend-round");
+    assert!(release_is_skipped_by_a_switch(&text));
+    // counter-tests (mutations): the switch case removed, the `if` back on the release step, the condition changed, the switch moved away
+    let weiche = step_body(&text, "release-weiche");
+    let no_case = text.replacen(&weiche, &weiche.replace("then: end", "then: continue"), 1);
+    assert_ne!(no_case, text);
+    assert!(!release_is_skipped_by_a_switch(&no_case));
+    assert!(!release_is_skipped_by_a_switch(&text.replacen(
+        "  - release:\n      then: end\n",
+        "  - release:\n      if: ${ .input.release != false }\n      then: end\n",
+        1
+    )));
+    assert!(!release_is_skipped_by_a_switch(&text.replacen(
+        ".input.release == false",
+        ".input.release == true",
+        1
+    )));
+    assert!(!release_is_skipped_by_a_switch(&swapped(
+        &text,
+        "release-weiche",
+        "release"
+    )));
+    // the whole step removed: the check is red (no such step), and the file check is red as well (`release` must be reached some way)
+    let gone = text.replacen(&format!("  - release-weiche:\n{weiche}\n"), "", 1);
+    assert_ne!(gone, text);
+    assert!(
+        std::panic::catch_unwind(|| release_is_skipped_by_a_switch(&gone)).map_or(true, |ok| !ok)
+    );
 }
