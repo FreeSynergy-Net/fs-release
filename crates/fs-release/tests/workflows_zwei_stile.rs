@@ -29,7 +29,9 @@ fn gate_before_convert(text: &str) -> bool {
         "zwei-stile-again",
         "convert",
     ];
-    order.windows(2).all(|w| position(text, w[0]) < position(text, w[1]))
+    order
+        .windows(2)
+        .all(|w| position(text, w[0]) < position(text, w[1]))
         && ["stil-vollstaendigkeit", "zwei-stile"].iter().all(|s| {
             let b = step_body(text, s);
             b.contains("actor: machine") && b.contains("kind: objective") && b.contains("call: ")
@@ -49,8 +51,16 @@ fn frontend_umbau_has_the_style_gate_before_the_replacement() {
 #[test]
 fn counter_gate_after_convert_or_by_the_agent_is_caught() {
     let text = read("frontend-umbau");
-    assert!(!gate_before_convert(&swapped(&text, "zwei-stile", "convert")));
-    assert!(!gate_before_convert(&swapped(&text, "stil-vollstaendigkeit", "zwei-stile")));
+    assert!(!gate_before_convert(&swapped(
+        &text,
+        "zwei-stile",
+        "convert"
+    )));
+    assert!(!gate_before_convert(&swapped(
+        &text,
+        "stil-vollstaendigkeit",
+        "zwei-stile"
+    )));
     let ai = text.replacen(
         "  - zwei-stile:\n      call: zwei-stile:0.0.6@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { stile2: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
         "  - zwei-stile:\n      call: zwei-stile:0.0.6@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { stile2: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
@@ -87,9 +97,18 @@ fn counter_a_jump_of_the_style_gate_to_a_missing_step_is_red() {
 
 fn style_saved_and_complete(text: &str) -> bool {
     let save = step_body(text, "stil-sichern");
-    ["stil-analyse", "stil-check", "stil-again", "stil-sichern", "stil-sichern-check", "stil-vollstaendigkeit", "stil-sichern-again", "images"]
-        .windows(2)
-        .all(|w| position(text, w[0]) < position(text, w[1]))
+    [
+        "stil-analyse",
+        "stil-check",
+        "stil-again",
+        "stil-sichern",
+        "stil-sichern-check",
+        "stil-vollstaendigkeit",
+        "stil-sichern-again",
+        "images",
+    ]
+    .windows(2)
+    .all(|w| position(text, w[0]) < position(text, w[1]))
         && save.contains("actor: ai")
         && save.contains("English name")
         && save.contains("licence")
@@ -109,8 +128,14 @@ fn frontend_round_saves_the_style_and_checks_it_is_complete() {
 #[test]
 fn counter_style_save_without_licence_or_after_images_is_caught() {
     let text = read("frontend-round");
-    assert!(!style_saved_and_complete(&text.replace("licence", "origin")));
-    assert!(!style_saved_and_complete(&swapped(&text, "stil-sichern", "images")));
+    assert!(!style_saved_and_complete(
+        &text.replace("licence", "origin")
+    ));
+    assert!(!style_saved_and_complete(&swapped(
+        &text,
+        "stil-sichern",
+        "images"
+    )));
     let by_ai = text.replacen(
         "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.6@fs\n      with:\n        contract: contract\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
         "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.6@fs\n      with:\n        contract: contract\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: ai",

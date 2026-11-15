@@ -100,13 +100,13 @@ do:
       with:
         branch: ${ .input.branch }
       export:
-        as: '${ $context + { head: .head } }'
+        as: '${ $context + { head: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Resolves the branch to the commit hash of its tip (git rev-parse, read only) after the local gates; the hash must equal the input `head`, otherwise the flow stops. From here on only this hash counts, never the branch name.
+        freesynergy.net:summary: Resolves the branch to the commit hash of its tip (git rev-parse, read only; the output is the hash itself) after the local gates; the hash must equal the input `head`, otherwise the flow stops. From here on only this hash counts, never the branch name.
   - review:
       run:
         workflow:
