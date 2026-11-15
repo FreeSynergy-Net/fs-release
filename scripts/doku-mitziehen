@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Gate doku-mitziehen: a change of code, names, interfaces or behaviour pulls the documentation along in the same run.
+
+  python3 -I scripts/doku-mitziehen --docs <fs-documentation clone> --docs-base <sha> [--code <repo> --code-base <sha>]
+        [--old NAME]... [--new NAME]... [--allow GLOB]... [--state FILE] [--json FILE]
+
+Deterministic, no network, no AI. Checks (every problem is one line `red: <reason>`):
+  1. changed         the code repo changed since --code-base, so the docs clone must have changed since --docs-base
+                     (files under docs/, conventions/, mkdocs.yml, README.md); no docs change = red.
+  2. de-en           a changed docs/de/<x> needs a changed docs/en/<x> and the other way round (official docs in both languages).
+  3. old-names       every --old name (the former name of a repo, crate or interface) must not appear anywhere in the docs
+                     (docs/, conventions/, mkdocs.yml, README.md), except in files matching --allow (history, ADR text).
+  4. new-names       every --new name must appear in the docs at least once.
+  5. links           every relative Markdown link in docs/ points to an existing file (anchors are not followed).
+  6. mkdocs          `mkdocs build --strict` of the clone; when mkdocs is missing or broken the result is `skipped`, never green.
+The docs clone is only read (the mkdocs build goes to a temporary folder). Round counter: the state file (default
+`<docs>/.git/doku-mitziehen-runde`, never tracked) counts red rounds (+1 on red, reset on green); the output has `runde=N`.
+rc 0 = green; rc 1 = red (round 1 or 2); rc 2 = bad input or mkdocs skipped (never green, counter untouched); rc 3 = red in the
+third round or later (escalate to the person). `--json FILE` writes {"red": bool, "runde": N, "problems": [...], "skipped": [...]}.
+"""
+import argparse
+import fnmatch
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+DOC_ROOTS = ("docs", "conventions", "mkdocs.yml", "README.md")
+LINK = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)\s#][^)\s]*?)(?:#[^)\s]*)?(?:\s+\"[^\"]*\")?\)")
+
+
+def git(repo, *args):
+    r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise ValueError(f"git {' '.join(args)} in {repo}: {r.stderr.strip()}")
+    return r.stdout
+
+
+def changed(repo, base, paths=None):
+    args = ["diff", "--name-only", f"{base}..HEAD"]
+    if paths:
+        args += ["--", *paths]
+    out = git(repo, *args).split("\n")
+    # committed changes plus uncommitted ones of the working tree (the run commits last)
+    out += git(repo, "diff", "--name-only", "HEAD", *(["--", *paths] if paths else [])).split("\n")
+    out += git(repo, "ls-files", "--others", "--exclude-standard", *(["--", *paths] if paths else [])).split("\n")
+    return sorted({p for p in out if p})
+
+
+def doc_files(docs):
+    for root in DOC_ROOTS:
+        path = os.path.join(docs, root)
+        if os.path.isfile(path):
+            yield root
+        for base, _, names in os.walk(path):
+            for n in names:
+                if n.endswith((".md", ".yml", ".yaml")):
+                    yield os.path.relpath(os.path.join(base, n), docs)
+
+
+def allowed(rel, allow):
+    return any(fnmatch.fnmatch(rel, g) for g in allow)
+
+
+def check_changed(a, problems):
+    if not a.code:
+        return
+    code = changed(a.code, a.code_base)
+    docs = changed(a.docs, a.docs_base, list(DOC_ROOTS))
+    if code and not docs:
+        problems.append(f"red: the code repo changed ({len(code)} file(s)) but the documentation did not - pull the docs along")
+
+
+def check_de_en(a, problems):
+    files = changed(a.docs, a.docs_base, ["docs/de", "docs/en"])
+    have = set(files)
+    for f in files:
+        if not f.endswith(".md"):
+            continue
+        other = f.replace("docs/de/", "docs/en/", 1) if f.startswith("docs/de/") else f.replace("docs/en/", "docs/de/", 1)
+        if other not in have:
+            problems.append(f"red: {f} changed, {other} did not (docs in German and English together)")
+
+
+def check_names(a, problems):
+    texts = {}
+    for rel in doc_files(a.docs):
+        if not allowed(rel, a.allow):
+            texts[rel] = open(os.path.join(a.docs, rel), encoding="utf-8", errors="replace").read()
+    for old in a.old:
+        pat = re.compile(r"(?<![\w-])" + re.escape(old) + r"(?![\w-])")
+        for rel, text in texts.items():
+            for n, line in enumerate(text.split("\n"), 1):
+                if pat.search(line):
+                    problems.append(f"red: old name {old!r} still in {rel}:{n}")
+    for new in a.new:
+        if not any(new in t for t in texts.values()):
+            problems.append(f"red: new name {new!r} appears nowhere in the docs")
+
+
+def check_links(a, problems):
+    for rel in doc_files(a.docs):
+        if not rel.endswith(".md"):
+            continue
+        base = os.path.dirname(os.path.join(a.docs, rel))
+        in_code = False
+        for n, line in enumerate(open(os.path.join(a.docs, rel), encoding="utf-8", errors="replace"), 1):
+            if line.lstrip().startswith("```"):
+                in_code = not in_code
+            if in_code:
+                continue
+            for target in LINK.findall(line):
+                if re.match(r"[a-z][a-z0-9+.-]*:", target) or target.startswith("/"):
+                    continue
+                if not os.path.exists(os.path.normpath(os.path.join(base, target))):
+                    problems.append(f"red: broken link {target!r} in {rel}:{n}")
+
+
+def check_mkdocs(a, problems, skipped):
+    probe = subprocess.run(["mkdocs", "--version"], capture_output=True, text=True) if shutil.which("mkdocs") else None
+    if probe is None or probe.returncode != 0:
+        skipped.append("mkdocs: not installed or broken, `mkdocs build --strict` was NOT run")
+        return
+    with tempfile.TemporaryDirectory() as out:
+        r = subprocess.run(
+            ["mkdocs", "build", "--strict", "-q", "-f", os.path.join(a.docs, "mkdocs.yml"), "-d", out],
+            capture_output=True,
+            text=True,
+        )
+    if r.returncode != 0:
+        tail = " | ".join((r.stdout + r.stderr).strip().split("\n")[-3:])
+        problems.append(f"red: mkdocs build --strict failed: {tail}")
+
+
+def counter(path, red):
+    try:
+        n = int(open(path).read().strip() or 0)
+    except (OSError, ValueError):
+        n = 0
+    n = n + 1 if red else 0
+    with open(path, "w") as f:
+        f.write(f"{n}\n")
+    return n
+
+
+def main(argv):
+    p = argparse.ArgumentParser(add_help=True)
+    p.add_argument("--docs", required=True)
+    p.add_argument("--docs-base", required=True)
+    p.add_argument("--code")
+    p.add_argument("--code-base")
+    p.add_argument("--old", action="append", default=[])
+    p.add_argument("--new", action="append", default=[])
+    p.add_argument("--allow", action="append", default=[])
+    p.add_argument("--state")
+    p.add_argument("--json")
+    try:
+        a = p.parse_args(argv)
+    except SystemExit:
+        return 2
+    if bool(a.code) != bool(a.code_base):
+        print("bad input: --code and --code-base belong together")
+        return 2
+    problems, skipped = [], []
+    try:
+        for check in (check_changed, check_de_en, check_names, check_links):
+            check(a, problems)
+        check_mkdocs(a, problems, skipped)
+    except (ValueError, OSError) as e:
+        print(f"bad input: {e}")
+        return 2
+    for s in skipped:
+        print(f"skipped: {s}")
+    for line in problems:
+        print(line)
+    red = bool(problems)
+    if skipped and not red:
+        print("skipped: not green because a check did not run")
+        return 2
+    runde = counter(a.state or os.path.join(a.docs, ".git", "doku-mitziehen-runde"), red)
+    print(f"runde={runde}")
+    if a.json:
+        with open(a.json, "w") as f:
+            json.dump({"red": red, "runde": runde, "problems": problems, "skipped": skipped}, f)
+    if not red:
+        print("green: the documentation moved with the change")
+        return 0
+    return 3 if runde >= 3 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,105 @@
+# Rule: every change of code, names, interfaces or behaviour pulls the documentation in fs-documentation along in the SAME run
+# (official docs are always current, DE and EN together). A change without a matching docs change turns the gate RED.
+# Used as a sub-workflow (`run: workflow`) by programm-neu, release-flow (so also by lift, frontend-round, frontend-umbau), upstream-update
+# and umbenennen. Agents never push, tag or merge; the push of the docs main branch is the human step of publish-doc.
+# Input: repo (the code repo), delta (`<old>..<new>`, the left part is the base of the code change), docs (clone or worktree of fs-documentation),
+# docs_base (commit of the docs branch at the start of the run), old / new (lists of names that were given up / came in; may be empty), allow (globs of
+# docs files that may keep an old name: history, ADR text).
+# Order: `Workflow doku-mitziehen, step <id>, parameters repo, delta, docs, docs_base, old, new, allow`. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: doku-mitziehen
+  version: 0.0.6
+  title: The documentation moves with every change of code, names, interfaces or behaviour
+do:
+  - suchen:
+      call: doku-search:0.0.6@fs
+      with:
+        docs: ${ .input.docs }
+        old: ${ .input.old }
+        new: ${ .input.new }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: grep (no AI) in docs/, conventions/, mkdocs.yml and README.md of the docs clone for every old and new name and for the links to the pages of the changed program; the list of hits is the work list of the next step. Nothing is changed here.
+  - schreiben:
+      call: docs-ai:0.0.6@fs
+      with:
+        repo: ${ .input.repo }
+        delta: ${ .input.delta }
+        docs: ${ .input.docs }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The author of the change works through the hits in its own worktree of fs-documentation - pages, links, examples, menus, the ADR or interface page that the change touches; docs/de and docs/en together, in step with the code; local commits ([COMMIT]), no push, no tag; no secrets; report per [BERICHT]. If the change needs no new sentence, it still adds the line in the changelog or status page of the program.
+  - docs-check:
+      call: check-docs:0.0.6@fs
+      with:
+        docs: ${ .input.docs }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: check-docs.sh on the changed docs files (sources, headings, language pairs); a red result is part of the gate below.
+  - gate:
+      call: doku-mitziehen:0.0.6@fs
+      with:
+        docs: ${ .input.docs }
+        docs_base: ${ .input.docs_base }
+        code: ${ .input.repo }
+        code_base: ${ .input.delta | split("..") | .[0] }
+        old: ${ .input.old }
+        new: ${ .input.new }
+        allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script `scripts/doku-mitziehen` (Python, no network, no AI) - RED when the code changed and the docs did not, when only one of docs/de and docs/en changed, when an old name is left in the docs, a new name is missing, a relative link is broken, or `mkdocs build --strict` fails. A skipped check (mkdocs missing) is never green (rc 2). The result carries `red` (true = back) and `runde` (red rounds counted by the script in its state file); the third red round goes to `eskalation`. Self test `scripts/test_doku_mitziehen.sh`.
+  - gate-again:
+      switch:
+        - runden:
+            when: '${ ($context.doku.red and ($context.doku.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.doku.red }'
+            then: suchen
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - red goes back to `suchen` (a fresh work list), from the third red round the flow ends in `eskalation` (the person decides); green leaves the flow, the caller goes on. There is no way past a red gate.
+  - veroeffentlichen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: publish-doc
+          version: 0.0.6
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, together with the merge of the code (never before the code is approved, never forced); the agent never pushes.
+  - eskalation:
+      set:
+        todo: doku-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The gate was red for the third time: the loop stops and the person decides (the change may need no docs, then the reason is written into the review; the gate is not switched off). The report names the last red lines. This flow ends."
