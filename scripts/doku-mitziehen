@@ -13,10 +13,14 @@ Deterministic, no network, no AI. Checks (every problem is one line `red: <reaso
   4. new-names       every --new name must appear in the docs at least once.
   5. links           every relative Markdown link in docs/ points to an existing file (anchors are not followed).
   6. mkdocs          `mkdocs build --strict` of the clone; when mkdocs is missing or broken the result is `skipped`, never green.
-The docs clone is only read (the mkdocs build goes to a temporary folder). Round counter: the state file (default
-`<docs>/.git/doku-mitziehen-runde`, never tracked) counts red rounds (+1 on red, reset on green); the output has `runde=N`.
+The docs clone is only read (the mkdocs build goes to a temporary folder). NOTE: `mkdocs build` runs the hooks and plugins named in
+the mkdocs.yml of the clone, i.e. code of the author's branch; use it only on the own docs repo.
+Round counter: the state file (default `<git dir of the docs clone>/doku-mitziehen-runde`, found with `git rev-parse --absolute-git-dir`,
+so it also works in a git worktree where `.git` is a file; never tracked; outside git a file in the temp folder) counts red rounds
+(+1 on red, reset on green); the output has `runde=N`.
 rc 0 = green; rc 1 = red (round 1 or 2); rc 2 = bad input or mkdocs skipped (never green, counter untouched); rc 3 = red in the
-third round or later (escalate to the person). `--json FILE` writes {"red": bool, "runde": N, "problems": [...], "skipped": [...]}.
+third round or later (escalate to the person). `--json FILE` writes {"status": "green"|"red"|"skipped", "red": bool, "runde": N,
+"problems": [...], "skipped": [...]} - also for rc 2 (status "skipped", never "green"; for bad input status "skipped" with the line in problems).
 """
 import argparse
 import fnmatch
@@ -97,7 +101,8 @@ def check_names(a, problems):
                 if pat.search(line):
                     problems.append(f"red: old name {old!r} still in {rel}:{n}")
     for new in a.new:
-        if not any(new in t for t in texts.values()):
+        pat = re.compile(r"(?<![\w-])" + re.escape(new) + r"(?![\w-])")
+        if not any(pat.search(t) for t in texts.values()):
             problems.append(f"red: new name {new!r} appears nowhere in the docs")
 
 
@@ -135,6 +140,20 @@ def check_mkdocs(a, problems, skipped):
         problems.append(f"red: mkdocs build --strict failed: {tail}")
 
 
+def state_path(a):
+    try:
+        gitdir = git(a.docs, "rev-parse", "--absolute-git-dir").strip()
+    except ValueError:
+        gitdir = tempfile.gettempdir()
+    return a.state or os.path.join(gitdir, "doku-mitziehen-runde")
+
+
+def write_json(a, status, red, runde, problems, skipped):
+    if a.json:
+        with open(a.json, "w") as f:
+            json.dump({"status": status, "red": red, "runde": runde, "problems": problems, "skipped": skipped}, f)
+
+
 def counter(path, red):
     try:
         n = int(open(path).read().strip() or 0)
@@ -163,6 +182,7 @@ def main(argv):
         return 2
     if bool(a.code) != bool(a.code_base):
         print("bad input: --code and --code-base belong together")
+        write_json(a, "skipped", False, 0, ["bad input: --code and --code-base belong together"], [])
         return 2
     problems, skipped = [], []
     try:
@@ -171,6 +191,7 @@ def main(argv):
         check_mkdocs(a, problems, skipped)
     except (ValueError, OSError) as e:
         print(f"bad input: {e}")
+        write_json(a, "skipped", False, 0, [f"bad input: {e}"], [])
         return 2
     for s in skipped:
         print(f"skipped: {s}")
@@ -179,12 +200,11 @@ def main(argv):
     red = bool(problems)
     if skipped and not red:
         print("skipped: not green because a check did not run")
+        write_json(a, "skipped", False, 0, problems, skipped)
         return 2
-    runde = counter(a.state or os.path.join(a.docs, ".git", "doku-mitziehen-runde"), red)
+    runde = counter(state_path(a), red)
     print(f"runde={runde}")
-    if a.json:
-        with open(a.json, "w") as f:
-            json.dump({"red": red, "runde": runde, "problems": problems, "skipped": skipped}, f)
+    write_json(a, "red" if red else "green", red, runde, problems, skipped)
     if not red:
         print("green: the documentation moved with the change")
         return 0

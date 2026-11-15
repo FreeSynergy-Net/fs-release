@@ -79,6 +79,38 @@ rc=$?
 if [ "$rc" -eq 2 ] && grep -qF "was NOT run" <<<"$out"; then echo "ok   mkdocs missing is skipped, never green"; else
   echo "FAIL mkdocs missing: rc=$rc"; echo "$out"; fails=$((fails + 1)); fi
 
+fresh newword; code_change; docs_both
+expect 1 "new name 'fs-ne' appears nowhere" "red: new name only as the start of a longer name (fs-new)" "$d" -- --new fs-ne
+
+fresh mkred; code_change; docs_both
+mkdir -p "$tmp/binred"
+# shellcheck disable=SC2016
+printf '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\necho "ERROR broken nav" >&2\nexit 1\n' >"$tmp/binred/mkdocs"
+chmod +x "$tmp/binred/mkdocs"
+out="$(PATH="$tmp/binred:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"
+rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "mkdocs build --strict failed" <<<"$out"; then echo "ok   red: mkdocs build fails"; else
+  echo "FAIL mkdocs build red: rc=$rc"; echo "$out"; fails=$((fails + 1)); fi
+
+# a git worktree: `.git` is a file there; the default state file must still work (rc 0, JSON with status green)
+fresh wt; code_change; docs_both
+g -C "$d/docs" worktree add -q "$d/wt" -b wtbranch
+out="$(PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/wt" --docs-base "$DB" --code "$d/code" --code-base "$CB" --json "$d/wt.json" 2>&1)"
+rc=$?
+if [ "$rc" -eq 0 ] && grep -qF '"status": "green"' "$d/wt.json"; then echo "ok   green in a git worktree without --state"; else
+  echo "FAIL worktree: rc=$rc"; echo "$out"; fails=$((fails + 1)); fi
+rm -f "$(g -C "$d/wt" rev-parse --absolute-git-dir)/doku-mitziehen-runde"
+
+# the JSON of a skipped run is never green (the flow keys on status == green)
+fresh skipjson; code_change; docs_both
+PATH="$tmp/empty" "$py" -I "$here/doku-mitziehen" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" \
+  --state "$d/state" --json "$d/skip.json" >/dev/null 2>&1
+if grep -qF '"status": "skipped"' "$d/skip.json"; then echo "ok   skipped run writes status skipped"; else
+  echo "FAIL skipped json"; fails=$((fails + 1)); fi
+"${tool[@]}" --docs "$d/docs" --docs-base nothere --json "$d/bad.json" >/dev/null 2>&1
+if grep -qF '"status": "skipped"' "$d/bad.json"; then echo "ok   bad input writes status skipped"; else
+  echo "FAIL bad json"; fails=$((fails + 1)); fi
+
 fresh rounds; code_change
 expect 1 "runde=1" "round 1 red" "$d" --
 expect 1 "runde=2" "round 2 red" "$d" --

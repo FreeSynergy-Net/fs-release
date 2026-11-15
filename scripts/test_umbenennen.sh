@@ -34,7 +34,7 @@ mk() { # mk <dir>: the world before the rename
   printf 'Das Wiki fs-wiki ist ein Programm. Nicht fs-wikipedia.\n' >"$1/fs-documentation/docs/de/wiki.md"
   : >"$1/retired.txt"
 }
-args() { echo --old fs-wiki --new fs-text --repos "$1/fs-wiki" "$1/fs-app" --catalog "$1/fs-catalog" --docs "$1/fs-documentation" --retired "$1/retired.txt"; }
+args() { echo --old fs-wiki --new fs-text --repos "$1/fs-wiki" "$1/fs-app" --catalog "$1/fs-catalog" --docs "$1/fs-documentation" --retired "$1/retired.txt" --state "$1/state.$RANDOM"; }
 
 w="$tmp/w1"; mk "$w"
 # shellcheck disable=SC2046
@@ -116,5 +116,23 @@ expect 1 "already retired" "retire twice is refused" -- retire --old fs-wiki --n
 expect 1 "never given out again" "retire onto a retired name is refused" -- retire --old fs-text --new fs-wiki --retired "$v/retired.txt"
 # shellcheck disable=SC2046
 expect 0 "green" "after is green once retired" -- after $(args "$v")
+
+# --- round counter of `after` (the script counts, rc 3 from the third red round, green resets)
+printf 'Siehe fs-wiki.\n' >"$v/fs-documentation/docs/de/wiki.md"
+st=(--old fs-wiki --new fs-text --repos "$v/fs-wiki" "$v/fs-app" --catalog "$v/fs-catalog" --docs "$v/fs-documentation" --retired "$v/retired.txt" --state "$v/rounds")
+expect 1 "runde=1" "after: red round 1" -- after "${st[@]}"
+expect 1 "runde=2" "after: red round 2" -- after "${st[@]}"
+expect 3 "runde=3" "after: red round 3 escalates (rc 3)" -- after "${st[@]}"
+printf 'Das Programm fs-text.\n' >"$v/fs-documentation/docs/de/wiki.md"
+expect 0 "runde=0" "after: green resets the counter" -- after "${st[@]}"
+printf 'Siehe fs-wiki.\n' >"$v/fs-documentation/docs/de/wiki.md"
+expect 1 "runde=1" "after: red starts at 1 again after green" -- after "${st[@]}"
+js="$tmp/after.json"
+"${tool[@]}" after "${st[@]}" --json "$js" >/dev/null
+if python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["red"] is True and d["runde"]==2 else 1)' "$js"; then
+  echo "ok   after: the JSON carries red and runde"; else echo "FAIL after: JSON"; fails=$((fails + 1)); fi
+"${tool[@]}" dry-run --old fs-wiki --new fs-text --repos "$tmp/nope" --json "$js" >/dev/null
+if python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["red"] is None else 1)' "$js"; then
+  echo "ok   bad input: the JSON has red = null (never green)"; else echo "FAIL bad input JSON"; fails=$((fails + 1)); fi
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

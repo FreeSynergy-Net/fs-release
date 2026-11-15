@@ -4,7 +4,7 @@
   python3 -I scripts/umbenennen dry-run --old fs-wiki --new fs-text --repos DIR... [--catalog DIR] [--docs DIR]
                                          [--retired FILE] [--json FILE]
   python3 -I scripts/umbenennen after   --old fs-wiki --new fs-text --repos DIR... [--catalog DIR] [--docs DIR]
-                                         [--retired FILE] [--allow GLOB]... [--json FILE]
+                                         [--retired FILE] [--allow GLOB]... [--state FILE] [--json FILE]
   python3 -I scripts/umbenennen retire  --old fs-wiki --new fs-text --retired FILE
 
 `--repos` are checkouts (worktrees) of the repos that may name the old program: the program itself, repos that pin it, CI files.
@@ -17,7 +17,10 @@ directory or a catalog entry of the new name exists, or when the old and new nam
 when the catalog entry of the new name lacks `replaces = ["<old>"]`. `retire` appends `<old> -> <new>` to the retired list; it
 refuses a name that is already there. A file with the list: one `old -> new  # reason` per line, `#` starts a comment.
 The GitHub rename itself is NOT done here; it is a human step after the approval gate of the flow.
-rc 0 = green, rc 1 = red (every problem a line `red: ...`), rc 2 = bad input.
+`after` counts the red rounds: the state file (`--state`, default `<temp folder>/umbenennen-<old>-<new>-runde`, never in a repo) gets +1
+on red and is reset on green; the output has `runde=N`. The JSON has `red`, `runde`, `plan`, `problems`.
+rc 0 = green, rc 1 = red (every problem a line `red: ...`), rc 2 = bad input (JSON with `red: null` if `--json` is given),
+rc 3 = `after` red in the third round or later (escalate to the person).
 """
 import argparse
 import fnmatch
@@ -25,6 +28,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 
 NAME = re.compile(r"fs-[a-z0-9]+(?:-[a-z0-9]+)*")
 SKIP_DIRS = {".git", "target", "node_modules", "site", ".fs-release"}
@@ -98,7 +102,7 @@ def plan(a):
     docs = []
     if a.docs:
         for path in walk(a.docs):
-            if not path.endswith((".md", ".yml")):
+            if not path.endswith((".md", ".yml", ".yaml")):
                 continue
             text = text_of(path) or ""
             for n, line in enumerate(text.split("\n"), 1):
@@ -168,6 +172,17 @@ def after_problems(a, p):
     return problems
 
 
+def counter(path, red):
+    try:
+        n = int(open(path).read().strip() or 0)
+    except (OSError, ValueError):
+        n = 0
+    n = n + 1 if red else 0
+    with open(path, "w") as f:
+        f.write(f"{n}\n")
+    return n
+
+
 def retire(a):
     problems = name_problems(a)
     if problems or not a.retired:
@@ -189,6 +204,7 @@ def main(argv):
     p.add_argument("--docs")
     p.add_argument("--retired")
     p.add_argument("--allow", action="append", default=[])
+    p.add_argument("--state")
     p.add_argument("--json")
     try:
         a = p.parse_args(argv)
@@ -197,6 +213,9 @@ def main(argv):
     for d in [*a.repos, a.catalog, a.docs]:
         if d and not os.path.isdir(d):
             print(f"bad input: {d} is not a folder")
+            if a.json:
+                with open(a.json, "w", encoding="utf-8") as f:
+                    json.dump({"red": None, "runde": 0, "plan": {}, "problems": [f"bad input: {d} is not a folder"]}, f)
             return 2
     if a.mode == "retire":
         return retire(a)
@@ -215,11 +234,18 @@ def main(argv):
                 print("  " + ", ".join(f"{k}={v}" for k, v in it.items()))
     for line in problems:
         print(line)
+    runde = 0
+    if a.mode == "after":
+        state = a.state or os.path.join(tempfile.gettempdir(), f"umbenennen-{a.old}-{a.new}-runde")
+        runde = counter(state, bool(problems))
+        print(f"runde={runde}")
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:
-            json.dump({"red": bool(problems), "plan": found, "problems": problems}, f)
+            json.dump({"red": bool(problems), "runde": runde, "plan": found, "problems": problems}, f)
     print("red" if problems else "green")
-    return 1 if problems else 0
+    if not problems:
+        return 0
+    return 3 if runde >= 3 else 1
 
 
 if __name__ == "__main__":
