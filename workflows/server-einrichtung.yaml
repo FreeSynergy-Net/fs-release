@@ -53,7 +53,7 @@ do:
       switch:
         - not-fit:
             when: '${ $context.inventory.unfit }'
-            then: exit
+            then: not-fit-notice
         - fit:
             then: continue
       metadata:
@@ -226,6 +226,9 @@ do:
         - red:
             when: '${ $context.check.red and $context.check.tries < 3 }'
             then: kanidm
+        - red-goes-on:
+            when: '${ $context.check.red }'
+            then: schedule
         - green:
             then: continue
       metadata:
@@ -233,7 +236,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - a red check goes back to kanidm up to three times (idempotent); then the flow goes on and the log shows the red lines to the person. A restart of the machine or a reinstall is never a jump back, it is a human gate.
+        freesynergy.net:summary: Control flow - a red check goes back to kanidm up to three times (idempotent); then the case `red-goes-on` (still red, `tries` >= 3) leaves the loop on purpose and the log shows the red lines to the person; `green` is only a green check. A restart of the machine or a reinstall is never a jump back, it is a human gate.
   - schedule:
       call: fs-server-timer:0.0.6@fs
       with:
@@ -247,6 +250,7 @@ do:
         freesynergy.net:summary: The person sets up, once, unattended-upgrades and a systemd timer ON the server for security updates (steps with gate none). Without an AI, the log as always. Only steps that need no approval run by schedule; everything with a gate waits for the person. Expected - timer enabled, next run shown, exit code 0.
   - hand-back:
       call: return-log:0.0.6@fs
+      then: end
       with:
         files: [bestand.txt, plan.txt, protocol.log]
       metadata:
@@ -255,3 +259,13 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The person hands back the one log file (the full log, appended only; secrets are redacted). Agents read it, they never log in. Each step of this run also leaves a short summary for the history (ADR 0020, 0079).
+  - not-fit-notice:
+      set:
+        todo: not-fit
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The inventory says the system does not fit way A (no systemd, no apt, no supported file system). The person reads the reason in the log and is told which separate workflow applies (B kexec, C provider rescue, D disk rebuild). This flow ends here, nothing was changed.
