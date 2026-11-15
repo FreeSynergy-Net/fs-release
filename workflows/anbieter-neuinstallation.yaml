@@ -77,7 +77,7 @@ do:
       switch:
         - red:
             when: '${ $context.check.exit != 0 }'
-            then: variables
+            then: config-generate
         - green:
             then: continue
       metadata:
@@ -187,6 +187,9 @@ do:
         freesynergy.net:summary: 'Only reads. The person logs in by SSH (new host key, compared and remembered) and starts fs-server-run - SSH reachable, boot mode as planned, mdadm --detail and /proc/mdstat show RAID1 for /boot/efi, /boot, swap and /, file systems as in the plan, the free rest of both disks for the data part. Expected - bestand-nachher.json, exit code 0, nothing changed.'
   - back-to-rescue:
       switch:
+        - rounds:
+            when: '${ ($context.after.red or $context.after.unreachable) and ($context.after.runde // 0) >= 3 }'
+            then: neuinstallation-eskalation
         - differs:
             when: '${ $context.after.red or $context.after.unreachable }'
             then: rescue
@@ -213,8 +216,11 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: 'The person runs the data lines of plan.txt on the new system - sgdisk for the rest of each disk, mkfs.btrfs with -d raid1 -m raid1 (two disks) or single (one disk), or the ZFS pool only when FS_DATA=zfs, then the mount at /srv/freesynergy and the fstab entry by UUID. installimage builds no multi-device btrfs, so this part is separate and under a human gate. With FS_DATA=none the step is skipped. Expected - the lines in the log, exit code 0.'
   - hand-over:
-      call: server-einrichtung:0.0.6@fs
-      with:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: server-einrichtung
+          version: 0.0.6
         input: ${ $context.server }
       metadata:
         freesynergy.net:actor: human
@@ -224,6 +230,7 @@ do:
         freesynergy.net:summary: 'Continue with the flow server-einrichtung (way A) on the new system - inventory, dry run, approval, layer, hardening, services. Way C ends here; it sets up no service and no package source.'
   - hand-back:
       call: return-log:0.0.6@fs
+      then: end
       with:
         files: [bestand-vorher.json, installimage.conf, plan.txt, bestand-nachher.json, protocol.log]
       metadata:
@@ -232,3 +239,13 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: 'The person hands back the one log file with these files (the full log, appended only, secrets redacted). Agents read it, they never log in.'
+  - neuinstallation-eskalation:
+      set:
+        todo: neuinstallation-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The check after the first boot was red or the server unreachable three times (`runde` >= 3); the person decides (rescue again, other image, provider support). This flow ends.
