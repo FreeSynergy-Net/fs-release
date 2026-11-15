@@ -1,0 +1,243 @@
+# Rename a program: repo, crates (fs-<x>-*), catalog entry with `replaces`, docs, pins in other repos (ADR 0080, ADR 0063, ADR 0077).
+# The old name is never given out again (scripts/retired-names.txt). Everything up to the approval gate is reversible work in worktrees
+# and branches; the GitHub rename is a step of its own, only after the approval gate (strategy OK for exactly this head). The dry run
+# (`trockenlauf`) and the after-check run without AI and without network. Agents never push, tag, merge, rename or delete a repo.
+# Order: `Workflow umbenennen, step <id>, parameters old, new, repos, catalog, docs, docs_base, allow, retired, branch, head, delta, tag`
+# (docs/prompt-template.md). FS profile: see README.md.
+# Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: umbenennen
+  version: 0.0.6
+  title: Rename a program - repo, crates, catalog with replaces, docs, pins - the old name is never given out again
+do:
+  - trockenlauf:
+      call: rename-dry-run:0.0.6@fs
+      with:
+        old: ${ .input.old }
+        new: ${ .input.new }
+        repos: ${ .input.repos }
+        catalog: ${ .input.catalog }
+        docs: ${ .input.docs }
+        retired: ${ .input.retired }
+      export:
+        as: '${ $context + { plan: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script `scripts/umbenennen dry-run` (Python, no network, no AI, reads only) - lists the crates `<old>-*` with their new names, CI files, pins in other repos, the catalog entry and the hits in the docs; RED when the new name was given up before (retired list), the old name is already retired, the new name already exists as a checkout or a catalog entry, or a name is not of the form fs-<x>. Self test `scripts/test_umbenennen.sh`. Red stops the flow before anything is changed."
+  - plan-red:
+      switch:
+        - red:
+            when: '${ $context.plan.red }'
+            then: end
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a red dry run ends the flow (the person changes the plan or the names); green goes on.
+  - plan-gate:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.approval
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The plan of the dry run (crates, files, pins, catalog, docs) is looked at and accepted by the strategy before any file is changed; the OK names exactly this plan (old, new). The first run of a rename also needs the user's yes for the rename (ADR 0080 F1).
+  - umbau:
+      call: rename-ai:0.0.6@fs
+      with:
+        old: ${ .input.old }
+        new: ${ .input.new }
+        repos: ${ .input.repos }
+        branch: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "In the worktree branch of the program (not in main) - crates `<old>-*` become `<new>-*` (Cargo.toml, imports, binary names, the link of the old binary name if ADR 0063 asks for it), CI files (release, typing-test, windows), release chain allowlist, package names; the catalog entry of the new name with `replaces = [old]` (ADR 0080, schema 2) in a branch of fs-catalog; pins in other repos only on the new tag (a later run, never a path dependency). Only what the plan lists. Own worktree, local commits ([COMMIT]), no push, no tag, no rename of a GitHub repo; gates one at a time ([GATES], [BASH]); report per [BERICHT]."
+  - sperre:
+      call: rename-retire:0.0.6@fs
+      with:
+        old: ${ .input.old }
+        new: ${ .input.new }
+        retired: ${ .input.retired }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script `scripts/umbenennen retire` writes `<old> -> <new>` into scripts/retired-names.txt (a local commit that goes through the same review); the old name is never given out again, a second entry for it is refused.
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.6
+        input:
+          repo: ${ .input.repos[0] }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ [.input.old] }
+          new: ${ [.input.new] }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Sub-workflow doku-mitziehen.yaml - the docs in fs-documentation (de and en, links, pages, ADR status lines; ADR texts are not rewritten, `allow` names the history pages) move in the same run, grep for the old name, `mkdocs build --strict`, check-docs; a rename without the docs is RED.
+  - nachher:
+      call: rename-after:0.0.6@fs
+      with:
+        old: ${ .input.old }
+        new: ${ .input.new }
+        repos: ${ .input.repos }
+        catalog: ${ .input.catalog }
+        docs: ${ .input.docs }
+        retired: ${ .input.retired }
+      export:
+        as: '${ $context + { after: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script `scripts/umbenennen after` - RED when the old name is still in a crate name, in `.github/`, in a pin or in the docs (outside the allowed history pages), when the catalog entry of the new name has no `replaces`, or when the old name is not on the retired list. The result carries `red` and `runde` (red rounds counted by the script); the third red round goes to `eskalation`."
+  - nachher-again:
+      switch:
+        - runden:
+            when: '${ ($context.after.red and ($context.after.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.after.red }'
+            then: umbau
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - red goes back to `umbau` with the lines of the check, from the third red round the flow ends in `eskalation`.
+  - gates:
+      call: repo-gates:0.0.6@fs
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The gates of every changed repo, once per head (scripts/gates.sh on a fresh clone; the checks of the catalog schema for the `replaces` field); the order is after the check of the names, so a red gate never hides a name leftover.
+  - gates-again:
+      switch:
+        - runden:
+            when: '${ $context.gates.red and ($context.gates.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.gates.red }'
+            then: umbau
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - red goes back to `umbau`, the third red round ends in `eskalation`.
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.6
+        input:
+          repo: ${ .input.repos[0] }
+          branch: ${ .input.branch }
+          head: ${ .input.head }
+          delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Sub-workflow review.yaml for exactly the head hash `${ .input.head }` (never a branch name) - the JA is bound to this hash by `bind`; a new head makes it void.
+  - freigabe:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.approval
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The approval gate before the GitHub rename - the strategy OK (approval file) for exactly this head and this pair old -> new; without it nothing is renamed, merged or pushed. The dry run (step `trockenlauf`) can be run alone at any time; it changes nothing and needs no approval.
+  - github-umbenennen:
+      call: rename-github:0.0.6@fs
+      with:
+        old: ${ .input.old }
+        new: ${ .input.new }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The human or the coordinator renames the repo on GitHub (tags, releases, issues and the redirect stay) after the approval above and after the merge of the branches; a placeholder repo of the new name is saved and removed or archived first (ADR 0080 F1, only with the user's yes). Agents never do this.
+  - weiterleitung:
+      call: rename-redirect-check:0.0.6@fs
+      with:
+        old: ${ .input.old }
+        new: ${ .input.new }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Read only - `git ls-remote` on the old and the new URL answers with the same refs (clone redirect). NOT proven: the redirect of release assets after the rename (ADR 0080, open) - the first release as the new name downloads from the new URL."
+  - release:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: release-flow
+          version: 0.0.6
+        input:
+          repo: ${ .input.new }
+          tag: ${ .input.tag }
+          prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The first release as the new name (next tag of the same count, ADR 0064) runs through release-flow.yaml with its own review; the catalog shows the new entry as an update of the old one (`replaces`); user data is copied, never moved.
+  - eskalation:
+      set:
+        todo: umbenennen-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time: the loop stops and the person decides. Nothing was renamed on GitHub. The report names the step and the last red lines. This flow ends."
