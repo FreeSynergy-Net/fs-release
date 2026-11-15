@@ -112,7 +112,9 @@ expect 1 "not on the retired list" "red: old name not retired" -- after $(args "
 
 # --- retire
 expect 0 "retired: fs-wiki -> fs-text" "retire appends" -- retire --old fs-wiki --new fs-text --retired "$v/retired.txt"
-expect 1 "already retired" "retire twice is refused" -- retire --old fs-wiki --new fs-text --retired "$v/retired.txt"
+expect 0 "already retired, same pair" "retire twice for the same pair is a no-op (the loop back to umbau)" -- retire --old fs-wiki --new fs-text --retired "$v/retired.txt"
+if [ "$(grep -c '^fs-wiki -> fs-text' "$v/retired.txt")" -eq 1 ]; then echo "ok   retire twice: still exactly one entry"; else echo "FAIL retire twice wrote a second entry"; fails=$((fails + 1)); fi
+expect 1 "already retired" "retire for the same old name with ANOTHER new name is refused" -- retire --old fs-wiki --new fs-other --retired "$v/retired.txt"
 expect 1 "never given out again" "retire onto a retired name is refused" -- retire --old fs-text --new fs-wiki --retired "$v/retired.txt"
 # shellcheck disable=SC2046
 expect 0 "green" "after is green once retired" -- after $(args "$v")

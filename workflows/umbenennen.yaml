@@ -81,7 +81,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script `scripts/umbenennen retire` writes `<old> -> <new>` into scripts/retired-names.txt (a local commit that goes through the same review); the old name is never given out again, a second entry for it is refused.
+        freesynergy.net:summary: Script `scripts/umbenennen retire` writes `<old> -> <new>` into scripts/retired-names.txt (a local commit that goes through the same review); the old name is never given out again, the same pair again is a no-op (the loops back to `umbau` run this step again), any other entry for the old name is refused.
   - doku:
       run:
         workflow:

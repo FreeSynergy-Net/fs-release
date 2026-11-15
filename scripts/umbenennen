@@ -184,6 +184,11 @@ def counter(path, red):
 
 
 def retire(a):
+    # The same pair again is a no-op (rc 0): the flow loops back to `umbau` after a red gate or a NO and runs `sperre` again.
+    # Any other entry for the old name (old -> something else) or for the new name as an old one stays red.
+    if a.retired and (a.old, a.new) in read_retired(a.retired) and not name_problems(a, check_retired=False):
+        print(f"already retired, same pair: {a.old} -> {a.new}")
+        return 0
     problems = name_problems(a)
     if problems or not a.retired:
         print("\n".join(problems) or "bad input: --retired is required")
