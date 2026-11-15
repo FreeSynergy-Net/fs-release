@@ -12,11 +12,13 @@ once for the whole organisation: `gh search issues --owner FreeSynergy --label r
     if: always()
     permissions:
       issues: write
-    uses: FreeSynergy/fs-release/.github/workflows/_notify-red.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_notify-red.yml@<full-commit-sha>   # pin to a commit of fs-release, never @main
     with:
       workflow: check
       failed: ${{ contains(needs.*.result, 'failure') }}
 ```
+
+Pin the call to the full commit SHA of a reviewed fs-release commit (a moving `@main` would let a later change run with the caller's `issues: write`); update the SHA on purpose.
 
 The calling job must grant `issues: write` itself: a called workflow can never have more rights than its caller.
 

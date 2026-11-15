@@ -31,7 +31,7 @@ jobs:
           url="${RUN_URL:-${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}}"
           # exact title match among the open issues with the label (the search is fuzzy)
           open=$(gh issue list --state open --label rot --limit 100 --json number,title \
-            --jq "[.[] | select(.title == \"${title}\") | .number] | .[]")
+            | jq -r --arg t "$title" '[.[] | select(.title == $t) | .number] | .[]')
           if [ "$FAILED" = "true" ]; then
             if [ -n "$open" ]; then
               for n in $open; do gh issue comment "$n" --body "Red again: ${url}"; done

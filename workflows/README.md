@@ -152,13 +152,16 @@ list (dump `fs-menu-dump/1`) with the `## Menü-Inventar` list / dialogs table o
 result is red. Applies to every Frontend of wave 1. Format: `docs/menue-vergleich.md`, self test
 `scripts/test_menue_vergleich.sh`.
 
+**Style gate of the theme bridge (user rules on ADR 0074, plan `/srv/FreeSynergy/.scratch/plan-theme-bruecke.md`).** In `frontend-umbau`, before `convert` (replacing painted copies by Blinc blocks), run `bruecke`, `alle-stile-erweitern`, `stil-vollstaendigkeit` (script: theme contract x all styles, a missing entry = red, no release) and `zwei-stile` (script: every block drawn in two styles, an unchanged picture = red, exceptions only for content; only blocks already reached through an adapter are drawn, own blocks still carry fixed values before `convert`). Order: contract, completeness, two styles. Every style styles every block with all parts and states; a new block, part or state = a new contract version and the fixed step `alle-stile-erweitern`. Red rounds are counted, from the third one the flow ends with the person. In `frontend-round`, `stil-sichern` saves the style of the rebuilt model (English name, reference and licence named, nothing copied), then `stil-vollstaendigkeit`. The scripts are not built yet.
+
 **Block assignment (user decision 14 Nov, all Frontends).** Fixed order: (1) block analysis - every area of the model is assigned to a
 block family and block id ("what is this?": table, tree, list, card, bar, dialog ...), existing blocks first, a new one only with the
 reason why no existing block (with a module) fits; (2) look - style analysis, tokens and style rules per block (ADR 0074); (3)
 composition - the arrangement in the Frontend. Example: the file table of fs-files is the same table as later in fs-data, only with
 hidden headers and no calculation module (formulas = a module, ADR 0084 pattern). The objective check `baustein-zuordnung` (in
 `dossier`, before publish; red jumps to `research`) lets `scripts/baustein-zuordnung` check the `## Baustein-Zuordnung` table of
-`bausteine.md` and reports the share of newly built blocks. Format: `docs/baustein-zuordnung.md`, self test
+`bausteine.md`, counts the red rounds itself (state file in the dossier folder, rc 3 from the third one) and reports the share per source
+(family, Blinc widget, new; source order family, Blinc, new with a reason). Format: `docs/baustein-zuordnung.md`, self test
 `scripts/test_baustein_zuordnung.sh`.
 
 **New program (`programm-neu`, user request 14 Nov).** One flow from the test question to acceptance, 17 steps in seven phases:
