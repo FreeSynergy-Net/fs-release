@@ -137,8 +137,8 @@ fn counter_style_save_without_licence_or_after_images_is_caught() {
         "images"
     )));
     let by_ai = text.replacen(
-        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.6@fs\n      with:\n        contract: contract\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
-        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.6@fs\n      with:\n        contract: contract\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
+        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.6@fs\n      with:\n        contract: ${ .input.contract }\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
+        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.6@fs\n      with:\n        contract: ${ .input.contract }\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
         1,
     );
     assert_ne!(by_ai, text);
