@@ -30,6 +30,7 @@ pub const FILES: [&str; 28] = [
     "review",
     "slot-check",
     "upstream-anfrage",
+    "upstream-update",
     "user-decision",
     "wip-continue",
     "workflow-pflege",
