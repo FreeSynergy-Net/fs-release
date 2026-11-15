@@ -878,6 +878,7 @@ do:
                 version: 0.0.6
               input:
                 finding: ${ $befund }
+                tag: ${ .input.tag }
                 repo: ${ .input.repo }
                 branch: ${ .input.branch }
                 head: ${ .input.head }
