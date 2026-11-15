@@ -43,7 +43,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+      - uses: FreeSynergy/fs-release/actions/setup-rust@94b65516ff38a058244ac4ff282afde7b02d76ac
         with:
           toolchain: pinned
           components: rustfmt,clippy
@@ -55,6 +55,6 @@ jobs:
           TEST_ENV: ${{ inputs.test-env }}
         run: printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
       - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
-        uses: FreeSynergy/fs-release/actions/gates@main
+        uses: FreeSynergy/fs-release/actions/gates@94b65516ff38a058244ac4ff282afde7b02d76ac
         with:
           working-directory: ${{ inputs.working-directory }}

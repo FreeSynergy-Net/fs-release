@@ -50,7 +50,7 @@ jobs:
         with:
           persist-credentials: false
       - id: plan
-        uses: FreeSynergy/fs-release/actions/plan@main
+        uses: FreeSynergy/fs-release/actions/plan@94b65516ff38a058244ac4ff282afde7b02d76ac
         with:
           tag: ${{ inputs.tag }}
           name: ${{ inputs.name }}
@@ -73,7 +73,7 @@ jobs:
   linux:
     needs: plan
     if: fromJSON(needs.plan.outputs.plan).has_linux
-    uses: FreeSynergy/fs-release/.github/workflows/_release-linux.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-linux.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     with:
       plan: ${{ needs.plan.outputs.plan }}
       apt-packages: ${{ inputs.apt-packages }}
@@ -83,7 +83,7 @@ jobs:
   windows:
     needs: plan
     if: fromJSON(needs.plan.outputs.plan).has_windows
-    uses: FreeSynergy/fs-release/.github/workflows/_release-windows.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-windows.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     with:
       plan: ${{ needs.plan.outputs.plan }}
       smoke: ${{ inputs.smoke }}
@@ -92,14 +92,14 @@ jobs:
   macos:
     needs: plan
     if: fromJSON(needs.plan.outputs.plan).has_macos
-    uses: FreeSynergy/fs-release/.github/workflows/_release-macos.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-macos.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     with:
       plan: ${{ needs.plan.outputs.plan }}
 
   flatpak:
     needs: plan
     if: inputs.flatpak
-    uses: FreeSynergy/fs-release/.github/workflows/_release-flatpak.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-flatpak.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     with:
       plan: ${{ needs.plan.outputs.plan }}
       manifest: ${{ inputs.flatpak-manifest }}
@@ -107,7 +107,7 @@ jobs:
   container:
     needs: [plan, linux]
     if: inputs.container
-    uses: FreeSynergy/fs-release/.github/workflows/_release-container.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-container.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     permissions:
       contents: read
       packages: write
@@ -120,7 +120,7 @@ jobs:
   mobile:
     needs: plan
     if: inputs.android || inputs.ios
-    uses: FreeSynergy/fs-release/.github/workflows/_release-mobile.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-mobile.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     with:
       plan: ${{ needs.plan.outputs.plan }}
       android: ${{ inputs.android }}
@@ -129,7 +129,7 @@ jobs:
   finalize:
     needs: [plan, linux, windows, macos, flatpak, container, mobile]
     if: ${{ !cancelled() && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') }}
-    uses: FreeSynergy/fs-release/.github/workflows/_release-finalize.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-finalize.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     permissions:
       contents: write
       id-token: write
@@ -145,7 +145,7 @@ jobs:
   publish:
     needs: [plan, finalize]
     if: ${{ needs.finalize.result == 'success' }}
-    uses: FreeSynergy/fs-release/.github/workflows/_release-publish.yml@main
+    uses: FreeSynergy/fs-release/.github/workflows/_release-publish.yml@94b65516ff38a058244ac4ff282afde7b02d76ac
     permissions:
       contents: write
     with:

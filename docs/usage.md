@@ -126,7 +126,7 @@ Packaging metadata stays in the app repo: `[package.metadata.deb]` and `[package
 
 Inside fs-release, nested workflows and composite actions are referenced as `FreeSynergy/fs-release/...@main`
 (GitHub cannot say "same ref as my caller" across repositories). Before tagging a release of fs-release run
-`scripts/pin-refs.sh v1.0.0`, commit, tag; callers then use `@v1`. Callers may also use `@main` while developing.
+`scripts/pin-refs.sh v1.0.0`, commit, tag; callers then use `@v1`. Callers may also use `@main` while developing. Inside fs-release itself (`.github/workflows/*.yml`) the references are pinned to the full commit SHA of a reviewed state of `main` (the jobs with the signing key must never run a moving ref); raise the SHA on purpose when the actions change.
 
 ### Local checks
 
