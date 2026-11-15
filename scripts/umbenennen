@@ -152,6 +152,15 @@ def catalog_replaces_ok(a):
     return [f"red: the catalog has no entry {a.new!r}"]
 
 
+def pair_is_clean(a, retired):
+    """The pair old -> new is on the list, it is the ONLY entry for the old name, and the new name was not given up since (ADR 0080)."""
+    if (a.old, a.new) not in retired:
+        return False
+    if sum(1 for r_old, _ in retired if r_old == a.old) != 1:
+        return False
+    return not any(r_old == a.new for r_old, _ in retired)
+
+
 def after_problems(a, p):
     problems = []
     for c in p["crates"]:
@@ -168,6 +177,8 @@ def after_problems(a, p):
     retired = read_retired(a.retired)
     if (a.old, a.new) not in retired:
         problems.append(f"red: {a.old} -> {a.new} is not on the retired list (the old name must never be given out again)")
+    elif not pair_is_clean(a, retired):
+        problems.append(f"red: the retired list is inconsistent for {a.old} -> {a.new} (another entry for the old name, or the new name was given up since)")
     return problems
 
 
@@ -198,8 +209,9 @@ def counter(path, red):
 
 def retire(a):
     # The same pair again is a no-op (rc 0): the flow loops back to `umbau` after a red gate or a NO and runs `sperre` again.
-    # Any other entry for the old name (old -> something else) or for the new name as an old one stays red.
-    if a.retired and (a.old, a.new) in read_retired(a.retired) and not name_problems(a, check_retired=False):
+    # Any other entry for the old name (old -> something else) or for the new name as an old one stays red - also for the same pair when the
+    # new name was given up in the meantime (name recycling, ADR 0080) or the list has a second entry for the old name.
+    if a.retired and pair_is_clean(a, read_retired(a.retired)) and not name_problems(a, check_retired=False):
         print(f"already retired, same pair: {a.old} -> {a.new}")
         return 0
     problems = name_problems(a)

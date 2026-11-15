@@ -128,7 +128,6 @@ schedule of `bump.yml` stays as the safety net; there is no token between repos 
 | `net.freesynergy.text.published` | candidate: text/docs repo on a push to main | candidate: docs build | `repo`, `commit` | build into the preview automatic; going public only with an approved source |
 | `net.freesynergy.run.failed` | any workflow when red (`_notify-red.yml`, issue `rot: <workflow> <repo>`, label `rot`; closes at the next green) | the coordinator, by one query: `gh search issues --owner FreeSynergy --label rot --state open` | `workflow`, `repo`, `run_url`, `step` | always allowed (a notice only); there is no status board |
 | `net.freesynergy.approval` | the Opus approval file | `release-flow` step `review` (`listen`) | head | stays a gate |
-| `net.freesynergy.test.done` | the end of the background full workspace run of `testlauf` (the wrapper around `build-slot.sh cargo test --workspace`) | `testlauf` step `voll-ende` (`listen`, subject = the head) | `red`, `runde`, `seconds`, `summary` (only the summary line) | not a gate, only the wait; a missing or foreign event is never green |
 | `net.freesynergy.ci.green` | CI of the pushed branch | `release-flow` step `ci` (`listen`) | head | not a gate, only the wait |
 
 **Mapping to Serverless Workflow 1.0 / what is proven.** Send = `emit.event.with` (`source`, `type`, `subject`, `data`; `id` is made by the

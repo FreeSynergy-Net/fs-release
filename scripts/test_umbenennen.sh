@@ -119,6 +119,18 @@ expect 1 "never given out again" "retire onto a retired name is refused" -- reti
 # shellcheck disable=SC2046
 expect 0 "green" "after is green once retired" -- after $(args "$v")
 
+# --- A1: the same pair is idempotent only while the new name was not given up in the meantime
+printf 'fs-a -> fs-b\nfs-b -> fs-c\n' >"$v/recycle.txt"
+expect 1 "never given out again" "retire a -> b is refused when b was given up (b -> c)" -- retire --old fs-a --new fs-b --retired "$v/recycle.txt"
+printf 'fs-a -> fs-x\nfs-a -> fs-b\n' >"$v/twice.txt"
+expect 1 "already retired" "retire a -> b is refused when the list has another entry for a" -- retire --old fs-a --new fs-b --retired "$v/twice.txt"
+if [ "$(wc -l <"$v/recycle.txt")" -eq 2 ] && [ "$(wc -l <"$v/twice.txt")" -eq 2 ]; then echo "ok   the refused retires wrote nothing"; else echo "FAIL a refused retire wrote"; fails=$((fails + 1)); fi
+cp "$v/retired.txt" "$v/retired.keep"
+printf 'fs-text -> fs-neu\n' >>"$v/retired.txt"
+# shellcheck disable=SC2046
+expect 1 "inconsistent" "after is red when the new name was given up since" -- after $(args "$v")
+cp "$v/retired.keep" "$v/retired.txt"
+
 # --- round counter of `after` (the script counts, rc 3 from the third red round, green resets)
 printf 'Siehe fs-wiki.\n' >"$v/fs-documentation/docs/de/wiki.md"
 st=(--old fs-wiki --new fs-text --repos "$v/fs-wiki" "$v/fs-app" --catalog "$v/fs-catalog" --docs "$v/fs-documentation" --retired "$v/retired.txt" --state "$v/rounds")
