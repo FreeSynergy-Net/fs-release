@@ -1,7 +1,7 @@
 # Convert existing building blocks and Frontends to the layers of ADR 0074: theme contract with fixed block names, DTCG tokens, no fixed colors or spacings in blocks or Frontends, arrangement separate. Goal: new Frontends are built quickly from blocks.
 # The ADR is conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md in fs-documentation.
 # Gate before replacing painted copies by Blinc blocks: bruecke, alle-stile-erweitern, stil-vollstaendigkeit, zwei-stile (plan-theme-bruecke.md).
-# One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters contract, repo,
+# One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters contract, tag, repo,
 # branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -239,6 +239,10 @@ do:
           namespace: freesynergy.net
           name: release-flow
           version: 0.0.6
+        input:
+          repo: ${ .input.repo }
+          tag: ${ .input.tag }
+          prerelease: true
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
