@@ -287,3 +287,14 @@ fn the_release_of_frontend_round_is_skipped_by_a_switch_and_not_by_an_if() {
         std::panic::catch_unwind(|| release_is_skipped_by_a_switch(&gone)).map_or(true, |ok| !ok)
     );
 }
+
+#[test]
+fn the_coordinator_starts_with_the_red_check_and_events_are_net_freesynergy() {
+    assert_eq!(position(&read("coordination-round"), "rot-pruefen"), 0);
+    assert_red("coordination-round", "first step must be `rot-pruefen`", |t| {
+        swapped(&t, "rot-pruefen", "cost-log")
+    });
+    assert_red("release-flow", "does not start with net.freesynergy.", |t| {
+        t.replacen("type: net.freesynergy.release.published", "type: net.example.x", 1)
+    });
+}
