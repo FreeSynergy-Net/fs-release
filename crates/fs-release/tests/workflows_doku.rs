@@ -56,6 +56,9 @@ fn gate_is_sound(text: &str) -> bool {
         && gate.contains("kind: objective")
         && gate.contains("doku-mitziehen:0.0.6@fs")
         && gate.contains("docs_base")
+        && gate.contains("program: ${ .input.programm")
+        && gate.contains("todo/checklisten/<programm>.md")
+        && step_body(text, "schreiben").contains("never delete a ticked item")
         && again.contains("then: eskalation")
         && again.contains(">= 3")
         && again.contains("then: suchen")
@@ -133,6 +136,9 @@ fn counter_a_gate_by_the_agent_or_without_escalation_is_caught() {
         &t.replace("then: eskalation", "then: continue")
     ));
     assert!(!gate_is_sound(&t.replace(">= 3", ">= 99")));
+    // checklist rule: the gate without the program (no checklist check) or without the author's duty is caught
+    assert!(!gate_is_sound(&t.replace("        program: ${ .input.programm", "        zz: ${ .input.programm")));
+    assert!(!gate_is_sound(&t.replace("never delete a ticked item", "delete as you like")));
     assert!(!gate_is_sound(&t.replace("then: suchen", "then: continue")));
     // B2: a skipped result (rc 2, no JSON) must not be green - the green case needs `status == "green"`, the default case escalates
     assert!(!gate_is_sound(

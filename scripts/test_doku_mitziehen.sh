@@ -5,7 +5,7 @@
 #   bash scripts/test_doku_mitziehen.sh
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-tool=(python3 -I "$here/doku-mitziehen")
+tool=(python3 -I "$here/doku-mitziehen" --program fs-test)
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 fails=0
@@ -21,7 +21,8 @@ py="$(command -v python3)"
 mkrepos() { # mkrepos <dir>: <dir>/code and <dir>/docs, one commit each; prints nothing
   mkdir -p "$1/code" "$1/docs/docs/de" "$1/docs/docs/en"
   (cd "$1/code" && g init -q . && echo a >a.rs && g add . && g commit -q -m base)
-  (cd "$1/docs" && g init -q . && echo "# Alt fs-old" >docs/de/a.md && echo "# Old fs-old" >docs/en/a.md &&
+  (cd "$1/docs" && g init -q . && mkdir -p todo/checklisten &&
+    printf '# fs-test\n- [x] **GRUNDSACHE** first (commit abc1234)\n- [ ] **GRUNDSACHE** second\n' >todo/checklisten/fs-test.md && echo "# Alt fs-old" >docs/de/a.md && echo "# Old fs-old" >docs/en/a.md &&
     echo "site_name: x" >mkdocs.yml && g add . && g commit -q -m base)
 }
 base() { g -C "$1" rev-parse HEAD; }
@@ -49,10 +50,27 @@ fresh() { # fresh <name>: new fixture dir in $d, bases in DB/CB
   CB="$(base "$d/code")"
 }
 code_change() { (cd "$d/code" && echo b >>a.rs && g commit -q -am change); }
-docs_both() { (cd "$d/docs" && echo "neu fs-new" >>docs/de/a.md && echo "new fs-new" >>docs/en/a.md && g commit -q -am docs); }
+docs_both() { (cd "$d/docs" && echo "neu fs-new" >>docs/de/a.md && echo "new fs-new" >>docs/en/a.md &&
+  echo '- [x] **GRUNDSACHE** third (commit def5678)' >>todo/checklisten/fs-test.md && g commit -q -am docs); }
+docs_nolist() { (cd "$d/docs" && echo "neu fs-new" >>docs/de/a.md && echo "new fs-new" >>docs/en/a.md && g commit -q -am docs); }
 
 fresh green; code_change; docs_both
 expect 0 "green" "green: code and both languages of the docs changed" "$d" -- --new fs-new
+
+fresh nolist; code_change; docs_nolist
+expect 1 "checklist todo/checklisten/fs-test.md was not updated" "red: docs changed, but not the checklist of the program" "$d" -- --new fs-new
+
+fresh noproof; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** fourth without proof' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "ticked without a proof" "red: ticked without a proof" "$d" --
+
+fresh dropped; code_change; docs_both
+(cd "$d/docs" && sed -i '/first (commit abc1234)/d' todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "a ticked item was removed" "red: a ticked item was removed" "$d" --
+
+fresh nofile; code_change; docs_both
+(cd "$d/docs" && g rm -q todo/checklisten/fs-test.md && g commit -q -m p)
+expect 1 "its checklist todo/checklisten/fs-test.md does not exist" "red: no checklist file" "$d" --
 
 fresh nodocs; code_change
 expect 1 "documentation did not" "red: code changed, docs not" "$d" --
@@ -73,7 +91,7 @@ fresh link; code_change; docs_both
 expect 1 "broken link 'nowhere.md' in docs/de/a.md" "red: broken link" "$d" --
 
 fresh nomk; code_change; docs_both
-out="$(PATH="$tmp/empty" "$py" -I "$here/doku-mitziehen" --docs "$d/docs" --docs-base "$DB" --code "$d/code" \
+out="$(PATH="$tmp/empty" "$py" -I "$here/doku-mitziehen" --program fs-test --docs "$d/docs" --docs-base "$DB" --code "$d/code" \
   --code-base "$CB" --state "$d/state" 2>&1)"
 rc=$?
 if [ "$rc" -eq 2 ] && grep -qF "was NOT run" <<<"$out"; then echo "ok   mkdocs missing is skipped, never green"; else
@@ -103,7 +121,7 @@ rm -f "$(g -C "$d/wt" rev-parse --absolute-git-dir)/doku-mitziehen-runde"
 
 # the JSON of a skipped run is never green (the flow keys on status == green)
 fresh skipjson; code_change; docs_both
-PATH="$tmp/empty" "$py" -I "$here/doku-mitziehen" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" \
+PATH="$tmp/empty" "$py" -I "$here/doku-mitziehen" --program fs-test --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" \
   --state "$d/state" --json "$d/skip.json" >/dev/null 2>&1
 if grep -qF '"status": "skipped"' "$d/skip.json"; then echo "ok   skipped run writes status skipped"; else
   echo "FAIL skipped json"; fails=$((fails + 1)); fi

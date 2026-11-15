@@ -2,7 +2,7 @@
 """Gate doku-mitziehen: a change of code, names, interfaces or behaviour pulls the documentation along in the same run.
 
   python3 -I scripts/doku-mitziehen --docs <fs-documentation clone> --docs-base <sha> [--code <repo> --code-base <sha>]
-        [--old NAME]... [--new NAME]... [--allow GLOB]... [--state FILE] [--json FILE]
+        [--program NAME] [--old NAME]... [--new NAME]... [--allow GLOB]... [--state FILE] [--json FILE]
 
 Deterministic, no network, no AI. Checks (every problem is one line `red: <reason>`):
   1. changed         the code repo changed since --code-base, so the docs clone must have changed since --docs-base
@@ -12,7 +12,10 @@ Deterministic, no network, no AI. Checks (every problem is one line `red: <reaso
                      (docs/, conventions/, mkdocs.yml, README.md), except in files matching --allow (history, ADR text).
   4. new-names       every --new name must appear in the docs at least once.
   5. links           every relative Markdown link in docs/ points to an existing file (anchors are not followed).
-  6. mkdocs          `mkdocs build --strict` of the clone; when mkdocs is missing or broken the result is `skipped`, never green.
+  6. checklist       the code repo changed, so the checklist of the program (docs clone: todo/checklisten/<program>.md, `--program`,
+                     default = folder name of --code) must have changed too; it must exist, every `- [x]` line needs a proof in
+                     parentheses, and no `- [x]` line may disappear (done items stay). A change of the program without its checklist = red.
+  7. mkdocs          `mkdocs build --strict` of the clone; when mkdocs is missing or broken the result is `skipped`, never green.
 The docs clone is only read (the mkdocs build goes to a temporary folder). NOTE: `mkdocs build` runs the hooks and plugins named in
 the mkdocs.yml of the clone, i.e. code of the author's branch; use it only on the own docs repo.
 Round counter: the state file (default `<git dir of the docs clone>/doku-mitziehen-runde`, found with `git rev-parse --absolute-git-dir`,
@@ -76,6 +79,40 @@ def check_changed(a, problems):
     docs = changed(a.docs, a.docs_base, list(DOC_ROOTS))
     if code and not docs:
         problems.append(f"red: the code repo changed ({len(code)} file(s)) but the documentation did not - pull the docs along")
+
+
+CHECKBOX = re.compile(r"^\s*- \[( |x)\] ")
+PROOF = re.compile(r"\([^()]*\S[^()]*\)")
+
+
+def check_checklist(a, problems):
+    """The checklist of the program moves with the program (todo/checklisten/<program>.md of the docs clone)."""
+    if not a.code:
+        return
+    if not changed(a.code, a.code_base):
+        return
+    program = a.program or os.path.basename(os.path.realpath(a.code))
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", program):
+        raise ValueError(f"bad --program {program!r}")
+    rel = f"todo/checklisten/{program}.md"
+    path = os.path.join(a.docs, rel)
+    if not os.path.isfile(path):
+        problems.append(f"red: the program {program} changed but its checklist {rel} does not exist")
+        return
+    if rel not in changed(a.docs, a.docs_base, [rel]):
+        problems.append(f"red: the program {program} changed but its checklist {rel} was not updated (tick, add or note the change)")
+    boxes = 0
+    for n, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
+        if CHECKBOX.match(line):
+            boxes += 1
+            if line.lstrip().startswith("- [x]") and not PROOF.search(line):
+                problems.append(f"red: {rel}:{n} is ticked without a proof in parentheses (commit, tag or picture)")
+    if boxes == 0:
+        problems.append(f"red: {rel} has no `- [ ]` / `- [x]` item")
+    diff = git(a.docs, "diff", a.docs_base, "--", rel).split("\n")
+    for line in diff:
+        if line.startswith("-") and not line.startswith("---") and line[1:].lstrip().startswith("- [x]"):
+            problems.append(f"red: {rel}: a ticked item was removed or reworded ({line[1:].strip()[:60]}); done items stay")
 
 
 def check_de_en(a, problems):
@@ -185,6 +222,7 @@ def main(argv):
     p.add_argument("--docs-base", required=True)
     p.add_argument("--code")
     p.add_argument("--code-base")
+    p.add_argument("--program")
     p.add_argument("--old", action="append", default=[])
     p.add_argument("--new", action="append", default=[])
     p.add_argument("--allow", action="append", default=[])
@@ -200,7 +238,7 @@ def main(argv):
         return 2
     problems, skipped = [], []
     try:
-        for check in (check_changed, check_de_en, check_names, check_links):
+        for check in (check_changed, check_checklist, check_de_en, check_names, check_links):
             check(a, problems)
         check_mkdocs(a, problems, skipped)
     except (ValueError, OSError) as e:
