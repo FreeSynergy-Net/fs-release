@@ -331,7 +331,7 @@ fn red_loops_escalate(text: &str, escalate: &str, skip: &[&str]) -> bool {
                 .and_then(|t| names.iter().position(|n| n == t))
                 .is_some_and(|j| j <= i)
         });
-        goes_to_escalate && first_back.map_or(true, |f| k < f) && human_step(text, escalate)
+        goes_to_escalate && first_back.is_none_or(|f| k < f) && human_step(text, escalate)
     })
 }
 
@@ -516,11 +516,7 @@ fn every_red_loop_of_programm_neu_stops_in_the_third_red_round() {
         &["befunde"]
     ));
     assert!(!red_loops_escalate(
-        &text.replacen(
-            one,
-            &format!("{}", one.replace("then: eskalation", "then: standards")),
-            1
-        ),
+        &text.replacen(one, &one.replace("then: eskalation", "then: standards"), 1),
         "eskalation",
         &["befunde"]
     ));
