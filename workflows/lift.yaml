@@ -1,5 +1,8 @@
 # The lift (`fs-release lift`, crates/fs-release/src/lift): one deterministic command, no LLM. Step names are the names of the
 # Task impls in the code; a test keeps both in step. FS profile: see README.md.
+# Rule doku-mitziehen: the lift only moves dependency tags, but the documentation obligation of the release is kept - `release-flow` runs the step
+# `doku` (sub-workflow doku-mitziehen.yaml) directly after this lift and before the gates and the review. Run alone, a lift that changes names or
+# behaviour is followed by `Workflow doku-mitziehen` for the same repo and delta.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net

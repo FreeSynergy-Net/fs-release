@@ -1,7 +1,7 @@
 # An upstream program has a new release: check it (severity, tag to commit, signature state), pin it in the mirror, check capabilities against the new book,
 # review, tag and push, start the mirror build by hand, publish the draft as Pre-release, raise in the catalog. Security fixes (high, critical) go first.
 # Agents never push, tag or merge. The mirror build only makes a DRAFT; publishing is a step of its own.
-# Order: `Workflow upstream-update, step check-upstream, parameters upstream, repo, from, book, branch, head, delta`.
+# Order: `Workflow upstream-update, step check-upstream, parameters upstream, repo, from, book, branch, head, delta, docs, docs_base, old, new, allow` (the last five feed `doku`).
 # `head` is the commit hash of the mirror branch under review (never a branch name); the YES of the review is bound to exactly this hash. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -95,6 +95,26 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a red gate goes back to pin with the findings as the order; the red rounds are counted (`runde`), from the third one the flow ends in `upstream-eskalation`; green goes on to the review.
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.6
+        input:
+          repo: ${ .input.repo }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml after the local gates: mirror.md, capabilities.md and the pages that name the version are in step with the pin (de and en); without a matching docs change the gate is RED and the flow does not reach the review."
   - head:
       call: resolve-head:0.0.6@fs
       with:

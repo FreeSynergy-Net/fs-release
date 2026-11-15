@@ -1,5 +1,6 @@
 # A bug report from the user to a release: reproduce red, fix, green, release (the one Opus review sits in release-flow). Agents never push, tag or
 # merge. Order: `Workflow bugfix, step <id>, parameters tag, repo, branch, head, delta, finding` (docs/prompt-template.md). FS profile: see README.md.
+# Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -76,6 +77,12 @@ do:
           repo: ${ .input.repo }
           tag: ${ .input.tag }
           prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

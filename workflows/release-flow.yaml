@@ -1,6 +1,7 @@
 # The release flow (`fs-release flow`, crates/fs-release/src/flow): lift, gates, review, tag, push, release, bump, sign.
 # A step marked with a gate halts until somebody else has acted; run again to go on. Nothing is published without the
-# approval of exactly this head. FS profile: see README.md.
+# approval of exactly this head. Between `lift` and `gates` the documentation moves along (`doku`, rule doku-mitziehen; inputs docs, docs_base,
+# old, new, allow besides repo and delta). FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -20,6 +21,26 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow lift.yaml with --commit; red here stops the flow before any review.
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.6
+        input:
+          repo: ${ .input.repo }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml: every change of code, names, interfaces or behaviour of this release pulls the documentation in fs-documentation (de and en) along in the same run; without a matching docs change the gate is RED and the flow stops before any review. The same step covers the release of lift, frontend-round and frontend-umbau, which end here."
   - gates:
       call: gates:0.0.6@fs
       metadata:

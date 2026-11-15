@@ -1,6 +1,7 @@
 # Use a foreign crate UNCHANGED by git pin: no copy, no fork, [patch] only in our own workspace root, our own adapter crate (the wrapper), Cargo.lock checked in, license gate in the GitHub CI (cargo-deny, not local).
 # A pin bump is its own run with the same gates. Agents never push, tag or merge. Order: `Workflow wrapper-einbindung, step <id>,
 # parameters tag, repo, branch, head, delta, crate, rev, wrapper` (docs/prompt-template.md). FS profile: see README.md.
+# Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -98,6 +99,12 @@ do:
           repo: ${ .input.repo }
           tag: ${ .input.tag }
           prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

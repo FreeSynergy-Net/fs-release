@@ -4,6 +4,7 @@
 # (3) COMPOSITION - the arrangement in the Frontend (step build). Agents never push, tag or merge. FS profile: see README.md.
 # Input: contract (the theme contract file), tag (the release tag for release-flow), vorbild (the model program the dossier is about), frontend (OUR program that is built; gap list, style analysis, images and build are about it), bestand (family inventory), blinc (Blinc widget inventory), dossier (folder of the dossier), model (pictures of the model), dump, exceptions,
 # repo, branch, head, delta, release (true or missing = the flow ends with release-flow; `false` = no release here, the caller releases later, e.g. programm-neu).
+# Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -294,6 +295,12 @@ do:
           repo: ${ .input.repo }
           tag: ${ .input.tag }
           prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
