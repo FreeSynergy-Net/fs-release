@@ -408,7 +408,7 @@ fn run_inputs_missing(caller: &str, text: &str) -> Vec<String> {
     let mut missing = vec![];
     for s in step_names(text) {
         let b = step_body(text, &s);
-        let Some(callee) = b
+        let Some(target_flow) = b
             .lines()
             .skip_while(|l| !l.contains("workflow:"))
             .find_map(|l| l.trim().strip_prefix("name: ").map(str::to_string))
@@ -421,7 +421,7 @@ fn run_inputs_missing(caller: &str, text: &str) -> Vec<String> {
             .skip(1)
             .filter_map(|l| l.trim().split_once(": ").map(|(k, _)| k.to_string()))
             .collect();
-        let callee_text = read(&callee);
+        let callee_text = read(&target_flow);
         let mut used: Vec<String> = callee_text
             .split(".input.")
             .skip(1)
@@ -435,7 +435,7 @@ fn run_inputs_missing(caller: &str, text: &str) -> Vec<String> {
         used.dedup();
         for u in used {
             if !given.contains(&u) {
-                missing.push(format!("{caller} step {s} -> {callee}: {u}"));
+                missing.push(format!("{caller} step {s} -> {target_flow}: {u}"));
             }
         }
     }
