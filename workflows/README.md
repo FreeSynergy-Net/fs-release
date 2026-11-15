@@ -32,6 +32,9 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
 - Neues Programm: `programm-neu` (17 Schritte in P0 bis P6, s. u.).
 - Fremdes: `upstream-anfrage` (ein git-bug-Issue an einen Upstream), `upstream-update` (neuer Upstream-Release in Spiegel und Katalog, Sicherheitsfixes zuerst; der Spiegel-Bau erzeugt nur einen Entwurf, die Veröffentlichung ist ein eigener Schritt mit Freigabe; fs-kanidm hat bisher kein Release und keinen Katalog-Eintrag, der erste Lauf legt beides an), `wrapper-einbindung` (fremde Crate per Git-Pin
   unverändert, eigene Wrapper-Crate, Lizenz-Gate in der CI).
+- Server: `server-einrichtung` (Weg A: unsere Schicht auf ein vorhandenes System mit SSH; Bestand, Trockenlauf, Gate, Schicht,
+  Absicherung, Dienste, Prüfung; der Mensch führt `fs-server-run` lokal aus, ohne KI; B kexec, D Plattenumbau sind eigene Workflows),
+  `anbieter-neuinstallation` (Weg C: Hetzner-Rescue und `installimage` mit Konfig aus Variablen durch `scripts/installimage-config`; Gate "Daten werden gelöscht" mit Hostname-Wiederholung; der Mensch führt Rescue und Install aus; danach Übergabe an `server-einrichtung`; Montagsablauf in `docs/anbieter-neuinstallation.md`).
 - Koordinator: `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
   `publish-doc`, `workflow-pflege`.
 - Strategie: `entscheidung` (erst ADR-Suche, dann Auswertung, Nutzerfrage nur bei Abweichung oder Lücke), `adr-write`,
