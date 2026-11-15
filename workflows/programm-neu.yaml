@@ -297,6 +297,38 @@ do:
         freesynergy.net:phase: P2
         freesynergy.net:adr: '0046'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell."
+  - speicher-check:
+      call: storage-typed-check:0.0.6@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { speicher: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0086'
+        freesynergy.net:summary: "Script check (ADR 0086, typed storage): the schema has no JSON and no blob column except `original`; every field of the data model is a typed column of a primitive type; the round trip import - store - export loses nothing. Red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - speicher-again:
+      switch:
+        - runden:
+            when: '${ ($context.speicher.red and ($context.speicher.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.speicher.red }'
+            then: datenmodell
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0086'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell (typed columns, no JSON or blob)."
   - schnittstelle:
       call: interface-ai:0.0.6@fs
       with:
@@ -811,28 +843,6 @@ do:
         freesynergy.net:phase: P5
         freesynergy.net:adr: '0077'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to pakete."
-  - doku:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: doku-mitziehen
-          version: 0.0.6
-        input:
-          repo: ${ .input.repo }
-          delta: ${ .input.delta }
-          docs: ${ .input.docs }
-          docs_base: ${ .input.docs_base }
-          old: ${ .input.old }
-          new: ${ .input.new }
-          allow: ${ .input.allow }
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:phase: P5
-        freesynergy.net:adr: '0077'
-        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml: the documentation of the new program (pages in de and en, links, catalog and manifest texts, the dossier links) is in step with the code; without a matching docs change the gate is RED. It follows the packages and comes before the one release review."
   - release:
       run:
         workflow:
@@ -856,7 +866,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:phase: P5
         freesynergy.net:adr: '0077'
-        freesynergy.net:summary: "After language, security and packages (the Frontend round did not release, `release: false`): release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge, push or tag."
+        freesynergy.net:summary: "After language, security and packages (the Frontend round did not release, `release: false`): release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge, push or tag. The documentation moves along inside release-flow (its step `doku`, rule doku-mitziehen, before the review; the docs main branch is pushed there only after the approval), so programm-neu has no own `doku` step."
   - server-lauf:
       call: server-run-human:0.0.6@fs
       with:

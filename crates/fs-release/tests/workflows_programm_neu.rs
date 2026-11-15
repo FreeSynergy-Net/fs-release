@@ -691,3 +691,43 @@ fn sub_workflows_get_every_input_they_read_and_the_dossier_is_the_models() {
         1
     )));
 }
+
+/// ADR 0086: after the data model comes the script check of the typed storage; red goes back to the data model, the third red round escalates.
+fn storage_check_is_sound(text: &str) -> bool {
+    let c = step_body(text, "speicher-check");
+    let a = step_body(text, "speicher-again");
+    position(text, "modell-again") < position(text, "speicher-check")
+        && position(text, "speicher-check") < position(text, "speicher-again")
+        && position(text, "speicher-again") < position(text, "schnittstelle")
+        && c.contains("actor: machine")
+        && c.contains("kind: objective")
+        && c.contains("storage-typed-check")
+        && c.contains("adr: '0086'")
+        && a.contains("then: datenmodell")
+        && a.contains(">= 3")
+        && a.contains("then: eskalation")
+}
+
+#[test]
+fn the_typed_storage_is_checked_after_the_data_model_adr_0086() {
+    let text = read(FLOW);
+    assert!(storage_check_is_sound(&text));
+    assert!(!storage_check_is_sound(
+        &text.replace("storage-typed-check", "an-agent-looks")
+    ));
+    assert!(!storage_check_is_sound(
+        &text.replace("adr: '0086'", "adr: '0046'")
+    ));
+    let b = step_body(&text, "speicher-again");
+    assert!(!storage_check_is_sound(&text.replacen(
+        &b,
+        &b.replace("then: datenmodell", "then: continue"),
+        1
+    )));
+    assert!(!storage_check_is_sound(&swapped(
+        &text,
+        "speicher-check",
+        "schnittstelle"
+    )));
+    assert!(!step_names(&text).contains(&"doku".to_string()));
+}

@@ -1,8 +1,8 @@
 # An upstream program has a new release: check it (severity, tag to commit, signature state), pin it in the mirror, check capabilities against the new book,
 # review, tag and push, start the mirror build by hand, publish the draft as Pre-release, raise in the catalog. Security fixes (high, critical) go first.
 # Agents never push, tag or merge. The mirror build only makes a DRAFT; publishing is a step of its own.
-# Order: `Workflow upstream-update, step check-upstream, parameters upstream, repo, from, book, branch, head, delta, docs, docs_base, old, new, allow` (the last five feed `doku`).
-# `head` is the commit hash of the mirror branch under review (never a branch name); the YES of the review is bound to exactly this hash. FS profile: see README.md.
+# Order: `Workflow upstream-update, step check-upstream, parameters upstream, repo, from, book, branch, delta, docs, docs_base, old, new, allow` (the last five feed `doku`; `head` only on re-entry at step `head` or `review`).
+# `head` is the commit hash of the mirror branch under review (never a branch name); it is created by `pin` and resolved by the step `head`; the input `head` exists only when the run re-enters at `head` or `review`. The YES of the review is bound to exactly this hash. An escalation of `doku` ends in `upstream-eskalation`; the docs main branch is pushed only after the approval (`doku-veroeffentlichen`). FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -109,12 +109,27 @@ do:
           old: ${ .input.old }
           new: ${ .input.new }
           allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml after the local gates: mirror.md, capabilities.md and the pages that name the version are in step with the pin (de and en); without a matching docs change the gate is RED and the flow does not reach the review."
+  - doku-weiter:
+      switch:
+        - eskaliert:
+            when: '${ $context.doku.eskaliert == true or $context.doku.status != "green" }'
+            then: upstream-eskalation
+        - weiter:
+            then: continue
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml after the local gates: mirror.md, capabilities.md and the pages that name the version are in step with the pin (de and en); without a matching docs change the gate is RED and the flow does not reach the review."
+        freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review. Only green goes on."
   - head:
       call: resolve-head:0.0.6@fs
       with:
@@ -126,7 +141,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Resolves the branch to the commit hash of its tip (git rev-parse, read only; the output is the hash itself) after the local gates; the hash must equal the input `head`, otherwise the flow stops. From here on only this hash counts, never the branch name.
+        freesynergy.net:summary: "Resolves the branch to the commit hash of its tip (git rev-parse, read only; the output is the hash itself) after the local gates. In a run from step 1 there is no input `head` (the head only exists since `pin`): the resolved hash is `$context.head`. Only when the run re-enters at `head` or `review` and the input `head` is given must the hash equal it, otherwise the flow stops. From here on only this hash counts, never the branch name."
   - review:
       run:
         workflow:
@@ -196,21 +211,46 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The coordinator starts the mirror build by hand (workflow_dispatch of mirror.yml with draft_release=true); the build does not start by itself. It builds from source at the pinned commit (refuses if the tag no longer resolves to it), adds source tarball and SBOM, signs, and creates a DRAFT release only.
   - wait-build:
-      listen:
-        to:
-          one:
-            with:
-              type: net.freesynergy.ci.green
-              subject: ${ $context.head }
-      timeout:
-        after:
-          hours: 2
+      try:
+        - warten:
+            listen:
+              to:
+                one:
+                  with:
+                    type: net.freesynergy.ci.green
+                    subject: ${ $context.head }
+            timeout:
+              after:
+                hours: 2
+      catch:
+        errors:
+          with:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+        do:
+          - build-ohne-ergebnis:
+              set:
+                timeout: true
+              export:
+                as: '${ $context + { build: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The flow waits for the CI result of exactly this run of mirror.yml (the event carries the head hash as subject; an event of another head is ignored). A red run sends no green event, so after 2 hours (timeout) without one the flow ends the flow in `upstream-eskalation`; nothing is published.
+        freesynergy.net:summary: The flow waits for the CI result of exactly this run of mirror.yml (the event carries the head hash as subject; an event of another head is ignored). A red run sends no green event; the timeout of 2 hours is an error of the task and is caught here (`try`/`catch` on the timeout error, SW 1.0) - it sets `build.timeout`, and the next step `build-weiter` sends the flow to `upstream-eskalation`; nothing is published.
+  - build-weiter:
+      switch:
+        - zeit:
+            when: '${ $context.build.timeout == true }'
+            then: upstream-eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - no green CI event of this head within 2 hours means `upstream-eskalation` (the person decides); a green event goes on to the Pre-release.
   - publish:
       call: publish-release:0.0.6@fs
       with:
@@ -222,6 +262,18 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: mirror.yml never publishes. The person or the coordinator turns the draft into a Pre-release, only with the YES of strategy or the user for exactly this head; this is a step of its own, not a pipeline behaviour.
+  - doku-veroeffentlichen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: publish-doc
+          version: 0.0.6
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, only AFTER the review (opus-ja) and the approval of the code, together with its merge; never before, never forced; the agent never pushes."
   - catalog-entry:
       call: catalog-entry:0.0.6@fs
       with:

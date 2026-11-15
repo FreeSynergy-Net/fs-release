@@ -1,7 +1,9 @@
 # Rule: every change of code, names, interfaces or behaviour pulls the documentation in fs-documentation along in the SAME run
 # (official docs are always current, DE and EN together). A change without a matching docs change turns the gate RED.
 # Used as a sub-workflow (`run: workflow`) by programm-neu, release-flow (so also by lift, frontend-round, frontend-umbau), upstream-update
-# and umbenennen. Agents never push, tag or merge; the push of the docs main branch is the human step of publish-doc.
+# and umbenennen. Agents never push, tag or merge. This flow does NOT publish: the push of the docs main branch (sub-workflow publish-doc, human) is a step
+# of the calling flow AFTER its review and approval (and after the merge of the code), never before.
+# Output: `status` (green | red | skipped) and `eskaliert` (true = the person decides; the caller must stop and not go on to its review).
 # Input: repo (the code repo), delta (`<old>..<new>`, the left part is the base of the code change), docs (clone or worktree of fs-documentation),
 # docs_base (commit of the docs branch at the start of the run), old / new (lists of names that were given up / came in; may be empty), allow (globs of
 # docs files that may keep an old name: history, ADR text).
@@ -64,42 +66,38 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script `scripts/doku-mitziehen` (Python, no network, no AI) - RED when the code changed and the docs did not, when only one of docs/de and docs/en changed, when an old name is left in the docs, a new name is missing, a relative link is broken, or `mkdocs build --strict` fails. A skipped check (mkdocs missing) is never green (rc 2). The result carries `red` (true = back) and `runde` (red rounds counted by the script in its state file); the third red round goes to `eskalation`. Self test `scripts/test_doku_mitziehen.sh`.
+        freesynergy.net:summary: Script `scripts/doku-mitziehen` (Python, no network, no AI) - RED when the code changed and the docs did not, when only one of docs/de and docs/en changed, when an old name is left in the docs, a new name is missing, a relative link is broken, or `mkdocs build --strict` fails. A skipped check (mkdocs missing) is never green (rc 2). The result carries `status` (green | red | skipped), `red` (true = back) and `runde` (red rounds counted by the script in its state file, per git worktree); the third red round goes to `eskalation`; `skipped` (rc 2) is never green. Self test `scripts/test_doku_mitziehen.sh`.
   - gate-again:
       switch:
         - runden:
-            when: '${ ($context.doku.red and ($context.doku.runde // 0) >= 3) }'
+            when: '${ ($context.doku.red == true and ($context.doku.runde // 0) >= 3) }'
             then: eskalation
         - red:
-            when: '${ $context.doku.red }'
+            when: '${ $context.doku.red == true }'
             then: suchen
         - green:
-            then: continue
+            when: '${ $context.doku.status == "green" }'
+            then: end
+        - skipped:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - red goes back to `suchen` (a fresh work list), from the third red round the flow ends in `eskalation` (the person decides); green leaves the flow, the caller goes on. There is no way past a red gate.
-  - veroeffentlichen:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: publish-doc
-          version: 0.0.6
-      metadata:
-        freesynergy.net:actor: human
-        freesynergy.net:actor-type: Person
-        freesynergy.net:gate: human
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, together with the merge of the code (never before the code is approved, never forced); the agent never pushes.
+        freesynergy.net:summary: Control flow - red goes back to `suchen` (a fresh work list), from the third red round the flow ends in `eskalation` (the person decides); only `status == "green"` leaves the flow and the caller goes on; every other result (a skipped check such as mkdocs missing, bad input, no result at all) is NOT green and goes to `eskalation` too. There is no way past a red or skipped gate.
   - eskalation:
       set:
         todo: doku-eskalation
+        eskaliert: true
+      export:
+        as: '${ $context + { doku: . } }'
       then: end
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The gate was red for the third time: the loop stops and the person decides (the change may need no docs, then the reason is written into the review; the gate is not switched off). The report names the last red lines. This flow ends."
+        freesynergy.net:summary: "The gate was red for the third time or a check did not run (skipped): the loop stops and the person decides (the change may need no docs, then the reason is written into the review; the gate is not switched off). The report names the last red lines. This flow ends with `eskaliert: true`; the caller stops there and does not go on to its review."
+output:
+  as: '${ { status: ($context.doku.status // "skipped"), eskaliert: ($context.doku.eskaliert // false) } }'
