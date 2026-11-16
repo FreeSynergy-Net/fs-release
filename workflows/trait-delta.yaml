@@ -3,8 +3,8 @@
 # Order: `Workflow trait-delta, step <id>, parameters programm, trait, ziel_crate, standard, vorbild, features, ordner, probe, repo, branch, head, delta, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
 # Inputs: programm (name after the naming rule, ADR 0087), trait (`<programm>_v1`, e.g. `tasks_v1`; the name is a capability or data, not a kind of app), standard (AS2, JSCalendar, JSContact, ValueFlows, ... or `eigen`), vorbild (model dossier) and features (feature list of the program: what the trait must carry) as the reference, ordner (draft folder, default `.scratch/pilot-<x>/<trait>`; the FIXED place is binding, see rule 8), `ziel_crate` (the crate of the program repo that carries the trait as public API, e.g. `fs-people-directory`), probe (throw-away probe crate under `.scratch/probe/<name>`).
 # Order: standard-recherche -> Opus draft -> compile probe -> Opus review (line 1 YES/NO) -> the strategy fixes the folder (hash) -> conformance test / fake -> docs -> release only after the lock. Every check is green only when it says so (`red == false`); a missing result goes to `eskalation`, never on.
-# Delimitation. `programm-grundgeruest` / `grundfassung`: the basics may start with a MINIMAL contract (only what the first window shows) and run in parallel to this flow (the draft starts with step 1 of the basics, the scaffold is built against the draft, the review of the basics checks the server against the LOCKED trait); their release-flow starts only when this flow ended `green` (`release_frei`). `kern-umbau` (the rebuild of an existing core onto the new core / ADR 0086 storage; it changes the inside and keeps the trait as it is) changes the INSIDE of a program and keeps the trait as it is; this flow changes or creates the OUTSIDE (the contract). A change of a locked trait is never part of `kern-umbau`.
-# Rules. (1) A locked folder (`sperren/<trait>.sha256`) changes only on the word of the user or the decision of the strategy: this flow starts a locked trait only as `<x>_v2` or as a part trait (step `gesperrt-weiche`). (2) The hash lock is a WORKING FIXPOINT (rules.md [FIXPUNKT]): it makes parallel runs build against the same state and may be moved (release, change, Opus look, new hash). The FEATURE FREEZE (the final lock) is set only on the word of the user after the hand test, his collection of ideas and the feature comparison: no agent and no strategy sets it, nobody says "done" or "frozen". (3) Rule "interfaces before release": before the FIRST release a locked trait is replaced by a v2 without further ado (no users, no migration): the old folder stays as `sperren/alt/` hash history, not as a copy. (4) [BRUECKE-BEIDE-SEITEN]: the data interface and the standard are built at the same time as the basics and the frontend, never from the surface alone. (5) capnp only append-only (evolution rule in the head of every file). (6) Files at most 300 lines, one `//! Pattern:` line each, `#[non_exhaustive]` only on enums, no default methods (as in the trait round). (8) PLACE (binding, decision b7): the folder `<trait>_v<n>/` lies in the program repo in the crate that carries the trait as public API (example `fs-people-directory/src/person_directory_v1`); `draft/` in the testdata crate ONLY while the trait is a draft; when the fixpoint is set the folder moves to the fixed place; the capnp contract lies ALWAYS in `fs-interfaces/schema/<x>.capnp` (plus the line in `capabilities.txt`). (7) No backup copies of what git holds ([PLATTE]); probe sources and every target under `/srv/FreeSynergy/.scratch/...`, never under /tmp ([EIGENES-TARGET]); build and test only through build-slot.sh, at most one slot.
+# Delimitation. `programm-grundgeruest` / `grundfassung`: the basics may start with a MINIMAL contract (only what the first window shows) and run in parallel to this flow (the draft starts with step 1 of the basics, the scaffold is built against the draft, the review of the basics checks the server against the LOCKED trait); A BASIC VERSION (`grundfassung`: only window + "what is coming" + docs, stores no data through the contract) may release as v0.0.1 without the trait lock, the contract is visibly marked "draft" in README/catalog; `release_frei` is mandatory before the first feature release (data through the contract) (decision b7). `kern-umbau` (the rebuild of an existing core onto the new core / ADR 0086 storage; it changes the inside and keeps the trait as it is) changes the INSIDE of a program and keeps the trait as it is; this flow changes or creates the OUTSIDE (the contract). A change of a locked trait is never part of `kern-umbau`.
+# Rules. (1) A locked folder (`sperren/<trait>.sha256`) changes only on the word of the user or the decision of the strategy: this flow starts a locked trait only as `<x>_v2` or as a part trait (step `gesperrt-weiche`). (2) The hash lock is a WORKING FIXPOINT (rules.md [FIXPUNKT]): it makes parallel runs build against the same state and may be moved (release, change, Opus look, new hash). The FEATURE FREEZE (the final lock) is set only on the word of the user after the hand test, his collection of ideas and the feature comparison: no agent and no strategy sets it, nobody says "done" or "frozen". (3) Rule "interfaces before release": before the FIRST release a locked trait is replaced by a v2 without further ado (no users, no migration): the old folder stays as `sperren/alt/` hash history, not as a copy. (4) [BRUECKE-BEIDE-SEITEN]: the data interface and the standard are built at the same time as the basics and the frontend, never from the surface alone. (5) capnp only append-only (evolution rule in the head of every file). (6) Files at most 300 lines, one `//! Pattern:` line each, `#[non_exhaustive]` only on enums, no default methods (as in the trait round). (7) No backup copies of what git holds ([PLATTE]); probe sources and every target under `/srv/FreeSynergy/.scratch/...`, never under /tmp ([EIGENES-TARGET]); build and test only through build-slot.sh, at most one slot. (8) PLACE (binding, decision b7): the folder `<trait>_v<n>/` lies in the program repo in the crate that carries the trait as public API (example `fs-people-directory/src/person_directory_v1`); `draft/` in the testdata crate ONLY while the trait is a draft; when the fixpoint is set the folder moves to the fixed place; the capnp contract lies ALWAYS in `fs-interfaces/schema/<x>.capnp` (plus the line in `capabilities.txt`).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -59,12 +59,13 @@ do:
       with:
         trait: ${ .input.trait }
         hash: ${ $context.lage.hash }
+      then: end
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: strategie-ok
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Decision of the strategy (or the user): the locked folder stays UNCHANGED. Either a NEW trait (`<x>_v2` or a part trait; before the first release replaced without further ado, rule 3) or the fixpoint is released, changed, looked at by Opus and set again with a new hash (rules.md [FIXPUNKT]; the change report names the hash before and after). Without a decision the flow stops here; nothing in the locked folder is touched."
+        freesynergy.net:summary: "Decision of the strategy (or the user): the locked folder stays UNCHANGED. Either a NEW trait (`<x>_v2` or a part trait; before the first release replaced without further ado, rule 3) or the fixpoint is released, changed, looked at by Opus and set again with a new hash (rules.md [FIXPUNKT]; the change report names the hash before and after). Without a decision the flow stops here; nothing in the locked folder is touched. The flow ends here; after the decision a new run starts with the new `trait` (`<x>_v2`/part trait) or after the fixpoint was released."
   - standard-recherche:
       call: standard-research-ai:0.0.10@fs
       with:
@@ -201,6 +202,19 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script (`tools/hash-ordner.sh <ordner>`, read only) - the reproducible SHA-256 of the draft folder as it was reviewed; it must be the hash of the JA; returns `sha256` and `trait` (`$context.sperre`)."
+  - hash-weiche:
+      switch:
+        - gleich:
+            when: '${ $context.sperre.sha256 == $context.review.hash }'
+            then: continue
+        - anderer-hash:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the fixpoint applies only to the hash of the JA: the folder hash equals the hash of the review, otherwise `eskalation`."
   - strategie-fixpunkt:
       listen:
         to:
@@ -349,7 +363,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - the gate before every release of the program: `sperren/<trait>.sha256` exists, equals the folder hash, equals the schema and capability state in fs-interfaces, and the conformance gates and the docs gate are green. Only then `release_frei` is true; a basics flow (`grundfassung`, `programm-grundgeruest`) hands its head to `release-flow` only with `release_frei == true`. The tag is set by the strategy's helper, never by an agent."
+        freesynergy.net:summary: "Script - the gate before every release of the program: `sperren/<trait>.sha256` exists, equals the folder hash, equals the schema and capability state in fs-interfaces, and the conformance gates and the docs gate are green. Only then `release_frei` is true; a basics flow hands its head to `release-flow` as a basic version (v0.0.1, contract marked as a draft) without the lock; `release_frei == true` is mandatory before the first feature release (data through the contract) (decision b7). The tag is set by the strategy's helper, never by an agent."
   - fertig:
       set:
         status: green
