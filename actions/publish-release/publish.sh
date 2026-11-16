@@ -51,7 +51,10 @@ grep -qxF SHA256SUMS.txt.asc <<<"$names" || fail "SHA256SUMS.txt has no detached
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 FPR="16A4A3EE563AEF51FCF0C55DED7B57C4A1904342"   # 16A4 A3EE 563A EF51 FCF0 C55D ED7B 57C4 A190 4342
 assets="$tmp/assets"; mkdir -p "$assets"
-gh release download "$TAG" --dir "$assets"
+gh release download "$TAG" --dir "$assets" || die "$REPO $TAG stays a draft: the download of the assets failed"
+# the folder holds exactly the files `gh release view` named (a file attached later, or one that did not download, is a problem)
+have=$(cd "$assets" && printf '%s\n' * | sort)
+[[ "$have" == "$(sort <<<"$names")" ]] || die "$REPO $TAG stays a draft: the downloaded files differ from the release assets"
 "$here/../../scripts/verify_release_assets.sh" "$assets" "$here/../../release-signing-key.asc" "$FPR" || die "$REPO $TAG stays a draft: hash or signature check failed"
 if [[ "${ATTEST:-true}" == "true" ]]; then
   for f in "$assets"/*; do
@@ -65,5 +68,5 @@ if [[ "$dry" == "true" ]]; then
   echo "dry-run: $REPO $TAG passes all checks ($listed files) - would run: gh release edit $TAG --draft=false --prerelease"
   exit 0
 fi
-gh release edit "$TAG" --draft=false --prerelease --latest=false
+gh release edit "$TAG" --draft=false --prerelease --latest=false || die "$REPO $TAG: gh release edit failed, the release stays a draft"
 echo "$REPO $TAG published as Pre-release"

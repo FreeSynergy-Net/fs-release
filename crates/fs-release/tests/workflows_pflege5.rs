@@ -35,7 +35,7 @@ fn counter_an_own_review_step_before_the_release_is_caught() {
     let text = read("frontend-umbau");
     let doubled = text.replacen(
         "  - release:",
-        "  - review:\n      call: review-ai:0.0.9@fs\n  - release:",
+        "  - review:\n      call: review-ai:0.0.10@fs\n  - release:",
         1,
     );
     assert_ne!(doubled, text);
@@ -140,8 +140,8 @@ fn upstream_anfrage_has_the_channel_choice_before_the_send() {
 fn counter_channel_as_machine_or_after_the_send_is_caught() {
     let text = read("upstream-anfrage");
     let machine = text.replacen(
-        "  - choose-channel:\n      call: choose-channel:0.0.9@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: human",
-        "  - choose-channel:\n      call: choose-channel:0.0.9@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
+        "  - choose-channel:\n      call: choose-channel:0.0.10@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: human",
+        "  - choose-channel:\n      call: choose-channel:0.0.10@fs\n      with:\n        upstream: ${ .input.upstream }\n      export:\n        as: '${ $context + { channel: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
         1,
     );
     assert_ne!(machine, text);
@@ -170,8 +170,8 @@ fn wrapper_einbindung_compares_licenses_by_script() {
 fn counter_a_license_compare_by_the_agent_is_caught() {
     let text = read("wrapper-einbindung");
     let changed = text.replacen(
-        "call: license-compare:0.0.9@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
-        "call: license-compare:0.0.9@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
+        "call: license-compare:0.0.10@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
+        "call: license-compare:0.0.10@fs\n      with:\n        crate: ${ .input.crate }\n      export:\n        as: '${ $context + { license: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
         1,
     );
     assert_ne!(changed, text);

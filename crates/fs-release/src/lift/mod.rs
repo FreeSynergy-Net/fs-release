@@ -2,6 +2,7 @@
 
 mod checks;
 mod commit;
+mod lockpin;
 mod opts;
 mod report;
 mod run;

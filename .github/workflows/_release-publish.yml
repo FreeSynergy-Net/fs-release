@@ -15,6 +15,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: FreeSynergy/fs-release/actions/publish-release@f1211066d0072c6319678659e845c19ae4384bd0
         with:

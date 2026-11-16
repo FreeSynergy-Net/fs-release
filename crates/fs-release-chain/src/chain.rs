@@ -15,7 +15,7 @@ use crate::registry;
 pub struct Chain {
     pub chain: String,
     pub version: String,
-    /// Command catalog and its version, `fs/0.0.9`.
+    /// Command catalog and its version, `fs/0.0.10`.
     pub catalog: String,
     pub steps: Vec<StepDecl>,
 }

@@ -158,7 +158,25 @@ impl Task<LiftEnv<'_>> for LockSources {
             env.script("gates-lock.sh"),
             env.opts.repo_dir.display().to_string(),
         ];
-        verdict("lock-sources", &env.exec("bash", args, vec![])?)
+        let ok = verdict("lock-sources", &env.exec("bash", args, vec![])?)?;
+        // From the lift run to V1+ (FS_LIFT_V1PLUS=1) the step is red until the repo has the new pin and `strict = true`.
+        let v1plus = env
+            .opts
+            .env
+            .iter()
+            .any(|(k, v)| k == "FS_LIFT_V1PLUS" && v == "1")
+            || std::env::var("FS_LIFT_V1PLUS").is_ok_and(|v| v == "1");
+        if v1plus {
+            let dir = &env.opts.repo_dir;
+            let read = |p: &str| std::fs::read_to_string(dir.join(p)).ok();
+            if let Some(p) = super::lockpin::problem(
+                read(".github/workflows/check.yml").as_deref(),
+                read(".fs-lock-sources.toml").as_deref(),
+            ) {
+                return Err(Stop::red(p));
+            }
+        }
+        Ok(ok)
     }
 }
 

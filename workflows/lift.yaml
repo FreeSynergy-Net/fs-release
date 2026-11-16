@@ -7,11 +7,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: lift
-  version: 0.0.9
+  version: 0.0.10
   title: Lift a program onto new fs-components / fs-interfaces tags
 do:
   - deps:
-      call: deps:0.0.9@fs
+      call: deps:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -19,7 +19,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Set the git tag of every fs-components / fs-interfaces dependency in the workspace.
   - lock:
-      call: lock:0.0.9@fs
+      call: lock:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -27,7 +27,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: cargo update --workspace, then prove Cargo.lock holds the asked tags.
   - lock-gate:
-      call: lock-gate:0.0.9@fs
+      call: lock-gate:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -35,7 +35,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Exactly one Blinc source in Cargo.lock, and it is on the approved list.
   - fmt:
-      call: fmt:0.0.9@fs
+      call: fmt:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -43,7 +43,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:may-fail: red is recorded, the next checks still run
   - clippy:
-      call: clippy:0.0.9@fs
+      call: clippy:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -51,7 +51,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:may-fail: red is recorded, the next checks still run
   - clippy-stable:
-      call: clippy-stable:0.0.9@fs
+      call: clippy-stable:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -60,7 +60,7 @@ do:
         freesynergy.net:summary: The CI-strict run, stable toolchain, --locked, pedantic.
         freesynergy.net:may-fail: red is recorded, the next checks still run
   - rules:
-      call: rules:0.0.9@fs
+      call: rules:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -68,7 +68,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:may-fail: red is recorded, the next checks still run
   - tests:
-      call: tests:0.0.9@fs
+      call: tests:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -76,7 +76,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:may-fail: red is recorded, the next checks still run
   - yaml-check:
-      call: yaml-check:0.0.9@fs
+      call: yaml-check:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -85,15 +85,15 @@ do:
         freesynergy.net:summary: Every .github/workflows/*.yml parses as YAML (and passes actionlint when installed); skipped, never green, without PyYAML.
         freesynergy.net:may-fail: red is recorded, the commit is blocked
   - lock-sources:
-      call: lock-sources:0.0.9@fs
+      call: lock-sources:0.0.10@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Lock check `scripts/gates-lock.sh` (one source per shared library in every Cargo.lock, scripts/lock-sources.toml). Warning first, error later: a lift to V1+ (fs-types from the repo FreeSynergy/fs-types, one tag of each library) ALSO raises the fs-release pin in .github/workflows/check.yml to the tag >= 0.0.10 and sets `strict = true` in the repo's `.fs-lock-sources.toml` (optionally `only_from_enabled = true`); after that the same step is red on a second source. These two edits are done by the person or agent that lifts; the step only reports."
+        freesynergy.net:summary: "Lock check `scripts/gates-lock.sh` (one source per shared library in every Cargo.lock, scripts/lock-sources.toml). Warning first, error later: a lift to V1+ (fs-types from the repo FreeSynergy/fs-types, one tag of each library) ALSO raises the fs-release pin in .github/workflows/check.yml to the tag >= 0.0.10 and sets `strict = true` in the repo's `.fs-lock-sources.toml` (optionally `only_from_enabled = true`); after that the same step is red on a second source. These two edits are done by the person or agent that lifts; the step reports. It becomes RED (not only a report) when the lift is the V1+ lift (env `FS_LIFT_V1PLUS=1`, set by the V1+ round, never earlier so that no repo is blocked before) and the fs-release pin of `.github/workflows/check.yml` is a tag older than v0.0.10 (a `@main` or commit pin is not compared) or `.fs-lock-sources.toml` lacks `strict = true`."
   - commit:
-      call: commit:0.0.9@fs
+      call: commit:0.0.10@fs
       if: ${ .input.commit }
       metadata:
         freesynergy.net:actor: machine

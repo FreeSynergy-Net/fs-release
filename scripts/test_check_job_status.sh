@@ -19,6 +19,11 @@ sed '/^    if: \${{ needs.finalize/d' "$fx/old.yml" > "$tmp/noif.yml"; chk "no i
 cat "$fx/new.yml" > "$tmp/deep.yml"; printf '  after:\n    needs: publish\n    runs-on: ubuntu-24.04\n    steps: [{ run: "true" }]\n' >> "$tmp/deep.yml"
 chk "a transitive descendant without status function is red" "$tmp/deep.yml" 1
 sed 's/!cancelled() \&\& needs.plan/always() \&\& needs.plan/' "$fx/new.yml" > "$tmp/al.yml"; chk "always() counts as a status function" "$tmp/al.yml" 0
+# chain A (always) -> B (success()) -> C (no if): C has no DIRECT lax parent; only the transitive check sees it
+printf 'on: push\njobs:\n  a:\n    if: always()\n    runs-on: x\n    steps: [{ run: "true" }]\n  b:\n    needs: a\n    if: success()\n    runs-on: x\n    steps: [{ run: "true" }]\n  c:\n    needs: b\n    runs-on: x\n    steps: [{ run: "true" }]\n' > "$tmp/chain.yml"
+chk "chain A(always) -> B(success()) -> C(no if): C is red" "$tmp/chain.yml" 1
+sed 's/out |= {p} | ancestors(p, seen + (n,))/out |= {p}/' "$tool" > "$tmp/mutd.py"
+chk "mutant (only direct needs) passes the chain, so the transitive test is real" "$tmp/chain.yml" 0 "$tmp/mutd.py"
 chk "the real repo is green" "$here/.." 0
 sed 's/LAX = re.compile(.*/LAX = re.compile(r"(?!)")/' "$tool" > "$tmp/mut.py"
 chk "mutant (lax pattern emptied) lets the old line through, so the red test is real" "$fx/old.yml" 0 "$tmp/mut.py"

@@ -29,7 +29,32 @@ if ! command -v gpg >/dev/null; then pass "verify-assets: gpg missing, skipped";
   # mutant: the VALIDSIG primary-fingerprint comparison removed -> the foreign-signer case would pass (so the test above is real)
   sed 's/if (\$12==w) ok=1/ok=1/' "$ROOT/scripts/verify_release_assets.sh" > "$TV/mut.sh"; chmod +x "$TV/mut.sh"
   mk other; "$TV/mut.sh" "$TV/a" "$TV/good.asc" "$FPR" >/dev/null 2>&1 && pass "verify-assets: mutant (signer comparison removed) lets the foreign signer through, so the red test is real" || fail "verify-assets: mutant must pass the foreign signer"
+  # B1: a signing SUBKEY signs (VALIDSIG field 3 is the subkey, field 12 the primary): green; a revoked subkey and an expired key: red
+  sk() { # <dir> <name> [expire] [fake time]: primary (cert) + signing subkey
+    mkdir -p "$TV/gen/$1"; chmod 700 "$TV/gen/$1"; local g=(env GNUPGHOME="$TV/gen/$1") ft=(); [ -n "${4:-}" ] && ft=(--faked-system-time "$4")
+    "${g[@]}" gpg --batch --quiet "${ft[@]}" --passphrase '' --pinentry-mode loopback --quick-generate-key "$2 <t@example.org>" ed25519 cert "${3:-never}" 2>/dev/null
+    SF=$("${g[@]}" gpg --batch --with-colons --list-keys 2>/dev/null | awk -F: '$1=="fpr"{print $10; exit}')
+    "${g[@]}" gpg --batch --quiet "${ft[@]}" --passphrase '' --pinentry-mode loopback --quick-add-key "$SF" ed25519 sign "${3:-never}" 2>/dev/null; }
+  sg() { # <dir> [fake time]: sign the three files of $TV/a with that home
+    local ft=(); [ -n "${2:-}" ] && ft=(--faked-system-time "$2")
+    for f in f1.txt f2.txt SHA256SUMS.txt; do GNUPGHOME="$TV/gen/$1" gpg --batch --yes "${ft[@]}" --detach-sign --armor -o "$TV/a/$f.asc" "$TV/a/$f" 2>/dev/null; done; }
+  sk sub subkey; SUBF=$SF; GNUPGHOME="$TV/gen/sub" gpg --batch --armor --export > "$TV/sub.asc" 2>/dev/null
+  mk; sg sub; "$ROOT/scripts/verify_release_assets.sh" "$TV/a" "$TV/sub.asc" "$SUBF" >"$TV/out" 2>&1 && pass "verify-assets: signed by a signing SUBKEY of the right primary is green" || fail "verify-assets: subkey signature must be green: $(cat "$TV/out")"
+  sed 's/if (\$12==w) ok=1/if ($3==w) ok=1/' "$ROOT/scripts/verify_release_assets.sh" > "$TV/mut3.sh"; chmod +x "$TV/mut3.sh"
+  "$TV/mut3.sh" "$TV/a" "$TV/sub.asc" "$SUBF" >/dev/null 2>&1 && fail "verify-assets: mutant field 3 instead of 12 must be caught by the subkey case" || pass "verify-assets: mutant (field 3 instead of primary field 12) is red on the subkey case"
+  printf 'key 1\nrevkey\ny\n0\n\ny\nsave\n' | GNUPGHOME="$TV/gen/sub" gpg --batch --command-fd 0 --edit-key "$SUBF" >/dev/null 2>&1
+  GNUPGHOME="$TV/gen/sub" gpg --batch --armor --export > "$TV/subrev.asc" 2>/dev/null
+  "$ROOT/scripts/verify_release_assets.sh" "$TV/a" "$TV/subrev.asc" "$SUBF" >"$TV/out" 2>&1 && fail "verify-assets: a REVOKED signing subkey must be red" || pass "verify-assets: a signature by a revoked subkey is red"
+  check_in "verify-assets: revoked/expired is named" "$(cat "$TV/out")" "revoked or expired"
+  sed -e 's/(REVKEYSIG|EXPKEYSIG|EXPSIG|KEYREVOKED|BADSIG|ERRSIG)/(NEVERMATCHES)/' -e "s/'^\\\\\[GNUPG:\\\\\] GOODSIG'/VALIDSIG/" "$ROOT/scripts/verify_release_assets.sh" > "$TV/mutr.sh"; chmod +x "$TV/mutr.sh"
+  "$TV/mutr.sh" "$TV/a" "$TV/subrev.asc" "$SUBF" >/dev/null 2>&1 && pass "verify-assets: mutant lets the revoked subkey through" || fail "verify-assets: rejection mutant must pass the revoked subkey"
+  sk exp expired 2d 20200101T000000; EXPF=$SF; GNUPGHOME="$TV/gen/exp" gpg --batch --armor --export > "$TV/exp.asc" 2>/dev/null
+  mk; sg exp 20200102T000000
+  "$ROOT/scripts/verify_release_assets.sh" "$TV/a" "$TV/exp.asc" "$EXPF" >"$TV/out" 2>&1 && fail "verify-assets: an EXPIRED key must be red" || pass "verify-assets: a signature by an expired key is red"
+  # mutant: without the REVKEYSIG/EXPKEYSIG/KEYREVOKED rejection AND the GOODSIG requirement (either one alone is enough to stay red) both cases would be green (so these tests are real)
+  "$TV/mutr.sh" "$TV/a" "$TV/exp.asc" "$EXPF" >/dev/null 2>&1 && pass "verify-assets: mutant (rejection list removed) lets the expired key through, so the red test is real" || fail "verify-assets: rejection mutant must pass the expired key"
+  # mutant: GOODSIG requirement removed does not matter when VALIDSIG is there; the check is kept for a status line without GOODSIG (not testable with gpg alone)
   [[ -z "$(ls -A "$TV/rt")" ]] && pass "verify-assets: no GNUPGHOME left in RUNNER_TEMP" || fail "verify-assets: left in RUNNER_TEMP: $(ls -A "$TV/rt")"
-  GNUPGHOME="$TV/gen/good" gpgconf --kill gpg-agent 2>/dev/null; GNUPGHOME="$TV/gen/other" gpgconf --kill gpg-agent 2>/dev/null
+  for h in good other sub exp; do GNUPGHOME="$TV/gen/$h" gpgconf --kill gpg-agent 2>/dev/null; done; GNUPGHOME="$TV/gen/other" gpgconf --kill gpg-agent 2>/dev/null
   unset RUNNER_TEMP
 fi

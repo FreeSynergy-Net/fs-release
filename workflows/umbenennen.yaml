@@ -13,11 +13,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: umbenennen
-  version: 0.0.9
+  version: 0.0.10
   title: Rename a program - repo, crates, catalog with replaces, docs, pins - the old name is never given out again
 do:
   - trockenlauf:
-      call: rename-dry-run:0.0.9@fs
+      call: rename-dry-run:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -62,7 +62,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The plan of the dry run (crates, files, pins, catalog, docs) is looked at and accepted by the strategy before any file is changed; the approval event must carry the subject `<old>-><new>` (exactly this plan), an approval for anything else does not open the gate. The first run of a rename also needs the user's yes for the rename (ADR 0080 F1).
   - umbau:
-      call: rename-ai:0.0.9@fs
+      call: rename-ai:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -75,7 +75,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "In the worktree branch of the program (not in main) - crates `<old>-*` become `<new>-*` (Cargo.toml, imports, binary names, the link of the old binary name if ADR 0063 asks for it), CI files (release, typing-test, windows), release chain allowlist, package names; the catalog entry of the new name with `replaces = [old]` (ADR 0080, schema 2) in a branch of fs-catalog; pins in other repos only on the new tag (a later run, never a path dependency). Only what the plan lists. Own worktree, local commits ([COMMIT]), no push, no tag, no rename of a GitHub repo; gates one at a time ([GATES], [BASH]); report per [BERICHT]. (L1) Write mode (the scaffold `scripts/umbenennen rename` exists, honours `--allow`, refuses a dirty tree and leaves pin URLs `github.com/FreeSynergy/<old>` alone until step `pins`; its lock part and the FS_<X>_* environment variables are (Spezifikation, Skript folgt): the env form is only reported and not replaced, it is a decision of its own via `keep`), in this order and only with the script (not by hand): `git mv` of the crate folders `crates/<old>-*` to `crates/<new>-*`; replacement of `<old>-` and `<old>_` with word boundary in `*.toml`, `*.rs`, `*.md` and `Cargo.lock` (the `keep` entries are skipped); the lock is renamed with the crates; then `cargo metadata --locked` (step `lock` below, (Spezifikation, Skript folgt)). (L5) CI comments: in `.github/workflows/release.yml` (and the other CI files) the comments that name the old program are renamed too, otherwise the next reader finds the old name again; a branch with open work in the repo (e.g. `r4-admin`) is brought to main first (a human step, not this one)."
   - lock:
-      call: rename-lock-check:0.0.9@fs
+      call: rename-lock-check:0.0.10@fs
       with:
         branch: ${ .input.branch }
       export:
@@ -103,7 +103,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red lock check goes back to `umbau` with the cargo lines (the write mode is run again on the same branch, the script is idempotent: names already renamed are a no-op); from the third red round (`runde`) the flow ends in `eskalation`; only `red == false` goes on. A run without a result is not green."
   - sperre:
-      call: rename-retire:0.0.9@fs
+      call: rename-retire:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -119,7 +119,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-mitziehen
-          version: 0.0.9
+          version: 0.0.10
         input:
           repo: ${ .input.repos[0] }
           branch: ${ .input.branch }
@@ -151,7 +151,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review. Only green goes on."
   - nachher:
-      call: rename-after:0.0.9@fs
+      call: rename-after:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -189,7 +189,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - red goes back to `umbau` with the lines of the check, from the third red round the flow ends in `eskalation`; a run without a result is not green and goes to `eskalation` too.
   - gates:
-      call: repo-gates:0.0.9@fs
+      call: repo-gates:0.0.10@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -215,7 +215,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - red goes back to `umbau`, the third red round ends in `eskalation`.
   - head:
-      call: resolve-head:0.0.9@fs
+      call: resolve-head:0.0.10@fs
       with:
         branch: ${ .input.branch }
       export:
@@ -231,7 +231,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.9
+          version: 0.0.10
         input:
           repo: ${ .input.repos[0] }
           branch: ${ .input.branch }
@@ -275,7 +275,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The approval gate before the GitHub rename - the strategy OK (approval file, event with the subject `$context.kopf.head`) for exactly this head (and this pair old -> new, bound by the plan approval); an approval of another head or subject does not open it; without it nothing is renamed, merged or pushed. The dry run (step `trockenlauf`) can be run alone at any time; it changes nothing and needs no approval.
   - merge:
-      call: merge-ff:0.0.9@fs
+      call: merge-ff:0.0.10@fs
       with:
         into: main
       metadata:
@@ -285,7 +285,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The human or the coordinator fast-forwards main of the program and of the repos with changed pins to the approved head (NOT fs-catalog, that is the own last step `katalog`) (no merge commit, never forced); only after the approval for exactly this head; agents never do. (L5) Before it, the human pushes both branches (program and docs, `unreviewed/...` branches named in the plan) - the push is a human step, not an agent step. The rename on GitHub below runs on this state of main. Order after the umbau (strategy) - code merge (this step), GitHub rename, docs merge, switch the remotes, catalog with replaces, name lock in effect.
   - github-umbenennen:
-      call: rename-github:0.0.9@fs
+      call: rename-github:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -300,7 +300,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: publish-doc
-          version: 0.0.9
+          version: 0.0.10
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -308,7 +308,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, only AFTER the review (opus-ja) and the approval of the code, together with its merge; never before, never forced; the agent never pushes. (L5) Doku-Merge erst NACH der GitHub-Umbenennung (`github-umbenennen`): davor zeigen die Links auf github.com/FreeSynergy/<new> und liefern 404 (mkdocs --strict prueft externe Links nicht). Reihenfolge nach dem Umbau (Strategie): Code-Merge (`merge`), GitHub-Umbenennung, Doku-Merge (hier), danach lokale Remotes umstellen (`remotes`), dann Katalog mit replaces (`katalog`, letzter Schritt)."
   - remotes:
-      call: rename-remotes:0.0.9@fs
+      call: rename-remotes:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -320,7 +320,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "(L5) After the GitHub rename and after the docs merge the local remotes are switched (`git remote set-url origin` to the new URL, in every checkout of the changed repos); the old URL redirects, the new one is the truth. Human or coordinator, never an agent."
   - pins:
-      call: rename-pins:0.0.9@fs
+      call: rename-pins:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -333,7 +333,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script `scripts/umbenennen rename --pins` (it runs only now, AFTER the GitHub rename and the remotes): replaces the pin URLs `github.com/FreeSynergy/<old>` by `<new>` in the repos that carry pins (`--allow` keeps history pages, a dirty tree is refused). The normal `rename` of `umbau` leaves these URLs as they are, because before the GitHub rename the new URL would 404. The change is a local commit in its own branch and goes through a short review and a human fast-forward like every other change; agents never push."
   - weiterleitung:
-      call: rename-redirect-check:0.0.9@fs
+      call: rename-redirect-check:0.0.10@fs
       with:
         old: ${ .input.old }
         new: ${ .input.new }
@@ -344,7 +344,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Read only - `git ls-remote` on the old and the new URL answers with the same refs (clone redirect). NOT proven: the redirect of release assets after the rename (ADR 0080, open) - the first release as the new name downloads from the new URL."
   - katalog:
-      call: merge-ff:0.0.9@fs
+      call: merge-ff:0.0.10@fs
       with:
         into: main
         repo: ${ .input.catalog }
@@ -359,7 +359,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.9
+          version: 0.0.10
         input:
           repo: ${ .input.new }
           tag: ${ .input.tag }
