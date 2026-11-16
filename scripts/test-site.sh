@@ -26,8 +26,8 @@ printf '%s\n' "# allowed signing keys" "$appr" > "$t/allowed"
 
 # --- the folder (written here: no placeholder pages are kept in git; the input of site-bauen is a folder a person approved)
 mkdir -p "$t/src/de"; printf 'p{color:#111}\n@media (prefers-color-scheme:dark){p{color:#eee}}\n' > "$t/src/s.css"
-printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \047self\047; script-src \047none\047"><title>t</title><link rel="stylesheet" href="s.css"></head><body><p>hello</p><a href="https://example.org/x">out</a> <a href="/de/">de</a></body></html>\n' > "$t/src/index.html"
-printf '<!doctype html>\n<html lang="de"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \047self\047"><title>t</title></head><body><p>hallo</p></body></html>\n' > "$t/src/de/index.html"
+printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \047self\047; script-src \047none\047; object-src \047none\047; base-uri \047none\047; form-action \047none\047"><title>t</title><link rel="stylesheet" href="s.css"></head><body><p>hello</p><a href="https://example.org/x">out</a> <a href="/de/">de</a></body></html>\n' > "$t/src/index.html"
+printf '<!doctype html>\n<html lang="de"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \047self\047; script-src \047none\047; object-src \047none\047; base-uri \047none\047; form-action \047none\047"><title>t</title></head><body><p>hallo</p></body></html>\n' > "$t/src/de/index.html"
 # the one place of the host names: site.toml (fixture values only; no template, script or test other than fixtures names a host)
 mktoml() { # file primary mode [alias]
   printf 'schema = 1\npurpose = "website"\n[names]\nprimary = "%s"\naliases = [%s]\n[dns]\nrecords = ["A", "AAAA", "CAA"]\n[acme]\nmethod = "http-01"\n[csp]\nmode = "%s"\n' "$2" "${4:+\"$4\"}" "$3" > "$1"; }
@@ -61,10 +61,10 @@ tm toolong "$(printf 'schema = 1\npurpose = "website"\n[names]\nprimary = "%s"\n
 grn "site.toml: the control of the long-name case is a valid name when it is short (the rule is the length)" bash -c "cp -r '$t/src' '$t/f-shortctl' && printf 'schema = 1\\npurpose = \"website\"\\n[names]\\nprimary = \"%s\"\\n[acme]\\nmethod = \"http-01\"\\n' 'a.example.org' > '$t/f-shortctl/site.toml' && '$B' check '$t/f-shortctl'"
 cp -r "$t/src" "$t/f-nlname"; : > "$t/f-nlname/"$'a.html\n'; red "folder: a file name with a line break is refused" "$B" check "$t/f-nlname"
 # mutations of site_manifest.py: the old `$` anchor and the missing length rule turn the cases green
-mkdir -p "$t/mut3"; cp "$here/site_manifest.py" "$t/mut3/site_manifest.py"; sed -i 's/DOMAIN.fullmatch(n)/DOMAIN.match(n + "")/; s/^DOMAIN = re.compile(r"(/DOMAIN = re.compile(r"^(/; s/{2,63}")  # used/{2,63}$")  # used/' "$t/mut3/site_manifest.py"
-grep -q 'DOMAIN.match' "$t/mut3/site_manifest.py" && ok "mutation: the old \`^...\$\` match put into a copy" || bad "mutation: site_manifest sed did not apply"
+mkdir -p "$t/mut3"; cp "$here/site_manifest.py" "$t/mut3/site_manifest.py"; sed -i 's/return DOMAIN1.fullmatch(n) is not None/return re.compile(r"^" + DOMAIN1.pattern + r"$").match(n) is not None/' "$t/mut3/site_manifest.py"
+grep -q 'r"^" + DOMAIN1.pattern' "$t/mut3/site_manifest.py" && ok "mutation: the old \`^...\$\` match put into a copy" || bad "mutation: site_manifest sed did not apply"
 grn "mutation control: with the old \`$\` anchor the name with a line break is GREEN" python3 -I "$t/mut3/site_manifest.py" "$t/f-nl-primary/site.toml"
-cp "$here/site_manifest.py" "$t/mut3/site_manifest.py"; sed -i 's/len(n) > 253 or //' "$t/mut3/site_manifest.py"
+cp "$here/site_manifest.py" "$t/mut3/site_manifest.py"; sed -i 's/if len(n) > 253:/if False:/' "$t/mut3/site_manifest.py"
 grn "mutation control: without the length rule the name of 316 characters is GREEN" python3 -I "$t/mut3/site_manifest.py" "$t/f-toolong/site.toml"
 rm -rf "$t/f-cspm"; cp -r "$t/src" "$t/f-cspm"; mktoml "$t/f-cspm/site.toml" helfa.org passthrough; red "site.toml: csp.mode passthrough in a static check is refused" "$B" check "$t/f-cspm"
 
@@ -156,7 +156,7 @@ s = open(p).read(); s = re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*
 PY
   red "folder: $1 is refused" "$B" check "$t/f-$1"; }
 nocsp csp-missing ''
-nocsp csp-unsafe-inline "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self' 'unsafe-inline'\">"
+nocsp csp-unsafe-inline "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; style-src 'self' 'unsafe-inline'\">"
 nocsp csp-external-host '<meta http-equiv="Content-Security-Policy" content="default-src https://x.test">'
 nocsp csp-no-default "<meta http-equiv=\"Content-Security-Policy\" content=\"img-src 'self'\">"
 nocsp csp-wildcard '<meta http-equiv="Content-Security-Policy" content="default-src *">'
@@ -210,10 +210,72 @@ grn "mutation control: with svg/style/math on the tag list the svg-style markup 
 red "mutation: the tag list changed, the svg-style-img bypass is still red (the strict tag grammar is a second, independent wall)" "$t/mut2/site-bauen.sh" check "$t/f-svg-style-img"
 mutate backslash 's/if "\\\\" in value or CTRL.search(value) or re.search(r"\\s", value):/if False:/'
 grn "mutation control: without the backslash rule the backslash address is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-backslash-src"
-mutate csp 's/if not rest or rest\[0\]\[0\] != "meta" or (rest\[0\]\[1\].get("http-equiv") or "").lower() != "content-security-policy":/if False:/'
+mutate csp 's/^    want = ("html", "head", "meta", "meta")$/    return None/'
 grn "mutation control: without the required CSP meta a page without it is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-csp-missing"
 mutate cspvalue 's/if not toks\[1:\] or any(t not in ("'"'self'"'", "'"'none'"'") for t in toks\[1:\]):/if False:/'
 grn "mutation control: without the policy value rule unsafe-inline is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-csp-unsafe-inline"
+# H1: the page policy is as strict as the exporter's (script-src 'self' would let the scripts of the site run in the page)
+CSPM() { printf '<meta http-equiv="Content-Security-Policy" content="%s">' "$1"; }
+nocsp csp-script-self "$(CSPM "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'")"
+nocsp csp-default-only "$(CSPM "default-src 'self'")"
+nocsp csp-no-base-uri "$(CSPM "default-src 'self'; script-src 'none'; object-src 'none'; form-action 'none'")"
+nocsp csp-form-self "$(CSPM "default-src 'self'; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'")"
+rm -rf "$t/f-csp-none-ok"; cp -r "$t/src" "$t/f-csp-none-ok"; sed -i "s#content=\"default-src 'self'; script-src#content=\"default-src 'none'; img-src 'self'; script-src#" "$t/f-csp-none-ok/index.html"
+grn "folder: the policy with default-src 'none' and the four 'none' passes (control of the strict-policy cases)" "$B" check "$t/f-csp-none-ok"
+mutate cspnone 's/^    for d in CSP_NONE:$/    for d in ():/'
+grn "mutation control: without the four-'none' rule script-src 'self' is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-csp-script-self"
+# A1: the CSP meta must be the FIRST element of <head> right after <meta charset>, nothing but white space before it (text or a character reference closes <head> in a browser: the meta then lands in <body> and is ignored, measured)
+hc() { # name from to: replaces the first `from` of index.html by `to`
+  rm -rf "$t/f-$1"; cp -r "$t/src" "$t/f-$1"
+  python3 -I - "$t/f-$1/index.html" "$2" "$3" <<'PY'
+import sys
+p, a, b = sys.argv[1:4]; s = open(p).read(); assert a in s, a
+open(p, "w").write(s.replace(a, b, 1))
+PY
+}
+CH='<meta charset="utf-8"><meta http-equiv'
+for c in "head-nbsp-between|&nbsp;" "head-text-between|x" "head-entity-space|&#32;" "head-entity-hex|&#x20;" "head-title-between|<title>t</title>" "head-viewport-between|<meta name=\"viewport\" content=\"width=device-width\">"; do
+  IFS='|' read -r n x <<<"$c"; hc "$n" "$CH" "<meta charset=\"utf-8\">$x<meta http-equiv"; red "folder: $n (something between <meta charset> and the CSP meta) is refused" "$B" check "$t/f-$n"
+done
+hc head-text-before-charset '<head><meta charset' '<head>x<meta charset'; red "folder: text right after <head> is refused" "$B" check "$t/f-head-text-before-charset"
+hc head-text-before-head '<html lang="en"><head>' '<html lang="en">x<head>'; red "folder: text between <html> and <head> is refused" "$B" check "$t/f-head-text-before-head"
+hc head-text-before-html '<html lang="en">' 'x<html lang="en">'; red "folder: text before <html> is refused" "$B" check "$t/f-head-text-before-html"
+hc head-no-charset '<meta charset="utf-8">' ''; red "folder: a page without <meta charset> is refused (charset is mandatory)" "$B" check "$t/f-head-no-charset"
+hc head-charset-latin '<meta charset="utf-8">' '<meta charset="iso-8859-1">'; red "folder: another charset is refused" "$B" check "$t/f-head-charset-latin"
+python3 -I - "$t/src/index.html" "$t/f-head-csp-first" "$t" <<'PY'
+import re, shutil, sys
+src, dst, t = sys.argv[1:4]
+shutil.copytree(t + "/src", dst); s = open(src).read()
+m = re.search(r'(<meta charset="utf-8">)(<meta http-equiv="Content-Security-Policy"[^>]*>)', s)
+open(dst + "/index.html", "w").write(s.replace(m.group(0), m.group(2) + m.group(1), 1))
+PY
+red "folder: the CSP meta before <meta charset> is refused (charset first, then the CSP)" "$B" check "$t/f-head-csp-first"
+hc head-ws-newline "$CH" "<meta charset=\"utf-8\">
+<meta http-equiv"; grn "folder: line break between <meta charset> and the CSP meta passes (the exporter writes one)" "$B" check "$t/f-head-ws-newline"
+mutate headoff 's/^    want = ("html", "head", "meta", "meta")$/    return None/'
+grn "mutation control: with the head check switched off the nbsp page is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-head-nbsp-between"
+mutate headws 's/pos = re.compile(f"{WS}\*").match(t, pos).end()/pos = re.compile("[^<]*").match(t, pos).end()/'
+grn "mutation control: with text allowed between the head elements the nbsp page is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-head-nbsp-between"
+grn "mutation control: with text allowed there the text-between page is GREEN too" "$t/mut2/site-bauen.sh" check "$t/f-head-text-between"
+# A2: xhtml:link in the sitemap only as rel="alternate" (a browser loads rel=stylesheet from a sitemap)
+sm() { rm -rf "$t/f-$1"; cp -r "$t/src" "$t/f-$1"; printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url><loc>https://one.example.org/</loc>%s</url></urlset>\n' "$2" > "$t/f-$1/sitemap.xml"; }
+sm sitemap-ok '<xhtml:link rel="alternate" hreflang="de" href="https://one.example.org/de/"/>'; grn "folder: sitemap with rel=alternate passes (control)" "$B" check "$t/f-sitemap-ok"
+sm sitemap-stylesheet '<xhtml:link rel="stylesheet" hreflang="de" href="https://fremd.test/x.css"/>'; red "folder: sitemap xhtml:link rel=stylesheet to a foreign host is refused" "$B" check "$t/f-sitemap-stylesheet"
+sm sitemap-stylesheet-rel '<xhtml:link rel="stylesheet" hreflang="de" href="x.css"/>'; red "folder: sitemap xhtml:link rel=stylesheet (relative) is refused" "$B" check "$t/f-sitemap-stylesheet-rel"
+sm sitemap-alt-stylesheet '<xhtml:link rel="alternate stylesheet" hreflang="de" href="https://fremd.test/x.css"/>'; red "folder: sitemap rel=\"alternate stylesheet\" is refused" "$B" check "$t/f-sitemap-alt-stylesheet"
+sm sitemap-icon '<xhtml:link rel="icon" hreflang="de" href="https://fremd.test/x.ico"/>'; red "folder: sitemap rel=icon is refused" "$B" check "$t/f-sitemap-icon"
+sm sitemap-no-rel '<xhtml:link hreflang="de" href="https://fremd.test/x.css"/>'; red "folder: sitemap xhtml:link without rel is refused" "$B" check "$t/f-sitemap-no-rel"
+sm sitemap-upper-rel '<xhtml:link rel="ALTERNATE" hreflang="de" href="https://one.example.org/de/"/>'; red "folder: sitemap rel=ALTERNATE (not exactly alternate) is refused" "$B" check "$t/f-sitemap-upper-rel"
+mutate sitemaprel 's/if k == "rel" and v != "alternate":/if False:/'
+grn "mutation control: without the rel rule the stylesheet link in the sitemap is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-sitemap-stylesheet"
+# H2: what the exporter does not write is not on the list
+fc not-span index.html '<span>x</span>'
+fc not-dl index.html '<dl><dt>a</dt><dd>b</dd></dl>'
+fc not-tel index.html '<a href="tel:+491234">x</a>'
+fc not-rel-icon index.html '<link rel="icon" href="a.ico">'
+fc not-dir index.html '<p dir="rtl">x</p>'
+fc not-aria-hidden index.html '<p aria-hidden="true">x</p>'
+fc not-aria-labelledby index.html '<p aria-labelledby="t">x</p>'
 mutate css 's/^CSS_BAD = .*/CSS_BAD = (/; s/^           "<", .*$/           )/'
 grn "mutation control: without the CSS rules the escaped url( is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-css-escape-url"
 cp -r "$t/src" "$t/bad-link"; ln -s /etc/passwd "$t/bad-link/x.txt"; red "folder: symlink refused" "$B" check "$t/bad-link"

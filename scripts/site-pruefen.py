@@ -6,10 +6,13 @@ usage: python3 -I site-pruefen.py [--passthrough] <folder>     exit 0 = folder o
 Mode static (default): ALLOWLIST, not a blocklist (Zentinel 26.11_2 sends no CSP on static routes, so this check is the only wall). File types by ending:
   html css txt xml json png jpg jpeg gif webp avif ico woff2 webmanifest toml (no svg, no js).
   html: strict tag grammar (every `<` starts a plain tag, double-quoted attribute values, no comment/CDATA/declaration), only the tags and attributes
-    the exporter fs-text-html writes (no svg, math, style, noscript, template, script, frame ...), all URL attributes relative (a href also http, https, mailto,
-    tel; link canonical/alternate also http, https), no backslash/space/control character in an address, no style attribute, no inline style; and a
-    PAGE-OWN Content-Security-Policy <meta> (default-src 'self' or 'none', values only 'self'/'none') as the first element of <head> after <meta charset>.
-  xml: sitemaps only (urlset, sitemapindex). css: a fixed style sheet: no url(), no @-rule but @media, no backslash (CSS escapes), no image-set.
+    the exporter fs-text-html writes (no svg, math, style, noscript, template, script, frame ...), all URL attributes relative (a href also http, https, mailto;
+    link canonical/alternate also http, https), no backslash/space/control character in an address, no style attribute, no inline style; and the PAGE-OWN
+    Content-Security-Policy <meta> as the FIRST element of <head>, in exactly the frame the exporter writes: `<!DOCTYPE html>`, `<html>`, `<head>`, `<meta charset="utf-8">`,
+    `<meta http-equiv="Content-Security-Policy" ...>`, with nothing but white space in between (any other text or character reference before it makes the browser close
+    <head> early and drop the meta, measured with Firefox). The policy is as strict as the exporter's: default-src 'self' or 'none', script-src, object-src, base-uri and
+    form-action 'none', every other value only 'self'/'none'.
+  xml: sitemaps only (urlset, sitemapindex; xhtml:link only rel="alternate" with hreflang and href). css: a fixed style sheet: no url(), no @-rule but @media, no backslash (CSS escapes), no image-set.
 Mode --passthrough (a person's own HTML, possibly with JavaScript, is passed through): the same file types plus js and mjs, no content rules for
   html/css/js/svg, but a log line per file (stdout, `log: <path> sha256 size [script] [external]`) so the passing is on record; the Content-Security-
   Policy of the web server (templates/site, CSP_MODE) is the second wall.
@@ -36,22 +39,26 @@ SECRET_TEXT = re.compile(rb"(password|passwort|secret|token)[ \t]*[=:]", re.I)
 
 # --- mode static: ALLOWLIST (what the exporter fs-text-html writes, fs-text-html/DESIGN.md "Rules of the export"). Zentinel 26.11_2 sends no CSP on
 # static routes, so this check is the only wall: whatever is not listed here is refused, nothing is "parsed and judged".
-HTML_TAGS = {"html", "head", "meta", "title", "link", "body", "a", "header", "nav", "main", "footer", "div", "section", "aside", "p", "span", "ul", "ol",
-             "li", "dl", "dt", "dd", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "code", "table", "thead", "tbody", "tr", "th", "td", "blockquote",
+# Every entry is something fs-text-html writes (frame.rs, render*.rs, table.rs, nav.rs, atoms.rs; raw.rs lets details summary sub sup kbd u mark br through). Not written
+# by the exporter and therefore NOT listed: span, dl/dt/dd, tel: links, rel=icon, dir, aria-hidden/-describedby/-labelledby. A wider list needs a reason per entry here.
+HTML_TAGS = {"html", "head", "meta", "title", "link", "body", "a", "header", "nav", "main", "footer", "div", "section", "aside", "p", "ul", "ol",
+             "li", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "code", "table", "thead", "tbody", "tr", "th", "td", "blockquote",
              "em", "strong", "del", "hr", "br", "img", "sup", "sub", "kbd", "u", "mark", "details", "summary", "input", "label"}
 # NOT in the list on purpose: svg math style script noscript template xmp plaintext textarea iframe object embed base form button select audio video source
 # (raw-text, foreign-content and plug-in elements: where a parser and a browser read the same bytes differently, or where script or a fetch starts).
 HTML_VOID = {"meta", "link", "hr", "br", "img", "input"}
-GLOBAL_ATTRS = {"class", "id", "lang", "title", "role", "dir", "aria-label", "aria-current", "aria-hidden", "aria-describedby", "aria-labelledby"}
+GLOBAL_ATTRS = {"class", "id", "lang", "title", "role", "aria-label", "aria-current"}
 TAG_ATTRS = {"html": {"lang"}, "meta": {"charset", "name", "content", "http-equiv"}, "link": {"rel", "href", "hreflang"},
              "a": {"href", "hreflang"}, "img": {"src", "alt", "width", "height", "loading"}, "input": {"type", "disabled", "checked"},
-             "ol": {"start"}, "th": {"scope"}, "td": {"scope"}, "details": {"open"}, "code": set(), "li": set()}
+             "ol": {"start"}, "th": {"scope"}, "details": {"open"}}
 IDENT = re.compile(r"^[A-Za-z0-9_:. -]{0,200}$")
 LANG = re.compile(r"^[A-Za-z0-9-]{1,35}$")
 NUM = re.compile(r"^[0-9]{1,6}$")
-LINK_RELS = {"stylesheet", "canonical", "alternate", "icon"}
+LINK_RELS = {"stylesheet", "canonical", "alternate"}
 CSP_DIRECTIVES = {"default-src", "script-src", "style-src", "img-src", "font-src", "connect-src", "object-src", "base-uri", "form-action", "media-src",
                   "manifest-src", "frame-src", "child-src", "worker-src"}
+# the exporter's strict policy (fs-text-html frame.rs `Csp::Strict`): these four are always 'none'; a page whose script-src may be 'self' is not accepted
+CSP_NONE = ("script-src", "object-src", "base-uri", "form-action")
 SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 WS = "[ \t\n\r\f]"
 TAG = re.compile(rf"<(/?)([A-Za-z][A-Za-z0-9:_-]*)((?:{WS}+[A-Za-z][A-Za-z0-9:_-]*(?:{WS}*={WS}*\"[^\"<>]*\")?)*){WS}*(/?)>")
@@ -67,7 +74,7 @@ CSS_BAD = ("url(", "@import", "expression(", "javascript:", "behavior", "-moz-bi
 
 
 def url_bad(value: str, how: str) -> str | None:
-    """Reason why a URL value is refused, else None. how: `rel` (relative only), `link` (relative, http, https, mailto, tel), `page` (relative, http, https)."""
+    """Reason why a URL value is refused, else None. how: `rel` (relative only), `link` (relative, http, https, mailto), `page` (relative, http, https)."""
     if not value:
         return "empty address"
     if "\\" in value or CTRL.search(value) or re.search(r"\s", value):
@@ -80,13 +87,13 @@ def url_bad(value: str, how: str) -> str | None:
     sch = m.group(0)[:-1].lower()
     if how == "rel":
         return f"{sch}: not a relative address"
-    if sch in ("http", "https") or (how == "link" and sch in ("mailto", "tel")):
+    if sch in ("http", "https") or (how == "link" and sch == "mailto"):
         return None
     return f"{sch}: URL is not allowed here"
 
 
 def csp_bad(content: str) -> str | None:
-    """The page's own policy must be strict: default-src 'self' or 'none', every value only 'self' or 'none', known directives only."""
+    """The page's own policy must be as strict as the exporter's: default-src 'self' or 'none', script-src/object-src/base-uri/form-action 'none', every value only 'self' or 'none', known directives only."""
     seen: dict[str, list[str]] = {}
     for part in content.split(";"):
         toks = part.split()
@@ -99,6 +106,9 @@ def csp_bad(content: str) -> str | None:
         seen[toks[0].lower()] = toks[1:]
     if "default-src" not in seen:
         return "policy has no default-src"
+    for d in CSP_NONE:
+        if seen.get(d) != ["'none'"]:
+            return f"policy needs {d} 'none' (as the exporter writes it; 'self' there would let scripts of the site run)"
     return None
 
 
@@ -170,7 +180,7 @@ def check_html(text: str) -> list[str]:
             bad += check_tag(name, attrs)
     except ValueError as e:
         bad.append(str(e))
-    bad += check_head(starts)
+    bad += check_head(text.lstrip("\ufeff"), starts)
     return bad
 
 
@@ -216,20 +226,35 @@ def check_tag(name: str, a: dict) -> list[str]:
     return out
 
 
-def check_head(starts: list[tuple[str, dict]]) -> list[str]:
-    """A page must open with <html>, <head>, optionally <meta charset>, and THEN its own Content-Security-Policy <meta>: before anything that loads."""
+def head_prefix(text: str) -> str | None:
+    """The page must open EXACTLY as the exporter writes it: DOCTYPE, <html>, <head>, <meta charset="utf-8">, then the Content-Security-Policy <meta>; only white space between.
+    Any text or character reference before the CSP meta (`<meta charset>&nbsp;<meta CSP>`) makes a browser close <head>, move the meta into <body> and ignore it."""
+    t = text.lstrip("\ufeff")
+    m = DOCTYPE.match(t)
+    pos = m.end() if m else 0
+    want = ("html", "head", "meta", "meta")
+    for k, name in enumerate(want):
+        pos = re.compile(f"{WS}*").match(t, pos).end()
+        tm = TAG.match(t, pos)
+        if tm is None or tm.group(1) or tm.group(2).lower() != name:
+            return f"the page must open with <html><head><meta charset=\"utf-8\"><meta CSP> and only white space between (found {t[pos:pos + 30]!r} instead of <{name}>)"
+        attrs = {am.group(2).lower(): html.unescape(am.group(3)) if am.group(3) is not None else None for am in ATTR.finditer(tm.group(3))}
+        if k == 2 and not (set(attrs) == {"charset"} and (attrs["charset"] or "").lower() == "utf-8"):
+            return '<meta charset="utf-8"> must be the first element of <head>'
+        if k == 3 and not (set(attrs) == {"http-equiv", "content"} and (attrs["http-equiv"] or "").lower() == "content-security-policy"):
+            return "the Content-Security-Policy <meta> must follow <meta charset> directly (first element of <head> after it)"
+        pos = tm.end()
+    return None
+
+
+def check_head(text: str, starts: list[tuple[str, dict]]) -> list[str]:
+    """Once-only elements and the exact opening (Zentinel 26.11_2 sends no CSP header, so the page's own <meta> is the second wall and must be effective)."""
     names = [n for n, _ in starts]
     for once in ("html", "head", "body", "title"):
         if names.count(once) > 1:
             return [f"<{once}> twice"]
-    if names[:2] != ["html", "head"]:
-        return ["a page must start with <html><head> (no content before the head)"]
-    rest = starts[2:]
-    if rest and rest[0][0] == "meta" and "charset" in rest[0][1]:
-        rest = rest[1:]
-    if not rest or rest[0][0] != "meta" or (rest[0][1].get("http-equiv") or "").lower() != "content-security-policy":
-        return ["no Content-Security-Policy <meta> as the first element of <head> (only <meta charset> may come before it; Zentinel 26.11_2 sends no CSP header)"]
-    return []
+    r = head_prefix(text)
+    return [r] if r else []
 
 
 def check_xml(text: str) -> list[str]:
@@ -251,13 +276,19 @@ def check_xml(text: str) -> list[str]:
                     bad.append("the root must be urlset or sitemapindex")
             if closing:
                 continue
+            if name == "xhtml:link" and not {"rel", "hreflang", "href"} <= set(attrs):
+                bad.append("<xhtml:link> needs rel=\"alternate\", hreflang and href")
             for k, v in attrs.items():
                 if name in ("urlset", "sitemapindex") and ((k == "xmlns" and v == XML_NS) or (k == "xmlns:xhtml" and v == XHTML_NS)):
                     continue
                 if name == "xhtml:link" and k in ("rel", "hreflang", "href") and v is not None:
                     r = url_bad(v, "page") if k == "href" else None
+                    if k == "rel" and v != "alternate":
+                        r = f"rel must be exactly \"alternate\" (a browser loads rel=stylesheet from a sitemap), not {v[:30]!r}"
+                    if k == "hreflang" and not (LANG.match(v) or v == "x-default"):
+                        r = "not a plain language tag"
                     if r:
-                        bad.append(f"<xhtml:link href>: {r}")
+                        bad.append(f"<xhtml:link {k}>: {r}")
                     continue
                 bad.append(f"<{name} {k}=...>: attribute is not allowed in xml")
     except ValueError as e:
@@ -309,8 +340,14 @@ def main(argv: list[str]) -> int:
     else:
         try:
             man = site_manifest.load(os.path.join(src, "site.toml"))
-            if man["csp_mode"] != ("passthrough" if passthrough else "static"):
-                bad.append(f"site.toml: csp.mode is {man['csp_mode']} but this check runs in mode {'passthrough' if passthrough else 'static'}")
+            if man["mode"] != ("passthrough" if passthrough else "static"):
+                bad.append(f"site.toml: the mode of the site (csp.mode, or an area in passthrough) is {man['mode']} but this check runs in mode {'passthrough' if passthrough else 'static'}")
+            for lang in man["languages"]:  # schema 2: the default language is at the root, every other language is a folder with its own index.html
+                if lang != man["default_language"] and not os.path.isfile(os.path.join(src, lang, "index.html")):
+                    bad.append(f"site.toml: language {lang} has no {lang}/index.html")
+            for a in man["areas"]:
+                if not os.path.isdir(os.path.join(src, a["path"].lstrip("/"))):
+                    bad.append(f"site.toml: csp.area {a['path']} is not a folder of the site")
         except (ValueError, OSError) as e:
             bad.append(f"site.toml: {e}")
     if len(files) > MAX_FILES or total > MAX_BYTES:
