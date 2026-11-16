@@ -131,6 +131,28 @@ A pure library has nothing to build, package or sign. Leave `binaries` **empty**
   signing step in library mode all turn it red).
 - The library actions arrive with the pin round after the merge (`scripts/pin-refs.sh <sha>`): a caller can use library mode only with a SHA that contains it.
 
+### Approval for the signing job (GitHub environment)
+
+The job that holds the signing key (`finalize` in `_release-finalize.yml`, the action `sign-files`) runs in the GitHub **environment** `release-signing`
+(`environment: release-signing`, on that job only). With a required reviewer, a run stops there until the owner approves it, so no agent account can sign
+alone, also after the agents work under their own account. The owner sets this up on GitHub (nothing in this repo does it):
+
+1. Repository -> Settings -> Environments -> New environment `release-signing`.
+2. **Required reviewers**: the owner's own account (never the account of an agent); switch on "Prevent self-review" only if the run is started by another account.
+3. **Deployment branches and tags**: "Selected branches and tags" with the tag rule `v*` (no branch rule), so only a tag run can reach the key.
+4. **Environment secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as secrets of THIS environment (not repository or organisation secrets); delete them from
+   the repository secrets. (`scripts/set-signing-secrets.sh` sets repository secrets: use `gh secret set --env release-signing` instead.)
+5. The same for every repo that signs: the mirror workflow of a wrapper repo (template `mirror.yml`, for example fs-zentinel) and `site.yml` of the site repo
+   get `environment: release-signing` on their signing job too, and nothing else.
+
+The signing job also checks that it runs for a tag (`github.ref_type == 'tag'`) and that the checkout is the commit of that tag (`git rev-parse HEAD` = `github.sha`).
+A mirror workflow should check the same two things before it signs. Not proven until the first real run: that the environment secrets reach the job inside the
+reusable workflow (a job with `uses:` cannot carry an `environment`, so the environment sits on the called job); the first run is a `dry-run` with the owner watching.
+
+Structure test: `scripts/check-signing-env [files...]` (also run by `scripts/test_check_signing_env.sh`, which has counter-checks): a job with `sign-files` without
+`environment:` is RED, and so is any other job that touches `GPG_*` secrets (only the call of `release.yml` / `_release-finalize.yml` may hand them on). Pass the mirror
+and site workflows as arguments to check them as well.
+
 ### Pipeline
 
 1. `plan`: validates the tag (SemVer) and Cargo version, builds one JSON plan.

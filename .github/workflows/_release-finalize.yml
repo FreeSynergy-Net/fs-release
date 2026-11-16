@@ -17,10 +17,21 @@ permissions:
 jobs:
   finalize:
     runs-on: ubuntu-24.04
+    # The ONLY job with the signing key: it waits for the required reviewer of this GitHub environment (the owner's account, never an agent account;
+    # set up by the owner: docs/usage.md "Approval for the signing job"). Secrets belong to the environment, not to the repository.
+    environment: release-signing
     steps:
+      - name: only the commit of a tag is signed
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF_TYPE" = tag ] || { echo "::error::signing runs only for a tag (ref_type=$GITHUB_REF_TYPE)"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the checkout is the commit of the tag
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse HEAD)" = "$GITHUB_SHA" ] || { echo "::error::HEAD is not github.sha - not the commit of the tag"; exit 1; }
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dist-*

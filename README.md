@@ -65,6 +65,11 @@ On macOS: open the app once, then System Settings > Privacy & Security > "Open A
 
 Licence: MIT OR Apache-2.0.
 
+### Who may sign
+
+The signing job runs in the GitHub environment `release-signing` with a required reviewer (the owner, never an agent account); the key lives only in that
+environment. Setup and the structure test: [docs/usage.md](docs/usage.md) ("Approval for the signing job").
+
 ### Verifying our releases
 
 All release files and packages are signed with OpenPGP (RFC 9580):
