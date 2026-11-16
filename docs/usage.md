@@ -281,7 +281,7 @@ features each package declares; a feature no package declares fails the plan run
 
 `workflows/grundfassung.yaml` is the slim flow for the first version of a program (scaffold, window with name, icon and a
 "what comes" list, package metadata, user documentation stub, callers, gates, picture OK, catalog proposal). Inputs: `programm`
-(name after the naming rule, ADR 0087), `beschreibung`, `was_kommt`, `icon` (path or `placeholder`), `frontend` (frontend id, e.g. `simple`), `repo`.
+(name after the naming rule, ADR 0087), `beschreibung`, `was_kommt`, `icon` (path or `placeholder`), `frontend` (frontend id, e.g. `simple`), `art` (`grundfassung` or `feature`), `repo`. A basics release (window, "what comes", documentation, no data over the contract) may go out as v0.0.1 without the trait lock; the contract is then a draft, marked "Contract: draft" in the README and the catalog description. A feature release needs the lock file `sperren/<programm>_v1.sha256`.
 The user creates the repository; the flow prepares the scaffold in an own worktree and makes no `gh` call. The callers are
 `check.yml` and `release.yml` at `@v0.0.10` (`scripts/pin-refs.sh --dir <repo> v0.0.10`), `.fs-lock-sources.toml` has
 `strict = true`, the AppStream metadata is schema 1 without `<icon>` until fs-packages 0.0.19. The catalog entry is only a diff

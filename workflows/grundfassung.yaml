@@ -1,8 +1,8 @@
 # Slim basics for a program: scaffold, window with name, icon and `was_kommt`, package metadata, user documentation stub, callers, gates, picture OK, catalog proposal.
 # Replaces nothing: `programm-grundgeruest` (draft, not runnable) stays for the feature work; `programm-neu` stays the entry for NEW programs with an interface decision.
 # The USER creates the repository; this flow prepares the scaffold in an own worktree and creates no repository. Agents never push, tag or merge; the tag goes through the strategy's helper after the review YES.
-# Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, was_kommt, icon, frontend, repo, branch, head, delta, tag, vorbild, dossier, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
-# Inputs: programm (name after the naming rule, ADR 0087), beschreibung (one sentence), was_kommt (list), icon (path or `placeholder`), frontend (frontend id, ASCII lower case, e.g. `simple`; the display name e.g. Einfach is translated; not core, server, client, app, bin, cli, engine, testserver - ADR 0094 draft, item 6), repo (name; the user creates it).
+# Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, was_kommt, icon, frontend, art, repo, branch, head, delta, tag, vorbild, dossier, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
+# Inputs: programm (name after the naming rule, ADR 0087), beschreibung (one sentence), was_kommt (list), icon (path or `placeholder`), frontend (frontend id, ASCII lower case, e.g. `simple`; the display name e.g. Einfach is translated; not core, server, client, app, bin, cli, engine, testserver - ADR 0094 draft, item 6), repo (name; the user creates it), art (`grundfassung` or `feature`; decides at `release-sperre` whether the trait lock is needed).
 # Every check is green only when it says so (`red == false`); a missing result is never green.
 document:
   dsl: 1.0.3
@@ -69,7 +69,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Contract and standard per program, at the same time as the basics and the frontend ([BRUECKE-BEIDE-SEITEN]): the trait or capnp schema in fs-interfaces and the standard it follows. If the contract is missing, the flow `trait-delta` is started (branch unreviewed/workflow-trait-delta, not yet in main). The basics may start with a MINIMAL contract; the release only when the lock file `sperren/<programm>_v1.sha256` exists (fixed point, set by the strategy, never by an agent; a lock is no feature freeze); `release-sperre` checks it, a missing lock is red, never green. Until `trait-delta.yaml` is in main: see the plan section Bruecke."
+        freesynergy.net:summary: "Contract and standard per program, at the same time as the basics and the frontend ([BRUECKE-BEIDE-SEITEN]): the trait or capnp schema in fs-interfaces and the standard it follows. If the contract is missing, the flow `trait-delta` is started (branch unreviewed/workflow-trait-delta, not yet in main). The basics may start with a MINIMAL contract; the release of a feature run only when the lock file `sperren/<programm>_v1.sha256` exists (fixed point, set by the strategy, never by an agent; a lock is no feature freeze); `release-sperre` checks it (`art: feature`: a missing lock is red, never green; `art: grundfassung`: draft contract, visibly marked). Until `trait-delta.yaml` is in main: see the plan section Bruecke."
   - geruest:
       call: scaffold-ai:0.0.10@fs
       with:
@@ -275,11 +275,11 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Sonnet - a DIFF for fs-catalog (two entries, program and frontend with `kind = frontend` and `requires` = the capability; schema 1 until fs-packages 0.0.19, description en and de), written as a patch file in the report; it is NOT pushed. The catalog change itself is `catalog-bump` after the release."
+        freesynergy.net:summary: "Sonnet - a DIFF for fs-catalog (two entries, program and frontend; for `art: grundfassung` the description and the README say \"Contract: draft\"; with `kind = frontend` and `requires` = the capability; schema 1 until fs-packages 0.0.19, description en and de), written as a patch file in the report; it is NOT pushed. The catalog change itself is `catalog-bump` after the release."
   - release-sperre:
       switch:
         - ohne-sperre:
-            when: ${ $context.vertrag.sperre != true }
+            when: ${ .input.art != "grundfassung" and $context.vertrag.sperre != true }
             then: end
         - mit-sperre:
             then: continue
@@ -288,7 +288,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the release goes on only when `vertrag.sperre == true` (the lock file `sperren/<programm>_v1.sha256` exists); a missing result or a missing lock ends this flow without a release (the person decides), never on."
+        freesynergy.net:summary: "Control flow (decision of the strategy, aim: visibility) - input `art` is `grundfassung` or `feature`. A BASICS release (only window, \"what comes\" and documentation; stores and exchanges no data over the contract) may release as v0.0.1 WITHOUT the lock: the contract is then a draft (`vertrag.status = entwurf`), marked visibly in the README (line \"Contract: draft\") and in the catalog description (`katalog-vorschlag`). A FEATURE release (stores or exchanges data over the contract) needs the lock file `sperren/<programm>_v1.sha256`; without it, or without a result, the flow ends (red, never green, the person decides). Reason: a lock before data flows over the contract protects nothing yet, while a visible first release is the aim."
   - release:
       run:
         workflow:
