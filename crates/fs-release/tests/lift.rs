@@ -316,3 +316,87 @@ fn the_pin_tag_is_an_input_not_a_constant() {
     let want = format!("check.yml@v{}\n", env!("CARGO_PKG_VERSION"));
     assert!(w.read(".github/workflows/check.yml").contains(&want));
 }
+
+/// Identity and message of HEAD: `author | committer | whole message`.
+fn head_ident(w: &World) -> (String, String) {
+    (
+        git(&w.work(), &["log", "-1", "--format=%an <%ae> | %cn <%ce>"]),
+        git(&w.work(), &["log", "-1", "--format=%B"]),
+    )
+}
+
+const HOUSE: &str = "FreeSynergy <support@freesynergy.net> | FreeSynergy <support@freesynergy.net>";
+
+#[test]
+fn a_lift_commit_has_the_house_identity_and_the_footer_even_against_an_identity_in_the_environment()
+{
+    let w = World::new();
+    let mut o = w.opts(); // the test environment carries GIT_AUTHOR_NAME=t and friends: they must not win
+    o.commit = true;
+    let (r, code) = run(&w, &o);
+    assert_eq!(code, 0, "{}", r.markdown());
+    let (who, msg) = head_ident(&w);
+    assert_eq!(who, HOUSE);
+    assert!(
+        msg.starts_with("lift to fs-components v0.2.0, fs-interfaces v0.2.0\n"),
+        "{msg}"
+    );
+    assert!(
+        msg.trim_end()
+            .ends_with("\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"),
+        "{msg}"
+    );
+}
+
+#[test]
+fn a_lift_commit_has_the_house_identity_without_any_identity_in_the_environment_or_the_git_config()
+{
+    let w = World::new();
+    let mut o = w.opts();
+    o.env
+        .retain(|(k, _)| !k.starts_with("GIT_AUTHOR") && !k.starts_with("GIT_COMMITTER"));
+    o.env.push(("GIT_CONFIG_GLOBAL".into(), "/dev/null".into()));
+    o.env.push(("GIT_CONFIG_NOSYSTEM".into(), "1".into()));
+    o.commit = true;
+    let (r, code) = run(&w, &o);
+    assert_eq!(code, 0, "{}", r.markdown());
+    assert_eq!(head_ident(&w).0, HOUSE);
+}
+
+#[test]
+fn the_footer_value_is_configurable_and_an_invalid_one_stops_before_anything_is_committed() {
+    let w = World::new();
+    let mut o = w.opts();
+    o.commit = true;
+    o.env.push((
+        "FS_LIFT_COAUTHOR".into(),
+        "Other Bot <bot@example.org>".into(),
+    ));
+    let (r, code) = run(&w, &o);
+    assert_eq!(code, 0, "{}", r.markdown());
+    assert!(head_ident(&w)
+        .1
+        .contains("\nCo-Authored-By: Other Bot <bot@example.org>"));
+    for bad in [
+        "",
+        "nobody",
+        "Name <nomail>",
+        "<a@b>",
+        "N <a@b>\nSigned-off-by: x",
+    ] {
+        let w = World::new();
+        let before = git(&w.work(), &["rev-parse", "HEAD"]);
+        let mut o = w.opts();
+        o.commit = true;
+        o.env.push(("FS_LIFT_COAUTHOR".into(), bad.into()));
+        let (r, code) = run(&w, &o);
+        assert_eq!(code, 1, "{bad:?}: {}", r.markdown());
+        let c = step(&r, "commit");
+        assert_eq!(c.status, "red", "{bad:?}");
+        assert!(
+            c.first_error.clone().unwrap().contains("FS_LIFT_COAUTHOR"),
+            "{bad:?}"
+        );
+        assert_eq!(git(&w.work(), &["rev-parse", "HEAD"]), before, "{bad:?}");
+    }
+}
