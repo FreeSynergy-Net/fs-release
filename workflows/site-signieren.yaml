@@ -36,7 +36,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Writes the approval text (gate site-signieren, name, version, mode, tree-sha256, tar-sha256, run-id = `<GITHUB_RUN_ID>-<GITHUB_RUN_ATTEMPT>` of the build run, expires) for the person; the strategy session may only PREPARE it, it cannot approve. The run id comes from the CI, never from an agent."
+        freesynergy.net:summary: "Writes the approval text (gate site-signieren, name, version, mode, tree-sha256, tar-sha256, run-id = `<GITHUB_RUN_ID>-<GITHUB_RUN_ATTEMPT>` of the build run, expires) for the person; the strategy session may only PREPARE it, it cannot approve. The run id is an input of whoever starts the signing run (`build-run`, workflow_dispatch), not derived by the CI: the check script only enforces the format `<id>-<attempt>` and that it is not the signing run itself; the protection are the tarball bytes plus the 72 hours."
   - approval:
       listen:
         to:
