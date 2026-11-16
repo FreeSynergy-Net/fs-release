@@ -167,7 +167,10 @@ fn round_is_sound(t: &str) -> bool {
         && step_body(t, "regel-weiche").contains("$context.regel.red == false")
         && step_body(t, "regel-weiche").contains("then: regel-rot")
         && step_body(t, "eskalation").contains("then: sichern")
-        && step_body(t, "bericht").contains("then: end")
+        // the one report is followed only by the push gate of the tidy-up (behind the report), then the round ends
+        && step_body(t, "bericht").contains("then: doku-push-weiche")
+        && step_body(t, "doku-push-weiche").contains("then: end")
+        && step_body(t, "doku-push").contains("then: end")
         && !t.contains("then: continue")
 }
 
@@ -242,7 +245,7 @@ fn counter_a_foreground_start_a_second_report_a_late_head_or_a_release_is_caught
     let bw = step_body(&t, "bericht");
     assert!(!round_is_sound(&t.replacen(
         &bw,
-        &bw.replace("then: end", "then: eskalation"),
+        &bw.replace("then: doku-push-weiche", "then: eskalation"),
         1
     )));
     assert!(!round_is_sound(&t.replacen(
