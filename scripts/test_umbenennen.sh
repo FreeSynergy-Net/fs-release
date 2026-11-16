@@ -209,6 +209,8 @@ expect 2 "--keep" "keep: not JSON is bad input" -- dry-run $(args "$d") --keep '
 printf '[package]\nname = "fs-wiki"\n[[bin]]\nname = "fs-wiki"\n' >"$d/fs-wiki/Cargo.toml"
 kb='[{"pattern":"\\[\\[bin\\]\\] name = \"fs-wiki\"","grund":"Binary als Link","bereich":"PROGRAM"}]'
 js="$tmp/keep.json"
+# args prints plain words (mktemp paths without blanks) and must split into separate options
+# shellcheck disable=SC2046
 "${tool[@]}" dry-run $(args "$d") --keep "$kb" --json "$js" >/dev/null
 if python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if len(d["plan"]["kept"])==1 and len([c for c in d["plan"]["crates"] if c["file"]=="Cargo.toml"])==1 else 1)' "$js"; then
   echo "ok   keep: only the [[bin]] line is kept, the [package] line stays a crate hit"; else echo "FAIL keep by section"; fails=$((fails + 1)); fi
