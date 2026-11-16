@@ -132,8 +132,11 @@ fn lessons_are_wired(text: &str) -> bool {
         // strategy order: code merge, GitHub rename, docs merge, remotes, catalog (own last step), then the release
         && in_order(
             text,
-            &["merge", "github-umbenennen", "doku-veroeffentlichen", "remotes", "weiterleitung", "katalog", "release"],
+            &["merge", "github-umbenennen", "doku-veroeffentlichen", "remotes", "pins", "weiterleitung", "katalog", "release"],
         )
+        && step_body(text, "pins").contains("rename --pins")
+        && step_body(text, "pins").contains("AFTER the GitHub rename")
+        && step_body(text, "umbau").contains("leaves pin URLs")
         && step_body(text, "katalog").contains("fs-catalog")
         && step_body(text, "katalog").contains("replaces")
         && !step_body(text, "merge").contains("of fs-catalog")

@@ -1,9 +1,13 @@
 """L1 write mode (scaffold): `git mv` of the crate folders, word-boundary replacement in *.toml, *.rs, *.md, Cargo.lock and the CI files.
 
 Only in a worktree branch (never main/master), idempotent (names already renamed are a no-op), `keep` lines are skipped, no network.
+Refuses on a dirty tree (it must be committed or clean first, so the rename is one reviewable diff). `--allow` (globs on the file) skips
+those files. Pin URLs (`github.com/FreeSynergy/<old>`) are NOT touched by the normal run: they stay until the GitHub rename has happened;
+the separate switch `--pins` (the flow calls it in the step after `github-umbenennen`) replaces only these URLs.
 The environment variable form (FS_X_ROOT) is NOT replaced (a decision of its own, see `keep`). The lock is renamed with the crates;
 the check `cargo metadata --locked` is the next step of the flow (`lock`), not done here.
 """
+import fnmatch
 import os
 import re
 
@@ -39,14 +43,37 @@ def _move_crates(a, repo, out):
     return bad
 
 
+def _pin(a):
+    return re.compile(r"github\.com/FreeSynergy/" + re.escape(a.old) + r"(?![\w-])")
+
+
+def _dirty(repo):
+    r = git(repo, "status", "--porcelain")
+    return r is None or r.returncode != 0 or bool(r.stdout.strip())
+
+
+def _transform(a, pin, name, sn, new_snk, line):
+    """The normal run: names renamed, pin URLs kept (they follow the GitHub rename)."""
+    urls = pin.findall(line)
+    work = pin.sub("\0", line)
+    work = sn.sub(new_snk, name.sub(a.new, work))
+    for u in urls:
+        work = work.replace("\0", u, 1)
+    return work
+
+
 def _rewrite(a, repo, keep, out):
     name, snk = words(a.old), snake(a.old)
     new_snk = snake(a.new)
+    pin = _pin(a)
+    pins_only = getattr(a, "pins", False)
     sn = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(snk) + r"(?![a-z0-9])")
     tracked, _ = file_lists(repo)
     for rel in tracked:
         base = os.path.basename(rel)
         if not (rel.endswith(EXT) or base == "Cargo.lock" or (rel.startswith(".github/") and rel.endswith((".yml", ".yaml")))):
+            continue
+        if any(fnmatch.fnmatch(rel, g) for g in (a.allow or [])):
             continue
         text = text_of(os.path.join(repo, rel))
         if text is None:
@@ -55,7 +82,10 @@ def _rewrite(a, repo, keep, out):
         for n, line, hay in lines_of(rel, text):
             if keep_for(keep, hay) is not None:
                 continue
-            new_line = sn.sub(new_snk, name.sub(a.new, line))
+            if pins_only:
+                new_line = pin.sub("github.com/FreeSynergy/" + a.new, line)
+            else:
+                new_line = _transform(a, pin, name, sn, new_snk, line)
             if new_line != line:
                 lines[n - 1] = new_line
                 changed += 1
@@ -73,7 +103,12 @@ def rename(a, keep):
             out.append(f"red: {repo} is on {branch or 'no branch'!r}; the rename runs only in a worktree branch")
             bad += 1
             continue
-        bad += _move_crates(a, repo, out)
+        if _dirty(repo):
+            out.append(f"red: {repo} has uncommitted changes; commit or clean the tree first")
+            bad += 1
+            continue
+        if not getattr(a, "pins", False):
+            bad += _move_crates(a, repo, out)
         _rewrite(a, repo, keep, out)
     print("\n".join(out) or "nothing to do")
     print("red" if bad else "green")

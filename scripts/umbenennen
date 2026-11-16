@@ -5,7 +5,7 @@
                                          [--retired FILE] [--keep JSON|FILE] [--allow GLOB]... [--json FILE]
   python3 -I scripts/umbenennen after   --old fs-wiki --new fs-text --repos DIR... [--catalog DIR] [--docs DIR] [--world DIR]
                                          [--retired FILE] [--keep JSON|FILE] [--allow GLOB]... [--state FILE] [--json FILE]
-  python3 -I scripts/umbenennen rename  --old fs-wiki --new fs-text --repos DIR... [--keep JSON|FILE]   (write mode L1, scaffold)
+  python3 -I scripts/umbenennen rename  --old fs-wiki --new fs-text --repos DIR... [--keep JSON|FILE] [--allow GLOB]... [--pins]   (write mode L1, scaffold; refuses on a dirty tree; --pins = only the pin URLs, after the GitHub rename)
   python3 -I scripts/umbenennen retire  --old fs-wiki --new fs-text --retired FILE
 
 `--repos` are checkouts (worktrees) of the repos that may name the old program: the program itself, repos that pin it, CI files.
@@ -95,6 +95,7 @@ def main(argv):
     p.add_argument("--keep")
     p.add_argument("--allow", action="append", default=[])
     p.add_argument("--state")
+    p.add_argument("--pins", action="store_true")
     p.add_argument("--json")
     try:
         a = p.parse_args(argv)

@@ -265,7 +265,11 @@ r="$tmp/w7"; mk "$r"; mkdir -p "$r/fs-wiki/crates/fs-wiki" "$r/fs-wiki/src"
 printf '[package]\nname = "fs-wiki"\n[[bin]]\nname = "fs-wiki"\n' >"$r/fs-wiki/crates/fs-wiki/Cargo.toml"
 printf 'use fs_wiki_core::x; // fs-wikipedia stays\nconst P: &str = "fs-wiki-core";\n' >"$r/fs-wiki/src/lib.rs"
 printf '[[package]]\nname = "fs-wiki-core"\n' >"$r/fs-wiki/Cargo.lock"
+printf 'siehe https://github.com/FreeSynergy/fs-wiki/releases und fs-wiki-core\n' >"$r/fs-wiki/README.md"
 mkrepo "$r/fs-wiki"
+printf 'dirty\n' >"$r/fs-wiki/untracked-but-tracked.txt"; git -C "$r/fs-wiki" add untracked-but-tracked.txt
+expect 1 "uncommitted changes" "rename refuses a dirty tree" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki"
+git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m dirty
 rk='[{"pattern":"\\[\\[bin\\]\\] name = \"fs-wiki\"","grund":"Binary als Link","bereich":"PROGRAM"}]'
 "${tool[@]}" rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --keep "$rk" >"$tmp/rename.out" 2>&1; rc=$?
 if [ "$rc" -eq 0 ] && [ -d "$r/fs-wiki/crates/fs-text" ] && [ -d "$r/fs-wiki/crates/fs-text-core" ] && [ ! -d "$r/fs-wiki/crates/fs-wiki-core" ] \
@@ -273,9 +277,19 @@ if [ "$rc" -eq 0 ] && [ -d "$r/fs-wiki/crates/fs-text" ] && [ -d "$r/fs-wiki/cra
   && grep -q 'name = "fs-text-core"' "$r/fs-wiki/Cargo.lock" \
   && [ "$(grep -c 'name = "fs-text"' "$r/fs-wiki/crates/fs-text/Cargo.toml")" -eq 1 ] && grep -q '^name = "fs-wiki"' "$r/fs-wiki/crates/fs-text/Cargo.toml"; then
   echo "ok   rename: crates moved, words replaced, fs-wikipedia and the kept [[bin]] line untouched"; else echo "FAIL rename: rc=$rc"; cat "$tmp/rename.out"; fails=$((fails + 1)); fi
+if grep -q 'github.com/FreeSynergy/fs-wiki/releases und fs-text-core' "$r/fs-wiki/README.md"; then echo "ok   rename: the pin URL stays until the GitHub rename"; else echo "FAIL rename touched the pin URL"; cat "$r/fs-wiki/README.md"; fails=$((fails + 1)); fi
+git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m rename
 before="$(git -C "$r/fs-wiki" status --porcelain | sort | md5sum)"
 expect 0 "nothing to do" "rename twice is a no-op" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --keep "$rk"
 if [ "$before" = "$(git -C "$r/fs-wiki" status --porcelain | sort | md5sum)" ]; then echo "ok   rename twice changes nothing"; else echo "FAIL rename twice changed files"; fails=$((fails + 1)); fi
+# --pins: only the pin URLs, after the GitHub rename; --allow keeps a history page as it is
+printf 'alt fs-wiki, github.com/FreeSynergy/fs-wiki\n' >"$r/fs-wiki/HIST.md"; git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m hist
+expect 0 "green" "rename --allow skips the history page" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --keep "$rk" --allow HIST.md
+if grep -q '^alt fs-wiki, github.com/FreeSynergy/fs-wiki$' "$r/fs-wiki/HIST.md"; then echo "ok   rename --allow: file untouched"; else echo "FAIL --allow ignored"; fails=$((fails + 1)); fi
+git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m x >/dev/null 2>&1
+expect 0 "green" "rename --pins" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --pins
+if grep -q 'github.com/FreeSynergy/fs-text/releases' "$r/fs-wiki/README.md" && grep -q 'github.com/FreeSynergy/fs-text$' "$r/fs-wiki/HIST.md" && grep -q 'alt fs-wiki, ' "$r/fs-wiki/HIST.md" && [ -d "$r/fs-wiki/crates/fs-text" ]; then echo "ok   rename --pins: only the URLs"; else echo "FAIL --pins"; cat "$r/fs-wiki/HIST.md"; fails=$((fails + 1)); fi
+git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m pins
 git -C "$r/fs-wiki" checkout -q -b main 2>/dev/null
 expect 1 "only in a worktree branch" "rename refuses on main" -- rename --old fs-wiki --new fs-other --repos "$r/fs-wiki"
 
