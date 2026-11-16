@@ -24,7 +24,7 @@ The key ring (`GNUPGHOME`, mode 0700) and the passphrase file (0600) are created
 
 ## Internal action references (2026-11-11)
 
-Composite actions in `actions/` never call another fs-release action by `uses: FreeSynergy/fs-release/...@ref` (a pinned action would pull later `main` states of the other one). `sbom` and `licence-check` run the shared `actions/install-tools/install.sh` by path (`$GITHUB_ACTION_PATH/../install-tools/install.sh`), so they always use the script of their own commit. `lint.yml` fails on any such `uses:` in `actions/`. Known limit: the reusable workflows (`release.yml`, `check.yml`, `_release-*.yml`) still call actions and each other with `@main`: `./` in a reusable workflow means the CALLER's repository, and a commit cannot name its own SHA, so `scripts/pin-refs.sh <tag>` rewrites them on the release commit.
+Composite actions in `actions/` never call another fs-release action by `uses: FreeSynergy/fs-release/...@ref` (a pinned action would pull later `main` states of the other one). `sbom` and `licence-check` run the shared `actions/install-tools/install.sh` by path (`$GITHUB_ACTION_PATH/../install-tools/install.sh`), so they always use the script of their own commit. `lint.yml` fails on any such `uses:` in `actions/`. Known limit: the reusable workflows (`release.yml`, `check.yml`, `_release-*.yml`) cannot use a relative ref and so name actions and each other by an explicit ref (the full SHA of a reviewed `main` state, no longer `@main`): `./` in a reusable workflow means the CALLER's repository, and a commit cannot name its own SHA, so `scripts/pin-refs.sh <sha>` rewrites them in a second commit.
 
 ## Blinc lock rule (always on)
 

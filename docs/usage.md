@@ -124,11 +124,11 @@ Packaging metadata stays in the app repo: `[package.metadata.deb]` and `[package
 
 ### Versioning the workflows
 
-Inside fs-release, nested workflows and composite actions are referenced as `FreeSynergy/fs-release/...@main`
+Inside fs-release, nested workflows and composite actions are referenced as `FreeSynergy/fs-release/...@<full commit SHA>` (a reviewed state of `main`)
 (GitHub cannot say "same ref as my caller" across repositories). Before tagging a release of fs-release run
 `scripts/pin-refs.sh v1.0.0`, commit, tag; callers then use `@v1`. Callers may also use `@main` while developing. Inside fs-release itself (`.github/workflows/*.yml`) the references are pinned to the full commit SHA of a reviewed state of `main` (the jobs with the signing key must never run a moving ref); raise the SHA on purpose when the actions change.
 
-**Mandatory after every merge that changes `.github/workflows/_release-*.yml` or `actions/`:** a commit cannot contain its own SHA, so `release.yml`, `ci.yml` and `check.yml` still point at the older commit and the signing job (`GPG_PRIVATE_KEY`) runs whatever refs that older commit holds. Raise the SHA to the merge commit in a second, reviewed commit (`scripts/pin-refs.sh <merge-sha>`) and check that `git grep '@main' .github/workflows` is empty at the commit the SHA names. The flows `release-flow` and `umbenennen` name this step in their release steps.
+**Mandatory after every merge that changes `.github/workflows/_release-*.yml` or `actions/`:** a commit cannot contain its own SHA, so `release.yml`, `ci.yml` and `check.yml` still point at the older commit and the signing job (`GPG_PRIVATE_KEY`) runs whatever refs that older commit holds. Two levels exist (`release.yml` -> `_release-*.yml` -> `actions/`): a change in `actions/` needs two pin rounds (first `_release-*` onto the new state, then `release.yml` onto that pin commit). The SHA is a fast-forward commit, not a merge commit, so say so in the commit text. Raise the SHA to that commit in a second, reviewed commit (`scripts/pin-refs.sh <sha>`) and check that `git grep '@main' .github/workflows` is empty at the commit the SHA names. The flows `release-flow` and `umbenennen` name this step in their release steps.
 
 ### Local checks
 
