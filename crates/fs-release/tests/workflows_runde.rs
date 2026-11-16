@@ -170,7 +170,8 @@ fn round_is_sound(t: &str) -> bool {
         // the one report is followed only by the push gate of the tidy-up (behind the report), then the round ends
         && step_body(t, "bericht").contains("then: doku-push-weiche")
         && step_body(t, "doku-push-weiche").contains("then: end")
-        && step_body(t, "doku-push").contains("then: end")
+        && step_body(t, "doku-push").contains("then: doku-marke-weiche")
+        && step_body(t, "doku-marke").contains("then: end")
         && !t.contains("then: continue")
 }
 
