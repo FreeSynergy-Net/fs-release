@@ -252,6 +252,7 @@ fn testlauf_is_sound(t: &str) -> bool {
             "gezielt",
             "gezielt-again",
             "fix",
+            "fix-zaehlen",
             "kopf",
             "end-weiche",
             "voll",
@@ -295,7 +296,7 @@ fn testlauf_is_sound(t: &str) -> bool {
         && step_body(t, "fix").contains("findings: ${ $context.gezielt }")
         && step_body(t, "end-weiche").contains("== \"end\"")
         && step_body(t, "slot").contains("at most 3")
-        && step_body(t, "fix").contains("then: slot")
+        && step_body(t, "fix-zaehlen").contains("then: slot")
         && strict(t, "gezielt-again", "$context.gezielt.red == false")
         && strict(t, "voll-again", "$context.voll.red == false")
         && step_body(t, "voll-again").contains("then: gruen")
