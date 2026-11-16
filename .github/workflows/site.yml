@@ -1,0 +1,108 @@
+# Website stage 0, the two jobs of ADR 0078: `build` (no key, no environment) and `sign` (the only job with the release key, behind an environment
+# with a required reviewer). Specification of the flows: workflows/site-bauen.yaml and workflows/site-signieren.yaml. Started by a person (workflow_dispatch)
+# on main only; scripts, the allowed signing keys and the approver keyring are read from this checkout of main, never from the folder that is built.
+#   Run 1: inputs repository, ref (commit of the approved folder state), folder, name, version, mode; leave `build-run`, `approval`, `approval-sig` empty.
+#          The summary prints tree-sha256, tar-sha256, mode and the run id `<id>-<attempt>`. The person writes the approval text with them and signs it
+#          (detached, armoured) with the approval subkey.
+#   Run 2: the same inputs plus `build-run` = the run id of run 1, `approval` and `approval-sig` (the two texts). `build` runs again without a key, `sign`
+#          rebuilds from the same ref, compares byte for byte, and only then loads the key. The signed folder is the artefact `site-signed`.
+# Not part of this file, by design: the delivery to a server (the person does it by hand, no agent has access).
+# TODO(person): create the environment `site-signing` (required reviewer = the person, secrets GPG_PRIVATE_KEY and GPG_PASSPHRASE only there), commit
+# configs/site/allowed-signing-keys.txt (fingerprints of the approval SUBKEY, one per line) and configs/site/approvers.pgp (the approver's public key
+# ring); the run is red while they are missing.
+name: site
+on:
+  workflow_dispatch:
+    inputs:
+      repository: { type: string, required: true, description: "owner/name of the repository that holds the approved folder state" }
+      ref: { type: string, required: true, description: "40-hex commit of the approved folder state" }
+      folder: { type: string, default: ".", description: "folder inside that repository" }
+      name: { type: string, required: true, description: "artefact name, e.g. helfa.org" }
+      version: { type: string, required: true, description: "version, e.g. 0.0.1" }
+      mode: { type: choice, options: [static, passthrough], default: static, description: "passthrough = the person's own HTML with JavaScript (explicit, logged)" }
+      build-run: { type: string, default: "", description: "run 2 only: run id <id>-<attempt> of run 1" }
+      approval: { type: string, default: "", description: "run 2 only: the approval text" }
+      approval-sig: { type: string, default: "", description: "run 2 only: the armoured detached signature of the approval text" }
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          path: src
+          persist-credentials: false
+      - name: Build (no key in this job)
+        env:
+          REF: ${{ inputs.ref }}
+          FOLDER: ${{ inputs.folder }}
+          NAME: ${{ inputs.name }}
+          VERSION: ${{ inputs.version }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          [[ $REF =~ ^[0-9a-f]{40}$ ]] || { echo "ref must be a 40-hex commit"; exit 1; }
+          [[ $FOLDER =~ ^[A-Za-z0-9._/-]+$ && $FOLDER != *..* && $FOLDER != /* ]] || { echo "folder is not a plain relative path"; exit 1; }
+          opt=(); [ "$MODE" != passthrough ] || opt=(--passthrough)
+          scripts/site-bauen.sh "${opt[@]}" build "src/$FOLDER" dist "$NAME" "$VERSION" | tee build.log
+          {
+            echo "### site build"; echo '```'; cat build.log
+            echo "run-id=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-dist
+          path: dist
+          if-no-files-found: error
+
+  sign:
+    needs: build
+    if: github.ref == 'refs/heads/main' && inputs.approval != '' && inputs.build-run != ''
+    runs-on: ubuntu-24.04
+    environment: site-signing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          path: src
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: site-dist
+          path: dist
+      - name: Write the approval
+        env:
+          APPROVAL: ${{ inputs.approval }}
+          APPROVAL_SIG: ${{ inputs.approval-sig }}
+        run: |
+          printf '%s\n' "$APPROVAL" > approval.txt
+          printf '%s\n' "$APPROVAL_SIG" > approval.txt.asc
+      - name: Sign (approval check, rebuild comparison, then the key)
+        env:
+          FOLDER: ${{ inputs.folder }}
+          BUILD_RUN: ${{ inputs.build-run }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          [[ $FOLDER =~ ^[A-Za-z0-9._/-]+$ && $FOLDER != *..* && $FOLDER != /* ]] || { echo "folder is not a plain relative path"; exit 1; }
+          scripts/site-signieren.sh dist approval.txt approval.txt.asc configs/site/approvers.pgp configs/site/allowed-signing-keys.txt \
+            "$BUILD_RUN" release-signing-key.asc "src/$FOLDER"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-signed
+          path: dist
+          if-no-files-found: error

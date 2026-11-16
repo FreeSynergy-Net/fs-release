@@ -1,6 +1,9 @@
 # Stage 0 of the website (ADR 0078 job `sign`): the only job with the release key. It runs only for an approval that is signed by a human key from
 # the fixed list, names exactly this hash, this name and version and THIS run, and has not expired. A missing key, approval or signature is RED.
 # Agents never sign, push, tag, merge or log in to a server; the person delivers (ADR 0079). FS profile: see README.md.
+# Two CI runs of .github/workflows/site.yml: run 1 = job `build` (steps build, request; no key); the person signs the approval text that names run 1;
+# run 2 = job `build` again (no key) and job `sign` (steps approval-check, rebuild, sign, signatures-check; environment-protected, the only job with
+# the key; its scripts, the list of allowed signing keys and the approver keyring come from the pinned main). Then the person delivers.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -21,7 +24,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Sub-workflow site-bauen without secrets; its tree hash and run id go into the approval request.
+        freesynergy.net:summary: "Sub-workflow site-bauen without a key (CI run 1, job build); its tree hash, tarball hash, mode and the id of THIS CI run go into the approval request."
   - request:
       call: site-approval-request:0.0.6@fs
       with:
@@ -33,7 +36,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Writes the approval text (gate site-signieren, name, version, tree-sha256, run-id, expires) for the person; the strategy session may only PREPARE it, it cannot approve.
+        freesynergy.net:summary: "Writes the approval text (gate site-signieren, name, version, mode, tree-sha256, tar-sha256, run-id = `<GITHUB_RUN_ID>-<GITHUB_RUN_ATTEMPT>` of the build run, expires) for the person; the strategy session may only PREPARE it, it cannot approve. The run id comes from the CI, never from an agent."
   - approval:
       listen:
         to:
@@ -48,7 +51,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The person signs the approval text with a key that is not usable under the agents' UID (touch policy or another device); the event only wakes the flow, the signature is what counts, not source or actor.
+        freesynergy.net:summary: "The person signs the approval text with a signing subkey that is not usable under the agents' UID (token with touch policy or another device; its fingerprint is pinned in the allowed list, a software subkey under the same primary key does not count); the event only wakes the flow, the signature is what counts, not source or actor. Proof that the key is unusable for agents is written down once before the first real run (TODO person)."
   - approval-check:
       call: site-freigabe-pruefen:0.0.6@fs
       with:
@@ -59,7 +62,15 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: freigabe-beleg
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "scripts/site-freigabe-pruefen.sh from the pinned main, never from an agent worktree: signer on the fixed list (read-only keyring), hash recomputed from the tarball, name, version, run id, not expired (72 h at most); anything missing is red."
+        freesynergy.net:summary: "scripts/site-freigabe-pruefen.sh from the pinned main, never from an agent worktree, WITHOUT the key in its environment: signing subkey on the fixed list (read-only keyring), dist holds exactly the four files, the tarball bytes equal tar-sha256 and pass the allowlist (plain files and folders only, no link, special mode or odd owner), tree hash recomputed from the tarball, name, version, mode, run id, not expired and at most 72 h after the SIGNATURE time; anything missing is red."
+  - rebuild:
+      call: site-rebuild-compare:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: freigabe-beleg
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Inside scripts/site-signieren.sh, BEFORE the key is loaded and without it in the environment: builds again from the git checkout of the approved folder state and compares every file byte for byte with the delivered folder; the delivered tarball is only what the approved source produces; a difference is red and nothing is signed."
   - sign:
       call: site-signieren:0.0.6@fs
       metadata:
@@ -67,15 +78,15 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: freigabe-beleg
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "scripts/site-signieren.sh: needs GPG_PRIVATE_KEY (missing = red, not 'not signed'), repeats the approval check, detached .asc for every file with sign-files/sign.sh; the key exists only in this job."
+        freesynergy.net:summary: "scripts/site-signieren.sh: needs GPG_PRIVATE_KEY (missing = red, not 'not signed'), repeats the approval check and the rebuild comparison first, only then detached .asc for the five files with sign-files/sign.sh; the key exists only in this job (CI environment `site-signing`)."
   - signatures-check:
-      call: site-signatures-check:0.0.6@fs
+      call: site-signaturen-pruefen:0.0.6@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Every file has an .asc, each verifies against the public release key and is made by exactly its fingerprint (done inside `sign`); a missing result is red.
+        freesynergy.net:summary: "scripts/site-signaturen-pruefen.sh <folder> <release-pubkey.asc> <name-version>: the folder holds exactly the five files, each with an .asc that verifies against the public release key and is made by exactly its fingerprint, plus the approver's own signature of approval.txt; a missing file, a foreign file or a missing signature is red. The same script is what the person runs before delivering."
   - deliver:
       call: deliver-by-hand:0.0.6@fs
       metadata:
@@ -83,7 +94,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The person fetches the signed files, checks signatures and SHA256SUMS.txt with scripts/verify, puts the folder in place and swaps the `current` link atomically (way back = the old link); no AI, no SSH by an agent.
+        freesynergy.net:summary: "The person fetches the signed files, runs scripts/site-signaturen-pruefen.sh and `sha256sum --check SHA256SUMS.txt`, unpacks the tarball with `tar -xzf --no-same-owner --no-same-permissions` into /srv/www/<domain>/releases/<version> (the folder the Zentinel roots point to is /srv/www/<domain>/current), then swaps the link atomically (`ln -sfn releases/<version> current.new && mv -T current.new current`; way back = the old link). The Zentinel configuration is a separate file the person has read: it is rendered by templates/site/render.sh from the pinned main and compared with its .sha256. No AI, no SSH by an agent."
   - record:
       call: append-log:0.0.6@fs
       metadata:
@@ -91,4 +102,4 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The person appends one line to the protocol (what, hash, when, who); only appended, never changed.
+        freesynergy.net:summary: "The person appends one line to the protocol (what, tarball hash, configuration hash, when, who); only appended, never changed."

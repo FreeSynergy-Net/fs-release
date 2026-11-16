@@ -1,11 +1,12 @@
 # Stage 0 of the website (ADR 0078 job `build`): from ONE approved folder state a deterministic tarball with manifest, SBOM and checksums.
-# No secret is read here, no server is touched, no AI step. The signing is `site-signieren`. FS profile: see README.md.
+# No key is read here, no server is touched, no AI step. The input is a folder state a person has approved (no placeholder pages are kept in git).
+# The signing is `site-signieren`. In CI this flow is the job `build` of .github/workflows/site.yml. FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: site-bauen
   version: 0.0.6
-  title: Build the artefacts of a site from an approved folder state (job build, no secrets)
+  title: Build the artefacts of a site from an approved folder state (job build, no key)
 do:
   - source-check:
       call: site-source-check:0.0.6@fs
@@ -16,11 +17,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "scripts/site-bauen.sh check <folder>: only regular files, safe names, index.html, no script or external resource, nothing secret-looking; red names every file."
+        freesynergy.net:summary: "scripts/site-bauen.sh [--passthrough] check <folder>: allowlist of file types (static: html css txt xml json svg images woff2; passthrough adds js), no dot files, safe names, only regular files, index.html; static mode parses html/svg/css (no script, no on* attribute, no frame, no meta refresh, every URL relative except a-links); nothing key-like; red names every file; passthrough logs every file."
   - build:
       call: site-build:0.0.6@fs
       with:
         folder: ${ .input.folder }
+        mode: ${ .input.mode }
         name: ${ .input.name }
         version: ${ .input.version }
       export:
@@ -30,15 +32,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: scripts/site-bauen.sh build <folder> <outdir> <name> <version>; a tar with sorted names, owner 0, mtime 0, gzip -n; manifest.json, SPDX 2.3 file list, SHA256SUMS.txt; the job has no secrets.
-  - same-bytes:
-      call: site-build-again:0.0.6@fs
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: The build ran twice into two folders and both are byte-identical (done inside `build`); a difference is red, a missing comparison is not green.
+        freesynergy.net:summary: "scripts/site-bauen.sh [--passthrough] build <folder> <outdir> <name> <version>: a tar with sorted names, owner 0, mtime 0, modes 0644/0755, gzip -n; manifest.json (with mode and tool versions), SPDX 2.3 file list, SHA256SUMS.txt; the build runs twice and the two results are compared byte for byte INSIDE this step (red on a difference; the comparison is mutation-tested in scripts/test-site.sh); the job holds no key."
   - hash-out:
       call: site-tree-hash:0.0.6@fs
       with:
@@ -48,7 +42,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Prints tree-sha256=<hash> of the folder state; this hash is what the approval in `site-signieren` must name. Same folder, same hash, any other change, other hash.
+        freesynergy.net:summary: "Prints tree-sha256=<hash> (the content of the folder state), tar-sha256=<hash> (the bytes of the tarball) and mode=; the approval in `site-signieren` must name all three. Same folder, same bytes; any other change, other hash."
   - pass-on:
       call: upload-artefact:0.0.6@fs
       metadata:
@@ -56,4 +50,4 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The directory goes to the sign job as an artefact (CI) or stays as a folder; the files only, never keys; nothing is published or pushed here.
+        freesynergy.net:summary: "The directory goes to the sign job as an artefact (CI) or stays as a folder; the four files only, never keys; nothing is published or pushed here. The sign job does not trust it: it rebuilds from the approved source and compares."
