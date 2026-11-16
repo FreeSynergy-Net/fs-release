@@ -51,7 +51,11 @@ fn script_is_sound(script: &str, yaml: &str) -> bool {
     let no_forbidden = !lines
         .iter()
         .any(|l| l.contains("git") && l.split_whitespace().any(|t| forbidden.contains(&t)));
-    ff_ok && no_prune && set_url_on_main && no_forbidden
+    // A1: `--no-prune` (also against fetch.prune=true) and the vanished refs from the read-only `remote prune --dry-run`
+    let reports_vanished = joined.contains("fetch --all --tags --no-prune")
+        && joined.contains("remote prune --dry-run")
+        && joined.contains("ref-verschwunden");
+    ff_ok && no_prune && reports_vanished && set_url_on_main && no_forbidden
 }
 
 #[test]
@@ -66,6 +70,11 @@ fn counter_a_prune_a_plain_merge_or_a_forbidden_git_command_is_caught() {
     let yaml = read("repos-abgleichen");
     assert!(!script_is_sound(
         &script.replace("fetch --all --tags", "fetch --all --tags --prune"),
+        &yaml
+    ));
+    assert!(!script_is_sound(&script.replace("--no-prune", ""), &yaml));
+    assert!(!script_is_sound(
+        &script.replace("remote prune --dry-run", "remote show"),
         &yaml
     ));
     assert!(!script_is_sound(
@@ -89,4 +98,17 @@ fn counter_a_set_url_outside_the_main_branch_is_caught() {
     // the branch test before set-url is removed: set-url would run for every repo
     let unguarded = script.replace("if [ \"$branch\" = \"main\" ]; then", "if true; then");
     assert!(!script_is_sound(&unguarded, &yaml));
+}
+
+#[test]
+fn the_shell_self_test_reports_a_vanished_ref_and_deletes_nothing() {
+    let out = std::process::Command::new("bash")
+        .arg(root().join("scripts/test_repos_abgleichen.sh"))
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
 }

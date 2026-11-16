@@ -1,7 +1,7 @@
 # Spezifikation: the local checkouts of all repos are brought to origin/main, fast-forward only. Everything runs in the one script
 # scripts/repos-abgleichen (the five steps are its phases; the catalog calls are not yet registered). FS profile: see README.md.
 # Nothing is pushed, tagged, reset or merged into a work branch. The rules, as the script states them:
-# - `fetch` runs WITHOUT --prune: no origin/*-ref disappears silently. Refs that vanished on origin are listed (`ref-verschwunden`).
+# - `fetch` runs with `--no-prune` (also against fetch.prune=true in the config): no origin/*-ref is deleted. Refs that vanished on origin are found by `git remote prune --dry-run origin` (read only, "would prune") and listed as `ref-verschwunden`.
 # - `remotes` (set-url SSH -> HTTPS) runs ONLY for repos that stand on main, before the fetch. Other repos keep their SSH origin
 #   and are only reported. A later push of a repo that was switched runs over HTTPS credentials instead of SSH.
 document:
