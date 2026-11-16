@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.9
+
+- Version 0.0.9 in all crates, all flows (38), `chains/release.chain.yaml` and all `@fs` calls (crate version = tag). `@main` refs in `ci.yml` and `release.yml` are pinned to the v0.0.8 commit (a fast-forward commit, not a merge commit).
+- `repos-abgleichen` (flow, `scripts/repos-abgleichen`, self test `scripts/test_repos_abgleichen.sh`): compares the repo list with the real repositories, brings list, test and head up to date. It fetches with `--no-prune`, finds vanished refs through `remote prune --dry-run` and sets a URL (`set-url`) only on `main`. Specification for the flow, the script is runnable.
+- `umbenennen` (rename of a repo or program, flow and `scripts/umbenennen` with `scripts/umbenennen_lib/`, self test `scripts/test_umbenennen.sh` extended): lessons L1-L5 from the activity rename are in the flow. The catalog is read through the `id`; `--keep` (keep-JSON, must be valid, format decision L2), `--world` (other repos by `git grep`, also untracked files), `rename` (scaffold; honours `--allow`, refuses a dirty tree, `--allow` also in the dry run) and `pins` (pin URLs are changed only in the step `pins`, AFTER the GitHub rename; docs after the rename, L5). Desktop files, `Cargo.lock` and source text are scanned. The catalog is the last step, the round counter has a lock. Marked as a specification (the flow is not run end to end).
+- Retire `fs-history` -> `fs-activity` (ADR 0087): `scripts/retired-names.txt` and two summaries in `programm-neu`.
+- `doku-aufraeumen` (flow for a full tidy-up of the documentation, push only by the strategy) with `scripts/doku-bestand` and `scripts/doku-themen` (library `scripts/doku_bestand_lib/`, self tests): incremental (machine first, AI only for changed topics), the mark of the last run lies OUTSIDE the checkout (XDG) and is set only after the reported push (`doku-marke`, never before it), known findings are carried in the mark when Opus ran, the branch name carries the time, `retired` names are checked against the stock, no push inside the tidy-up run (push gate behind the report), only `escalated` stops the run. The verdict is a catalog call, not a sub-flow. Marked as a specification (the scripts are runnable).
+- `dossier-gate` (`scripts/dossier-gate`, self test `scripts/test_dossier_gate.sh`; decision of 16 Nov.): a state is `belegt` only with a source, otherwise `[offen]` marked `ohne Vorbild` as an own version; applies in the belt and the dossier. The call `dossier-gate@fs` in the flow stays a specification.
+- Tests: `tests/workflows_repos_abgleichen.rs`, `workflows_umbenennen.rs`, `workflows_doku_aufraeumen.rs` (wiring with counter-checks), `workflows_runde.rs` follows the push step behind the report.
+- Known limits (follow-ups of the Opus review, not closed here): the handling of `bestand.json` (stock of `doku-bestand`) and the name of the mark (`doku-marke`) are listed as follow-up points; `push-unreviewed` was found ok (only `unreviewed/*`, a step of the person). `umbenennen`, `doku-aufraeumen` and `repos-abgleichen` as flows are not proven in a real run.
+
 ## 0.0.8
 
 - Version 0.0.8 in all crates, all flows, `chains/release.chain.yaml` and all `@fs` calls (crate version = tag).
