@@ -218,11 +218,40 @@ DH="$(base "$d/docs")"
 expect 1 "broken link" "red: export-ignore on docs/** does not hide a broken link (--docs-head)" "$d" -- --docs-head "$DH" --old fs-old
 expect 1 "old name 'fs-old' still in docs/de/a.md" "red: export-ignore does not hide the old name (--docs-head)" "$d" -- --docs-head "$DH" --old fs-old
 
+# B1: working-tree-encoding / filter of the author's .gitattributes must not hide the docs (attributes read from the empty tree)
+fresh enc; code_change; docs_both
+(cd "$d/docs" && echo "kaputt [x](nowhere.md) fs-old" >>docs/de/a.md && echo "broken [x](nowhere.md) fs-old" >>docs/en/a.md && g commit -q -am enc1 &&
+  printf 'docs/** working-tree-encoding=UTF-16\ntodo/** filter=lfs\n' >.gitattributes && g add .gitattributes && g commit -q -m enc2)
+DH="$(base "$d/docs")"
+expect 1 "broken link" "red: working-tree-encoding=UTF-16 does not hide a broken link (B1)" "$d" -- --docs-head "$DH" --old fs-old
+expect 1 "old name 'fs-old' still in docs/de/a.md" "red: working-tree-encoding does not hide the old name (B1)" "$d" -- --docs-head "$DH" --old fs-old
+
+# A3: a symlink of the author's branch is written as a plain text file, never followed
+fresh symb; code_change; docs_both
+(cd "$d/docs" && ln -s "$tmp/victim" docs/de/leak.md && ln -s "$tmp/victim" docs/en/leak.md && g add . && g commit -q -am sym)
+DH="$(base "$d/docs")"
+out="$(PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --docs-head "$DH" --json "$d/symb.json" 2>&1)"
+if [ -z "$(find "$tmp" -maxdepth 1 -name 'doku-mitziehen-*' 2>/dev/null)" ] && ! grep -q 'Traceback' <<<"$out"; then echo "ok   symlink of the branch does not break the gate"; else echo "FAIL symlink branch: $out"; fails=$((fails + 1)); fi
+mkdir -p "$tmp/chk" && (cd "$d/docs" && python3 -I - "$here" "$DH" "$tmp/chk" <<'PY'
+import importlib.machinery, importlib.util, os, sys
+here, dh, dest = sys.argv[1:4]
+loader = importlib.machinery.SourceFileLoader("dm", os.path.join(here, "doku-mitziehen"))
+spec = importlib.util.spec_from_loader("dm", loader)
+m = importlib.util.module_from_spec(spec)
+loader.exec_module(m)
+m.checkout_tree(".", dh, dest)
+p = os.path.join(dest, "docs/de/leak.md")
+sys.exit(0 if os.path.isfile(p) and not os.path.islink(p) else 1)
+PY
+)
+crc=$?
+if [ "$crc" -eq 0 ]; then echo "ok   a symlink is checked out as a text file (A3)"; else echo "FAIL symlink checked out as link"; fails=$((fails + 1)); fi
+
 # K5: --code-base / --docs-base go through resolve(): no option injection
 fresh inj; code_change; docs_both
-out="$("${tool[@]}" --docs "$d/docs" --docs-base "--output=$tmp/pwn5" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+out="$("${tool[@]}" --docs "$d/docs" --docs-base="--output=$tmp/pwn5" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
 if [ "$rc" -eq 2 ] && [ ! -e "$tmp/pwn5" ]; then echo "ok   --docs-base option injection refused"; else echo "FAIL docs-base injection rc=$rc"; fails=$((fails + 1)); fi
-out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "--output=$tmp/pwn5b" --state "$d/state" 2>&1)"; rc=$?
+out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base="--output=$tmp/pwn5b" --state "$d/state" 2>&1)"; rc=$?
 if [ "$rc" -eq 2 ] && [ ! -e "$tmp/pwn5b" ] && [ ! -e "$tmp/pwn5b..HEAD" ] && [ ! -e "$d/pwn5b..HEAD" ]; then echo "ok   --code-base option injection refused"; else echo "FAIL code-base injection rc=$rc"; fails=$((fails + 1)); fi
 
 # K6: an open item replaced by a literal copy of an old ticked line (no proof) is red; a vanished open item is red
@@ -235,5 +264,17 @@ expect 1 "an open item disappeared" "red: an open item vanished (K6)" "$d" --
 fresh k6c; code_change; docs_both
 (cd "$d/docs" && sed -i 's/^- \[ \] \*\*GRUNDSACHE\*\* second$/- [x] **GRUNDSACHE** second (commit 1234abc)/' todo/checklisten/fs-test.md && g commit -q -am k6c)
 expect 0 "green" "green: an open item ticked with a proof stays fine (K6)" "$d" --
+
+# A2: an open item that foreign work removed BEFORE --docs-base is not red for this agent, even with an older --proof-base
+fresh a2
+(cd "$d/docs" && sed -i '/\*\*GRUNDSACHE\*\* second$/d' todo/checklisten/fs-test.md && g commit -q -am foreign)
+PB="$DB"; DB="$(base "$d/docs")"
+code_change; docs_both
+expect 0 "green" "green: an open item removed before --docs-base is not this agent's problem (A2)" "$d" -- --proof-base "$PB"
+
+# A4: `todo/** -diff` of the docs must not hide a removed tick
+fresh a4; code_change; docs_both
+(cd "$d/docs" && printf 'todo/** -diff\n' >.gitattributes && sed -i '/\*\*GRUNDSACHE\*\* first/d' todo/checklisten/fs-test.md && g add . && g commit -q -am a4)
+expect 1 "a ticked item was removed" "red: -diff in .gitattributes does not hide a removed tick (A4)" "$d" --
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

@@ -368,7 +368,10 @@ fn resolve_head_paths_are_sound(text: &str) -> bool {
     !text.contains("resolve-head")
         || (text.matches("{ kopf: . }").count() >= text.matches("call: resolve-head").count()
             && !text.contains("$context.head")
-            && !text.contains("{ head: . }"))
+            && !text.contains("{ head: . }")
+            // an expression that ends right after `kopf` (no `.head`) hands over the whole object
+            && !text.contains("$context.kopf }")
+            && !text.contains("$context.kopf\""))
 }
 
 #[test]
@@ -397,5 +400,9 @@ fn counter_resolve_head_paths_of_the_other_form_are_caught() {
     ));
     assert!(!resolve_head_paths_are_sound(
         &t.replace("$context.kopf.head", "$context.head")
+    ));
+    // the whole object instead of its field `head`
+    assert!(!resolve_head_paths_are_sound(
+        &t.replace("${ $context.kopf.head }", "${ $context.kopf }")
     ));
 }

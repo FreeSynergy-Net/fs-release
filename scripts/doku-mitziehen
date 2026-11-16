@@ -47,6 +47,9 @@ DOC_ROOTS = ("docs", "conventions", "mkdocs.yml", "README.md")
 LINK = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)\s#][^)\s]*?)(?:#[^)\s]*)?(?:\s+\"[^\"]*\")?\)")
 
 
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
 def git(repo, *args):
     r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
     if r.returncode != 0:
@@ -63,10 +66,12 @@ def resolve(repo, ref):
 
 def checkout_tree(repo, commit, dest):
     """The tree of a commit into dest through an OWN temporary index (read-tree + checkout-index); never `git archive`, which obeys
-    the .gitattributes (export-ignore, export-subst) of the archived tree - an author could hide files from the gate with it."""
+    the .gitattributes (export-ignore, export-subst) of the archived tree - an author could hide files from the gate with it.
+    Attributes are read from the EMPTY tree (--attr-source), so working-tree-encoding, filter=lfs (network!), eol, ident of the author's
+    branch never act; symlinks are written as plain text files (core.symlinks=false), so nothing outside the tree can be read."""
     with tempfile.TemporaryDirectory(prefix="doku-mitziehen-idx-") as idx:
         env = {**os.environ, "GIT_INDEX_FILE": os.path.join(idx, "index")}
-        for args in (["read-tree", commit], ["--work-tree=" + dest, "checkout-index", "-a", "-f"]):
+        for args in (["read-tree", commit], ["--attr-source=" + EMPTY_TREE, "-c", "core.symlinks=false", "--work-tree=" + dest, "checkout-index", "-a", "-f"]):
             r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, env=env)
             if r.returncode != 0:
                 raise ValueError(f"git {args[-1] if args[0] != 'read-tree' else 'read-tree'} {commit}: {r.stderr.strip()}")
@@ -142,7 +147,12 @@ def check_checklist(a, problems):
     except ValueError:
         old_lines = []  # the file did not exist at the base: everything is new
     old_ticked = Counter(l.strip() for l in old_lines if TICKED.match(l))
-    old_open = Counter(l.strip() for l in old_lines if CHECKBOX.match(l) and not TICKED.match(l))
+    # open items are measured against --docs-base (what the agent started from), not --proof-base: foreign work in between never turns red
+    try:
+        base_lines = git(a.docs, "show", f"{a.docs_base}:{rel}").split("\n")
+    except ValueError:
+        base_lines = []
+    old_open = Counter(l.strip() for l in base_lines if CHECKBOX.match(l) and not TICKED.match(l))
     seen = Counter()
     for n, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
         if CHECKBOX.match(line):
@@ -162,7 +172,7 @@ def check_checklist(a, problems):
         new_ticks = max(0, got - sum(c for k, c in old_ticked.items() if k.lower().startswith(ticked)))
         if seen[item] + new_ticks < n:
             problems.append(f"red: {rel}: an open item disappeared ({item[:60]}); it stays open or is ticked with a proof")
-    diff = git(a.docs, "diff", a.docs_base if not a.docs_head else f"{a.docs_base}..{a.docs_head}", "--", rel).split("\n")
+    diff = git(a.docs, "diff", "--text", "--no-textconv", a.docs_base if not a.docs_head else f"{a.docs_base}..{a.docs_head}", "--", rel).split("\n")
     for line in diff:
         if line.startswith("-") and not line.startswith("---") and TICKED.match(line[1:].lstrip()):
             problems.append(f"red: {rel}: a ticked item was removed or reworded ({line[1:].strip()[:60]}); done items stay")
