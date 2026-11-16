@@ -145,7 +145,7 @@ alone, also after the agents work under their own account. The owner sets this u
 2. **Required reviewers**: the owner's own account (never the account of an agent); switch on "Prevent self-review" only if the run is started by another account.
 3. **Deployment branches and tags**: "Selected branches and tags" with the tag rule `v*` (no branch rule), so only a tag run can reach the key.
 4. **Environment secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as secrets of THIS environment (not repository or organisation secrets); delete them from
-   the repository secrets. (`scripts/set-signing-secrets.sh` sets repository secrets: use `gh secret set --env release-signing` instead.)
+   the repository secrets. `scripts/set-signing-secrets.sh --env` does steps 1 to 4 (see "Setting it up with the script" below).
 5. The same for every repo that signs: the mirror workflow of a wrapper repo (template `mirror.yml`, for example fs-zentinel) and `site.yml` of the site repo
    get `environment: release-signing` on their signing job too, and nothing else.
 6. **Every repo that calls `release.yml` needs its OWN environment `release-signing`** (steps 1 to 4 in THAT repo): the environment belongs to the repo in which the
@@ -155,6 +155,34 @@ alone, also after the agents work under their own account. The owner sets this u
    must be repeated against GitHub before the pin round): fs-calendars, fs-capnpc, fs-files, fs-groups, fs-maps, fs-messages, fs-people, fs-packages, fs-broadcast,
    fs-tasks, fs-draw, fs-texts. Further callers: fs-components (library mode, planned), the mirror workflows of the wrapper repos and `site.yml`.
    When all callers are converted, remove the handing-on of `secrets.GPG_*` in `release.yml` and in the caller examples, so that only environment secrets act.
+
+#### Setting it up with the script (step 6, per repository)
+
+The person who sets it up must be an **admin of every target repository** (GitHub answers 404 otherwise) and holds the key passphrase file; no agent runs this
+(rule: no agent access to the key or to servers). The reviewer is a login that is NOT an agent account and has access to the repository.
+
+```
+# 1. look first: only prints the gh calls (no secret values, no reading, no gpg), changes nothing
+REVIEWER=<login> bash scripts/set-signing-secrets.sh --env --dry-run
+# 2. for real; asks per repository before deleting the old repository secrets (--yes asks nothing)
+REVIEWER=<login> bash scripts/set-signing-secrets.sh --env
+# 3. tag protection of fs-release itself (no secrets, no REVIEWER)
+bash scripts/set-signing-secrets.sh --ruleset-tags fs-release
+```
+
+Default list of `--env` (the 9 callers of `release.yml`): fs-texts, fs-people, fs-calendars, fs-tasks, fs-groups, fs-maps, fs-capnpc, fs-packages, fs-files;
+`--repos texts,packages` (program names, with or without `fs-`) overrides it. Per repository, in this order: (1) PUT the environment `release-signing` with the
+required reviewer (`REVIEWER`, a required argument or variable: there is no default; the login becomes a numeric id) and deployment only for named refs
+(creates a missing environment and hardens an existing unprotected one); (2) tag rule `v*` (listed first, never created twice); (3) `GPG_PRIVATE_KEY` and
+`GPG_PASSPHRASE` as environment secrets (values only on standard input, never an argument, never printed); (4) only after BOTH are set and after your
+confirmation: delete the repository secrets of the same names (an error in between deletes nothing); (5) a read-only check (environment, reviewer, tag rule,
+secret names, repository secrets gone): any deviation ends with rc 1. `--repo-secrets` is the old mode (repository secrets), deprecated and unprotected,
+kept only on request.
+
+`prevent_self_review` is ON by default: the account that starts a run cannot approve it, so a second pair of eyes is real. If `REVIEWER` is the account that pushes the tags
+(one account for everything), no run could ever be approved: the script then refuses (rc 2) unless you pass `--allow-self-review`. `--ruleset-tags <repo>` creates (or
+updates) the ruleset "tags v* immutable": target `tag`, `refs/tags/v*`, rules `deletion` and `non_fast_forward` (a tag cannot be deleted or moved; creating a new tag stays
+allowed). It has no bypass actor: to remove a wrong tag, the owner must switch the ruleset off first.
 
 The signing job also checks that it runs for a tag (`github.ref_type == 'tag'`) and that the checkout is the commit of that tag (`git rev-parse HEAD` = `github.sha`).
 A mirror workflow should check the same two things before it signs. Not proven until the first real run: that the environment secrets reach the job inside the
