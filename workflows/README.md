@@ -33,6 +33,7 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
   unverändert, eigene Wrapper-Crate, Lizenz-Gate in der CI).
 - Koordinator: `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
   `publish-doc`, `workflow-pflege`.
+- Website Stufe 0: `site-bauen` (deterministisches Artefakt aus einem freigegebenen Ordnerstand, ohne Secrets, ohne KI), `site-signieren` (Job sign nach ADR 0078: Freigabe = signierter, an Hash, Name, Version und Lauf-Kennung gebundener Beleg, geprüft von `scripts/site-freigabe-pruefen.sh`; der Mensch liefert aus). Vorlagen und Platzhalterseiten: `templates/site/`.
 - Strategie: `entscheidung` (erst ADR-Suche, dann Auswertung, Nutzerfrage nur bei Abweichung oder Lücke), `adr-write`,
   `user-decision`, `handoff-update`, `restart-handoff`.
 
@@ -61,3 +62,5 @@ looks up the existing ADRs (`entscheidung`, `user-decision`).
 
 The `@fs` catalog (`call: <command>:<version>@fs`) is the fixed list of commands of the draft; it is not defined as a
 `use.catalogs` entry yet, so these files are valid YAML in the profile's shape but not runnable by a stock SW runtime.
+
+- Website stage 0: `site-bauen` (deterministic artefact from an approved folder state, no secrets, no AI), `site-signieren` (job sign after ADR 0078: approval = a signature bound to hash, name, version and run id, checked by `scripts/site-freigabe-pruefen.sh`; the person delivers). Templates and placeholder pages: `templates/site/`.

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use super::{have_yaml, python};
 
-pub const FILES: [&str; 27] = [
+pub const FILES: [&str; 29] = [
     "adr-write",
     "agent-run",
     "bugfix",
@@ -27,6 +27,8 @@ pub const FILES: [&str; 27] = [
     "report-to-strategy",
     "restart-handoff",
     "review",
+    "site-bauen",
+    "site-signieren",
     "slot-check",
     "upstream-anfrage",
     "user-decision",

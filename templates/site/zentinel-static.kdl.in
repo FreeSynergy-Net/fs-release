@@ -1,0 +1,161 @@
+// Zentinel static-files for three sites (stage 0 of the website): HTTPS with ACME HTTP-01 (Let's Encrypt), one document root per domain.
+// TEMPLATE. Render it with render.sh; the upper-case markers between two @ signs are replaced, nothing else. No secrets are needed or stored here.
+// Port 80 does NOT redirect: it serves one static page per host (meta refresh + link to https), decision of the strategy for the pilot.
+// The meta-refresh page is our own solution (there is no such workaround upstream); the upstream example route "redirect-https" only sets a
+// Location header without a 3xx status and is no real redirect.
+// The first certificates are fetched at start through a temporary challenge server on the first http listener; renewals are answered by
+// the running proxy. Start with ACME_STAGING=true (staging certificates, untrusted by browsers, high limits) and only then production.
+schema-version "1.0"
+
+system {
+    worker-threads 0
+    graceful-shutdown-timeout-secs 30
+}
+
+listeners {
+    listener "http" {
+        address "@HTTP_ADDR@"
+        protocol "http"
+        request-timeout-secs 30
+        namespace "plain"
+    }
+
+    listener "https" {
+        address "@HTTPS_ADDR@"
+        protocol "https"
+        request-timeout-secs 30
+        tls {
+            min-version "TLS1.2"
+
+            // One certificate per domain; a domain may appear in only one acme block (upstream rule).
+            acme {
+                email "@ACME_EMAIL@"
+                domains "@SITE1@"
+                staging #@ACME_STAGING@
+                storage "/var/lib/zentinel/acme"
+                challenge-type "http-01"
+            }
+            sni {
+                acme {
+                    email "@ACME_EMAIL@"
+                    domains "@SITE2@"
+                    staging #@ACME_STAGING@
+                    storage "/var/lib/zentinel/acme"
+                    challenge-type "http-01"
+                }
+            }
+            sni {
+                acme {
+                    email "@ACME_EMAIL@"
+                    domains "@SITE3@"
+                    staging #@ACME_STAGING@
+                    storage "/var/lib/zentinel/acme"
+                    challenge-type "http-01"
+                }
+            }
+        }
+    }
+}
+
+// A listener that belongs to a namespace serves only that namespace's routes: port 80 shows the redirect page, port 443 the sites.
+namespace "plain" {
+    routes {
+    route "plain1" {
+        matches {
+            host "@SITE1@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/_port80/@SITE1@"
+            index "index.html"
+            fallback "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "plain2" {
+        matches {
+            host "@SITE2@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/_port80/@SITE2@"
+            index "index.html"
+            fallback "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "plain3" {
+        matches {
+            host "@SITE3@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/_port80/@SITE3@"
+            index "index.html"
+            fallback "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    }
+}
+
+routes {
+    route "site1" {
+        matches {
+            host "@SITE1@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/@SITE1@"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "site2" {
+        matches {
+            host "@SITE2@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/@SITE2@"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "site3" {
+        matches {
+            host "@SITE3@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/@SITE3@"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+}
+
+limits {
+    max-header-size 8192
+    max-header-count 100
+    max-body-size 1048576
+}
+
+observability {
+    logging {
+        level "info"
+        format "json"
+    }
+}

@@ -1,0 +1,94 @@
+# Stage 0 of the website (ADR 0078 job `sign`): the only job with the release key. It runs only for an approval that is signed by a human key from
+# the fixed list, names exactly this hash, this name and version and THIS run, and has not expired. A missing key, approval or signature is RED.
+# Agents never sign, push, tag, merge or log in to a server; the person delivers (ADR 0079). FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: site-signieren
+  version: 0.0.6
+  title: Sign the artefacts of a site after an approval that is bound to the hash (job sign)
+do:
+  - build:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: site-bauen
+          version: 0.0.6
+      export:
+        as: '${ $context + { tree: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Sub-workflow site-bauen without secrets; its tree hash and run id go into the approval request.
+  - request:
+      call: site-approval-request:0.0.6@fs
+      with:
+        tree: ${ $context.tree }
+      export:
+        as: '${ $context + { run: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Writes the approval text (gate site-signieren, name, version, tree-sha256, run-id, expires) for the person; the strategy session may only PREPARE it, it cannot approve.
+  - approval:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.approval
+              subject: ${ $context.tree }
+      export:
+        as: '${ $context + { approval: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The person signs the approval text with a key that is not usable under the agents' UID (touch policy or another device); the event only wakes the flow, the signature is what counts, not source or actor.
+  - approval-check:
+      call: site-freigabe-pruefen:0.0.6@fs
+      with:
+        approval: ${ $context.approval }
+        run: ${ $context.run }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: freigabe-beleg
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/site-freigabe-pruefen.sh from the pinned main, never from an agent worktree: signer on the fixed list (read-only keyring), hash recomputed from the tarball, name, version, run id, not expired (72 h at most); anything missing is red."
+  - sign:
+      call: site-signieren:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: freigabe-beleg
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/site-signieren.sh: needs GPG_PRIVATE_KEY (missing = red, not 'not signed'), repeats the approval check, detached .asc for every file with sign-files/sign.sh; the key exists only in this job."
+  - signatures-check:
+      call: site-signatures-check:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Every file has an .asc, each verifies against the public release key and is made by exactly its fingerprint (done inside `sign`); a missing result is red.
+  - deliver:
+      call: deliver-by-hand:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The person fetches the signed files, checks signatures and SHA256SUMS.txt with scripts/verify, puts the folder in place and swaps the `current` link atomically (way back = the old link); no AI, no SSH by an agent.
+  - record:
+      call: append-log:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The person appends one line to the protocol (what, hash, when, who); only appended, never changed.

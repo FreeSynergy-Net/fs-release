@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (branch unreviewed/site-stufe0)
+
+- Website stage 0: flows `site-bauen` and `site-signieren` (all steps `machine` except the person's approval, delivery and log; the build has no secrets and no AI), scripts `site-bauen.sh` (check, deterministic build twice and compared, manifest, SPDX file list, SHA256SUMS), `site-freigabe-pruefen.sh` (approval = detached OpenPGP signature by a key on a fixed list in a read-only keyring; bound to the tree hash recomputed from the tarball, name, version, run id; 72 h at most; every missing input is red), `site-signieren.sh` (missing key is red, unlike sign-files which warns and exits 0; every file must carry a verifying .asc), selftest `scripts/test-site.sh` (53 checks, counter-test per rule), tests `workflows_site.rs`.
+- `templates/site/`: Zentinel `static-files` template for freesynergy.net, helfa.org, freeplanetearth.org (ACME HTTP-01, staging first; port 80 serves one meta-refresh page per host with a link to https), neutral placeholder pages de/en per domain (real contents and imprint are TODO for the person), `render.sh`, `gen-pages.sh`, `test-podman.sh` (config test plus HTTP checks in Podman, run with the maker's image 26.11_1 and with the signed mirror .deb 26.11_2).
+- Measured, not source-read: Zentinel 26.11_1 and 26.11_2 answer `If-None-Match` with 200 and send no br/gzip for static files in this setup (also for a 36 KB file). Not proven: the real ACME run, TLS, the `@fs` names of the new steps (`site-source-check`, `site-build`, `site-freigabe-pruefen`, ...), a runtime run of the flows.
+
 ## 0.0.6
 
 - All crates, all flows, `chains/release.chain.yaml` and all `@fs` calls at 0.0.6 (crate version = tag).

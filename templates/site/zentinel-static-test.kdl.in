@@ -1,0 +1,110 @@
+// Zentinel static-files for three sites: LOCAL TEST variant (no TLS, no ACME, no network). Same routes and document roots as
+// zentinel-static.kdl.in; port 80 and 443 are replaced by test-port addresses. Rendered by render.sh --test.
+schema-version "1.0"
+
+system {
+    worker-threads 1
+}
+
+listeners {
+    listener "http" {
+        address "@HTTP_ADDR@"
+        protocol "http"
+        request-timeout-secs 30
+        namespace "plain"
+    }
+    listener "sites" {
+        address "@HTTPS_ADDR@"
+        protocol "http"
+        request-timeout-secs 30
+    }
+}
+
+namespace "plain" {
+    routes {
+    route "plain1" {
+        matches {
+            host "@SITE1@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/_port80/@SITE1@"
+            index "index.html"
+            fallback "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "plain2" {
+        matches {
+            host "@SITE2@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/_port80/@SITE2@"
+            index "index.html"
+            fallback "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "plain3" {
+        matches {
+            host "@SITE3@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/_port80/@SITE3@"
+            index "index.html"
+            fallback "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    }
+}
+
+routes {
+    route "site1" {
+        matches {
+            host "@SITE1@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/@SITE1@"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "site2" {
+        matches {
+            host "@SITE2@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/@SITE2@"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+    route "site3" {
+        matches {
+            host "@SITE3@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            root "@WEBROOT@/@SITE3@"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+    }
+}

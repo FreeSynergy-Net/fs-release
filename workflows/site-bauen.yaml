@@ -1,0 +1,59 @@
+# Stage 0 of the website (ADR 0078 job `build`): from ONE approved folder state a deterministic tarball with manifest, SBOM and checksums.
+# No secret is read here, no server is touched, no AI step. The signing is `site-signieren`. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: site-bauen
+  version: 0.0.6
+  title: Build the artefacts of a site from an approved folder state (job build, no secrets)
+do:
+  - source-check:
+      call: site-source-check:0.0.6@fs
+      with:
+        folder: ${ .input.folder }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/site-bauen.sh check <folder>: only regular files, safe names, index.html, no script or external resource, nothing secret-looking; red names every file."
+  - build:
+      call: site-build:0.0.6@fs
+      with:
+        folder: ${ .input.folder }
+        name: ${ .input.name }
+        version: ${ .input.version }
+      export:
+        as: '${ $context + { tree: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/site-bauen.sh build <folder> <outdir> <name> <version>; a tar with sorted names, owner 0, mtime 0, gzip -n; manifest.json, SPDX 2.3 file list, SHA256SUMS.txt; the job has no secrets.
+  - same-bytes:
+      call: site-build-again:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The build ran twice into two folders and both are byte-identical (done inside `build`); a difference is red, a missing comparison is not green.
+  - hash-out:
+      call: site-tree-hash:0.0.6@fs
+      with:
+        tree: ${ $context.tree }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Prints tree-sha256=<hash> of the folder state; this hash is what the approval in `site-signieren` must name. Same folder, same hash, any other change, other hash.
+  - pass-on:
+      call: upload-artefact:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The directory goes to the sign job as an artefact (CI) or stays as a folder; the files only, never keys; nothing is published or pushed here.
