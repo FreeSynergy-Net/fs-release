@@ -68,7 +68,7 @@ Licence: MIT OR Apache-2.0.
 ### Who may sign
 
 The signing job runs in the GitHub environment `release-signing` with a required reviewer (the owner, never an agent account); the key lives only in that
-environment. Setup and the structure test: [docs/usage.md](docs/usage.md) ("Approval for the signing job").
+environment. Setup and the structure test: [docs/usage.md](docs/usage.md) ("Approval for the signing job"). **Every repo that calls `release.yml` must create its own environment `release-signing`** (otherwise GitHub creates it without protection rules and the release is signed without approval); the list of callers is in the same section.
 
 ### Verifying our releases
 
