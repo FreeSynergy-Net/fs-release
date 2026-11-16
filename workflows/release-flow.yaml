@@ -169,7 +169,7 @@ do:
       call: bump:0.0.9@fs
       with:
         workflow: bump.yml
-        repo: FreeSynergy/fs-catalog
+        repo: FreeSynergy/Catalog
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service

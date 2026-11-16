@@ -181,7 +181,7 @@ the step is `skipped` with a warning (record status `skipped`, `gates.sh` prints
 `bump` (flow step after `push`, `fs-release bump`): needs `--reach public`, the pre-approved list (repo, catalog, `public_ok`),
 the approval of this head (audited like tag and push) and a published Pre-release of the tag (not a draft, `isPrerelease` set),
 else HALT `release` (run again after `release.yml`). Known limit: that the tag points at the approved head is checked by the
-chain's `tag` step, not again by `bump` (`gh release view` has no machine-readable commit sha, only a branch name). It then runs `gh workflow run bump.yml --repo FreeSynergy/fs-catalog` (the same as `-R`); the
+chain's `tag` step, not again by `bump` (`gh release view` has no machine-readable commit sha, only a branch name). It then runs `gh workflow run bump.yml --repo FreeSynergy/Catalog` (the same as `-R`); the
 catalog's `sign` and `test` runs follow there and are not polled by this step. Tests use a mock `gh`, no real call. A flow at
 `--reach shared` now ends with HALT `reach-limit` at `bump` after the push (before: DONE).
 `workflows/` holds the visible workflows (Serverless Workflow 1.0 YAML, FS profile, draft `ENTWURF-workflow-standard.md` v3):

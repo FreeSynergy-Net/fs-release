@@ -134,7 +134,7 @@ fn release_flow_yaml_names_the_flow_steps_in_order_and_bumps_after_the_release()
     assert_eq!(names.first().map(String::as_str), Some("lift"));
     assert!(at("push") < at("release") && at("release") < at("bump") && at("bump") < at("sign"));
     let text = read("release-flow");
-    assert!(text.contains("workflow: bump.yml") && text.contains("repo: FreeSynergy/fs-catalog"));
+    assert!(text.contains("workflow: bump.yml") && text.contains("repo: FreeSynergy/Catalog"));
 }
 
 #[test]

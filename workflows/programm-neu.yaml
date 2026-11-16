@@ -264,7 +264,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:phase: P2
         freesynergy.net:adr: '0014, 0046, 0076, 0085'
-        freesynergy.net:summary: "Step 6 - the data model on the standards: types and fields map to the standards of step 3 (time and person fields as in step 5, ADR 0085 draft: UTC plus zone id, date only, person reference), storage through fs-store, history as AS2 activities through fs-activities, saving is not exporting (ADR 0046: work on the database copy, export is separate). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step datenmodell, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+        freesynergy.net:summary: "Step 6 - the data model on the standards: types and fields map to the standards of step 3 (time and person fields as in step 5, ADR 0085 draft: UTC plus zone id, date only, person reference), storage through fs-objects, history as AS2 activities through fs-activities, saving is not exporting (ADR 0046: work on the database copy, export is separate). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step datenmodell, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - modell-check:
       call: model-check:0.0.9@fs
       with:
@@ -278,7 +278,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:phase: P2
         freesynergy.net:adr: '0046'
-        freesynergy.net:summary: "Script - every field maps to a standard field, storage goes through fs-store, changes are AS2 activities in fs-activities, no export inside the save path; red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+        freesynergy.net:summary: "Script - every field maps to a standard field, storage goes through fs-objects, changes are AS2 activities in fs-activities, no export inside the save path; red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
   - modell-again:
       switch:
         - runden:

@@ -60,7 +60,7 @@ impl World {
         fs::create_dir_all(rel.join(".fs")).unwrap();
         fs::write(
             rel.join(".fs/preapproved.toml"),
-            format!("repos = [\"{SLUG}\"]\ncatalog_targets = [\"FreeSynergy/fs-catalog\"]\npublic_ok = \"{public_ok}\"\n"),
+            format!("repos = [\"{SLUG}\"]\ncatalog_targets = [\"FreeSynergy/Catalog\"]\npublic_ok = \"{public_ok}\"\n"),
         )
         .unwrap();
         git(&rel, &["add", ".fs"]);
@@ -84,7 +84,7 @@ impl World {
             version: "0.0.9".into(),
             release_dir: self.rel(),
             catalog_dir: None,
-            catalog_slug: "FreeSynergy/fs-catalog".into(),
+            catalog_slug: "FreeSynergy/Catalog".into(),
             approval_dir: self.root().join("freigaben"),
             approval_days: 7,
             today_days: today,

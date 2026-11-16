@@ -18,7 +18,7 @@ do:
       call: bump:0.0.9@fs
       with:
         workflow: bump.yml
-        repo: FreeSynergy/fs-catalog
+        repo: FreeSynergy/Catalog
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -29,7 +29,7 @@ do:
       call: sign:0.0.9@fs
       with:
         workflow: sign.yml
-        repo: FreeSynergy/fs-catalog
+        repo: FreeSynergy/Catalog
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -40,7 +40,7 @@ do:
       emit:
         event:
           with:
-            source: https://github.com/FreeSynergy/fs-catalog
+            source: https://github.com/FreeSynergy/Catalog
             type: net.freesynergy.catalog.signed
             data:
               commit: ${ .input.commit }
@@ -62,7 +62,7 @@ do:
       emit:
         event:
           with:
-            source: https://github.com/FreeSynergy/fs-catalog
+            source: https://github.com/FreeSynergy/Catalog
             type: net.freesynergy.catalog.tested
             data:
               ok: ${ .input.ok }
