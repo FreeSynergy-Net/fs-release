@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# repos-abgleichen: holt origin je Repo unter ROOT (Standard /srv/FreeSynergy, Muster fs-* und blinc)
+# und zieht main NUR per `git merge --ff-only origin/main` nach, wenn alles stimmt.
+# Sonst wird nichts geaendert, nur gemeldet. Kein reset, checkout, stash, pull, push, loeschen.
+# Schreibaktionen, genau diese: `git remote set-url` (SSH -> HTTPS, NUR bei Repos, die auf main stehen, vor dem Fetch),
+# `git fetch --all --tags --no-prune` (--no-prune schuetzt auch gegen fetch.prune=true in der Config) und `git merge --ff-only origin/main` (nur auf main, sauber, ff moeglich).
+# Verschwundene origin/*-Refs werden nicht geloescht: `git remote prune --dry-run origin` (nur lesen, "would prune") nennt sie,
+# sie werden als Zeile `ref-verschwunden` gemeldet. Repos, die nicht auf main stehen, behalten ihre origin-URL (SSH) und werden nur gemeldet.
+# Aufruf: scripts/repos-abgleichen [ROOT]   Ausgabe: je Repo eine Zeile: repo|vorher|nachher|aktion|grund
+set -u
+
+ROOT="${1:-/srv/FreeSynergy}"
+rc_all=0
+
+# Ein Repo mit Zustandsfeld in einer Zeile ausgeben.
+emit() {
+  printf '%s|%s|%s|%s|%s\n' "$1" "$2" "$3" "$4" "$5"
+}
+
+# vanished_of <dir>: the origin/*-refs that no longer exist on origin, comma separated. Read only: `git remote prune --dry-run`
+# lists them as "would prune" and deletes nothing.
+vanished_of() {
+  LC_ALL=C git -C "$1" remote prune --dry-run origin 2>/dev/null | sed -n 's/^ *\* \[would prune\] origin\///p' | paste -sd, -
+}
+
+for dir in "$ROOT"/fs-* "$ROOT"/blinc; do
+  [ -d "$dir" ] || continue
+  name=$(basename "$dir")
+
+  if ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+    emit "$name" "-" "-" "uebersprungen" "kein git-Checkout"
+    continue
+  fi
+
+  before=$(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "?")
+  branch=$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
+  vorher="$branch@$before"
+
+  # 1. origin auf HTTPS umstellen, falls SSH (git@github.com:Besitzer/Repo.git) - NUR bei Repos auf main.
+  note=""
+  url=$(git -C "$dir" remote get-url origin 2>/dev/null || echo "")
+  if [ "$branch" = "main" ]; then
+    case "$url" in
+      git@github.com:*)
+        path="${url#git@github.com:}"
+        if git -C "$dir" remote set-url origin "https://github.com/$path"; then
+          note="origin SSH->HTTPS"
+        else
+          emit "$name" "$vorher" "$vorher" "fehler" "set-url fehlgeschlagen"
+          rc_all=1
+          continue
+        fi
+        ;;
+    esac
+  fi
+
+  # 2. fetch mit --no-prune; verschwundene origin/*-Refs werden gemeldet, nicht geloescht.
+  if ! git -C "$dir" fetch --all --tags --no-prune >/dev/null 2>&1; then
+    emit "$name" "$vorher" "$vorher" "uebersprungen" "fetch-Fehler"
+    rc_all=1
+    continue
+  fi
+  vanished=$(vanished_of "$dir")
+  if [ -n "$vanished" ]; then
+    emit "$name" "$vorher" "$vorher" "ref-verschwunden" "$vanished"
+  fi
+
+  if ! git -C "$dir" rev-parse --verify --quiet origin/main >/dev/null; then
+    emit "$name" "$vorher" "$vorher" "uebersprungen" "kein origin/main ${note:+($note)}"
+    continue
+  fi
+
+  # 2. Bedingungen: main, sauber (nur untracked .claude/ erlaubt), ff moeglich.
+  if [ "$branch" != "main" ]; then
+    emit "$name" "$vorher" "$vorher" "uebersprungen" "Branch $branch, nicht main (origin unveraendert)"
+    continue
+  fi
+
+  dirty=$(git -C "$dir" status --porcelain 2>/dev/null | grep -v -E '^\?\? \.claude/$' | wc -l)
+  if [ "$dirty" -ne 0 ]; then
+    emit "$name" "$vorher" "$vorher" "uebersprungen" "$dirty uncommittete Aenderung(en)/untracked ${note:+($note)}"
+    continue
+  fi
+
+  if ! git -C "$dir" merge-base --is-ancestor main origin/main; then
+    emit "$name" "$vorher" "$vorher" "uebersprungen" "abweichende Historie (kein ff) ${note:+($note)}"
+    continue
+  fi
+
+  if [ "$before" = "$(git -C "$dir" rev-parse --short origin/main)" ]; then
+    emit "$name" "$vorher" "$vorher" "aktuell" "schon auf origin/main ${note:+($note)}"
+    continue
+  fi
+
+  # 3. Fast-Forward, mehr nicht.
+  if git -C "$dir" merge --ff-only origin/main >/dev/null 2>&1; then
+    after=$(git -C "$dir" rev-parse --short HEAD)
+    n=$(git -C "$dir" rev-list --count "$before..$after" 2>/dev/null || echo "?")
+    emit "$name" "$vorher" "main@$after" "ff" "+$n Commits ${note:+($note)}"
+  else
+    emit "$name" "$vorher" "$vorher" "fehler" "merge --ff-only abgelehnt"
+    rc_all=1
+  fi
+done
+
+exit "$rc_all"
