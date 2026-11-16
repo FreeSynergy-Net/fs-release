@@ -174,6 +174,8 @@ jobs:
     uses: FreeSynergy/fs-release/.github/workflows/_release-publish.yml@f1211066d0072c6319678659e845c19ae4384bd0
     permissions:
       contents: write
+      attestations: read
     with:
       tag: ${{ fromJSON(needs.plan.outputs.plan).tag }}
       dry-run: ${{ inputs.dry-run }}
+      attest: ${{ inputs.attest }}

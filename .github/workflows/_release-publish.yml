@@ -6,9 +6,11 @@ on:
     inputs:
       tag: { type: string, required: true }
       dry-run: { type: boolean, default: false }
+      attest: { type: boolean, default: true }
 
 permissions:
   contents: write
+  attestations: read
 
 jobs:
   publish:
@@ -20,3 +22,4 @@ jobs:
           repo: ${{ github.repository }}
           token: ${{ github.token }}
           dry-run: ${{ inputs.dry-run }}
+          attest: ${{ inputs.attest }}

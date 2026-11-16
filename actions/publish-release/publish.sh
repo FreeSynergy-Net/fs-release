@@ -45,6 +45,22 @@ grep -qxF SHA256SUMS.txt.asc <<<"$names" || fail "SHA256SUMS.txt has no detached
 
 [[ $problems -eq 0 ]] || die "$REPO $TAG stays a draft: $problems problem(s) above"
 
+# Verify the content before anything is published: hashes, signatures against the FIXED release fingerprint, build attestations.
+# Any failure leaves the release a draft (the job is red). The attestation check names the signing workflow: without --signer-workflow
+# the reusable-workflow identity does not match (fs-packages v0.0.18).
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+FPR="16A4A3EE563AEF51FCF0C55DED7B57C4A1904342"   # 16A4 A3EE 563A EF51 FCF0 C55D ED7B 57C4 A190 4342
+assets="$tmp/assets"; mkdir -p "$assets"
+gh release download "$TAG" --dir "$assets"
+"$here/../../scripts/verify_release_assets.sh" "$assets" "$here/../../release-signing-key.asc" "$FPR" || die "$REPO $TAG stays a draft: hash or signature check failed"
+if [[ "${ATTEST:-true}" == "true" ]]; then
+  for f in "$assets"/*; do
+    gh attestation verify "$f" --repo "$REPO" --signer-workflow FreeSynergy/fs-release/.github/workflows/_release-finalize.yml >/dev/null \
+      || fail "$(basename "$f"): no valid build attestation of $REPO from _release-finalize.yml"
+  done
+  [[ $problems -eq 0 ]] || die "$REPO $TAG stays a draft: attestation check failed"
+fi
+
 if [[ "$dry" == "true" ]]; then
   echo "dry-run: $REPO $TAG passes all checks ($listed files) - would run: gh release edit $TAG --draft=false --prerelease"
   exit 0

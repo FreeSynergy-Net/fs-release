@@ -4,6 +4,7 @@ inputs:
   tag: { description: "Release tag", required: true }
   repo: { description: "owner/name of the program repo", default: "${{ github.repository }}" }
   token: { description: "Token with contents write on that repo", required: true }
+  attest: { description: "true - also verify the build attestation of every asset (gh attestation verify, needs attestations read); false for repos whose finalize ran without attest", default: "true" }
   dry-run: { description: "true - check and report only, change nothing", default: "false" }
 runs:
   using: composite
@@ -14,4 +15,5 @@ runs:
         REPO: ${{ inputs.repo }}
         GH_TOKEN: ${{ inputs.token }}
         DRY_RUN: ${{ inputs.dry-run }}
+        ATTEST: ${{ inputs.attest }}
       run: '"$GITHUB_ACTION_PATH/publish.sh"'
