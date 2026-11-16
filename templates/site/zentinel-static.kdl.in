@@ -1,10 +1,11 @@
 // Zentinel static-files for three sites (stage 0 of the website): HTTPS with ACME HTTP-01 (Let's Encrypt), one document root per domain.
 // TEMPLATE. Render it with render.sh; the upper-case markers between two @ signs are replaced, nothing else. No secrets are needed or stored here.
-// Port 80 does NOT redirect: it serves one static page per host (meta refresh + link to https), decision of the strategy for the pilot.
-// The meta-refresh page is our own solution (there is no such workaround upstream); the upstream example route "redirect-https" only sets a
-// Location header without a 3xx status and is no real redirect.
+// Port 80 redirects with a real 301 (namespace "redirect" below, see the comment there). Document roots are `<webroot>/<domain>/current`.
 // The first certificates are fetched at start through a temporary challenge server on the first http listener; renewals are answered by
-// the running proxy. Start with ACME_STAGING=true (staging certificates, untrusted by browsers, high limits) and only then production.
+// the running proxy. A FIRST start with ACME in the configuration stops when the first certificate cannot be issued (fs-zentinel examples/README.md):
+// start with `render.sh --http-only` first, DNS set and port 80 reachable, then staging (ACME_STAGING=true, certificates untrusted by browsers),
+// and only then production.
+// Content-Security-Policy per site is a SETTING (render.sh CSP_MODE1..3 / CSP1..3), the default is strict (no script, nothing from outside).
 schema-version "1.0"
 
 system {
@@ -17,7 +18,7 @@ listeners {
         address "@HTTP_ADDR@"
         protocol "http"
         request-timeout-secs 30
-        namespace "plain"
+        namespace "redirect"
     }
 
     listener "https" {
@@ -57,51 +58,26 @@ listeners {
     }
 }
 
-// A listener that belongs to a namespace serves only that namespace's routes: port 80 shows the redirect page, port 443 the sites.
-namespace "plain" {
+// A listener that belongs to a namespace serves only that namespace's routes (upstream: crates/config/src/scopes.rs). Port 80 therefore answers
+// every request with a real 301 to https (same host and path; the query string is NOT carried over). Measured with 26.11_2 on a high port (GET):
+// messung-zentinel-redirect.md and fs-zentinel examples/test_serve.sh. NOT measured: ACME HTTP-01 on this listener (upstream answers the challenge
+// before the routing, acme.md / http_trait.rs), HEAD, POST, IPv6. The staging run checks these; until then they are "not proven".
+namespace "redirect" {
+    filters {
+        filter "to-https" {
+            type "redirect"
+            scheme "https"
+            status-code 301
+        }
+    }
     routes {
-    route "plain1" {
-        matches {
-            host "@SITE1@"
-            path-prefix "/"
+        route "to-https" {
+            matches {
+                path-prefix "/"
+            }
+            service-type "web"
+            filters "to-https"
         }
-        service-type "static"
-        static-files {
-            root "@WEBROOT@/_port80/@SITE1@"
-            index "index.html"
-            fallback "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-    }
-    route "plain2" {
-        matches {
-            host "@SITE2@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            root "@WEBROOT@/_port80/@SITE2@"
-            index "index.html"
-            fallback "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-    }
-    route "plain3" {
-        matches {
-            host "@SITE3@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            root "@WEBROOT@/_port80/@SITE3@"
-            index "index.html"
-            fallback "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-    }
     }
 }
 
@@ -113,10 +89,20 @@ routes {
         }
         service-type "static"
         static-files {
-            root "@WEBROOT@/@SITE1@"
+            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
+            root "@WEBROOT@/@SITE1@/current"
             index "index.html"
             cache-control "public, max-age=300"
             compress #true
+        }
+        policies {
+            response-headers {
+                set {
+                    "Content-Security-Policy" "@CSP1@"
+                    "X-Content-Type-Options" "nosniff"
+                    "Referrer-Policy" "no-referrer"
+                }
+            }
         }
     }
     route "site2" {
@@ -126,10 +112,20 @@ routes {
         }
         service-type "static"
         static-files {
-            root "@WEBROOT@/@SITE2@"
+            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
+            root "@WEBROOT@/@SITE2@/current"
             index "index.html"
             cache-control "public, max-age=300"
             compress #true
+        }
+        policies {
+            response-headers {
+                set {
+                    "Content-Security-Policy" "@CSP2@"
+                    "X-Content-Type-Options" "nosniff"
+                    "Referrer-Policy" "no-referrer"
+                }
+            }
         }
     }
     route "site3" {
@@ -139,10 +135,20 @@ routes {
         }
         service-type "static"
         static-files {
-            root "@WEBROOT@/@SITE3@"
+            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
+            root "@WEBROOT@/@SITE3@/current"
             index "index.html"
             cache-control "public, max-age=300"
             compress #true
+        }
+        policies {
+            response-headers {
+                set {
+                    "Content-Security-Policy" "@CSP3@"
+                    "X-Content-Type-Options" "nosniff"
+                    "Referrer-Policy" "no-referrer"
+                }
+            }
         }
     }
 }

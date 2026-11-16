@@ -1,0 +1,102 @@
+// Zentinel static-files for three sites: FIRST-START variant, plain HTTP only, no TLS and no ACME (render.sh --http-only). Zentinel stops at start
+// when the first certificate cannot be issued, so the first start uses this file; switch to the staging rendering when the DNS records point to
+// this server and port 80 is reachable. Same routes, document roots (`<webroot>/<domain>/current`) and headers as zentinel-static.kdl.in.
+schema-version "1.0"
+
+system {
+    worker-threads 0
+    graceful-shutdown-timeout-secs 30
+}
+
+listeners {
+    listener "http" {
+        address "@HTTP_ADDR@"
+        protocol "http"
+        request-timeout-secs 30
+    }
+}
+
+routes {
+    route "site1" {
+        matches {
+            host "@SITE1@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
+            root "@WEBROOT@/@SITE1@/current"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+        policies {
+            response-headers {
+                set {
+                    "Content-Security-Policy" "@CSP1@"
+                    "X-Content-Type-Options" "nosniff"
+                    "Referrer-Policy" "no-referrer"
+                }
+            }
+        }
+    }
+    route "site2" {
+        matches {
+            host "@SITE2@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
+            root "@WEBROOT@/@SITE2@/current"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+        policies {
+            response-headers {
+                set {
+                    "Content-Security-Policy" "@CSP2@"
+                    "X-Content-Type-Options" "nosniff"
+                    "Referrer-Policy" "no-referrer"
+                }
+            }
+        }
+    }
+    route "site3" {
+        matches {
+            host "@SITE3@"
+            path-prefix "/"
+        }
+        service-type "static"
+        static-files {
+            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
+            root "@WEBROOT@/@SITE3@/current"
+            index "index.html"
+            cache-control "public, max-age=300"
+            compress #true
+        }
+        policies {
+            response-headers {
+                set {
+                    "Content-Security-Policy" "@CSP3@"
+                    "X-Content-Type-Options" "nosniff"
+                    "Referrer-Policy" "no-referrer"
+                }
+            }
+        }
+    }
+}
+
+limits {
+    max-header-size 8192
+    max-header-count 100
+    max-body-size 1048576
+}
+
+observability {
+    logging {
+        level "info"
+        format "json"
+    }
+}

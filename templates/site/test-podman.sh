@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Local proof of the stage-0 sites with Zentinel in Podman. Nothing leaves this machine: ports are bound to 127.0.0.1, no ACME, no DNS,
-# no server, no network access (the image must already be present; it is not pulled here).
+# Local proof of the stage-0 sites with Zentinel in Podman. Nothing leaves this machine: ports are bound to 127.0.0.1, no ACME, no DNS, no server.
+# The config check (step 1) runs with `--network none`; the serving container (step 2) has no such flag because a published port needs a network,
+# but its configuration has no ACME and no upstream, so no outgoing traffic is expected (not enforced). The image must already be present (no pull).
 #   test-podman.sh [<image>]           default image: ghcr.io/zentinelproxy/zentinel:26.11_1 (local test only; the server gets the signed mirror .deb)
 # Env: CONTAINER_TOOL (default podman), PORT (default 18680; PORT and PORT+1 are used).
 #   ZENTINEL_DEB=<zentinel_..._amd64.deb> BASE_IMAGE=<local image with glibc, e.g. an ubuntu>  tests the binary of the signed mirror .deb
 #   (the pinned 26.11_2) instead of the maker's image. Verify the .deb first (fs-zentinel scripts/verify-mirror.sh); this script does not.
-# 1. `zentinel test -c` on the PRODUCTION rendering (ACME staging): the file is valid.   2. serves the pages (test variant) and checks them over HTTP.
+# The pages are TEST pages written here (a marker per site); real pages only come through site-bauen/site-signieren. The layout is the delivered one:
+# <webroot>/<domain>/releases/1 and the link `current` -> releases/1.
+# 1. `zentinel test -c` on the production rendering (ACME staging) and the first-start rendering: valid.   2. serves (test variant) and checks over HTTP:
+# pages, 404, traversal, headers (CSP, nosniff: NOTE, see below), port 80 = real 301.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 tool=${CONTAINER_TOOL:-podman}; image=${1:-ghcr.io/zentinelproxy/zentinel:26.11_1}; port=${PORT:-18680}
@@ -23,13 +27,19 @@ cleanup() { "$tool" rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$t"; }; trap 
 chmod 755 "$t"
 export SITE1=freesynergy.net SITE2=helfa.org SITE3=freeplanetearth.org ACME_EMAIL=admin@helfa.org WEBROOT=/www
 mkdir -p "$t/www" "$t/conf"
-WEBROOT="$t/www" "$here/render.sh" --staging --install-pages "$t/conf/prod.kdl" >/dev/null
-sed "s#$t/www#/www#g" "$t/conf/prod.kdl" > "$t/conf/prod.tmp" && mv "$t/conf/prod.tmp" "$t/conf/prod.kdl"
+for d in freesynergy.net helfa.org freeplanetearth.org; do
+  mkdir -p "$t/www/$d/releases/1/de" "$t/www/$d/releases/1/en"
+  for l in "" de/ en/; do printf '<!doctype html>\n<html lang="%s"><head><meta charset="utf-8"><title>test %s</title></head><body><p>MARKER-%s</p><a href="/de/">de</a> <a href="/en/">en</a></body></html>\n' "${l%/}" "$d" "$d" > "$t/www/$d/releases/1/${l}index.html"; done
+  ln -s releases/1 "$t/www/$d/current"
+done
+WEBROOT=/www "$here/render.sh" --staging "$t/conf/prod.kdl" >/dev/null
+WEBROOT=/www "$here/render.sh" --http-only "$t/conf/first.kdl" >/dev/null
 WEBROOT=/www HTTP_ADDR=0.0.0.0:8080 HTTPS_ADDR=0.0.0.0:8081 "$here/render.sh" --test "$t/conf/test.kdl" >/dev/null
 chmod -R a+rX "$t"
 mount=(-v "$t/www:/www:ro,z" -v "$t/conf:/conf:ro,z")
 echo "== 1. production rendering passes zentinel test"
 "$tool" run --rm --network none "${bin[@]}" "${mount[@]}" "$image" test -c /conf/prod.kdl
+"$tool" run --rm --network none "${bin[@]}" "${mount[@]}" "$image" test -c /conf/first.kdl
 echo "== 2. serve the pages and check them"
 "$tool" run -d --name "$name" -p "127.0.0.1:$port:8080" -p "127.0.0.1:$((port+1)):8081" "${bin[@]}" "${mount[@]}" "$image" -c /conf/test.kdl >/dev/null
 python3 -I - "$port" "$name" "$tool" <<'PY'
@@ -49,23 +59,37 @@ def check(n, c):
     global ok; print(("ok   " if c else "FAIL ") + n); ok = ok and bool(c)
 D = ["freesynergy.net", "helfa.org", "freeplanetearth.org"]
 for d in D:
-    s, b, h = get(d); check(f"{d} / -> 200, language choice", s == 200 and b'href="/de/"' in b and b'href="/en/"' in b)
+    mark = f"MARKER-{d}".encode()
+    s, b, h = get(d); check(f"{d} / -> 200, its own page", s == 200 and mark in b and b'href="/de/"' in b)
     s, b, h = get(d, "/de/"); check(f"{d} /de/ -> 200, lang=de", s == 200 and b'<html lang="de">' in b)
     s, b, h = get(d, "/en/"); check(f"{d} /en/ -> 200, lang=en", s == 200 and b'<html lang="en">' in b)
     s, b, h = get(d, "/nope"); check(f"{d} missing -> 404", s == 404)
-    s, b, h = get(d, "/../helfa.org/index.html"); check(f"{d} traversal blocked", b"<title>helfa.org</title>" not in b or d == "helfa.org")
-    for path in ("/", "/de/", "/en/"):
-        s, b, h = get(d, path); check(f"{d}{path} no script, no external resource", b"<script" not in b and b'src="http' not in b and b"stylesheet" not in b)
+    for other in D:
+        if other != d:
+            s, b, h = get(d, f"/../{other}/current/index.html"); check(f"{d} traversal to {other} blocked", f"MARKER-{other}".encode() not in b)
+            s, b, h = get(d, f"/%2e%2e/{other}/current/index.html"); check(f"{d} encoded traversal to {other} blocked", f"MARKER-{other}".encode() not in b)
     s, b, h = get(d); check(f"{d} Cache-Control set", "public" in h.get("cache-control", ""))
+    # Measured with 26.11_2: the route's response-headers (CSP, nosniff, referrer policy) are NOT sent for static-files routes (upstream handlers.rs
+    # writes the static response directly, the header policies only run for upstream responses). The configuration carries the setting and passes
+    # `zentinel test -c`; here it is a NOTE, and a version that sends the header turns it into a checked value.
+    csp = h.get("content-security-policy", "")
+    if csp:
+        check(f"{d} CSP header is the strict default (no script, nothing from outside)", "default-src 'none'" in csp and "script-src" not in csp and "frame-ancestors 'none'" in csp)
+        check(f"{d} nosniff and referrer policy", h.get("x-content-type-options") == "nosniff" and h.get("referrer-policy") == "no-referrer")
+    else:
+        print(f"NOTE {d} static route sends NO Content-Security-Policy/nosniff/referrer headers (route response-headers are not applied to static-files in this version)")
     etag = h.get("etag"); check(f"{d} ETag present", bool(etag))
-    # Measured, not required: 26.11_1 and 26.11_2 answered 200 (no 304) and sent no compression in this setup, although the source reading
-    # (zentinel-static.md) says ETag/304 and br/gzip exist. Printed as NOTE so a change in a later version shows up; it does not fail the test.
+    # Measured, not required: 26.11_1 and 26.11_2 answered 200 (no 304) and sent no compression in this setup (upstream handlers.rs hands the static
+    # server a request without headers). Printed as NOTE so a change in a later version shows up; it does not fail the test.
     s, b, h = get(d, "/", **{"If-None-Match": etag or "x"}); print(f"NOTE {d} If-None-Match -> {s} ({'304 works' if s == 304 else 'no 304'})")
     s, b, h = get(d, "/", **{"Accept-Encoding": "br, gzip"}); print(f"NOTE {d} Accept-Encoding br,gzip -> content-encoding {h.get('content-encoding')}")
-    s, b, h = get(d, "/", port); check(f"{d} port 80 page -> 200, meta refresh + link to https",
-        s == 200 and f'http-equiv="refresh" content="0;url=https://{d}/"'.encode() in b and f'href="https://{d}/"'.encode() in b)
-    s, b, h = get(d, "/de/x", port); check(f"{d} port 80, any path -> the redirect page, no site content", s == 200 and f"https://{d}/".encode() in b and b"Wir bauen um" not in b)
-s, b, h = get("evil.example"); check("unknown host gets no page", b"rebuilding" not in b.lower() and b"umbau" not in b.lower())
+    for path in ("/", "/de/x", "/a/b?x=1&y=2"):
+        s, b, h = get(d, path, port)
+        check(f"{d} port 80 {path} -> 301 to https, same host and path", s == 301 and h.get("location") == f"https://{d}/" + path.lstrip("/").split("?")[0])
+    s, b, h = get(d, "/a?x=1", port); print(f"NOTE {d} port 80 query string in Location: {h.get('location')} (measured: it is dropped)")
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=5); c.request("HEAD", "/", headers={"Host": d}); r = c.getresponse(); print(f"NOTE {d} port 80 HEAD -> {r.status} {r.getheader('location')}")
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=5); c.request("POST", "/", body=b"x", headers={"Host": d}); r = c.getresponse(); print(f"NOTE {d} port 80 POST -> {r.status} {r.getheader('location')}")
+s, b, h = get("evil.example"); check("unknown host gets no page", b"MARKER-" not in b)
 sys.exit(0 if ok else 1)
 PY
 echo "all checks passed"
