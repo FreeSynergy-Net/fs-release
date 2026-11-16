@@ -17,6 +17,11 @@ fn tidy_is_sound(t: &str) -> bool {
         && step_body(t, "uebersprungen").contains("eskaliert: false")
         && step_body(t, "weiche").contains("then: uebersprungen")
         && t.contains("YYYYMMDD-HHMM")
+        // the mark is not set on the green path before the push: no `marke` step between the check and `fertig`
+        && !names.iter().any(|n| n == "marke" || n == "marke-opus" || n == "marke-weiche")
+        && step_body(t, "weiter").contains("then: fertig")
+        && step_body(t, "fertig").contains("marke_kopf:")
+        && step_body(t, "fertig").contains("marke_opus:")
 }
 
 fn callers_are_sound(release: &str, runde: &str) -> bool {
@@ -32,6 +37,10 @@ fn callers_are_sound(release: &str, runde: &str) -> bool {
         && step_body(runde, "bericht").contains("then: doku-push-weiche")
         && step_body(runde, "doku-push").contains("gate: strategie-ok")
         && step_body(runde, "doku-push").contains("actor: human")
+        && in_order(runde, &["doku-push", "doku-marke-weiche", "doku-marke"])
+        && step_body(runde, "doku-push").contains("then: doku-marke-weiche")
+        && step_body(runde, "doku-marke-weiche").contains("push.ok == true")
+        && step_body(runde, "doku-marke").contains("--schreibe-marke")
         && step_body(runde, "doku-push-weiche").contains("push_offen == true")
 }
 
@@ -73,6 +82,13 @@ fn counter_a_mark_in_the_checkout_a_push_step_a_human_message_or_a_missing_retir
         &t.replace("then: uebersprungen", "then: eskalation")
     ));
     assert!(!tidy_is_sound(&t.replace("YYYYMMDD-HHMM", "YYYY-MM-DD")));
+    // the mark moved before the push again: the green check leads to a `marke` step
+    assert!(!tidy_is_sound(&t.replacen(
+        "  - fertig:",
+        "  - marke:\n      run:\n        script: x\n  - fertig:",
+        1
+    )));
+    assert!(!tidy_is_sound(&t.replace("marke_kopf:", "kopf:")));
 }
 
 #[test]

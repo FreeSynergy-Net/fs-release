@@ -12,7 +12,8 @@
 #   (5) `ausfuehren` - Haiku, ONLY the listed pages: the changed topic pages (aktualisieren) and the Opus list. Branch `unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM>`
 #                    in its own worktree, local commits, no push.
 #   (6) `pruefen`  - check-docs with `mkdocs build --strict` WITHOUT quiet flag; red goes back to `ausfuehren` (third red round: `eskalation`); skipped is never green.
-#   (7) `marke`    - script `doku-themen --schreibe-marke <kopf>` (state): ONLY after green; with `--bekannt-aus` only if Opus ran.
+#   (7) `marke`    - NOT set here on the green path: `fertig` hands `marke_kopf` and `marke_opus` to the caller, which runs `doku-themen --schreibe-marke <kopf>` (with `--bekannt-aus -` only if Opus ran)
+#                    only AFTER the push is reported done (`doku-marke`); a failed or refused push leaves the mark where it was, so the findings are not skipped next time. Only the end without changed pages (`marke-ohne-seiten`: nothing to push) moves the mark itself.
 #   (8) result   - the branch is NOT pushed here: `fertig` reports `push_offen: true` and the branch; the caller reports it and the push (gate `strategie-ok`,
 #                    the person, only this `unreviewed/*` branch, never main) is its own step AFTER the report (koordinator-runde: `doku-push`), so the
 #                    flow of the caller never hangs on the strategy. Agents never push, tag or merge.
@@ -194,7 +195,7 @@ do:
             then: ausfuehren
         - gruen:
             when: '${ $context.pruefung.status == "green" }'
-            then: marke-weiche
+            then: fertig
         - sonst:
             then: eskalation
       metadata:
@@ -202,45 +203,14 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red goes back to `ausfuehren` (red lines as data); from the third red round `eskalation`; only `status == \"green\"` goes on to the mark and the push; skipped or any other result is NOT green and goes to `eskalation`."
-  - marke-weiche:
-      switch:
-        - opus_gelaufen:
-            when: '${ $context.urteil != null }'
-            then: marke-opus
-        - sonst:
-            then: marke
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the mark moves with the findings Opus has decided (`--bekannt-aus`) only when Opus ran; otherwise a plain mark. Without this, the same folders would go to Opus on every run."
-  - marke-opus:
-      run:
-        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --repo ${ .input.repo } --bekannt-aus -'
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "After the green check, Opus ran: moves the mark to `themen.kopf` and adds the keys of the inventory file `<repo>.bestand.json` next to the mark (written by `bestand` with `json: -`) to `bekannt`. Writes the state file only."
-      then: fertig
-  - marke:
-      run:
-        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --repo ${ .input.repo }'
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "After the green check, no Opus run: moves the mark to the head the topic run read (`themen.kopf`). Writes the state file only."
-      then: fertig
+        freesynergy.net:summary: "Control flow - red goes back to `ausfuehren` (red lines as data); from the third red round `eskalation`; only `status == \"green\"` goes on to `fertig`; skipped or any other result is NOT green and goes to `eskalation`."
   - fertig:
       set:
         status: green
         branch: ${ "unreviewed/doku-aufraeumen-" + .input.datum }
         push_offen: true
+        marke_kopf: ${ $context.themen.kopf }
+        marke_opus: ${ $context.urteil != null }
         eskaliert: false
       export:
         as: '${ $context + { ergebnis: . } }'
@@ -250,7 +220,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The branch is checked green and the mark is moved; `push_offen: true`: the push is a separate step of the caller after its report (gate `strategie-ok`, the person). Sets `status: green`."
+        freesynergy.net:summary: "The branch is checked green; the mark is NOT moved yet (`marke_kopf`, `marke_opus` go to the caller, which moves it only after the push). `push_offen: true`: the push is a separate step of the caller after its report (gate `strategie-ok`, the person). Sets `status: green`."
   - uebersprungen:
       set:
         status: skipped
@@ -279,4 +249,4 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The check was red for the third time, skipped (mkdocs missing) or a result is missing: the tidy-up stops, the person decides; nothing is pushed and the mark stays where it was."
 output:
-  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), branch: ($context.ergebnis.branch // null), push_offen: ($context.ergebnis.push_offen // false), hinweis: ($context.ergebnis.hinweis // null), tokens: { bestand: ($context.bestand.tokens // 0), themen: ($context.themen.tokens // 0), urteil: ($context.urteil.tokens // 0), ausfuehren: ($context.ausgefuehrt.tokens // 0), pruefen: ($context.pruefung.tokens // 0) } } | . + { tokens_summe: ([.tokens[]] | add) } }'
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), branch: ($context.ergebnis.branch // null), push_offen: ($context.ergebnis.push_offen // false), marke_kopf: ($context.ergebnis.marke_kopf // null), marke_opus: ($context.ergebnis.marke_opus // false), hinweis: ($context.ergebnis.hinweis // null), tokens: { bestand: ($context.bestand.tokens // 0), themen: ($context.themen.tokens // 0), urteil: ($context.urteil.tokens // 0), ausfuehren: ($context.ausgefuehrt.tokens // 0), pruefen: ($context.pruefung.tokens // 0) } } | . + { tokens_summe: ([.tokens[]] | add) } }'
