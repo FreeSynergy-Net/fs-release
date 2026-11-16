@@ -117,3 +117,77 @@ fn counter_a_rename_approval_of_another_head_or_a_stale_head_or_a_missing_no_is_
         .replacen("  - zz:", "  - github-umbenennen:", 1);
     assert!(!rename_is_sound(&swapped));
 }
+
+/// Lessons L1, L2, L5 of the first rename (review-umbau-activity): the lock check after the write mode, the keep list
+/// in the dry run and the after-check, the docs only after the rename. Each rule has a counter-test.
+fn lessons_are_wired(text: &str) -> bool {
+    in_order(text, &["umbau", "lock", "lock-weiter", "sperre"])
+        && step_body(text, "lock").contains("cargo metadata --locked")
+        && step_body(text, "lock-weiter").contains("then: umbau")
+        && step_body(text, "lock-weiter").contains("then: continue")
+        && step_body(text, "trockenlauf").contains("keep: ${ .input.keep }")
+        && step_body(text, "nachher").contains("keep: ${ .input.keep }")
+        && in_order(text, &["github-umbenennen", "doku-veroeffentlichen"])
+        && step_body(text, "doku-veroeffentlichen").contains("NACH der GitHub-Umbenennung")
+        // strategy order: code merge, GitHub rename, docs merge, remotes, catalog (own last step), then the release
+        && in_order(
+            text,
+            &["merge", "github-umbenennen", "doku-veroeffentlichen", "remotes", "weiterleitung", "katalog", "release"],
+        )
+        && step_body(text, "katalog").contains("fs-catalog")
+        && step_body(text, "katalog").contains("replaces")
+        && !step_body(text, "merge").contains("of fs-catalog")
+        // the name lock is written before `nachher`, in effect at the end
+        && in_order(text, &["sperre", "nachher"])
+        && step_body(text, "sperre").contains("geschrieben vor nachher, wirksam am Schluss")
+        // lock loop: round counter and escalation like the other flows
+        && step_body(text, "lock").contains("`runde`")
+        && step_body(text, "lock-weiter").contains("lock.runde")
+        && step_body(text, "lock-weiter").contains(">= 3")
+        && step_body(text, "lock-weiter").contains("then: eskalation")
+        // keep example is valid JSON (double quotes, escaped in the YAML string), not single quotes
+        && step_body(text, "trockenlauf").contains("[{\\\"pattern\\\": \\\"history.*\\\", \\\"grund\\\"")
+        && !step_body(text, "trockenlauf").contains("{'pattern'")
+        // parts of the script that do not exist yet are marked as specification
+        && step_body(text, "lock").contains("(Spezifikation, Skript folgt")
+        && step_body(text, "umbau").contains("(Spezifikation, Skript folgt")
+}
+
+#[test]
+fn umbenennen_lessons_l1_l2_l5_are_wired() {
+    assert!(lessons_are_wired(&read("umbenennen")));
+}
+
+#[test]
+fn counter_a_lock_check_that_does_not_go_back_or_a_docs_step_before_the_rename_is_caught() {
+    let t = read("umbenennen");
+    assert!(!lessons_are_wired(&t.replace("then: umbau\n        - gruen", "then: continue\n        - gruen")));
+    assert!(!lessons_are_wired(&t.replace("cargo metadata --locked", "cargo check")));
+    assert!(!lessons_are_wired(&t.replace("NACH der GitHub-Umbenennung", "vor der GitHub-Umbenennung")));
+    assert!(!lessons_are_wired(&t.replace("keep: ${ .input.keep }", "")));
+    let swapped = t
+        .replacen("  - doku-veroeffentlichen:", "  - zz:", 1)
+        .replacen("  - github-umbenennen:", "  - doku-veroeffentlichen:", 1)
+        .replacen("  - zz:", "  - github-umbenennen:", 1);
+    assert!(!lessons_are_wired(&swapped));
+}
+
+#[test]
+fn counter_order_rounds_json_and_spec_marks_of_the_corrected_lessons_are_caught() {
+    let t = read("umbenennen");
+    // the catalog before the GitHub rename (back in `merge`), the catalog step missing, the catalog before the remotes
+    assert!(!lessons_are_wired(&t.replace("the own last step `katalog`)", "of fs-catalog)").replace("(NOT fs-catalog, that is", "(of fs-catalog, that is")));
+    let swapped = t
+        .replacen("  - katalog:", "  - zz:", 1)
+        .replacen("  - remotes:", "  - katalog:", 1)
+        .replacen("  - zz:", "  - remotes:", 1);
+    assert!(!lessons_are_wired(&swapped));
+    // the lock loop without the round counter or the escalation
+    assert!(!lessons_are_wired(&t.replace("lock.runde", "lock.rounds")));
+    let no_esc = step_body(&t, "lock-weiter").replace("then: eskalation", "then: umbau");
+    assert!(!lessons_are_wired(&t.replacen(&step_body(&t, "lock-weiter"), &no_esc, 1)));
+    // the keep example with single quotes (no valid JSON), the lock step without the spec mark, the name lock text
+    assert!(!lessons_are_wired(&t.replace("\\\"pattern\\\"", "'pattern'")));
+    assert!(!lessons_are_wired(&t.replace("(Spezifikation, Skript folgt - the script step", "(the script step")));
+    assert!(!lessons_are_wired(&t.replace("wirksam am Schluss", "sofort")));
+}
