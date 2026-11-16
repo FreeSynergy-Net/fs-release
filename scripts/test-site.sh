@@ -377,6 +377,33 @@ red "signatures-check: wrong public key is red" "$here/site-signaturen-pruefen.s
 rm -rf "$t/d2"; cp -r "$t/dist" "$t/d2"
 red "sign: wrong public key for the check is red" env "GPG_PRIVATE_KEY=$(cat "$t/rel.sec.asc")" "$S" "$t/d2" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/other.pub" "$t/src"
 
+# --- the key as a FILE, not in an environment (children must not read it from /proc/<pid>/environ of a parent), and the check-only step
+chmod 600 "$t/rel.sec.asc"
+rm -rf "$t/d8"; cp -r "$t/dist" "$t/d8"
+grn "check-only: approval, rebuild and sums are checked with NO key anywhere" env -u GPG_PRIVATE_KEY -u GPG_PRIVATE_KEY_FILE "$S" --check-only "$t/d8" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc" "$t/src"
+[ -z "$(find "$t/d8" -name '*.asc' -print -quit)" ] && [ ! -e "$t/d8/approval.txt" ] && ok "check-only: wrote nothing into dist" || bad "check-only: wrote into dist"
+red "check-only: a bad approval is red without a key too" env -u GPG_PRIVATE_KEY -u GPG_PRIVATE_KEY_FILE "$S" --check-only "$t/d8" "$t/e.txt" "$t/e.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc" "$t/src"
+red "check-only: a rebuild from another source is red without a key too" env -u GPG_PRIVATE_KEY -u GPG_PRIVATE_KEY_FILE "$S" --check-only "$t/d8" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc" "$t/srcx"
+mkdir -p "$t/shim"; real_gpg=$(command -v gpg)
+cat > "$t/shim/gpg" <<'SH'
+#!/bin/bash
+# test shim: before the real gpg runs, look for the private key in the environment of this process and of every ancestor (what a child can read)
+p=$$
+while [ "$p" -gt 1 ]; do
+  tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -q 'BEGIN PGP PRIVATE KEY' && echo "key in environ of pid $p ($(tr '\0' ' ' < /proc/$p/cmdline | cut -c1-60))" >> "$LEAKLOG"
+  p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || break; [ -n "$p" ] || break
+done
+exec "$REALGPG" "$@"
+SH
+chmod +x "$t/shim/gpg"
+rm -rf "$t/d9"; cp -r "$t/dist" "$t/d9"; : > "$t/leak-file"
+grn "sign with the key as a FILE: signs, and every signature verifies" env "PATH=$t/shim:$PATH" "REALGPG=$real_gpg" "LEAKLOG=$t/leak-file" GPG_PRIVATE_KEY_FILE="$t/rel.sec.asc" "$S" "$t/d9" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc" "$t/src"
+[ ! -s "$t/leak-file" ] && ok "key as a file: no process (gpg and its ancestors) holds the key in its environment" || { bad "key as a file: a process holds the key in its environment"; cat "$t/leak-file"; }
+rm -rf "$t/d10"; cp -r "$t/dist" "$t/d10"; : > "$t/leak-env"
+env "PATH=$t/shim:$PATH" "REALGPG=$real_gpg" "LEAKLOG=$t/leak-env" "GPG_PRIVATE_KEY=$(cat "$t/rel.sec.asc")" "$S" "$t/d10" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc" "$t/src" >/dev/null 2>&1
+[ -s "$t/leak-env" ] && ok "control: with the key in the environment the shim DOES see it in the ancestors (so the test above can go red)" || bad "control: the shim sees nothing even with the key in the environment (the test above proves nothing)"
+red "sign: GPG_PRIVATE_KEY_FILE empty is red" env GPG_PRIVATE_KEY_FILE=/dev/null -u GPG_PRIVATE_KEY "$S" "$t/d9" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc" "$t/src"
+
 # --- templates
 T="$root/templates/site"
 [ ! -e "$T/sites" ] && [ ! -e "$T/port80" ] && [ ! -e "$T/gen-pages.sh" ] && ok "templates: no placeholder pages are kept in git" || bad "templates: placeholder pages are back"

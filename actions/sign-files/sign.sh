@@ -8,7 +8,13 @@
 set -euo pipefail
 mode=$1 dir=$2
 
-if [[ -z "${GPG_PRIVATE_KEY:-}" ]]; then
+# The key may also come as a FILE (GPG_PRIVATE_KEY_FILE, optional GPG_PASSPHRASE_FILE): then no environment variable of any process holds it (a child could read
+# /proc/<pid>/environ of its parent); only the one `gpg --import` reads it, from stdin. The site flow (scripts/site-signieren.sh) uses this form.
+if [[ -z "${GPG_PRIVATE_KEY:-}" && -n "${GPG_PRIVATE_KEY_FILE:-}" ]]; then
+  [[ -s "$GPG_PRIVATE_KEY_FILE" ]] || { echo "::error::GPG_PRIVATE_KEY_FILE is empty or missing"; exit 1; }
+  key_from_file=1
+fi
+if [[ -z "${GPG_PRIVATE_KEY:-}" && -z "${key_from_file:-}" ]]; then
   echo "::warning::GPG_PRIVATE_KEY is not set - artefacts are NOT signed (see docs/signing.md)"
   exit 0
 fi
@@ -28,8 +34,8 @@ cleanup() {
 }
 trap cleanup EXIT
 chmod 700 "$GNUPGHOME"; chmod 600 "$pass_file"
-printf '%s' "${GPG_PASSPHRASE:-}" > "$pass_file"
-printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+if [[ -n "${GPG_PASSPHRASE_FILE:-}" && -z "${GPG_PASSPHRASE:-}" ]]; then cat -- "$GPG_PASSPHRASE_FILE" > "$pass_file"; else printf '%s' "${GPG_PASSPHRASE:-}" > "$pass_file"; fi
+if [[ -n "${key_from_file:-}" ]]; then gpg --batch --import < "$GPG_PRIVATE_KEY_FILE"; else printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import; fi
 fpr=$(gpg --batch --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
 [[ -n "$fpr" ]] || { echo "::error::no secret key found in GPG_PRIVATE_KEY"; exit 1; }
 gpg_opts=(--batch --yes --pinentry-mode loopback --passphrase-file "$pass_file" --local-user "$fpr")
