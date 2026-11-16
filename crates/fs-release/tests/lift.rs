@@ -263,5 +263,56 @@ fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
     assert!(!t.contains("@main"));
     // A second run finds the tag in place and changes nothing.
     let (r, _) = run(&w, &w.opts());
-    assert!(step(&r, "pins").detail.contains("already on v0.0.10"));
+    assert!(step(&r, "pins").detail.contains(" 0 file(s) changed"));
+}
+
+/// A repo with workflows on `@main`, an old tag and a newer tag, committed in the world's work tree.
+fn world_with_workflows() -> World {
+    let w = World::new();
+    let wf = w.work().join(".github/workflows");
+    fs::create_dir_all(&wf).unwrap();
+    fs::write(
+        wf.join("check.yml"),
+        "jobs:\n  c:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n",
+    )
+    .unwrap();
+    fs::write(wf.join("release.yml"), "jobs:\n  r:\n    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.11\n  s:\n    uses: FreeSynergy/fs-release/actions/sbom@main\n").unwrap();
+    git(&w.work(), &["add", "-A"]);
+    git(&w.work(), &["commit", "--quiet", "-m", "workflows"]);
+    w
+}
+
+#[test]
+fn pins_never_lowers_a_line_that_is_on_a_higher_tag() {
+    let w = world_with_workflows();
+    let (r, _) = run(&w, &w.opts());
+    assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
+    let check = w.read(".github/workflows/check.yml");
+    let release = w.read(".github/workflows/release.yml");
+    assert!(check.contains("check.yml@v0.0.10\n"), "{check}");
+    assert!(release.contains("release.yml@v0.0.11\n"), "{release}");
+    assert!(release.contains("actions/sbom@v0.0.10\n"), "{release}");
+}
+
+#[test]
+fn the_pin_tag_is_an_input_not_a_constant() {
+    let w = world_with_workflows();
+    let mut o = w.opts();
+    o.env.push(("FS_LIFT_PIN_TAG".into(), "v0.0.12".into()));
+    let (r, _) = run(&w, &o);
+    assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
+    let all = format!(
+        "{}{}",
+        w.read(".github/workflows/check.yml"),
+        w.read(".github/workflows/release.yml")
+    );
+    assert_eq!(all.matches("@v0.0.12\n").count(), 3, "{all}");
+    // Not a tag: ignored, the default is the version of this crate (the release tag).
+    let w = world_with_workflows();
+    let mut o = w.opts();
+    o.env.push(("FS_LIFT_PIN_TAG".into(), "main".into()));
+    let (r, _) = run(&w, &o);
+    assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
+    let want = format!("check.yml@v{}\n", env!("CARGO_PKG_VERSION"));
+    assert!(w.read(".github/workflows/check.yml").contains(&want));
 }

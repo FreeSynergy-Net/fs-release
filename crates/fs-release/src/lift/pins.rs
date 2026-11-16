@@ -1,4 +1,4 @@
-//! Pattern: Strategy (the step `pins`, before `lock-sources`: raise the fs-release pins of the lifted repo to the first tag with the lock check).
+//! Pattern: Strategy (the step `pins`, before `lock-sources`: raise the fs-release pins of the lifted repo to the release tag, never lower one).
 
 use fs_release_chain::outcome::Stop;
 
@@ -6,12 +6,38 @@ use super::checks::red_line;
 use super::LiftEnv;
 use crate::task::{Task, SKIPPED};
 
-/// The tag the pins are raised to (the lock check exists from there; see `lockpin`).
-const TAG: &str = "v0.0.10";
+/// Environment variable that overrides the tag the pins are raised to (`vX.Y.Z`).
+pub const TAG_ENV: &str = "FS_LIFT_PIN_TAG";
 
-/// `scripts/pin-refs.sh --dir <repo> v0.0.10`: every `uses: FreeSynergy/fs-release/...@<ref>` of the repo's `.github/workflows/*.yml`
-/// (`@main`, an old tag or a commit) becomes `@v0.0.10`; other actions stay. No workflows = skipped. A repo whose `check.yml` is
-/// already on a tag of v0.0.10 or newer is left alone (a pin is never lowered). It changes files; the step `commit` takes them along.
+/// `vX.Y.Z` of exactly this string.
+fn is_tag(t: &str) -> bool {
+    t.strip_prefix('v').is_some_and(|r| {
+        let p: Vec<&str> = r.split('.').collect();
+        p.len() == 3
+            && p.iter()
+                .all(|x| !x.is_empty() && x.bytes().all(|b| b.is_ascii_digit()))
+    })
+}
+
+/// The tag the pins are raised to: `FS_LIFT_PIN_TAG` (in the lift options or the process environment) when it is a tag, else `v<version of
+/// this crate>`. The crate version is the release tag (rule "version = tag"), so the release bump to the next tag moves the pin
+/// with no code change.
+#[must_use]
+pub fn tag(env: &LiftEnv) -> String {
+    env.opts
+        .env
+        .iter()
+        .find(|(k, _)| k == TAG_ENV)
+        .map(|(_, v)| v.clone())
+        .or_else(|| std::env::var(TAG_ENV).ok())
+        .filter(|v| is_tag(v))
+        .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")))
+}
+
+/// `scripts/pin-refs.sh --dir <repo> <tag>`: every `uses: FreeSynergy/fs-release/...@<ref>` of the repo's `.github/workflows/*.yml`
+/// (`@main`, an older tag or a commit) becomes `@<tag>`; other actions stay. No workflows = skipped. A pin is never lowered, line by
+/// line: a `uses:` line already on a HIGHER tag stays (the script compares, `release.yml@v0.0.11` against v0.0.10 stays). It changes
+/// files; the step `commit` takes them along.
 pub struct Pins;
 
 impl Task<LiftEnv<'_>> for Pins {
@@ -28,15 +54,11 @@ impl Task<LiftEnv<'_>> for Pins {
         if !dir.join(".github/workflows").is_dir() {
             return Ok(format!("{SKIPPED}no .github/workflows in the repo"));
         }
-        let check = std::fs::read_to_string(dir.join(".github/workflows/check.yml")).ok();
-        if check.as_deref().is_some_and(super::lockpin::already_new) {
-            return Ok(format!("already on {TAG} or newer: nothing to pin"));
-        }
         let args = vec![
             env.script("pin-refs.sh"),
             "--dir".to_string(),
             dir.display().to_string(),
-            TAG.to_string(),
+            tag(env),
         ];
         let o = env.exec("bash", args, vec![])?;
         if o.ok() {
@@ -48,6 +70,21 @@ impl Task<LiftEnv<'_>> for Pins {
                 .to_string())
         } else {
             Err(Stop::red(red_line(&o)))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_tag;
+
+    #[test]
+    fn only_vx_y_z_is_a_tag() {
+        assert!(is_tag("v0.0.11") && is_tag("v10.2.300"));
+        for bad in [
+            "0.0.1", "main", "v1.2", "v1.2.3.4", "v1..3", "v1.2.x", "v1.2.3;", "",
+        ] {
+            assert!(!is_tag(bad), "{bad}");
         }
     }
 }

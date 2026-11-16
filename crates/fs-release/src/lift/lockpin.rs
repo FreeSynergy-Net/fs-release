@@ -14,13 +14,6 @@ fn tag_of(check_yml: &str) -> Option<(u64, u64, u64)> {
     Some((n.next()?.ok()?, n.next()?.ok()?, n.next()?.ok()?))
 }
 
-/// True when the fs-release pin of `check.yml` is already a tag of v0.0.10 or newer (the step `pins` then leaves everything as it is
-/// and never lowers a newer pin).
-#[must_use]
-pub fn already_new(check_yml: &str) -> bool {
-    tag_of(check_yml).is_some_and(|t| t >= FIRST_TAG)
-}
-
 /// What is wrong in a repo that is lifted to V1+ (the step is red then): the fs-release pin of its `check.yml` is a tag older than
 /// v0.0.10, or `.fs-lock-sources.toml` does not say `strict = true`. A pin that is `@main` or a commit is not a tag and cannot be compared:
 /// it is not a problem here.
@@ -61,16 +54,6 @@ mod tests {
             ),
             None
         );
-    }
-
-    #[test]
-    fn already_new_only_for_a_tag_from_v0_0_10() {
-        assert!(super::already_new(NEW));
-        assert!(super::already_new(&NEW.replace("v0.0.10", "v0.1.2")));
-        assert!(!super::already_new(OLD));
-        assert!(!super::already_new(
-            "uses: FreeSynergy/fs-release/.github/workflows/check.yml@main\n"
-        ));
     }
 
     #[test]

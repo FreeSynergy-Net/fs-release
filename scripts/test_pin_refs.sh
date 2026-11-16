@@ -60,6 +60,7 @@ mkforeign() {
   mkdir -p "$1/.github/workflows"
   cat >"$1/.github/workflows/check.yml" <<YML
 # comment: FreeSynergy/fs-release/.github/workflows/check.yml@main stays
+# note: uses: FreeSynergy/fs-release/.github/workflows/check.yml@main (old)
 jobs:
   check:
     uses: FreeSynergy/fs-release/.github/workflows/check.yml@main
@@ -87,7 +88,7 @@ dir_checks() {
   n="$(git -C "$d" grep -hE '^[[:space:]]*(-[[:space:]]+)?uses: FreeSynergy/fs-release/[^@]*@v0.0.10( |$)' | wc -l)"
   [ "$n" -eq 3 ] && ok "$l 3 fs-release uses: lines now @v0.0.10" || bad "$l uses: lines @v0.0.10: $n (want 3)"
   git -C "$d" grep -q "uses: $checkout" && ok "$l foreign action untouched" || bad "$l foreign action changed"
-  git -C "$d" grep -q '# comment: FreeSynergy/fs-release/.github/workflows/check.yml@main' && git -C "$d" grep -q 'note: FreeSynergy/fs-release/x@main' && git -C "$d" grep -q '  ref: FreeSynergy/fs-release/.github/workflows/check.yml@main' && ok "$l comment and non-uses lines untouched" || bad "$l comment or non-uses line changed"
+  git -C "$d" grep -q '# comment: FreeSynergy/fs-release/.github/workflows/check.yml@main' && git -C "$d" grep -q '# note: uses: FreeSynergy/fs-release/.github/workflows/check.yml@main (old)' && git -C "$d" grep -q 'note: FreeSynergy/fs-release/x@main' && git -C "$d" grep -q '  ref: FreeSynergy/fs-release/.github/workflows/check.yml@main' && ok "$l comment and non-uses lines untouched" || bad "$l comment or non-uses line changed"
   git -C "$d" grep -q '@v0.0.10 # pinned' && ok "$l trailing comment of a uses: line kept" || bad "$l trailing comment lost"
   [ -z "$(git -C "$d" diff --name-only | grep -v '^.github/workflows/.*\.yml$')" ] && ok "$l only workflow yml files changed" || bad "$l other files changed"
   echo "$out" | grep -q 'changed .*check.yml' && echo "$out" | grep -q 'changed .*release.yml' && ok "$l changed files reported" || bad "$l changed files not reported: $out"
@@ -107,17 +108,34 @@ bash "$here/pin-refs.sh" --dir >/dev/null 2>&1; rc=$?
 bash "$here/pin-refs.sh" v0.0.10 v0.0.11 >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 2 ] && ok "two refs rc 2" || bad "two refs rc=$rc"
 
-# mutations of the --dir path: each must turn dir_checks red
+# never lower (--dir, per `uses:` line): a line on a HIGHER tag stays, @main / SHA / older tags are raised, even when another line already has the new tag
+nolower_checks() {
+  local s=$1 l=$2 d="$tmp/n-$2"
+  mkdir -p "$d/.github/workflows"
+  printf 'jobs:\n  a:\n    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.11\n  b:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n  c:\n    uses: FreeSynergy/fs-release/actions/sbom@v0.1.0 # newer minor\n  d:\n    uses: FreeSynergy/fs-release/actions/x@v0.0.10\n  e:\n    uses: FreeSynergy/fs-release/actions/y@main\n  f:\n    uses: FreeSynergy/fs-release/actions/z@v0.0.100\n' >"$d/.github/workflows/release.yml"
+  git -C "$d" init -q && git -C "$d" add -A && git -C "$d" -c user.name=t -c user.email=t@t commit -qm base
+  bash "$s" --dir "$d" v0.0.10 >/dev/null 2>&1; rc=$?
+  [ "$rc" -eq 0 ] && ok "$l never-lower run rc 0" || bad "$l never-lower rc=$rc"
+  git -C "$d" grep -q 'release.yml@v0.0.11$' && git -C "$d" grep -q 'sbom@v0.1.0 # newer minor' && git -C "$d" grep -q 'actions/z@v0.0.100$' && ok "$l higher tags (v0.0.11, v0.1.0, v0.0.100) stay" || bad "$l a higher tag was lowered"
+  git -C "$d" grep -q 'check.yml@v0.0.10$' && git -C "$d" grep -q 'actions/y@v0.0.10$' && git -C "$d" grep -q 'actions/x@v0.0.10$' && ok "$l v0.0.9 and @main are raised to v0.0.10" || bad "$l old pin not raised"
+  bash "$s" --dir "$d" 0123456789abcdef0123456789abcdef01234567 >/dev/null 2>&1
+  [ "$(git -C "$d" grep -c '@0123456789abcdef0123456789abcdef01234567' | awk -F: '{s+=$NF} END{print s}')" -eq 6 ] && ok "$l a SHA target replaces every ref (no tag comparison)" || bad "$l SHA target"
+}
+nolower_checks "$here/pin-refs.sh" real
+
+# mutations of the --dir path: each must turn dir_checks (or the never-lower checks) red
 red_by() { # <label> <sed expression on the script>
   local m="$tmp/m-$1.sh"
   sed -E "$2" "$here/pin-refs.sh" >"$m"
   if cmp -s "$m" "$here/pin-refs.sh"; then bad "mutation $1 did not change the script"; return; fi
   local res
-  res="$(dir_checks "$m" "$1" 2>&1)"
+  res="$(dir_checks "$m" "$1" 2>&1; nolower_checks "$m" "$1" 2>&1)"
   if echo "$res" | grep -q '^FAIL'; then ok "mutation $1 turns the --dir checks red"; else bad "mutation $1 stayed green"; fi
 }
-red_by noanchor 's@"/\^\[\[:space:\]\]\*\(-\[\[:space:\]\]\+\)\?uses:/ s#@"s#@'
-red_by widened 's@\(FreeSynergy/fs-release/\[A-Za-z0-9_\./-\]\+\)@([A-Za-z0-9_]+/[A-Za-z0-9_./-]+)@'
+red_by noanchor 's@\$0 ~ "\^\[\[:space:\]\]\*\(-\[\[:space:\]\]\+\)\?uses:"@$0 ~ "uses:"@'
+red_by widened 's@re = "FreeSynergy/fs-release/@re = "[A-Za-z0-9_]+/@'
+red_by lowers 's@if \(!\(keep == 1.*\)\) tok@if (1) tok@'
+red_by semver-as-text 's@ver\(old\) > ver\(ref\)@old > ref@'
 red_by dirignored 's@^if \[ -n "\$dir" \]; then@if false; then@'
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
