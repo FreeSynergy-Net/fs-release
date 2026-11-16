@@ -37,7 +37,7 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
   `anbieter-neuinstallation` (Weg C: Hetzner-Rescue und `installimage` mit Konfig aus Variablen durch `scripts/installimage-config`; Gate "Daten werden gelöscht" mit Hostname-Wiederholung; der Mensch führt Rescue und Install aus; danach Übergabe an `server-einrichtung`; Montagsablauf in `docs/anbieter-neuinstallation.md`).
 - Umbenennen und Doku: `umbenennen` (Repo, Crates `fs-<x>-*`, Katalog mit `replaces`, Doku, Pins; der alte Name wird nie wieder vergeben, ADR 0080; Trockenlauf ohne KI, GitHub-Umbenennung nur nach dem Freigabe-Gate `strategie-ok`), `doku-mitziehen` (Pflichtschritt, s. u.).
 - Koordinator: `koordinator-runde`, `testlauf`, `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
-  `publish-doc`, `workflow-pflege`.
+  `publish-doc`, `workflow-pflege`, `repos-abgleichen` (alle lokalen Repos holen, origin auf HTTPS, main nur per `merge --ff-only`; Skript `scripts/repos-abgleichen`).
 - Strategie: `entscheidung` (erst ADR-Suche, dann Auswertung, Nutzerfrage nur bei Abweichung oder Lücke), `adr-write`,
   `user-decision`, `handoff-update`, `restart-handoff`.
 

@@ -1,5 +1,9 @@
-# Bring the local checkouts of all repos to origin/main, fast-forward only. FS profile: see README.md.
-# Draft (Entwurf), not yet in main. Nothing is pushed, tagged or merged into a work branch.
+# Spezifikation: the local checkouts of all repos are brought to origin/main, fast-forward only. Everything runs in the one script
+# scripts/repos-abgleichen (the five steps are its phases; the catalog calls are not yet registered). FS profile: see README.md.
+# Nothing is pushed, tagged, reset or merged into a work branch. The rules, as the script states them:
+# - `fetch` runs WITHOUT --prune: no origin/*-ref disappears silently. Refs that vanished on origin are listed (`ref-verschwunden`).
+# - `remotes` (set-url SSH -> HTTPS) runs ONLY for repos that stand on main, before the fetch. Other repos keep their SSH origin
+#   and are only reported. A later push of a repo that was switched runs over HTTPS credentials instead of SSH.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -14,7 +18,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script - origin on SSH (git@github.com:...) becomes https://github.com/...; other remotes are not touched.
+        freesynergy.net:summary: "Script - only for repos on main: origin on SSH (git@github.com:...) becomes https://github.com/...; repos on another branch keep their remote and are only reported."
   - fetch:
       call: repos-fetch:0.0.8@fs
       metadata:
@@ -22,7 +26,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Script - git fetch --all --tags --prune per repo; a fetch error means skipped and reported, nothing else changed.
+        freesynergy.net:summary: Script - git fetch --all --tags per repo (no --prune); origin/*-refs that vanished are listed as ref-verschwunden, not deleted; a fetch error means skipped and reported.
   - check:
       call: repos-check:0.0.8@fs
       metadata:
