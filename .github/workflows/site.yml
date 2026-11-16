@@ -7,7 +7,7 @@
 #   Run 2: the same inputs plus `build-run` = the run id of run 1, `approval` and `approval-sig` (the two texts). `build` runs again without a key, `sign`
 #          rebuilds from the same ref, compares byte for byte, and only then loads the key. The signed folder is the artefact `site-signed`.
 # Not part of this file, by design: the delivery to a server (the person does it by hand, no agent has access).
-# The key: only the step "Place the key" has the secrets in its environment (shell builtins only, writes two 0600 files); the step that signs gets file
+# The key: only the step "Place the key" has the secrets in its environment (shell builtins only, writes two 0600 files into a folder an earlier step made without secrets); the step that signs gets file
 #   paths, so no process holds the key in /proc/<pid>/environ (tests/test-site.sh shim). The check steps run before the key exists on the runner.
 # `if: github.ref == 'refs/heads/main'` does NOT protect anything: whoever can push a branch runs the site.yml OF THAT BRANCH, without the `if`. The wall is the
 #   Deployment-branch rule of the environment `site-signing` (main only) plus the required reviewer and the protected main; secrets exist only there.
@@ -125,14 +125,19 @@ jobs:
             done
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Place the key as a file (the only step with the secrets; shell builtins only, no child process)
+      - name: Create the folder for the key (a normal process; NO secrets in this step)
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -m 700 "$RUNNER_TEMP/site-key"
+      - name: Place the key as a file (the only step with the secrets, shell builtins only, so no child process inherits them)
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
           umask 077
-          d="$RUNNER_TEMP/site-key"; mkdir -m 700 "$d"
+          d="$RUNNER_TEMP/site-key"
           printf '%s' "$GPG_PRIVATE_KEY" > "$d/key.asc"
           printf '%s' "$GPG_PASSPHRASE" > "$d/pass"
       - name: Sign (approval check and rebuild again, then the key from the file)

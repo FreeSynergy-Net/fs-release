@@ -589,5 +589,26 @@ grn "mutation control: without the segment and .. rules the prefix /../../etc is
 mutm 's/^SEGMENT = .*/SEGMENT = re.compile(r"[a-z0-9._\\\\-]+")/' backslash
 grn "mutation control: with a backslash allowed in a segment the backslash prefix is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-bs.toml" "$t/x.kdl"
 rm -rf "$mutset"
+# H3: the step that holds the secrets starts no other process (builtins only: set, umask, assignment, printf with redirection), the folder is made by an earlier step
+cat > "$t/secretstep.py" <<'PY'
+import re, sys, yaml
+doc = yaml.safe_load(open(sys.argv[1]))
+ok = [re.compile(x) for x in (r"set -euo pipefail", r"umask 077", r'd="\$RUNNER_TEMP/site-key"', r"printf '%s' \"\$GPG_[A-Z_]+\" > \"\$d/[a-z.]+\"")]
+steps = [st for job in doc["jobs"].values() for st in job.get("steps", []) if "secrets.GPG_PRIVATE_KEY" in str(st.get("env", ""))]
+if len(steps) != 1:
+    sys.exit(f"{len(steps)} steps hold the secret (exactly one expected)")
+bad = [ln for ln in map(str.strip, steps[0]["run"].splitlines()) if ln and not ln.startswith("#") and not any(r.fullmatch(ln) for r in ok)]
+if bad:
+    sys.exit("not a builtin-only line: " + "; ".join(bad))
+mk = [st for job in doc["jobs"].values() for st in job.get("steps", []) if "mkdir -m 700" in st.get("run", "")]
+if len(mk) != 1 or "secrets." in str(mk[0].get("env", "")):
+    sys.exit("the folder must be made by a step without secrets")
+PY
+if python3 -c 'import yaml' 2>/dev/null; then
+  grn "site.yml: the step with the secrets runs builtins only, the folder is made before by a step without secrets" python3 -I "$t/secretstep.py" "$root/.github/workflows/site.yml"
+  sed 's#^          d="\$RUNNER_TEMP/site-key"$#          d="$RUNNER_TEMP/site-key"; mkdir -m 700 "$d"#' "$root/.github/workflows/site.yml" > "$t/site-mut.yml"
+  cmp -s "$t/site-mut.yml" "$root/.github/workflows/site.yml" && bad "mutation site.yml: the sed did not apply"
+  red "mutation: an external mkdir in the step with the secrets is found" python3 -I "$t/secretstep.py" "$t/site-mut.yml"
+else echo "skip site.yml secret-step test (no PyYAML)"; fi
 if [ -n "${ZENTINEL_BIN:-}" ]; then for f in s p h; do grn "zentinel test -c on the rendering $f" "$ZENTINEL_BIN" test -c "$t/$f.kdl"; done; fi
 exit "$fail"
