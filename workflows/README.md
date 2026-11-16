@@ -109,6 +109,16 @@ is no copy in the repo. The `[EFFIZIENZ]` rules (one run = one gate cycle, gates
 mechanics as a script, abort protection) are step rules in `agent-run` and `review`. Before any decision `scripts/adr-search`
 looks up the existing ADRs (`entscheidung`, `user-decision`).
 
+**The flows.**
+- Release and build: `release-flow` (lift, gates, review, tag, push, CI, ff main, release, bump, sign), `lift`, `catalog-bump`, `cleanup-targets`, `agent-run`, `bugfix`, `review`.
+- Frontend and pictures: `frontend-round` (with the objective step `menue-vergleich`), `frontend-umbau`, `dossier`, `icon-round`, `picture-acceptance`.
+- New program: `programm-neu` (17 steps in P0 to P6), `programm-grundgeruest` (assembly line for the basics of every program).
+- Foreign code: `upstream-anfrage` (a git-bug issue to an upstream), `upstream-update` (new upstream release into mirror and catalog, security fixes first), `wrapper-einbindung` (foreign crate by unchanged git pin, own wrapper crate, license gate in CI).
+- Server: `server-einrichtung` (path A: our layer on an existing system over SSH; the person runs `fs-server-run` locally, without AI), `anbieter-neuinstallation` (path C: Hetzner rescue and `installimage`; gate "data will be deleted" with hostname repeat).
+- Rename and docs: `umbenennen` (repo, crates `fs-<x>-*`, catalog with `replaces`, docs, pins; the old name is never given out again, ADR 0080; dry run without AI, GitHub rename only after the approval gate `strategie-ok`; order of the end: code merge, GitHub rename, docs merge, remotes, pins, catalog last), `doku-mitziehen` (mandatory step), `doku-aufraeumen` (incremental docs tidy-up: daily in `koordinator-runde` and closing step of every `release-flow`; scripts first, AI only for pages of topics changed since the mark, the mark lies outside the checkout; the push is its own step after the report, by the strategy only).
+- Coordinator: `koordinator-runde`, `testlauf`, `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`, `publish-doc`, `workflow-pflege`, `repos-abgleichen` (fetch all local repos, origin over HTTPS, main only by `merge --ff-only`, vanished refs are reported, never pruned).
+- Strategy: `entscheidung` (ADR search first), `adr-write`, `user-decision`, `handoff-update`, `restart-handoff`.
+
 ## Events / Ereignisse
 
 **DE.** Workflows und CI-Läufe wecken einander über Ereignisse nach CloudEvents (Pflichtfelder `id`, `source`, `specversion`,
