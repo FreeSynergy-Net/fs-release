@@ -22,8 +22,9 @@ if [ -z "${CI:-}" ]; then
 fi
 echo "gates: rustc $(rustc --version)"
 cargo fmt --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
-cargo test --workspace --all-features
+# --locked: the gate builds exactly the committed Cargo.lock (a repo without a current lock is red; `cargo update` is a visible commit)
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -W clippy::pedantic
+cargo test --workspace --all-features --locked
 python3 -I "$rules" "$root"
 # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
 bash "$here/gates-lock.sh" "$root"
