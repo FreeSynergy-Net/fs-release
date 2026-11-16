@@ -46,6 +46,11 @@ fn the_signing_environment_check_passes_its_self_test() {
 }
 
 #[test]
+fn the_main_caller_check_passes_its_self_test() {
+    run_self_test("test_check_no_main_callers.sh");
+}
+
+#[test]
 fn the_pattern_kill_check_passes_its_self_test() {
     run_self_test("test_check_no_pkill.sh");
 }

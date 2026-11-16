@@ -1,0 +1,5 @@
+# Negative test of scripts/check-no-main-callers: the only place where @main in a uses: line is allowed (marker comment, same line or line above).
+jobs:
+  x:
+    # negative-test: allow @main
+    uses: FreeSynergy/fs-release/.github/workflows/check.yml@main

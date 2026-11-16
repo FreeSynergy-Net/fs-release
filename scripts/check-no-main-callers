@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""Rule check: no `uses: FreeSynergy/fs-release/...@main` (a moving ref) in workflows, composite actions, examples or fixtures.
+
+  python3 -I scripts/check-no-main-callers [<folder or file>...]      (default: .github actions examples tests workflows docs, relative to the repo root)
+
+A caller that follows `@main` runs whatever lands on main later, with the caller's rights (and, for release, its secrets). Callers pin a full commit SHA
+(or a release tag); the pins are raised after every release (docs/usage.md). Only `uses:` lines count (a commented line or prose is not red).
+An explicit negative test may keep `@main` if the SAME line, or the line directly above, carries the marker comment `# negative-test: allow @main`.
+rc 0 = clean, rc 1 = red (one line `red: file:line: text`), rc 2 = bad input.
+"""
+import os
+import re
+import sys
+
+USES_MAIN = re.compile(r"^\s*(?:-\s+)?uses:\s*['\"]?FreeSynergy/fs-release/\S*?@main(?![\w./-])")
+MARKER = "# negative-test: allow @main"
+SKIP_DIRS = {".git", "target", "node_modules", "wt"}
+DEFAULT = [".github", "actions", "examples", "tests", "workflows", "docs"]
+SUFFIXES = (".yml", ".yaml", ".md")
+
+
+def files(paths):
+    for p in paths:
+        if os.path.isfile(p):
+            yield p
+            continue
+        for base, dirs, names in os.walk(p):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+            for n in names:
+                if n.endswith(SUFFIXES):
+                    yield os.path.join(base, n)
+
+
+def scan(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return
+    for i, line in enumerate(lines):
+        if not USES_MAIN.search(line):
+            continue
+        if MARKER in line or (i > 0 and MARKER in lines[i - 1]):
+            continue
+        yield i + 1, line.strip()
+
+
+def main(argv):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    paths = argv or [os.path.join(root, d) for d in DEFAULT if os.path.exists(os.path.join(root, d))]
+    for p in paths:
+        if not os.path.exists(p):
+            print(f"bad input: {p} does not exist")
+            return 2
+    red = 0
+    for f in sorted(set(files(paths))):
+        for i, text in scan(f):
+            print(f"red: {f}:{i}: {text}")
+            red += 1
+    if red:
+        print(f"{red} uses: line(s) follow @main; pin a full commit SHA (scripts/pin-refs.sh) or mark a negative test with '{MARKER}'")
+        return 1
+    print("ok: no uses: FreeSynergy/fs-release/...@main")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
