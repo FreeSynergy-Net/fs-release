@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Released history is never rewritten: for EVERY tag vX.Y.Z (`git tag -l 'v[0-9]*'`) the section `## X.Y.Z` of CHANGELOG.md must exist and equal
 # the section of that tag (a renamed heading, a deleted or a changed section turns this red). Without tags or in a shallow clone the test is
-# NOT green: it prints "skipped" and exits 2 (the gate cannot be checked there). It runs LOCALLY and in agent worktrees (full clones with all tags),
-# through `cargo test -p fs-release` (rc 2 = red there). It does NOT run in any CI: fs-release has no CI run of `cargo test` (only lint.yml), and the
-# reusable ci.yml/check.yml run in the CALLING repos, which do not have this script, so they keep their flat clone (no fetch-depth 0, no fetch-tags).
+# NOT green: it prints "skipped" and exits 2 (the gate cannot be checked there). It runs in the OWN CI of fs-release (job `changelog-released` of
+# lint.yml, checkout with fetch-depth 0 and fetch-tags, so a red here blocks the merge), locally and in agent worktrees (full clones with all tags), and
+# through `cargo test -p fs-release` (rc 2 = red there). It does NOT run in the reusable ci.yml/check.yml: those run in the CALLING repos, which do not
+# have this script, so they keep their flat clone (no fetch-depth 0, no fetch-tags).
 # A tag whose own CHANGELOG has no section of its own is only allowed through the explicit list NO_OWN_SECTION below (not by a silent existence check).
 # Counter-checks run the same loop over a renamed heading, a deleted section and a changed entry.
 #   bash scripts/test_changelog_released.sh

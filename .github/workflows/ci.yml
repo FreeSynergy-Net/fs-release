@@ -31,8 +31,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0 # all history and tags: scripts/test_changelog_released.sh compares the released sections with the tags
-          fetch-tags: true
       - name: System packages
         if: inputs.apt-packages != ''
         env:
