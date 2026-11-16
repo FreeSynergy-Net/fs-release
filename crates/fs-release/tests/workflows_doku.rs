@@ -363,6 +363,11 @@ fn the_checklist_reader_passes_its_self_test() {
     run_self_test("test_read_checklists.sh");
 }
 
+#[test]
+fn pin_refs_passes_its_self_test() {
+    run_self_test("test_pin_refs.sh");
+}
+
 /// K4: `resolve-head` has ONE output form, `{ head: <sha> }`; every caller keeps it as `kopf` and reads `$context.kopf.head`.
 fn resolve_head_paths_are_sound(text: &str) -> bool {
     !text.contains("resolve-head")
