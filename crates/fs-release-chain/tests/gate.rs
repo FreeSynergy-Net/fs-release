@@ -252,7 +252,7 @@ fn slug_with_dots_or_slashes_is_red_and_never_reaches_a_path() {
     ] {
         assert!(fs_release_chain::slug::validate(bad).is_err(), "{bad:?}");
     }
-    assert!(fs_release_chain::slug::validate("FreeSynergy/fs-store").is_ok());
+    assert!(fs_release_chain::slug::validate("FreeSynergy/fs-packages").is_ok());
     let w = World::new();
     let code = main_with(
         [

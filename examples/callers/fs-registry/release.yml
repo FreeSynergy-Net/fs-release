@@ -1,4 +1,4 @@
-# Copy to fs-hub/.github/workflows/release.yml
+# Copy to fs-registry/.github/workflows/release.yml
 name: release
 on:
   push:
@@ -14,8 +14,8 @@ jobs:
   release:
     uses: FreeSynergy/fs-release/.github/workflows/release.yml@main
     with:
-      binaries: fs-hub
-      cargo-package: fs-hub          # workspace: fs-hub, fs-hub-client, fs-hub-proto
+      binaries: fs-registry
+      cargo-package: fs-registry          # workspace: fs-registry, fs-registry-client, fs-registry-proto
       kind: daemon
       app-id: net.freesynergy.Hub
       description: FreeSynergy Hub daemon
@@ -24,7 +24,7 @@ jobs:
       # set container-push: true (and container-image) to publish to ghcr.io.
       container: true
       containerfile: Containerfile
-      container-image: ghcr.io/freesynergy/fs-hub
+      container-image: ghcr.io/freesynergy/fs-registry
       container-push: false
     secrets:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}

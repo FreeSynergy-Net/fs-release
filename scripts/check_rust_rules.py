@@ -20,7 +20,7 @@ Checks (exit 1 on any violation):
     (scripts/check_blinc_lock.py; crates.io, path, other tags/shas, two Blinc sources are errors). With Blinc in the lock,
     `.cargo/config(.toml)` may have no `paths` and no `[source.*] replace-with` (always on). Only the root lock is read.
 
-    python3 scripts/check_rust_rules.py /srv/FreeSynergy/fs-store [/srv/FreeSynergy/fs-hub …]
+    python3 scripts/check_rust_rules.py /srv/FreeSynergy/fs-packages [/srv/FreeSynergy/fs-registry …]
 """
 import importlib.util, re, subprocess, sys, tomllib
 from pathlib import Path

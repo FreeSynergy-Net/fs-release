@@ -14,7 +14,7 @@ read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
 [[ ${#bins[@]} -gt 0 ]] || die "the plan lists no binaries - nothing to start"
 
 # Who starts the binaries. Empty = the current user. In the container we are root, and a program may (rightly) refuse to
-# run as root (fs-store does), so deb_inside starts them as a plain user, like a person would.
+# run as root (fs-packages does), so deb_inside starts them as a plain user, like a person would.
 runas=()
 
 # start_one PATH -> the binary starts and exits 0 (stdin closed, so a program waiting for input ends instead of hanging).

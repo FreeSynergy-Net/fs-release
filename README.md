@@ -61,7 +61,7 @@ On macOS: open the app once, then System Settings > Privacy & Security > "Open A
 | [docs/formats.md](docs/formats.md) | formats, tools, licences, free vs paid |
 | [docs/standards.md](docs/standards.md) | OpenPGP, SPDX, SLSA, SemVer, Reproducible Builds |
 | [docs/fdroid.md](docs/fdroid.md) | what an Android app repo must provide |
-| [examples/callers/](examples/callers/) | ready callers for fs-capnpc and fs-hub |
+| [examples/callers/](examples/callers/) | ready callers for fs-capnpc and fs-registry |
 
 Licence: MIT OR Apache-2.0.
 

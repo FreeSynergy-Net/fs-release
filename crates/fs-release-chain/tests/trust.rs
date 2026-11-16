@@ -69,7 +69,7 @@ fn check_wants_the_pinned_key_and_a_good_fs_store() {
     fs::write(w.fake().join("store-red"), "").unwrap();
     let o = w.run_names(Reach::Public, &names(&["check"]));
     assert!(
-        matches!(&o, Outcome::Red { line, .. } if line.contains("fs-store check")),
+        matches!(&o, Outcome::Red { line, .. } if line.contains("fs-packages check")),
         "{}",
         o.line()
     );
@@ -161,19 +161,19 @@ fn approval_rules_expiry_findings_author_and_the_fixed_folder() {
 #[test]
 fn slug_must_be_the_origin() {
     assert!(check_slug(
-        "FreeSynergy/fs-store",
-        "https://github.com/FreeSynergy/fs-store.git"
+        "FreeSynergy/fs-packages",
+        "https://github.com/FreeSynergy/fs-packages.git"
     )
     .is_ok());
     assert!(check_slug(
-        "FreeSynergy/fs-store",
-        "git@github.com:FreeSynergy/fs-store.git"
+        "FreeSynergy/fs-packages",
+        "git@github.com:FreeSynergy/fs-packages.git"
     )
     .is_ok());
     assert!(check_slug(
-        "FreeSynergy/fs-store",
+        "FreeSynergy/fs-packages",
         "https://github.com/FreeSynergy/fs-tasks"
     )
     .is_err());
-    assert!(check_slug("FreeSynergy/fs-store", "/tmp/some/path").is_err());
+    assert!(check_slug("FreeSynergy/fs-packages", "/tmp/some/path").is_err());
 }

@@ -280,14 +280,14 @@ impl Step for Check {
         let root = work.join("store-root");
         fs::create_dir_all(&root)?;
         let store = f.ctx.runner.run(&Cmd {
-            program: "fs-store".into(),
+            program: "fs-packages".into(),
             args: vec!["check".into()],
-            env: vec![("FS_STORE_ROOT".into(), root.display().to_string())],
+            env: vec![("FS_PACKAGES_ROOT".into(), root.display().to_string())],
             ..Cmd::default()
         })?;
         if !store.ok() {
             return Err(Stop::red(format!(
-                "fs-store check: {}",
+                "fs-packages check: {}",
                 store.first_error()
             )));
         }

@@ -30,7 +30,7 @@ on:
       flatpak-manifest: { type: string, default: "", description: "Path of the Flatpak manifest" }
       container: { type: boolean, default: false, description: "Build an OCI image from the Linux binaries" }
       containerfile: { type: string, default: Containerfile, description: "Containerfile (build context holds amd64/ and arm64/)" }
-      container-image: { type: string, default: "", description: "Image name for pushing, e.g. ghcr.io/freesynergy/fs-hub" }
+      container-image: { type: string, default: "", description: "Image name for pushing, e.g. ghcr.io/freesynergy/fs-registry" }
       container-push: { type: boolean, default: false, description: "Push the image (public!) - default only exports an OCI archive" }
       android: { type: boolean, default: false, description: "TODO - Android build (arrives with the first Blinc app)" }
       ios: { type: boolean, default: false, description: "TODO - iOS build (build only)" }

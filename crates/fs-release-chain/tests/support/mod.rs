@@ -68,7 +68,7 @@ impl World {
         fs::create_dir_all(r.join("bin")).unwrap();
         script(&r.join("bin/gh"), GH);
         script(&r.join("bin/gpg"), include_str!("fake-gpg.sh"));
-        script(&r.join("bin/fs-store"), "#!/usr/bin/env bash\necho \"fs-store $*\" >> \"$FAKE_DIR/calls.log\"\n[ -f \"$FAKE_DIR/store-red\" ] && { echo 'error: catalog not readable' >&2; exit 1; }\nexit 0\n");
+        script(&r.join("bin/fs-packages"), "#!/usr/bin/env bash\necho \"fs-packages $*\" >> \"$FAKE_DIR/calls.log\"\n[ -f \"$FAKE_DIR/store-red\" ] && { echo 'error: catalog not readable' >&2; exit 1; }\nexit 0\n");
         w.program_repo();
         w.catalog_repo();
         w.release_dir();

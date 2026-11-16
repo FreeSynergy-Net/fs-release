@@ -3,7 +3,7 @@
 /// Result of an edit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Edit {
-    /// Catalog id of the package (`fs-store`).
+    /// Catalog id of the package (`fs-packages`).
     pub id: String,
     /// The new text of the file.
     pub text: String,

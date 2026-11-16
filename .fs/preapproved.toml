@@ -4,19 +4,19 @@
 repos = [
   "FreeSynergy/fs-interfaces",
   "FreeSynergy/fs-components",
-  "FreeSynergy/fs-store",
+  "FreeSynergy/fs-packages",
   "FreeSynergy/fs-files",
   "FreeSynergy/fs-people",
   "FreeSynergy/fs-groups",
   "FreeSynergy/fs-tasks",
-  "FreeSynergy/fs-wiki",
-  "FreeSynergy/fs-calendar",
+  "FreeSynergy/fs-texts",
+  "FreeSynergy/fs-calendars",
   "FreeSynergy/fs-maps",
-  "FreeSynergy/fs-messenger",
+  "FreeSynergy/fs-messages",
   "FreeSynergy/fs-release",
 ]
 # Catalog repos that bump and sign may push to (public reach only).
-catalog_targets = ["FreeSynergy/fs-catalog"]
+catalog_targets = ["FreeSynergy/Catalog"]
 
 # Public reach (`--reach public`) stays locked until the reference of the Opus JA that lifts the lock stands here.
 public_ok = ""

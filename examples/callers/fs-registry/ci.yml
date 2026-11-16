@@ -1,4 +1,4 @@
-# Copy to fs-hub/.github/workflows/ci.yml
+# Copy to fs-registry/.github/workflows/ci.yml
 name: ci
 on:
   push:

@@ -50,7 +50,7 @@ pub fn validate_branch(name: &str) -> Result<(), String> {
     }
 }
 
-/// The repo name part (`fs-store` of `FreeSynergy/fs-store`).
+/// The repo name part (`fs-packages` of `FreeSynergy/fs-packages`).
 #[must_use]
 pub fn name(slug: &str) -> &str {
     slug.rsplit('/').next().unwrap_or(slug)

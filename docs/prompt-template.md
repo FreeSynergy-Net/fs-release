@@ -25,7 +25,7 @@ the mean size and cost per kind).
 Build:
 
 ```
-Workflow agent-run, Schritt build. Parameter: repo=fs-store, branch=unreviewed/store-017, head=7b5cb6e, delta=-.
+Workflow agent-run, Schritt build. Parameter: repo=fs-packages, branch=unreviewed/store-017, head=7b5cb6e, delta=-.
 Auftrag: <was gebaut wird, 3-8 Zeilen, Entscheidungen des Nutzers im Wortlaut>.
 Grenzen: <nur wenn von rules.md abweichend, sonst weglassen>.
 ```
@@ -33,7 +33,7 @@ Grenzen: <nur wenn von rules.md abweichend, sonst weglassen>.
 Fix (after a review NEIN or a user finding):
 
 ```
-Workflow bugfix, Schritt reproduce, dann fix. Parameter: repo=fs-store, branch=unreviewed/store-016-fix, head=7b5cb6e,
+Workflow bugfix, Schritt reproduce, dann fix. Parameter: repo=fs-packages, branch=unreviewed/store-016-fix, head=7b5cb6e,
 delta=8b3dcf3..7b5cb6e, finding="Neu laden funktioniert nicht zuverlaessig".
 Befunde des Reviews: <Datei:Zeile, je eine Zeile>.
 ```
@@ -41,7 +41,7 @@ Befunde des Reviews: <Datei:Zeile, je eine Zeile>.
 Review:
 
 ```
-Workflow review, Schritt read. Parameter: repo=fs-store, branch=unreviewed/store-016, head=7b5cb6e,
+Workflow review, Schritt read. Parameter: repo=fs-packages, branch=unreviewed/store-016, head=7b5cb6e,
 delta=8b3dcf3..7b5cb6e, scope=B4, tests=reload_notices,window_draws.
 Nutzerbefunde und Pruefpunkte: (a) <...> (b) <...> ... (nur die Sachfragen dieses Laufs).
 Bericht: BERICHT.md.
@@ -50,7 +50,7 @@ Bericht: BERICHT.md.
 Dossier:
 
 ```
-Workflow dossier, Schritt research. Parameter: frontend=fs-wiki, repo=fs-documentation, branch=unreviewed/dossier-wiki.
+Workflow dossier, Schritt research. Parameter: frontend=fs-texts, repo=fs-documentation, branch=unreviewed/dossier-wiki.
 Quellen und Vorbilder: <Namen/URLs, die erlaubt sind>. Schwerpunkt: <z. B. Kontextmenüs, Kürzel>.
 ```
 
@@ -64,7 +64,7 @@ German, findings file:line).
 After (about 1 KB, the same content, nothing lost):
 
 ```
-Workflow review, Schritt read. Parameter: repo=fs-store, branch=unreviewed/store-016, head=7b5cb6e,
+Workflow review, Schritt read. Parameter: repo=fs-packages, branch=unreviewed/store-016, head=7b5cb6e,
 delta=8b3dcf3..7b5cb6e, scope=store-016 (B4), tests=reload_notices,window_draws.
 Nutzerbefunde: (a) Neu laden unzuverlaessig - Ursache + Test; (b) Reload-Knopf view-refresh, Tooltip "Katalog neu laden", keine
 Beschriftung; (c) Vorschau IST die Bestaetigung, Passwortabfrage angekuendigt; (d) Meldungen blenden aus, Schliessen, Verlauf;

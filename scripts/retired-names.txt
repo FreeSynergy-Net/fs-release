@@ -2,3 +2,12 @@
 # given out again, and no later rename may take a name on the left as its new name (ADR 0080: the redirect of the old repo name would
 # break). The list is written by `scripts/umbenennen retire` as a step of the flow `umbenennen` and read by its dry run.
 fs-history -> fs-activity  # ADR 0087
+fs-hub -> fs-registry  # names wave 2026-11-16
+fs-store -> fs-packages  # names wave 2026-11-16
+fs-wiki -> fs-texts  # names wave 2026-11-16
+fs-messenger -> fs-messages  # names wave 2026-11-16
+fs-calendar -> fs-calendars  # names wave 2026-11-16
+fs-whiteboard -> fs-draw  # names wave 2026-11-16
+fs-streaming -> fs-broadcast  # names wave 2026-11-16
+fs-surveys -> fs-forms  # names wave 2026-11-16
+fs-catalog -> Catalog  # names wave 2026-11-16

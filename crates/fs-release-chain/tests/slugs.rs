@@ -10,30 +10,30 @@ use support::{git, World};
 #[test]
 fn only_the_two_exact_github_forms_are_accepted() {
     for good in [
-        "https://github.com/FreeSynergy/fs-store",
-        "https://github.com/FreeSynergy/fs-store.git",
-        "git@github.com:FreeSynergy/fs-store.git",
-        "git@github.com:FreeSynergy/fs-store",
+        "https://github.com/FreeSynergy/fs-packages",
+        "https://github.com/FreeSynergy/fs-packages.git",
+        "git@github.com:FreeSynergy/fs-packages.git",
+        "git@github.com:FreeSynergy/fs-packages",
     ] {
         assert_eq!(
             slug_of(good).as_deref(),
-            Some("FreeSynergy/fs-store"),
+            Some("FreeSynergy/fs-packages"),
             "{good}"
         );
     }
     for bad in [
-        "https://evil.example/github.com/FreeSynergy/fs-store",
-        "https://github.com.evil.example/FreeSynergy/fs-store",
-        "https://user@github.com/FreeSynergy/fs-store",
-        "http://github.com/FreeSynergy/fs-store",
-        "ssh://git@github.com/FreeSynergy/fs-store",
-        "https://github.com/FreeSynergy/fs-store/",
-        "https://github.com/FreeSynergy/fs-store/extra",
+        "https://evil.example/github.com/FreeSynergy/fs-packages",
+        "https://github.com.evil.example/FreeSynergy/fs-packages",
+        "https://user@github.com/FreeSynergy/fs-packages",
+        "http://github.com/FreeSynergy/fs-packages",
+        "ssh://git@github.com/FreeSynergy/fs-packages",
+        "https://github.com/FreeSynergy/fs-packages/",
+        "https://github.com/FreeSynergy/fs-packages/extra",
         "https://github.com/FreeSynergy/f\u{0455}-store",
         "https://github.com/FreeSynergy/fs%2Dstore",
-        "https://github.com/FreeSynergy/fs-store\0",
+        "https://github.com/FreeSynergy/fs-packages\0",
         "https://github.com/FreeSynergy/..",
-        "https://github.com/../fs-store",
+        "https://github.com/../fs-packages",
         "https://github.com/FreeSynergy/",
         "/srv/some/path",
         "",
