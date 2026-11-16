@@ -92,8 +92,8 @@ Full examples: [`examples/callers/`](../examples/callers/) (fs-capnpc as CLI, fs
 
 | Input | Default | Meaning |
 |-------|---------|---------|
-| `binaries` | required | comma separated binary names |
-| `kind` | `cli` | `cli`, `daemon`, `app`: selects default formats (below) |
+| `binaries` | empty | comma separated binary names; **empty only together with `kind: library`** (an empty list without it is an error) |
+| `kind` | `cli` | `cli`, `daemon`, `app`: selects default formats (below); `library`: library mode (see below) |
 | `app-id` | | reverse-DNS id; needed for AppImage, Flatpak, macOS bundle |
 | `app-name`, `description`, `name` | Cargo values | display name, one-liner, artefact base name |
 | `cargo-package` | | `-p` for workspaces; preferred owner of the binaries it provides (msi uses it too). Binaries of other packages are still built and packaged per their own package |
@@ -115,6 +115,55 @@ Packaging metadata stays in the app repo: `[package.metadata.deb]` and `[package
 (without them sensible defaults are generated), optional `wix/main.wxs`, `packaging/<app-id>.desktop`,
 `packaging/<app-id>.png|svg` (AppImage), `packaging/icon.icns` (macOS app).
 
+### Library mode (`kind: library`, no binaries)
+
+A pure library has nothing to build, package or sign. Set `kind: library` and leave `binaries` **empty**; the same `release.yml` then runs in library mode
+(caller example: [`examples/callers/library-release.yml`](../examples/callers/library-release.yml), pinned to a full SHA, not `@main`):
+
+- The mode must be asked for: an empty `binaries` WITHOUT `kind: library` stays an error (an app repo that forgot or lost its `binaries` must not publish a release without packages), and `kind: library` WITH `binaries` is an error too. `plan` checks (`actions/library-release/notes.py`) that the tag is `vX.Y.Z` (SemVer), that the tag version equals the
+  `[workspace.package] version` of `Cargo.toml` (or `[package] version`) and that `CHANGELOG.md` has a **non-empty** section `## X.Y.Z` (or `## <name> X.Y.Z`).
+  Any other state is red before a job starts.
+- The platform jobs, `finalize` (SBOM, signatures, checksums, provenance) and `publish` are skipped; there are no artefacts, so **no binary packages and no
+  signature are needed**, and no secret is passed. Only the job `library` runs, with `contents: write` and its own `GITHUB_TOKEN`.
+- `library` creates a draft whose notes are exactly that CHANGELOG section (not generated notes) and publishes it as **Pre-release** (0.0.N is always a pre-release,
+  ADR 0064); `dry-run: true` creates nothing; a release that already exists is never touched. The job checks out the full history and refuses a tag whose commit is
+  not an ancestor of `origin/main` (as the release job of fs-components does; also in `dry-run`).
+- **Repeat after a failure:** the draft is created first and published second. If publishing fails after the draft exists, an unpublished DRAFT of the tag stays. A new run
+  does NOT overwrite it: it recognises the draft, names it in the error (`an unpublished DRAFT of this tag is left over`) and stops. Publish it by hand
+  (`gh release edit <tag> --draft=false --prerelease`) or delete it (`gh release delete <tag>`) and run again.
+- Self test with counter-checks and mutations: `scripts/test_library_release.sh` (wrong tag name, version differs from the tag, missing or empty section, a platform or
+  signing step in library mode all turn it red).
+- The library actions arrive with the pin round after the merge (`scripts/pin-refs.sh <sha>`): a caller can use library mode only with a SHA that contains it.
+
+### Approval for the signing job (GitHub environment)
+
+The job that holds the signing key (`finalize` in `_release-finalize.yml`, the action `sign-files`) runs in the GitHub **environment** `release-signing`
+(`environment: release-signing`, on that job only). With a required reviewer, a run stops there until the owner approves it, so no agent account can sign
+alone, also after the agents work under their own account. The owner sets this up on GitHub (nothing in this repo does it):
+
+1. Repository -> Settings -> Environments -> New environment `release-signing`.
+2. **Required reviewers**: the owner's own account (never the account of an agent); switch on "Prevent self-review" only if the run is started by another account.
+3. **Deployment branches and tags**: "Selected branches and tags" with the tag rule `v*` (no branch rule), so only a tag run can reach the key.
+4. **Environment secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as secrets of THIS environment (not repository or organisation secrets); delete them from
+   the repository secrets. (`scripts/set-signing-secrets.sh` sets repository secrets: use `gh secret set --env release-signing` instead.)
+5. The same for every repo that signs: the mirror workflow of a wrapper repo (template `mirror.yml`, for example fs-zentinel) and `site.yml` of the site repo
+   get `environment: release-signing` on their signing job too, and nothing else.
+6. **Every repo that calls `release.yml` needs its OWN environment `release-signing`** (steps 1 to 4 in THAT repo): the environment belongs to the repo in which the
+   run happens, not to fs-release. If it is missing there, GitHub creates it at the first run **without any protection rule**, the repository secrets that are handed
+   on still arrive, and the release is signed WITHOUT approval and without anyone noticing. Create it before the first run after the pin round. Callers found in the
+   local clones of the organisation (read-only scan of `.github/workflows/release.yml`, state 2026-11-16; `gh search code` returned nothing, so the scan is local and
+   must be repeated against GitHub before the pin round): fs-calendar, fs-capnpc, fs-files, fs-groups, fs-maps, fs-messenger, fs-people, fs-store, fs-streaming,
+   fs-tasks, fs-whiteboard, fs-wiki. Further callers: fs-components (library mode, planned), the mirror workflows of the wrapper repos and `site.yml`.
+   When all callers are converted, remove the handing-on of `secrets.GPG_*` in `release.yml` and in the caller examples, so that only environment secrets act.
+
+The signing job also checks that it runs for a tag (`github.ref_type == 'tag'`) and that the checkout is the commit of that tag (`git rev-parse HEAD` = `github.sha`).
+A mirror workflow should check the same two things before it signs. Not proven until the first real run: that the environment secrets reach the job inside the
+reusable workflow (a job with `uses:` cannot carry an `environment`, so the environment sits on the called job); the first run is a `dry-run` with the owner watching.
+
+Structure test: `scripts/check-signing-env [files...]` (also run by `scripts/test_check_signing_env.sh`, which has counter-checks): a job with `sign-files` without
+`environment:` is RED, and so is any other job that touches `GPG_*` secrets (only the call of `release.yml` / `_release-finalize.yml` may hand them on). Pass the mirror
+and site workflows as arguments to check them as well.
+
 ### Pipeline
 
 1. `plan`: validates the tag (SemVer) and Cargo version, builds one JSON plan.
@@ -124,9 +173,11 @@ Packaging metadata stays in the app repo: `[package.metadata.deb]` and `[package
 
 ### Versioning the workflows
 
-Inside fs-release, nested workflows and composite actions are referenced as `FreeSynergy/fs-release/...@main`
+Inside fs-release, nested workflows and composite actions are referenced as `FreeSynergy/fs-release/...@<full commit SHA>` (a reviewed state of `main`)
 (GitHub cannot say "same ref as my caller" across repositories). Before tagging a release of fs-release run
-`scripts/pin-refs.sh v1.0.0`, commit, tag; callers then use `@v1`. Callers may also use `@main` while developing.
+`scripts/pin-refs.sh v1.0.0`, commit, tag. Callers may also use `@main` while developing. Inside fs-release itself (`.github/workflows/*.yml`) the references are pinned to the full commit SHA of a reviewed state of `main` (the jobs with the signing key must never run a moving ref); raise the SHA on purpose when the actions change.
+
+**Mandatory after every merge that changes `.github/workflows/_release-*.yml` or `actions/`:** a commit cannot contain its own SHA, so `release.yml`, `ci.yml` and `check.yml` still point at the older commit and the signing job (`GPG_PRIVATE_KEY`) runs whatever refs that older commit holds. Two levels exist (`release.yml` -> `_release-*.yml` -> `actions/`): a change in `actions/` needs two pin rounds (first `_release-*` onto the new state, then `release.yml` onto that pin commit). The SHA is a fast-forward commit, not a merge commit, so say so in the commit text. Raise the SHA to that commit in a second, reviewed commit (`scripts/pin-refs.sh <sha>`) and check that `git grep '@main' .github/workflows` is empty at the commit the SHA names. The flows `release-flow` and `umbenennen` name this step in their release steps.
 
 ### Local checks
 

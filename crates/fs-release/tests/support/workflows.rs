@@ -2,17 +2,20 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use super::{have_yaml, python};
 
-pub const FILES: [&str; 29] = [
+pub const FILES: [&str; 38] = [
     "adr-write",
     "agent-run",
+    "anbieter-neuinstallation",
     "bugfix",
     "catalog-bump",
     "cleanup-targets",
     "coordination-round",
     "cost-reconcile",
+    "doku-mitziehen",
     "dossier",
     "download-readonly",
     "entscheidung",
@@ -20,17 +23,24 @@ pub const FILES: [&str; 29] = [
     "frontend-umbau",
     "handoff-update",
     "icon-round",
+    "koordinator-runde",
     "lift",
     "picture-acceptance",
+    "programm-grundgeruest",
+    "programm-neu",
     "publish-doc",
     "release-flow",
     "report-to-strategy",
     "restart-handoff",
     "review",
+    "server-einrichtung",
     "site-bauen",
     "site-signieren",
     "slot-check",
+    "testlauf",
+    "umbenennen",
     "upstream-anfrage",
+    "upstream-update",
     "user-decision",
     "wip-continue",
     "workflow-pflege",
@@ -83,4 +93,33 @@ pub fn assert_red(file: &str, needle: &str, edit: impl Fn(String) -> String) {
     } else {
         assert_eq!(code, 2, "{out}");
     }
+}
+
+pub fn pos(text: &str, step: &str) -> usize {
+    step_names(text)
+        .iter()
+        .position(|n| n == step)
+        .unwrap_or_else(|| panic!("no step {step}"))
+}
+
+pub fn in_order(text: &str, order: &[&str]) -> bool {
+    order.windows(2).all(|w| pos(text, w[0]) < pos(text, w[1]))
+}
+
+pub fn run_self_test(name: &str) {
+    // no silent skip: without python3 the self test cannot run, and a test that did not run is not green
+    assert!(
+        Command::new("python3").arg("--version").output().is_ok(),
+        "python3 is missing: the self test {name} was NOT run"
+    );
+    let out = Command::new("bash")
+        .arg(root().join("scripts").join(name))
+        .output()
+        .expect("bash");
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success() && text.contains("all ok"),
+        "{text}\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }

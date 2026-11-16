@@ -1,11 +1,13 @@
 # The release flow (`fs-release flow`, crates/fs-release/src/flow): lift, gates, review, tag, push, release, bump, sign.
 # A step marked with a gate halts until somebody else has acted; run again to go on. Nothing is published without the
-# approval of exactly this head. FS profile: see README.md.
+# approval of exactly this head. Between `lift` and `gates` the documentation moves along (`doku`, rule doku-mitziehen; inputs docs, docs_base,
+# old, new, allow besides repo and delta; an escalation of `doku` ends this flow before the review: `doku-weiter`); the docs main branch is pushed only after
+# the review, the approval and the merge of the code (`doku-veroeffentlichen`, human, after `main-ff`). FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: release-flow
-  version: 0.0.6
+  version: 0.0.8
   title: Release a branch of a program as a pre-release and bring it into the catalog
 do:
   - lift:
@@ -13,15 +15,50 @@ do:
         workflow:
           namespace: freesynergy.net
           name: lift
-          version: 0.0.6
+          version: 0.0.8
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow lift.yaml with --commit; red here stops the flow before any review.
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml: every change of code, names, interfaces or behaviour of this release pulls the documentation in fs-documentation (de and en) along in the same run; without a matching docs change the gate is RED and the flow stops before any review. The same step covers the release of lift, frontend-round and frontend-umbau, which end here."
+  - doku-weiter:
+      switch:
+        - eskaliert:
+            when: '${ $context.doku.eskaliert == true or $context.doku.status != "green" }'
+            then: eskalation
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review (`eskalation` ends it with `eskaliert: true` for the caller). Only green goes on."
   - gates:
-      call: gates:0.0.6@fs
+      call: gates:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -29,7 +66,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh on a fresh clone, the one definition of the checks.
   - review-request:
-      call: review-request:0.0.6@fs
+      call: review-request:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -49,7 +86,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews the head and writes the approval file; a new head makes a JA invalid.
   - tag:
-      call: tag:0.0.6@fs
+      call: tag:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -57,7 +94,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Annotated tag v<version> on the approved head, locally.
   - push:
-      call: push:0.0.6@fs
+      call: push:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -77,7 +114,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: CI of the pushed branch release-<version> must be green for exactly this head; red stops the flow.
   - main-ff:
-      call: merge-ff:0.0.6@fs
+      call: merge-ff:0.0.8@fs
       with:
         into: main
       metadata:
@@ -86,6 +123,18 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: The human or the coordinator fast-forwards main to the green, approved head (no merge commit, never forced); agents never do.
+  - doku-veroeffentlichen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: publish-doc
+          version: 0.0.8
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, only AFTER the review (opus-ja) and the approval of the code, together with its merge; never before, never forced; the agent never pushes."
   - release:
       listen:
         to:
@@ -97,18 +146,35 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release).
+        freesynergy.net:summary: "release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release). MANDATORY after the merge into main of a program or of fs-release itself: the SHA of `FreeSynergy/fs-release/...@<sha>` in release.yml, ci.yml and check.yml is raised to the merge commit in a second reviewed commit (scripts/pin-refs.sh; a commit cannot contain its own SHA), otherwise the signing job still runs the refs of the older commit (docs/usage.md)."
+  - announce:
+      emit:
+        event:
+          with:
+            source: https://github.com/${ .input.repo }
+            type: net.freesynergy.release.published
+            subject: ${ .input.tag }
+            data:
+              repo: ${ .input.repo }
+              tag: ${ .input.tag }
+              prerelease: ${ .input.prerelease }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The sender side of the event the step release waits for - the last job of release.yml sends it, only after publish was green and the Pre-release is really published (a draft sends nothing). It follows the approved push; no gate is skipped. No secret, no command in data.
   - bump:
-      call: bump:0.0.6@fs
+      call: bump:0.0.8@fs
       with:
         workflow: bump.yml
         repo: FreeSynergy/fs-catalog
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
-        freesynergy.net:gate: opus-ja
+        freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: After the Pre-release is published - gh workflow run bump.yml -R FreeSynergy/fs-catalog, behind the approval, public reach only.
+        freesynergy.net:summary: Runs by itself as the follow-up of the published release (event net.freesynergy.release.published, see catalog-bump.yaml); the approval (opus-ja, picture OK) lay before, at the tag and push. Pull without token - fs-catalog reads the public releases on its 15-minute schedule; nobody starts it by hand.
   - sign:
       listen:
         to:
@@ -123,3 +189,30 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Waits for the sign and test runs of the catalog (see catalog-bump.yaml); the flow only describes this wait, it does not poll yet.
+  - fertig:
+      set:
+        status: released
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The flow reached its end (the sign and test events of the catalog are in); sets `status: released`."
+  - eskalation:
+      set:
+        status: escalated
+        eskaliert: true
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The docs gate escalated (red three times or a check skipped): this flow ends before the review with `eskaliert: true`; the person decides."
+output:
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false) } }'

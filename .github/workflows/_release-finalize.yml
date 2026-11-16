@@ -17,28 +17,39 @@ permissions:
 jobs:
   finalize:
     runs-on: ubuntu-24.04
+    # The ONLY job with the signing key: it waits for the required reviewer of this GitHub environment (the owner's account, never an agent account;
+    # set up by the owner: docs/usage.md "Approval for the signing job"). Secrets belong to the environment, not to the repository.
+    environment: release-signing
     steps:
+      - name: only the commit of a tag is signed
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF_TYPE" = tag ] || { echo "::error::signing runs only for a tag (ref_type=$GITHUB_REF_TYPE)"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: the checkout is the commit of the tag
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse HEAD)" = "$GITHUB_SHA" ] || { echo "::error::HEAD is not github.sha - not the commit of the tag"; exit 1; }
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dist-*
           merge-multiple: true
           path: dist
-      - uses: FreeSynergy/fs-release/actions/sbom@main
+      - uses: FreeSynergy/fs-release/actions/sbom@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           name: ${{ fromJSON(inputs.plan).name }}
           version: ${{ fromJSON(inputs.plan).version }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
       # Order matters: package signatures change the files, so they come before the checksums.
-      - uses: FreeSynergy/fs-release/actions/sign-files@main
+      - uses: FreeSynergy/fs-release/actions/sign-files@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           mode: packages
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      - uses: FreeSynergy/fs-release/actions/checksums@main
-      - uses: FreeSynergy/fs-release/actions/sign-files@main
+      - uses: FreeSynergy/fs-release/actions/checksums@f1211066d0072c6319678659e845c19ae4384bd0
+      - uses: FreeSynergy/fs-release/actions/sign-files@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           mode: detached
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -47,7 +58,7 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*
-      - uses: FreeSynergy/fs-release/actions/draft-release@main
+      - uses: FreeSynergy/fs-release/actions/draft-release@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           tag: ${{ fromJSON(inputs.plan).tag }}
           name: ${{ fromJSON(inputs.plan).name }}

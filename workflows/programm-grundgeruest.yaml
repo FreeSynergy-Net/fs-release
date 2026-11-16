@@ -1,0 +1,501 @@
+# ENTWURF / DRAFT - SPECIFICATION, NOT RUNNABLE, NOT PART OF 0.0.7: nearly all `@fs` names have no script (`trait-lock`, `trait-verify`, `core-ai`, ...), the approval gate `strategie-ok`
+# is open (A3') and no SW 1.0 run exists. It describes the intended belt; do not run it.
+# Conveyor belt (ADR 0087 item 7): every program gets the basics - it starts, does simple things and ends; the frontends come with it.
+# Stage 1 in parallel: (a) dossier and documentation (model apps, menus, workflows), (b) research (standards, data model, crates, licence, state of care;
+# Haiku, read and write of notes only). Stage 2: Opus plan with a FIXED trait (hash locked), then the gate `strategie-ok` (counts only from an authorised sender, step `absender`).
+# Stage 3 in parallel (Sonnet): core (trait, typed storage after ADR 0086, CLI) and frontend (block assignment first, test data against the trait).
+# Stage 4: `doku-mitziehen` FIRST (the doc commits are part of the head), then the head is resolved and Opus reviews exactly it, then the picture gate (`bilder-again`: accepted = green, not accepted = back to stufe-3, no verdict = eskalation, never green without a verdict). A change of the trait after the lock is a new plan and a new `strategie-ok`.
+# Relation to `programm-neu` (decision of bundle 0.0.7, ADR 0087 item 7): this flow does NOT replace a part of `programm-neu`; it is the basics belt for every
+# program, also existing ones. `programm-neu` stays the only entry for NEW programs; it calls this flow as its component for the steps after the
+# interface in a later bundle (not wired in 0.0.7). Agents never push, tag or merge; the release goes through `release-flow` of the caller.
+# Every check is green only when it says so (`red == false`); a missing result goes to `eskalation`, never on. Output: `status`, `eskaliert`.
+# Input: programm, lock_dir (outside every worktree, default $XDG_STATE_HOME/freesynergy/trait-lock), vorbild, tag, dossier, model, bestand, blinc, contract, dump, exceptions, repo, branch, head, delta, docs, docs_base, old, new, allow.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: programm-grundgeruest
+  version: 0.0.8
+  title: "Conveyor belt for the basics of a program: dossier and research, fixed trait, core and frontend, review, pictures, docs"
+do:
+  - stufe-1:
+      fork:
+        compete: false
+        branches:
+          - dossier-doku:
+              call: dossier-ai:0.0.8@fs
+              with:
+                programm: ${ .input.programm }
+                vorbild: ${ .input.vorbild }
+                dossier: ${ .input.dossier }
+          - recherche:
+              call: research-haiku:0.0.8@fs
+              with:
+                programm: ${ .input.programm }
+                topics: standards, data model, crates, licence, state of care
+                mode: read-and-write-notes-only
+      export:
+        as: '${ $context + { stufe1: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Two branches at the same time. (a) dossier-doku (Sonnet): dossier with states, menus and workflows of the model apps, documentation. (b) recherche (Haiku, only reading and writing notes, never code): standards, data model, crates, licence, state of care. Both write into the dossier folder."
+  - stufe-1-check:
+      call: grundgeruest-stufe1-check:0.0.8@fs
+      with:
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { stufe1check: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check without AI: the dossier has states, menus and workflows of the model apps; the research file names standards, data model, crates, licence and state of care with a source each. Carries red and runde."
+  - stufe-1-again:
+      switch:
+        - runden:
+            when: '${ ($context.stufe1check.red and ($context.stufe1check.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.stufe1check.red == true }'
+            then: stufe-1
+        - green:
+            when: '${ $context.stufe1check.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to stufe-1, from the third red round to eskalation; only `red == false` goes on, a missing result goes to eskalation."
+  - adr-suche:
+      call: adr-search:0.0.8@fs
+      with:
+        docs: ${ .input.docs }
+        terms: 0086, 0087, 0085, ${ .input.programm }
+      export:
+        as: '${ $context + { adrs: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/adr-search on fs-documentation origin/main (conventions/decisions) for the terms of the program, at least ADR 0086 (typed storage), 0087 (generic names), 0085 (normalisation); the hits are input of the plan."
+  - plan:
+      call: plan-ai:0.0.8@fs
+      with:
+        dossier: ${ .input.dossier }
+        adrs: ${ $context.adrs }
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { plan: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Opus writes the plan with a FIXED trait (result field `trait` = the path of the trait file; the public interface of the program as a Rust trait file, signatures final), the data model as typed tables (ADR 0086) and the split into core and frontend. Model: Opus."
+  - plan-check:
+      call: grundgeruest-plan-check:0.0.8@fs
+      export:
+        as: '${ $context + { plancheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check: the trait file exists and compiles as a signature check; the name follows ADR 0087 (a capability or data, not a kind of app); no JSON or blob column except `original` (ADR 0086); every ADR of the hits is named. Carries red and runde."
+  - plan-again:
+      switch:
+        - runden:
+            when: '${ ($context.plancheck.red and ($context.plancheck.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.plancheck.red == true }'
+            then: plan
+        - green:
+            when: '${ $context.plancheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to plan, from the third red round to eskalation; only `red == false` goes on, a missing result goes to eskalation."
+  - trait-sperre:
+      call: trait-lock:0.0.8@fs
+      with:
+        trait: ${ $context.plan.trait }
+        lock_dir: ${ .input.lock_dir }
+      export:
+        as: '${ $context + { sperre: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "BEFORE the approval: computes the SHA-256 of the trait file and writes it into a read-only file in `lock_dir` (outside every agent worktree and not writable for agents; written by the coordinator side only), and returns `sha256` and `trait` to this flow (`$context.sperre`). The approval below binds exactly this hash."
+  - strategie-ok:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.approval
+              subject: ${ $context.sperre.sha256 }
+      export:
+        as: '${ $context + { freigabe: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Approval gate: the strategy (or the user) approves the plan and the fixed trait; the approval event must carry the subject = the SHA-256 of the locked trait (`$context.sperre.sha256`), an approval for another plan or trait does not open the gate. The lock lies BEFORE this gate, so what is approved is what is locked. The event is kept as `freigabe`; WHO sent it is checked by the next step `absender` (the hash alone is readable by agents, so it proves nothing about the sender). Without this approval stage 3 does not start."
+  - absender:
+      switch:
+        - berechtigt:
+            when: '${ ($context.freigabe.subject == $context.sperre.sha256) and (($context.freigabe.source // "") == "net.freesynergy.strategie" or ($context.freigabe.source // "") == "net.freesynergy.nutzer") and (($context.freigabe.data.actor // "") == "human") }'
+            then: stufe-3
+        - fremd:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the approval counts only from an authorised sender: `source` is `net.freesynergy.strategie` or `net.freesynergy.nutzer` and `data.actor` is `human`, and the subject is the locked hash. An event from any other source (an agent, a worktree, a CI job) or without `data.actor: human` never opens stage 3: the flow goes to `eskalation` (the person decides). Who may send `net.freesynergy.approval` is fixed in the event catalog of README.md."
+  - stufe-3:
+      fork:
+        compete: false
+        branches:
+          - kern:
+              call: core-ai:0.0.8@fs
+              with:
+                programm: ${ .input.programm }
+                trait: ${ $context.sperre.trait }
+                storage: typed tables after ADR 0086
+                cli: start, simple commands, stop
+          - frontend:
+              call: frontend-ai:0.0.8@fs
+              with:
+                programm: ${ .input.programm }
+                vorbild: ${ .input.vorbild }
+                first: block assignment (baustein-zuordnung)
+                test_data: against the trait
+      export:
+        as: '${ $context + { stufe3: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Two Sonnet branches at the same time, each in its own worktree. (a) kern: the trait, typed storage after ADR 0086 (no JSON, no blob), the CLI. (b) frontend: first the block assignment (scripts/baustein-zuordnung), then test data against the trait, no own data model. Neither branch changes the trait."
+  - trait-unveraendert:
+      call: trait-verify:0.0.8@fs
+      with:
+        trait: ${ $context.sperre.trait }
+        expected: ${ $context.sperre.sha256 }
+        lock_dir: ${ .input.lock_dir }
+      export:
+        as: '${ $context + { traitcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Compares the SHA-256 of the trait file with the hash the flow holds (`$context.sperre.sha256`, passed as `expected`) AND with the read-only lock file in `lock_dir` (outside every worktree; an agent cannot move the reference); a changed trait or a differing reference is red (a new plan and a new strategie-ok are needed). A missing lock file or result is red, never green. Carries red."
+  - trait-again:
+      switch:
+        - red:
+            when: '${ $context.traitcheck.red == true }'
+            then: plan
+        - green:
+            when: '${ $context.traitcheck.red == false }'
+            then: gates
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a changed trait goes back to plan (and so to a new lock and a new strategie-ok); only `red == false` goes on; a missing result is NOT green and goes to eskalation."
+  - gates:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: testlauf
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          head: ${ .input.head }
+          delta: ${ .input.delta }
+          scope: gezielt
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Targeted tests of the changed crates and test files through the flow testlauf (the full workspace run only as an end gate); the flow contains the AI step `fix`. The result carries `status`, `red`, `runde`, `eskaliert`."
+  - gates-again:
+      switch:
+        - runden:
+            when: '${ ($context.gates.red == true and ($context.gates.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.gates.red == true }'
+            then: stufe-3
+        - green:
+            when: '${ $context.gates.status == "green" and $context.gates.red == false }'
+            then: speicher-check
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red tests go back to stufe-3, from the third red round to eskalation; only `status == green` goes on; a missing result is NOT green. Red tests no longer slip through."
+  - speicher-check:
+      call: storage-typed-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+      export:
+        as: '${ $context + { speicher: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check (ADR 0086): no JSON and no blob column in the schema except `original`; every field of the trait has a typed column; round trip import - store - export loses nothing. Carries red and runde."
+  - lauf-check:
+      call: lifecycle-smoke:0.0.8@fs
+      with:
+        repo: ${ .input.repo }
+      export:
+        as: '${ $context + { lauf: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script check of the goal: the program starts, does simple things (the CLI commands of the plan) and ends cleanly; the frontend test data run against the trait. Carries red and runde."
+  - stufe-3-again:
+      switch:
+        - runden:
+            when: '${ (($context.speicher.red == true or $context.lauf.red == true) and (($context.lauf.runde // 0) >= 3 or ($context.speicher.runde // 0) >= 3)) }'
+            then: eskalation
+        - red:
+            when: '${ $context.speicher.red == true or $context.lauf.red == true }'
+            then: stufe-3
+        - green:
+            when: '${ $context.speicher.red == false and $context.lauf.red == false }'
+            then: doku
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to stufe-3, from the third red round to eskalation; only `red == false` of BOTH checks goes on to `doku`; a missing result is NOT green."
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen), BEFORE the review so that the doc commits are part of the reviewed head: documentation of the program in de and en, links, manifest and catalog texts; without a matching docs change the gate is RED. The sub-workflow contains an AI step; its result `status` and `eskaliert` is read by `doku-weiter`."
+  - doku-weiter:
+      switch:
+        - eskaliert:
+            when: '${ $context.doku.eskaliert == true or $context.doku.status != "green" }'
+            then: eskalation
+        - weiter:
+            then: kopf
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - doku-mitziehen ended with `eskaliert` or without `status == green`: the belt goes to `eskalation`, never on to the review. Only green goes on."
+  - kopf:
+      call: resolve-head:0.0.8@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+      export:
+        as: '${ $context + { kopf: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Resolves the branch to the commit hash of its tip (git rev-parse, read only) AFTER stage 3, the gates and the docs - all their commits are in it. From here on only this hash counts for the review, never the branch name and never the head the belt was started with."
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          head: ${ $context.kopf.head }
+          delta: ${ .input.delta }
+      export:
+        as: '${ $context + { review: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Opus review of exactly the head of step `kopf` (resolved after the docs; repo, branch, delta given; the delta and the file list only), one review per head; the JA is bound to this hash."
+  - review-again:
+      switch:
+        - rounds:
+            when: '${ $context.review.verdict == "NEIN" and ($context.review.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.review.verdict == "NEIN" }'
+            then: stufe-3
+        - ja:
+            when: '${ $context.review.verdict == "JA" }'
+            then: bilder-erzeugen
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO goes back to stufe-3 with the findings as the order (new commits mean new gates, new docs, a new head and a new review); from the third NO (`runde`) the belt ends in `eskalation`; only a JA goes on to the picture gate; a missing verdict (null) or any other value is NOT a JA and goes to `eskalation` - never an endless loop back to stufe-3."
+  - bilder-erzeugen:
+      call: render-images:0.0.8@fs
+      with:
+        frontend: ${ .input.programm }
+      export:
+        as: '${ $context + { images: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Renders our pictures of the frontend (as in frontend-round `images`); whatever they look like, the state changes to shown."
+  - bilder-waechter:
+      call: theme-waechter-check:0.0.8@fs
+      with:
+        frontend: ${ .input.programm }
+        images: ${ $context.images }
+      export:
+        as: '${ $context + { waechter: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "SPECIFICATION, NOT RUNNABLE (no script yet). Theme guard (rule [THEME-WAECHTER] of testlauf): every rendered picture carries the requested theme and a token colour at a fixed place matches it; no shared theme state between the picture tests. A wrong theme is red; a missing result is not green."
+  - waechter-weiche:
+      switch:
+        - gruen:
+            when: '${ $context.waechter.red == false }'
+            then: bilder
+        - rot:
+            when: '${ $context.waechter.red == true }'
+            then: stufe-3
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only `red == false` shows the pictures to the picture gate; pictures with a red guard go back to stufe-3 with the finding, pictures without a guard result are an escalation. Pictures without a green guard never count as evidence."
+  - bilder:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: picture-acceptance
+          version: 0.0.8
+        input:
+          programm: ${ .input.programm }
+          model: ${ .input.model }
+          ours: ${ $context.images }
+          waechter: ${ $context.waechter }
+      export:
+        as: '${ $context + { bild: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Picture gate: the model and our picture side by side; the strategy and the user give their verdict. The result `accepted` is read by `bilder-again`; without `accepted == true` nothing is green and no release follows."
+  - bilder-again:
+      switch:
+        - ja:
+            when: '${ $context.bild.accepted == true }'
+            then: fertig
+        - nein:
+            when: '${ $context.bild.accepted == false }'
+            then: stufe-3
+        - ohne-urteil:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only `accepted == true` ends the belt green (`fertig`); `accepted == false` goes back to stufe-3 with the words of the verdict as the order (correction, then new gates, docs, head, review and pictures); a missing verdict is NOT green and goes to `eskalation`."
+  - fertig:
+      set:
+        status: green
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The only way to a green result: every check above was green, the review said JA for the head and the pictures are accepted. Sets `status: green`."
+  - eskalation:
+      set:
+        todo: grundgeruest-eskalation
+        status: escalated
+        eskaliert: true
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a result was missing or the docs gate escalated: the belt stops and the person decides. The report names the last red lines. This flow ends with `eskaliert: true`; the caller stops there."
+output:
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false) } }'

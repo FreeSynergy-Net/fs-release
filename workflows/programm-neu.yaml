@@ -1,0 +1,1018 @@
+# Input: contract (the theme contract file), tag (the release tag), programm, vorbild (the model program, name), bestand (block inventory of the fs-components family), blinc (inventory of the Blinc widgets), dossier (folder of the model dossier), model (pictures of the model), dump, exceptions (menu dump and exception list), repo, branch, head, delta, docs, docs_base (clone of fs-documentation and its commit at the start of the run, for `doku`), old, new, allow (empty lists unless names changed).
+# Loops: a red check jumps back at most twice (red rounds 1 and 2); the third red round goes to `eskalation` (the person). The script carries `runde`
+# (red rounds of that check so far). `runde` is NOT reset by a green result inside one loop (a loop of several checks counts its rounds together);
+# it is reset only when the flow leaves the phase.
+# New program: from the test question 'whose data?' to acceptance by the user, 17 steps (plus 9a) in the phases P0 to P6.
+# Every agent step (objective) is followed by an objective script check; red goes back (switch with then); every step names its ADRs
+# (freesynergy.net:adr). Outcomes Facette, Modul and Suite leave the flow at a stub (facette-abzweig, modul-abzweig, suite-abzweig, at the
+# end of the file); `facette-anlegen` does not exist yet (TODO, not invented). Agents never push, tag or merge, never touch a real server,
+# never handle secrets. Order: `Workflow programm-neu, step <id>, parameters contract, tag, repo, branch, head, delta, programm, vorbild, bestand, blinc, dossier, model, dump, exceptions`
+# (docs/prompt-template.md). FS profile: see README.md.
+# Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: programm-neu
+  version: 0.0.8
+  title: Build a new program from the test question to the user acceptance
+do:
+  - wessen-daten:
+      call: classify-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0076, 0061'
+        freesynergy.net:summary: "Step 1 - the test question 'whose data?' (ADR 0076): the agent writes einordnung.md with exactly one outcome Programm, Facette, Modul or Suite and the reason (own data and own rules = Programm; a fixed filter on another program's data = Facette, ADR 0061; a part inside a program = Modul; several programs = Suite). The outcome is a decision, so the gate is opus-ja and it carries the decision (the script check below tests only the form: one outcome, a reason). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step wessen-daten, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - ausgang-check:
+      call: einordnung-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { einordnung: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0076'
+        freesynergy.net:summary: "Script (no network, no AI) - einordnung.md has exactly one outcome of Programm, Facette, Modul, Suite and a non-empty reason; the result carries the flags `facette`, `modul`, `suite` (at most one true). The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - einordnung-again:
+      switch:
+        - runden:
+            when: '${ ($context.einordnung.red and ($context.einordnung.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.einordnung.red }'
+            then: wessen-daten
+        - facette:
+            when: '${ $context.einordnung.facette }'
+            then: facette-abzweig
+        - modul:
+            when: '${ $context.einordnung.modul }'
+            then: modul-abzweig
+        - suite:
+            when: '${ $context.einordnung.suite }'
+            then: suite-abzweig
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0076'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to wessen-daten; then `ausgang` branches (below): Facette, Modul and Suite leave this flow at their stub, only Programm continues."
+  - katalog-suche:
+      call: catalog-lookup:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { katalog: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0068, 0077'
+        freesynergy.net:summary: "Step 2 - hub and catalog: the script looks in fs-catalog (and the hub) for a package that already provides the capability (AppStream provides, ADR 0068; kind per ADR 0077); `vorhanden` true means: use or extend that package, no new program. The result carries `fehler` (true = the lookup itself failed, e.g. catalog not readable; rc 2 of the script) and `vorhanden`; a lookup error is not green and is not `neu`."
+  - katalog-weiter:
+      switch:
+        - fehler:
+            when: '${ $context.katalog.fehler }'
+            then: katalog-fehler
+        - vorhanden:
+            when: '${ $context.katalog.vorhanden }'
+            then: vorhanden-bericht
+        - neu:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0068'
+        freesynergy.net:summary: "Control flow - a failed lookup goes to `katalog-fehler` (the person); the capability exists already: to `vorhanden-bericht` (report and the human gate, then the flow ends; the existing package is used or extended in its own workflow); otherwise it goes on to P1."
+  - standards:
+      call: standards-research-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0014'
+        freesynergy.net:summary: "Step 3 - standards first (ADR 0014): for every data type of the program the agent names the standard (AS2 as the common base, JSContact, JSCalendar ...) with its official test collections (conformance suites); an own format only where no standard exists, with the proof of the search; nothing is copied (ADR 0013). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step standards, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - standards-check:
+      call: standards-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { standards: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0014'
+        freesynergy.net:summary: "Script - every data type names a standard or a search proof for 'none', and every named standard names its test collection or `[keine Testsammlung]` with a reason; red when one is missing. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - standards-again:
+      switch:
+        - runden:
+            when: '${ ($context.standards.red and ($context.standards.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.standards.red }'
+            then: standards
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0014'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to standards."
+  - kern-crate:
+      call: core-crate-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0015, 0014'
+        freesynergy.net:summary: "Step 4 - search the core crate: candidates with licence (list of allowed licences), maturity (releases, maintenance, tests) and the way in (wrapper with a Git pin and an adapter, never a fork; flow wrapper-einbindung); no suitable crate means an own core: the outcome `eigener-kern` with the reason and the list of the rejected candidates (each with the reason), written to kern.md. The choice of a dependency is a decision, so the gate is opus-ja. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step kern-crate, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - kern-check:
+      call: core-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { kern: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0015'
+        freesynergy.net:summary: "Script - two outcomes. Crate chosen: the licences of the crate and its dependencies against the allowed list, a pin exists, the repo is no fork. Own core (`eigener-kern` in kern.md): no pin is asked for; instead kern.md lists at least one rejected candidate with a reason (or the proof of the search for none) and a non-empty reason for the own core. Red on a forbidden licence, a fork, or a missing reason. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - kern-again:
+      switch:
+        - runden:
+            when: '${ ($context.kern.red and ($context.kern.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.kern.red }'
+            then: kern-crate
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0015'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to kern-crate."
+  - umzug:
+      call: migration-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0014, 0046, 0085'
+        freesynergy.net:summary: "Step 5 - fix the formats and the way of moving house: the formats of the widespread programs of this topic (read and write their files) with sample files as fixtures, and for every time and every person field the inner form per ADR 0085 (draft): times in UTC plus IANA zone id where the local meaning counts, all-day dates without time, persons as references to People (frozen extract only for bookings, invoices, contracts); the import and export commands and the round trip over the fixtures are built and checked only in step 9a (grenz-adapter, grenz-check); export is its own command, not saving (ADR 0046). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step umzug, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - umzug-check:
+      call: format-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { umzug: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0046'
+        freesynergy.net:summary: "Script - only what step 5 produces: the list of formats exists, every format has sample files (fixtures) that parse, every time and person field has its inner form per ADR 0085 (draft); NO import or export command and NO round trip here (they exist only after step 9a and are checked in grenz-check); red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - umzug-again:
+      switch:
+        - runden:
+            when: '${ ($context.umzug.red and ($context.umzug.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.umzug.red }'
+            then: umzug
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P1
+        freesynergy.net:adr: '0046'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to umzug."
+  - datenmodell:
+      call: datamodel-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0014, 0046, 0076, 0085'
+        freesynergy.net:summary: "Step 6 - the data model on the standards: types and fields map to the standards of step 3 (time and person fields as in step 5, ADR 0085 draft: UTC plus zone id, date only, person reference), storage through fs-store, history as AS2 activities through fs-history, saving is not exporting (ADR 0046: work on the database copy, export is separate). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step datenmodell, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - modell-check:
+      call: model-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { modell: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0046'
+        freesynergy.net:summary: "Script - every field maps to a standard field, storage goes through fs-store, changes are AS2 activities in fs-history, no export inside the save path; red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - modell-again:
+      switch:
+        - runden:
+            when: '${ ($context.modell.red and ($context.modell.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.modell.red }'
+            then: datenmodell
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0046'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell."
+  - speicher-check:
+      call: storage-typed-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { speicher: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0086'
+        freesynergy.net:summary: "Script check (ADR 0086, typed storage): the schema has no JSON and no blob column except `original`; every field of the data model is a typed column of a primitive type; the round trip import - store - export loses nothing. Red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - speicher-again:
+      switch:
+        - runden:
+            when: '${ ($context.speicher.red == true and ($context.speicher.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.speicher.red == true }'
+            then: datenmodell
+        - green:
+            when: '${ $context.speicher.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0086'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell (typed columns, no JSON or blob); only `red == false` goes on, a missing result goes to eskalation."
+  - schnittstelle:
+      call: interface-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0045, 0066'
+        freesynergy.net:summary: "Step 7 - the topic interface in fs-interfaces: a capnp schema plus a trait; what a backend cannot do answers Unsupported (ADR 0045, an interface is a target, a change is a jump); every command carries `supported` (ADR 0066) and the type description reports fields, base types and commands. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step schnittstelle, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - schnittstelle-check:
+      call: interface-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { schnittstelle: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0045, 0066'
+        freesynergy.net:summary: "Script - the capnp schema compiles, a trait exists, Unsupported is returned for a missing capability, every command has `supported`; the result may carry `modell` (the model is wrong). The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - schnittstelle-again:
+      switch:
+        - runden:
+            when: '${ ($context.schnittstelle.red and ($context.schnittstelle.runde // 0) >= 3) }'
+            then: eskalation
+        - modell:
+            when: '${ $context.schnittstelle.red and $context.schnittstelle.modell }'
+            then: datenmodell
+        - red:
+            when: '${ $context.schnittstelle.red }'
+            then: schnittstelle
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0045'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise a model fault (flag `modell`) goes back to datenmodell, any other red to schnittstelle."
+  - manifest:
+      call: manifest-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0068, 0074'
+        freesynergy.net:summary: "Step 8 - the manifest: the functions and objects the program publishes for menus (ADR 0074) and what it provides and requires as capabilities (ADR 0068, AppStream provides/requires, no own format). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step manifest, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - manifest-check:
+      call: manifest-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { manifest: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0068, 0074'
+        freesynergy.net:summary: "Script - the manifest parses, every function and object has a name and a command of the interface, provides and requires use versions; red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - manifest-again:
+      switch:
+        - runden:
+            when: '${ ($context.manifest.red and ($context.manifest.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.manifest.red }'
+            then: manifest
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P2
+        freesynergy.net:adr: '0068'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to manifest."
+  - engine:
+      call: engine-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0021, 0045, 0014'
+        freesynergy.net:summary: "Step 9 - the engine against the interface: the engine implements the trait; the contract tests (same for every backend) and the standard test collection of step 3 run against it ([GATES]). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step engine, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - engine-check:
+      call: contract-tests:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { engine: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0045, 0014'
+        freesynergy.net:summary: "Script - contract tests and the standard test collection are green; the result may carry `schnittstelle` (the contract itself is wrong). The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - engine-again:
+      switch:
+        - runden:
+            when: '${ ($context.engine.red and ($context.engine.runde // 0) >= 3) }'
+            then: eskalation
+        - vertrag:
+            when: '${ $context.engine.red and $context.engine.schnittstelle }'
+            then: schnittstelle
+        - red:
+            when: '${ $context.engine.red }'
+            then: engine
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0045'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise a contract fault goes back to schnittstelle, any other red to engine."
+  - grenz-adapter:
+      call: boundary-adapter-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0085, 0014, 0046'
+        freesynergy.net:summary: "Step 9a - importers and exporters as border adapters (ADR 0085, draft): every importer reads a foreign format and normalizes it into the inner model (times to UTC plus IANA zone id, all-day dates stay dates, person names become references to People or to the small local store); every exporter converts for the target and is its own command, not saving (ADR 0046); what cannot be mapped is kept as the original and reported. Tests with the sample files of step 5 and a round trip. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step grenz-adapter, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - grenz-check:
+      call: boundary-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { grenz: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0085'
+        freesynergy.net:summary: "Script - every import and export command has tests with foreign sample files and a round trip over the fixtures of step 5 keeps the data (or names the loss, ADR 0046); no free person name and no local time without zone in the inner model after an import; export of an all-day date stays a date; red otherwise. The result may carry `modell` (the model is wrong). The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - grenz-again:
+      switch:
+        - runden:
+            when: '${ ($context.grenz.red and ($context.grenz.runde // 0) >= 3) }'
+            then: eskalation
+        - modell:
+            when: '${ $context.grenz.red and $context.grenz.modell }'
+            then: datenmodell
+        - red:
+            when: '${ $context.grenz.red }'
+            then: grenz-adapter
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0085'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise a model fault (flag `modell`, e.g. a field of the model cannot take the inner form) goes back to datenmodell, any other red to grenz-adapter."
+  - admin-frontend:
+      call: admin-frontend-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0061, 0066'
+        freesynergy.net:summary: "Step 10 - the admin Frontend generated from the type description (Fiori idea, ADR 0066: all fields, all settings, all commands; mandatory for program and facet, ADR 0061); no data of its own. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step admin-frontend, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - admin-check:
+      call: admin-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { admin: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0061, 0066'
+        freesynergy.net:summary: "Script - every field and command of the type description appears in the admin Frontend; nothing is hard-coded per field; the result may carry `schnittstelle`. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - admin-again:
+      switch:
+        - runden:
+            when: '${ ($context.admin.red and ($context.admin.runde // 0) >= 3) }'
+            then: eskalation
+        - typ:
+            when: '${ $context.admin.red and $context.admin.schnittstelle }'
+            then: schnittstelle
+        - red:
+            when: '${ $context.admin.red }'
+            then: admin-frontend
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P3
+        freesynergy.net:adr: '0066'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise a type-description fault goes back to schnittstelle, any other red to admin-frontend."
+  - vorbild-dossier:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: dossier
+          version: 0.0.8
+        input:
+          vorbild: ${ .input.vorbild }
+          bestand: ${ .input.bestand }
+          blinc: ${ .input.blinc }
+          dossier: ${ .input.dossier }
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P4
+        freesynergy.net:adr: '0074, 0084'
+        freesynergy.net:summary: "Step 11 - the model dossier with the menu inventory (`## Menü-Inventar`, dialogs, workflows) for the model program of this topic: sub-workflow dossier.yaml, repeat until check-docs is green; it ends with the human publish, so the step carries that gate. The next step (frontend-round) starts with the same sub-workflow with the same input (`vorbild` = the model program, same `dossier`, `bestand`, `blinc`, `repo`, `branch`; `frontend` of step 12 is our program `programm`, the dossier is about the model) and finds it green at once; the dossier is about the model, not about our program."
+  - frontend:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: frontend-round
+          version: 0.0.8
+        input:
+          contract: ${ .input.contract }
+          tag: ${ .input.tag }
+          vorbild: ${ .input.vorbild }
+          frontend: ${ .input.programm }
+          bestand: ${ .input.bestand }
+          blinc: ${ .input.blinc }
+          dossier: ${ .input.dossier }
+          model: ${ .input.model }
+          dump: ${ .input.dump }
+          exceptions: ${ .input.exceptions }
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          head: ${ .input.head }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+          release: false
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P4
+        freesynergy.net:adr: '0074, 0084'
+        freesynergy.net:summary: "Step 12 - sub-workflow frontend-round.yaml in its fixed order: block assignment (baustein-zuordnung), then the look (style analysis), then composition, then the objective menue-vergleich against the dossier; red there goes back inside that flow. It holds the pictures and the one review per head, so the step carries its human gate. Input `release: false`: frontend-round does NOT release here; the one release comes in the step `release` after language, security and packages."
+  - sprache:
+      call: texts-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P4
+        freesynergy.net:adr: '0057, 0074 (blocks only; accessibility: [kein ADR])'
+        freesynergy.net:summary: "Step 13 - language and accessibility: every fixed text of program and Frontend as an MF2 message in German and English (ADR 0057, not Fluent), accessible names, roles and keyboard use for every block. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step sprache, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - texte-check:
+      call: texts-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { texte: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P4
+        freesynergy.net:adr: '0057'
+        freesynergy.net:summary: "Script - the gate texts-check: no fixed text left, every message in de and en, valid MF2. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - a11y-check:
+      call: a11y-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { a11y: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P4
+        freesynergy.net:adr: '0074 (blocks only; accessibility has no ADR of its own: [kein ADR])'
+        freesynergy.net:summary: "Script - every interactive element has an accessible name and role and can be reached by keyboard. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - sprache-again:
+      switch:
+        - runden:
+            when: '${ ($context.texte.red and ($context.texte.runde // 0) >= 3) or ($context.a11y.red and ($context.a11y.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.texte.red or $context.a11y.red }'
+            then: sprache
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P4
+        freesynergy.net:adr: '0057, 0074 (blocks only; accessibility: [kein ADR])'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red texts or red accessibility go back to sprache."
+  - hub-adapter:
+      call: hub-adapter-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0082, 0056, 0068'
+        freesynergy.net:summary: "Step 14 - registration at the hub and the fs-server adapter (ADR 0082): rights through Kanidm groups (a Kanidm flat list where it must, ADR 0056), settings readable and settable from outside, online. Agents work ONLY locally against test instances and mocks; nothing on a real server, no SSH or root for an agent; the script for a real run is written for the human. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step hub-adapter, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - adapter-check:
+      call: adapter-test:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { adapter: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0082'
+        freesynergy.net:summary: "Script - the adapter tests run against a local test instance (a temporary home and ports), no remote target in the configuration; red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - adapter-again:
+      switch:
+        - runden:
+            when: '${ ($context.adapter.red and ($context.adapter.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.adapter.red }'
+            then: hub-adapter
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0082'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to hub-adapter."
+  - sicherheit:
+      call: security-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0054, 0056, 0067'
+        freesynergy.net:summary: "Step 15 - security and privacy: AI participants are marked and can be shut out completely (ADR 0054), agents are never admin and run in their own sandbox (ADR 0056), secrets only through the vault fs-vault (ADR 0067), nothing secret in the repo; personal data as in the privacy notes of the program. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step sicherheit, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - sicherheit-check:
+      call: security-check:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { sicherheit: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0054, 0056, 0067'
+        freesynergy.net:summary: "Script - secret scan of the repo green, no secret outside the vault interface, the participant mark and the shut-out command exist; red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - sicherheit-again:
+      switch:
+        - runden:
+            when: '${ ($context.sicherheit.red and ($context.sicherheit.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.sicherheit.red }'
+            then: sicherheit
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0067'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to sicherheit."
+  - pakete:
+      call: package-ai:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0077, 0068'
+        freesynergy.net:summary: "Step 16 - packages and catalog: rpm and deb, the catalog entry with `kind` (ADR 0077) and provides/requires (ADR 0068), documentation and help in German and English (official docs always current), release notes for release-flow. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step pakete, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
+  - pakete-check:
+      call: check-docs:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { pakete: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0077'
+        freesynergy.net:summary: "Script - check-docs on the documentation (de and en), the catalog entry validates against the schema, the packages build and install in a temporary root; red otherwise. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
+  - pakete-again:
+      switch:
+        - runden:
+            when: '${ ($context.pakete.red and ($context.pakete.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.pakete.red }'
+            then: pakete
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0077'
+        freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to pakete."
+  - release:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: release-flow
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          tag: ${ .input.tag }
+          prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0077'
+        freesynergy.net:summary: "After language, security and packages (the Frontend round did not release, `release: false`): release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge, push or tag. The documentation moves along inside release-flow (its step `doku`, rule doku-mitziehen, before the review; the docs main branch is pushed there only after the approval), so programm-neu has no own `doku` step."
+  - server-lauf:
+      call: server-run-human:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P5
+        freesynergy.net:adr: '0082, 0079'
+        freesynergy.net:summary: Only after the release, the person runs the script of hub-adapter on the real server (VPS or home PC, with or without a domain) and logs it; no agent ever has SSH or root there, the workflow part itself runs without AI. Skipped by the person when the program needs no server. The result of the run is what it is (subjective).
+  - abnahme:
+      call: user-acceptance:0.0.8@fs
+      with:
+        programm: ${ .input.programm }
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { abnahme: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P6
+        freesynergy.net:adr: '0074'
+        freesynergy.net:summary: "Step 17 - acceptance by the user: the user clicks through the working flows of the dossier in the installed Frontend (picture-acceptance helps with pictures) and says what is wrong; the result is `befunde` (a list, empty when accepted). A verdict, so subjective; no agent decides it."
+  - abnahme-again:
+      switch:
+        - offen:
+            when: '${ $context.abnahme.befunde != null and ($context.abnahme.befunde | length) > 0 }'
+            then: befunde
+        - angenommen:
+            then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P6
+        freesynergy.net:adr: '0074'
+        freesynergy.net:summary: "Control flow - findings go to the bugfix flow and back to the acceptance, an empty list ends the flow."
+  - befunde:
+      for:
+        each: befund
+        in: ${ $context.abnahme.befunde }
+      do:
+        - bugfix:
+            run:
+              workflow:
+                namespace: freesynergy.net
+                name: bugfix
+                version: 0.0.8
+              input:
+                finding: ${ $befund }
+                tag: ${ .input.tag }
+                repo: ${ .input.repo }
+                branch: ${ .input.branch }
+                head: ${ .input.head }
+                delta: ${ .input.delta }
+                docs: ${ .input.docs }
+                docs_base: ${ .input.docs_base }
+                old: ${ .input.old }
+                new: ${ .input.new }
+                allow: ${ .input.allow }
+      then: abnahme
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:phase: P6
+        freesynergy.net:adr: '0074'
+        freesynergy.net:summary: "Every finding of the acceptance runs through bugfix.yaml (reproduce, fix, gates, release-flow) with the user's words as the finding; afterwards the user accepts again."
+  - facette-abzweig:
+      set:
+        todo: facette-abzweig
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0061, 0076'
+        freesynergy.net:summary: "TODO - outcome Facette: the flow `facette-anlegen` does NOT exist yet and is not invented here; the strategy session writes it (workflow-pflege), until then the person decides by hand. This flow ends."
+  - modul-abzweig:
+      set:
+        todo: modul-abzweig
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0076, 0084'
+        freesynergy.net:summary: "TODO - outcome Modul: no flow for a module exists yet (pattern ADR 0084: one block with modules); the strategy session writes it (workflow-pflege), until then the person decides by hand. This flow ends."
+  - suite-abzweig:
+      set:
+        todo: suite-abzweig
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0076, 0068'
+        freesynergy.net:summary: "Outcome Suite: split into its programs and run programm-neu once per program; the person does the split. This flow ends."
+  - katalog-fehler:
+      set:
+        todo: katalog-fehler
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0068'
+        freesynergy.net:summary: "The catalog lookup (step 2) failed (`fehler`); the person looks at the catalog and decides by hand; a failed lookup is neither green nor `neu`. This flow ends."
+  - vorhanden-bericht:
+      set:
+        todo: vorhanden-bericht
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0068, 0077'
+        freesynergy.net:summary: "The capability exists already (step 2): the report names the package found; the person decides whether it is used or extended (own workflow) - the gate human carries this, nothing ends unseen. This flow ends."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:phase: P0
+        freesynergy.net:adr: '0076 (no ADR of its own for the escalation rule: [kein ADR])'
+        freesynergy.net:summary: "A check step was red for the third time (`runde` >= 3; a green result inside the loop does not reset the counter): the loop stops and the person decides (what the step asks for may be wrong or not reachable). The report names the step and the last red result. This flow ends."

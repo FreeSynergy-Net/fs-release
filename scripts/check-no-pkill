@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Rule check: no `pkill` / `killall` / `fuser -k` (and no kill fed by `pgrep` / `pidof` / `ps`, directly or through a variable) in the scripts and workflows of this repo.
+
+  python3 -I scripts/check-no-pkill [<folder or file>...]      (default: workflows scripts actions .github crates, relative to the repo root)
+
+A pattern kill ends processes of OTHER agents (several agents share one machine). An agent ends only its OWN processes, through the PID of the
+build-slot.sh process it started itself (`scripts/build-slot.sh ... & pid=$!`, then `kill "$pid"`), never through a name or pattern.
+Only the COMMAND use is red (a line where the command stands at the start of a command: after start of line, `;`, `&`, `|`, `(`, `{`, `$(`,
+`sudo`, `xargs`, `exec`, `env`, `nohup`, `then`, `do`, `else`, a path prefix `/usr/bin/` or `\\`, `command`); prose that names the rule (`no pkill`) is not. rc 0 = clean, rc 1 = red (one line `file:line: text`), rc 2 = bad input.
+"""
+import os
+import re
+import sys
+
+WORDS = "pk" + "ill|kill" + "all"  # written in two pieces so that this file does not name the command at a command position
+PATH_PREFIX = r"(?:\\|/(?:usr/)?(?:local/)?s?bin/|command\s+)?"  # `\pkill`, `/usr/bin/pkill`, `command pkill`
+CMD = re.compile(
+    rf"(?:^|[;&|({{!]|\$\(|\b(?:then|do|else|elif|if|while|until)\b)\s*(?:(?:sudo|xargs|exec|env|nohup|timeout\s+\S+)\s+(?:-\S+\s+)*)*{PATH_PREFIX}(?:{WORDS})(?:\s|$)"
+)
+FUSER = re.compile(r"(?:^|[;&|({!]|\$\(|\b(?:then|do|else|elif)\b)\s*(?:sudo\s+)?(?:/\S*/)?fuser\s+(?:-\S+\s+)*-\w*k")
+FINDER = r"(?:pgrep|pidof)"
+# a kill fed by a name lookup on ONE line: kill $(pgrep ..), kill `pidof ..`, pgrep .. | xargs kill, ps .. | xargs kill, `for p in $(pgrep ..); do kill $p`
+PGREP_KILL = re.compile(
+    rf"\bkill\b[^\n#]*(?:\$\(|`)\s*{FINDER}(?=\s+[^\s`])|\b{FINDER}\b[^\n#]*\|\s*xargs\s+(?:-\S+\s+)*kill\b|\bps\b[^\n#]*\|\s*xargs\s+(?:-\S+\s+)*kill\b"
+    rf"|\b{FINDER}\b[^\n#]*[;&]\s*kill\b|\bkill\b[^\n#]*\bfor\s+\w+\s+in\b[^\n#]*{FINDER}\b"
+)
+# a variable that holds the result of a name lookup (`x=$(pgrep ..)`, `for p in $(pidof ..)`) and is later given to kill
+LOOKUP_VAR = re.compile(rf"(?:\b(\w+)=(?:\$\(|`)\s*{FINDER}\b|\bfor\s+(\w+)\s+in\b[^\n#]*(?:\$\(|`)\s*{FINDER}(?=\s+[^\s`]))")
+SELF = {"check-no-pkill", "test_check_no_pkill.sh"}  # the check and its self test name the commands on purpose
+SKIP_DIRS = {".git", "target", "node_modules", "wt"}
+DEFAULT = ["workflows", "scripts", "actions", ".github", "crates"]
+TEXT_SUFFIXES = (".sh", ".py", ".yaml", ".yml", ".rs", ".toml", ".md", "")
+
+
+def files(paths):
+    for p in paths:
+        if os.path.isfile(p):
+            yield p
+            continue
+        for base, dirs, names in os.walk(p):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+            for n in names:
+                if n in SELF:
+                    continue
+                if os.path.splitext(n)[1] in TEXT_SUFFIXES:
+                    yield os.path.join(base, n)
+
+
+def scan(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return
+    lookup_vars = set()
+    for i, line in enumerate(lines, 1):
+        code = line.lstrip()
+        if code.startswith("#") or code.startswith("//"):
+            continue
+        # a command in a YAML value or a shell line: look at the text after `run:`, `- ` or the line itself
+        text = re.sub(r"^\s*(?:-\s+)?(?:run|command|cmd):\s*", "", line)
+        for m in LOOKUP_VAR.finditer(text):
+            lookup_vars.add(m.group(1) or m.group(2))
+        by_var = any(re.search(rf"\bkill\b[^\n#]*\$\{{?{re.escape(v)}\b", text) for v in lookup_vars)
+        if CMD.search(text) or FUSER.search(text) or PGREP_KILL.search(text) or by_var:
+            yield i, line.strip()
+
+
+def main(argv):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    paths = argv or [os.path.join(root, d) for d in DEFAULT if os.path.exists(os.path.join(root, d))]
+    for p in paths:
+        if not os.path.exists(p):
+            print(f"bad input: {p} does not exist")
+            return 2
+    red = 0
+    for f in sorted(set(files(paths))):
+        for i, text in scan(f):
+            print(f"red: {f}:{i}: {text}")
+            red += 1
+    if red:
+        print(f"{red} pattern kill(s): end only your own processes through the PID of your build-slot.sh process")
+        return 1
+    print("ok: no pattern kill")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

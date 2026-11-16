@@ -1,0 +1,318 @@
+# An upstream program has a new release: check it (severity, tag to commit, signature state), pin it in the mirror, check capabilities against the new book,
+# review, tag and push, start the mirror build by hand, publish the draft as Pre-release, raise in the catalog. Security fixes (high, critical) go first.
+# Agents never push, tag or merge. The mirror build only makes a DRAFT; publishing is a step of its own.
+# Order: `Workflow upstream-update, step check-upstream, parameters upstream, repo, from, book, branch, delta, docs, docs_base, old, new, allow` (the last five feed `doku`; `head` only on re-entry at step `head` or `review`).
+# `head` is the commit hash of the mirror branch under review (never a branch name); it is created by `pin` and resolved by the step `head`; the input `head` exists only when the run re-enters at `head` or `review`. The YES of the review is bound to exactly this hash. An escalation of `doku` ends in `upstream-eskalation`; the docs main branch is pushed only after the approval (`doku-veroeffentlichen`). FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: upstream-update
+  version: 0.0.8
+  title: Take over a new upstream release into the mirror and the catalog, security fixes first
+do:
+  - check-upstream:
+      call: check-upstream:0.0.8@fs
+      with:
+        upstream: ${ .input.upstream }
+        repo: ${ .input.repo }
+      export:
+        as: '${ $context + { upstream: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Is there a new upstream tag? Read the release text and the security advisories (gh api, read only), rate the severity (critical, high, medium, low, none), resolve tag to commit (gh api, the commit the tag points to, not the tag object), look at the signature state of tag and commit (unsigned stays unsigned, a change is reported). Output - tag, commit, date, severity, advisory ids, signature state. High or critical severity goes first.
+  - compare:
+      call: compare-versions:0.0.8@fs
+      with:
+        from: ${ .input.from }
+        to: ${ $context.upstream.tag }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: gh api compare from...to (read only) - do the build toolchain (rust-toolchain, MSRV), the dependencies (Cargo.lock) or the build profile change? The answer goes into the report and decides whether mirror.yml needs a change.
+  - pin:
+      call: pin-mirror:0.0.8@fs
+      with:
+        tag: ${ $context.upstream.tag }
+        commit: ${ $context.upstream.commit }
+        released: ${ $context.upstream.released }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Sets mirror.toml (version, released, tag, commit, artefact names, container note), the capabilities.toml sources and version, scripts and tests that carry the old version, and the README; adds the security note (severity, advisory, fixed in). Only the pinned commit counts; never an unresolved tag.
+  - capabilities-check:
+      call: capabilities-check:0.0.8@fs
+      with:
+        book: ${ .input.book }
+        tag: ${ $context.upstream.tag }
+      export:
+        as: '${ $context + { capabilities: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Every capability line is checked against the book of the NEW version (page and sentence quoted in the report); a line the book does not show is marked 'not proven', never guessed; a changed support value (yes, no, unstable) is reported and decided in the review.
+  - docs:
+      call: docs-sync:0.0.8@fs
+      with:
+        languages: [de, en]
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: docs/de and docs/en are generated and adapted together (mirror.md, capabilities.md, date of the check); both languages say the same.
+  - local-gates:
+      call: repo-gates:0.0.8@fs
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The local gates of the repo (verify-mirror selftest, repo_tool.py checks, rust rules where they apply), once per head.
+  - back-to-pin:
+      switch:
+        - rounds:
+            when: '${ $context.gates.red and ($context.gates.runde // 0) >= 3 }'
+            then: upstream-eskalation
+        - red:
+            when: '${ $context.gates.red }'
+            then: pin
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a red gate goes back to pin with the findings as the order; the red rounds are counted (`runde`), from the third one the flow ends in `upstream-eskalation`; green goes on to the review.
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml after the local gates: mirror.md, capabilities.md and the pages that name the version are in step with the pin (de and en); without a matching docs change the gate is RED and the flow does not reach the review."
+  - doku-weiter:
+      switch:
+        - eskaliert:
+            when: '${ $context.doku.eskaliert == true or $context.doku.status != "green" }'
+            then: upstream-eskalation
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review. Only green goes on."
+  - head:
+      call: resolve-head:0.0.8@fs
+      with:
+        branch: ${ .input.branch }
+      export:
+        as: '${ $context + { kopf: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Resolves the branch to the commit hash of its tip (git rev-parse, read only; the output is the object `{ head: <sha> }`, kept as `$context.kopf`) after the local gates. In a run from step 1 there is no input `head` (the head only exists since `pin`): the resolved hash is `$context.kopf.head`. Only when the run re-enters at `head` or `review` and the input `head` is given must the hash equal it, otherwise the flow stops. From here on only this hash counts, never the branch name."
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          head: ${ $context.kopf.head }
+          delta: ${ .input.delta }
+          scope: delta
+      export:
+        as: '${ $context + { review: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Sub-workflow review.yaml (review-request, review, verdict, bind) for exactly the head hash of step `head` - Strategy (Opus) reviews the delta and answers YES or NO bound to this hash, the approval file is written for it. A security fix with severity high or critical is reviewed the same day. Without the YES nothing is tagged, pushed or published.
+  - review-again:
+      switch:
+        - rounds:
+            when: '${ $context.review.verdict == "NEIN" and ($context.review.runde // 0) >= 3 }'
+            then: upstream-eskalation
+        - nein:
+            when: '${ $context.review.verdict == "NEIN" }'
+            then: pin
+        - ja:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a NO goes back to pin with the findings of BERICHT.md as the order; from the third NO (`runde`) the flow ends in `upstream-eskalation`; a YES goes on to the tag.
+  - tag:
+      call: tag:0.0.8@fs
+      with:
+        head: ${ $context.kopf.head }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Annotated tag v<version> of the mirror on the approved head hash (the approval file of exactly this hash must exist, as in release-flow), locally.
+  - push:
+      call: push:0.0.8@fs
+      with:
+        head: ${ $context.kopf.head }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: preapproved-list
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Branch release-<version> and tag, never forced; the repo must be on the pre-approved list (as in release-flow); agents never push, the coordinator does.
+  - start-build:
+      call: dispatch-workflow:0.0.8@fs
+      with:
+        workflow: mirror.yml
+        inputs:
+          draft_release: true
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: preapproved-list
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The coordinator starts the mirror build by hand (workflow_dispatch of mirror.yml with draft_release=true); the build does not start by itself. It builds from source at the pinned commit (refuses if the tag no longer resolves to it), adds source tarball and SBOM, signs, and creates a DRAFT release only.
+  - wait-build:
+      try:
+        - warten:
+            listen:
+              to:
+                one:
+                  with:
+                    type: net.freesynergy.ci.green
+                    subject: ${ $context.kopf.head }
+            timeout:
+              after:
+                hours: 2
+      catch:
+        errors:
+          with:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/timeout
+        do:
+          - build-ohne-ergebnis:
+              set:
+                timeout: true
+              export:
+                as: '${ $context + { build: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: The flow waits for the CI result of exactly this run of mirror.yml (the event carries the head hash as subject; an event of another head is ignored). A red run sends no green event; the timeout of 2 hours is an error of the task and is caught here (`try`/`catch` on the timeout error, SW 1.0) - it sets `build.timeout`, and the next step `build-weiter` sends the flow to `upstream-eskalation`; nothing is published.
+  - build-weiter:
+      switch:
+        - zeit:
+            when: '${ $context.build.timeout == true }'
+            then: upstream-eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - no green CI event of this head within 2 hours means `upstream-eskalation` (the person decides); a green event goes on to the Pre-release.
+  - publish:
+      call: publish-release:0.0.8@fs
+      with:
+        from: draft
+        to: pre-release
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: mirror.yml never publishes. The person or the coordinator turns the draft into a Pre-release, only with the YES of strategy or the user for exactly this head; this is a step of its own, not a pipeline behaviour.
+  - doku-veroeffentlichen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: publish-doc
+          version: 0.0.8
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, only AFTER the review (opus-ja) and the approval of the code, together with its merge; never before, never forced; the agent never pushes."
+  - catalog-entry:
+      call: catalog-entry:0.0.8@fs
+      with:
+        program: ${ .input.upstream }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Is the program in the catalog already? If not, the entry is created first (decision of strategy). fs-kanidm has had no release and no catalog entry so far - the first run creates both.
+  - catalog-bump:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: catalog-bump
+          version: 0.0.8
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Sub-workflow catalog-bump after the Pre-release is published, behind the approval, public reach only (as in release-flow).
+  - catalog-check:
+      call: check:0.0.8@fs
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Looks at the catalog like a user - fresh clone, signature, the new version is in it and the old one is no longer offered as current.
+  - upstream-eskalation:
+      set:
+        todo: upstream-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The gates or the review were red three times, the mirror build was red, or it gave no result in time; the person decides what is wrong. This flow ends, nothing is tagged, pushed or published.

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# workspace-test-background - the full workspace test run as an end gate, in the BACKGROUND, bound to ONE head, with a defined result file.
+#
+#   workspace-test-background start --repo DIR --head HASH
+#   workspace-test-background wait  --repo DIR --head HASH [--timeout SECONDS]   (default 7200)
+#
+# start  checks that the head of DIR is exactly HASH (else rc 2), takes a lock for HASH and starts `build-slot.sh cargo test --workspace`
+#        detached (setsid), then returns at once. Prints one JSON line {"started": true, "head": ..., "result": <file>}.
+#        Starting again for a head that is running or has a GREEN result is not a second run (prints {"started": false, ...}). A RED result of the
+#        same head is run again and counted (`runde` rises), so a fix without a new commit ends in `runde` 3 and the escalation of the caller.
+# wait   blocks WITHOUT a polling loop (flock on the lock of the run, with a timeout) until the run of exactly this head is over, then prints
+#        the result JSON: {"head", "red" (bool), "runde" (red full runs of this REPO in a row, over several heads; a fix makes a new head, the count goes on; green resets it), "seconds", "exit", "summary" (the last
+#        `test result` line only, never the whole log)}. rc 0 = result printed (red or not: read `red`), rc 3 = timeout (no result, never green),
+#        rc 2 = bad input, not started, head changed, or the run ended without a result (never green).
+# Result file: $XDG_STATE_HOME/freesynergy/test-bg/<HASH>.json (folder 0700, files 0600, written atomically, never through a symlink);
+# the full log is <HASH>.log in the same folder and is never printed.
+# Environment: BUILD_SLOT_SH (default /srv/FreeSynergy/.scratch/build-slot.sh), TEST_BG_DIR (folder, default as above).
+set -euo pipefail
+
+die() { echo "workspace-test-background: $*" >&2; exit 2; }
+[ "$#" -ge 1 ] || die "usage: $0 start|wait --repo DIR --head HASH [--timeout SECONDS]"
+mode="$1"; shift
+repo="" head="" tmo=7200
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo) repo="${2:-}"; shift 2 ;;
+    --head) head="${2:-}"; shift 2 ;;
+    --timeout) tmo="${2:-}"; shift 2 ;;
+    *) die "unknown argument $1" ;;
+  esac
+done
+[[ "$head" =~ ^[0-9a-f]{7,64}$ ]] || die "--head must be a hex commit hash"
+[[ "$tmo" =~ ^[0-9]+$ ]] || die "--timeout must be a number of seconds"
+[ -d "$repo" ] || die "--repo is not a folder"
+real="$(git -C "$repo" rev-parse HEAD 2>/dev/null)" || die "--repo is not a git repo"
+case "$real" in "$head"*) ;; *) die "the head of the repo is $real, not $head (the result is bound to one head)" ;; esac
+head="$real"
+
+state="${TEST_BG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/freesynergy/test-bg}"
+mkdir -p "$state"
+[ ! -L "$state" ] || die "state folder is a symlink"
+chmod 700 "$state"
+lock="$state/$head.lock"; result="$state/$head.json"; log="$state/$head.log"; rkey="$(printf %s "$(cd "$repo" && pwd -P)" | sha256sum | cut -c1-16)"; runs="$state/runs-$rkey"
+for f in "$lock" "$result" "$log" "$runs"; do [ ! -L "$f" ] || die "$f is a symlink"; done
+
+case "$mode" in
+start)
+  slot="${BUILD_SLOT_SH:-/srv/FreeSynergy/.scratch/build-slot.sh}"
+  [ -x "$slot" ] || die "build-slot.sh not found ($slot)"
+  exec 9>"$lock"
+  # running (lock held) = no second run; a GREEN result of this head = no second run (nothing to repeat)
+  if ! flock -n 9 || { [ -s "$result" ] && ! grep -q '"red": true' "$result"; }; then
+    printf '{"started": false, "head": "%s", "result": "%s"}\n' "$head" "$result"; exit 0
+  fi
+  # a RED result of the same head is run again and counted (`runde` goes on): a fix that made no new commit cannot loop for ever, the third red run
+  # of the repo is `runde` 3 and the caller escalates
+  rm -f "$result"
+  # the child keeps fd 9 (and so the lock) until the run is over
+  # shellcheck disable=SC2016  # the inner script is single-quoted on purpose
+  setsid bash -c '
+    slot="$1"; repo="$2"; head="$3"; result="$4"; log="$5"; runs="$6"
+    t0=$(date +%s)
+    ( cd "$repo" && "$slot" cargo test --workspace ) >"$log" 2>&1; rc=$?
+    secs=$(( $(date +%s) - t0 ))
+    sum="$(grep -E "^test result:" "$log" | tail -n 1 | cut -c1-300 || true)"
+    if [ "$rc" -eq 0 ]; then echo 0 >"$runs"; r=0; else n=0; [ -f "$runs" ] && n="$(cat "$runs" 2>/dev/null || echo 0)"; r=$((n + 1)); echo "$r" >"$runs"; fi
+    python3 -I - "$head" "$rc" "$r" "$secs" "$sum" "$result" <<PY
+import json, os, sys
+head, rc, r, secs, summ, out = sys.argv[1:]
+data = {"head": head, "red": rc != "0", "runde": int(r), "seconds": int(secs), "exit": int(rc), "summary": summ}
+tmp = out + ".tmp"
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+with os.fdopen(fd, "w") as f:
+    json.dump(data, f)
+os.replace(tmp, out)
+PY
+  ' _ "$slot" "$repo" "$head" "$result" "$log" "$runs" 9>&9 </dev/null >/dev/null 2>&1 &
+  disown || true
+  printf '{"started": true, "head": "%s", "result": "%s"}\n' "$head" "$result"
+  ;;
+wait)
+  [ -e "$lock" ] || die "no run was started for $head"
+  exec 9>"$lock"
+  if ! flock -w "$tmo" 9; then echo "workspace-test-background: timeout after ${tmo}s for $head" >&2; exit 3; fi
+  [ -s "$result" ] || die "the run of $head ended without a result file (never green)"
+  cat "$result"; echo
+  ;;
+*) die "mode must be start or wait" ;;
+esac

@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+# Self test of scripts/doku-mitziehen with small git fixtures (a code repo and a docs clone, a fake mkdocs on PATH):
+# green, code without docs, only one language, old name left over (and allowed), new name missing, broken link, mkdocs missing,
+# round counter up to rc 3 and the reset on green, bad input. Counter-checks: every rule must really turn the gate red.
+#   bash scripts/test_doku_mitziehen.sh
+set -uo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+tool=(python3 -I "$here/doku-mitziehen" --program fs-test)
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+fails=0
+g() { git -c user.name=t -c user.email=t@example.org -c commit.gpgsign=false "$@"; }
+
+mkdir -p "$tmp/bin"
+printf '#!/bin/sh\nexit 0\n' >"$tmp/bin/mkdocs"
+chmod +x "$tmp/bin/mkdocs"
+export FS_MKDOCS_VENV=/nonexistent/mkdocs  # the .venv of fs-documentation must not leak into the fixtures
+mkdir -p "$tmp/empty"
+ln -s "$(command -v git)" "$tmp/empty/git"
+py="$(command -v python3)"
+
+mkrepos() { # mkrepos <dir>: <dir>/code and <dir>/docs, one commit each; prints nothing
+  mkdir -p "$1/code" "$1/docs/docs/de" "$1/docs/docs/en"
+  (cd "$1/code" && g init -q . && echo a >a.rs && g add . && g commit -q -m base)
+  (cd "$1/docs" && g init -q . && mkdir -p todo/checklisten &&
+    printf '# fs-test\n- [x] **GRUNDSACHE** first (commit abc1234)\n- [ ] **GRUNDSACHE** second\n' >todo/checklisten/fs-test.md && echo "# Alt fs-old" >docs/de/a.md && echo "# Old fs-old" >docs/en/a.md &&
+    echo "site_name: x" >mkdocs.yml && g add . && g commit -q -m base)
+}
+base() { g -C "$1" rev-parse HEAD; }
+
+expect() { # expect <rc> <needle or -> <name> <dir> -- extra args...
+  local want="$1" needle="$2" name="$3" dir="$4"
+  shift 5
+  local out rc
+  out="$(PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$dir/docs" --docs-base "$DB" --code "$dir/code" --code-base "$CB" \
+    --state "$dir/state" "$@" 2>&1)"
+  rc=$?
+  if [ "$rc" -ne "$want" ] || { [ "$needle" != "-" ] && ! grep -qF -- "$needle" <<<"$out"; }; then
+    echo "FAIL $name: rc=$rc (want $want), needle '$needle'"
+    printf "    %s\n" "${out//$'\n'/$'\n    '}"
+    fails=$((fails + 1))
+  else
+    echo "ok   $name"
+  fi
+}
+
+fresh() { # fresh <name>: new fixture dir in $d, bases in DB/CB
+  d="$tmp/$1"
+  mkrepos "$d"
+  DB="$(base "$d/docs")"
+  CB="$(base "$d/code")"
+}
+code_change() { (cd "$d/code" && echo b >>a.rs && g commit -q -am change); }
+docs_both() { (cd "$d/docs" && echo "neu fs-new" >>docs/de/a.md && echo "new fs-new" >>docs/en/a.md &&
+  echo '- [x] **GRUNDSACHE** third (commit def5678)' >>todo/checklisten/fs-test.md && g commit -q -am docs); }
+docs_nolist() { (cd "$d/docs" && echo "neu fs-new" >>docs/de/a.md && echo "new fs-new" >>docs/en/a.md && g commit -q -am docs); }
+
+fresh green; code_change; docs_both
+expect 0 "green" "green: code and both languages of the docs changed" "$d" -- --new fs-new
+
+fresh nolist; code_change; docs_nolist
+expect 1 "checklist todo/checklisten/fs-test.md was not updated" "red: docs changed, but not the checklist of the program" "$d" -- --new fs-new
+
+fresh noproof; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** fourth without proof' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "ticked without a proof" "red: ticked without a proof" "$d" --
+
+# C3: the proof must be a real one - a remark in parentheses, a short hex word or a capital [X] without a proof is RED
+fresh remark; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** fifth (z. B. fs-text "gespeichert")' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: a remark in parentheses is no proof" "$d" --
+
+fresh shorthex; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** sixth (abc12)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: 5 hex characters are no proof (K3, own case)" "$d" --
+
+fresh hexword; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** seventh (defaced)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: a hex-only word without a digit is no proof (K3, own case)" "$d" --
+
+fresh hex6; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** seventh b (abc1234)' >>todo/checklisten/fs-test.md && echo '- [x] **GRUNDSACHE** six (abc123)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 ":6 is ticked without a proof" "red: exactly 6 hex characters are no proof, 7 are (line 5 ok, line 6 red)" "$d" --
+
+fresh bigx; code_change; docs_both
+(cd "$d/docs" && echo '- [X] **GRUNDSACHE** eighth' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: capital [X] without a proof is checked like [x]" "$d" --
+
+fresh goodproofs; code_change; docs_both
+(cd "$d/docs" && printf '%s\n' '- [x] **GRUNDSACHE** tag (tag v0.0.7)' '- [X] **GRUNDSACHE** picture (Bild bilder/start.png)' '- [x] **GRUNDSACHE** hash (commit 0123abcdef0123abcdef0123abcdef0123abcdef)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 0 "green" "green: tag, picture path and long commit hash are proofs" "$d" --
+
+fresh dropped; code_change; docs_both
+(cd "$d/docs" && sed -i '/first (commit abc1234)/d' todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "a ticked item was removed" "red: a ticked item was removed" "$d" --
+
+fresh nofile; code_change; docs_both
+(cd "$d/docs" && g rm -q todo/checklisten/fs-test.md && g commit -q -m p)
+expect 1 "its checklist todo/checklisten/fs-test.md does not exist" "red: no checklist file" "$d" --
+
+fresh nodocs; code_change
+expect 1 "documentation did not" "red: code changed, docs not" "$d" --
+
+fresh onelang; code_change
+(cd "$d/docs" && echo x >>docs/de/a.md && g commit -q -am de)
+expect 1 "docs/en/a.md did not" "red: only the German page changed" "$d" --
+
+fresh oldname; code_change; docs_both
+expect 1 "old name 'fs-old' still in docs/de/a.md:1" "red: old name left over" "$d" -- --old fs-old
+expect 0 "green" "green: old name only in an allowed history file" "$d" -- --old fs-old --allow 'docs/*/a.md'
+
+fresh newname; code_change; docs_both
+expect 1 "new name 'fs-zzz' appears nowhere" "red: new name missing" "$d" -- --new fs-zzz
+
+fresh link; code_change; docs_both
+(cd "$d/docs" && echo "see [x](nowhere.md#a)" >>docs/de/a.md && echo "see [x](a.md)" >>docs/en/a.md && g commit -q -am l)
+expect 1 "broken link 'nowhere.md' in docs/de/a.md" "red: broken link" "$d" --
+
+fresh nomk; code_change; docs_both
+out="$(PATH="$tmp/empty" "$py" -I "$here/doku-mitziehen" --program fs-test --docs "$d/docs" --docs-base "$DB" --code "$d/code" \
+  --code-base "$CB" --state "$d/state" 2>&1)"
+rc=$?
+if [ "$rc" -eq 2 ] && grep -qF "was NOT run" <<<"$out"; then echo "ok   mkdocs missing is skipped, never green"; else
+  echo "FAIL mkdocs missing: rc=$rc"; echo "$out"; fails=$((fails + 1)); fi
+
+fresh newword; code_change; docs_both
+expect 1 "new name 'fs-ne' appears nowhere" "red: new name only as the start of a longer name (fs-new)" "$d" -- --new fs-ne
+
+fresh mkred; code_change; docs_both
+mkdir -p "$tmp/binred"
+# shellcheck disable=SC2016
+printf '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\necho "ERROR broken nav" >&2\nexit 1\n' >"$tmp/binred/mkdocs"
+chmod +x "$tmp/binred/mkdocs"
+out="$(PATH="$tmp/binred:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"
+rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "mkdocs build --strict failed" <<<"$out"; then echo "ok   red: mkdocs build fails"; else
+  echo "FAIL mkdocs build red: rc=$rc"; echo "$out"; fails=$((fails + 1)); fi
+
+# a git worktree: `.git` is a file there; the default state file must still work (rc 0, JSON with status green)
+fresh wt; code_change; docs_both
+g -C "$d/docs" worktree add -q "$d/wt" -b wtbranch
+out="$(PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/wt" --docs-base "$DB" --code "$d/code" --code-base "$CB" --json "$d/wt.json" 2>&1)"
+rc=$?
+if [ "$rc" -eq 0 ] && grep -qF '"status": "green"' "$d/wt.json"; then echo "ok   green in a git worktree without --state"; else
+  echo "FAIL worktree: rc=$rc"; echo "$out"; fails=$((fails + 1)); fi
+rm -f "$(g -C "$d/wt" rev-parse --absolute-git-dir)/doku-mitziehen-runde"
+
+# the JSON of a skipped run is never green (the flow keys on status == green)
+fresh skipjson; code_change; docs_both
+PATH="$tmp/empty" "$py" -I "$here/doku-mitziehen" --program fs-test --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" \
+  --state "$d/state" --json "$d/skip.json" >/dev/null 2>&1
+if grep -qF '"status": "skipped"' "$d/skip.json"; then echo "ok   skipped run writes status skipped"; else
+  echo "FAIL skipped json"; fails=$((fails + 1)); fi
+"${tool[@]}" --docs "$d/docs" --docs-base nothere --json "$d/bad.json" >/dev/null 2>&1
+if grep -qF '"status": "skipped"' "$d/bad.json"; then echo "ok   bad input writes status skipped"; else
+  echo "FAIL bad json"; fails=$((fails + 1)); fi
+
+fresh rounds; code_change
+expect 1 "runde=1" "round 1 red" "$d" --
+expect 1 "runde=2" "round 2 red" "$d" --
+expect 3 "runde=3" "round 3 red escalates" "$d" --
+docs_both
+expect 0 "runde=0" "green resets the counter" "$d" --
+
+fresh bad
+expect 2 "bad input" "bad base hash" "$d" -- --docs-base nothere
+out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ]; then echo "ok   --code without --code-base"; else echo "FAIL code-base pairing rc=$rc"; fails=$((fails + 1)); fi
+
+# the default state file (in the git folder of docs) is never written through a symlink
+fresh sym; code_change; docs_both
+sf="$(g -C "$d/docs" rev-parse --absolute-git-dir)/doku-mitziehen-runde"
+: >"$tmp/victim"; ln -s "$tmp/victim" "$sf"
+PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --json "$d/sym.json" >/dev/null 2>&1; rc=$?
+if [ "$rc" -eq 2 ] && [ ! -s "$tmp/victim" ] && grep -qF '"status": "skipped"' "$d/sym.json"; then echo "ok   a symlinked state file is refused (skipped, never green)"; else
+  echo "FAIL symlink state: rc=$rc"; fails=$((fails + 1)); fi
+
+# C4: a glob in a picture path is a proof (`*-de-*.png`)
+fresh glob; code_change; docs_both
+# shellcheck disable=SC2016
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** pictures (`.scratch/wiki-0013-bilder/*-de-*.png` und `*-en-*.png`)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 0 "green" "green: a picture path with * is a proof (C4)" "$d" --
+fresh noglob; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** nothing (*-de-*)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: a bare glob without a file ending is no proof (C4 counter)" "$d" --
+
+# C5: an OLD ticked line without a proof (before the base) never blocks; a NEW or CHANGED one does
+fresh oldline
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** old item (README)' >>todo/checklisten/fs-test.md && g commit -q -am old)
+DB="$(base "$d/docs")"
+code_change; docs_both
+expect 0 "green" "green: an old ticked line without a proof does not block (C5)" "$d" --
+(cd "$d/docs" && sed -i 's/old item (README)/old item reworded (README)/' todo/checklisten/fs-test.md && g commit -q -am rw)
+expect 1 "is ticked without a proof" "red: the same old line CHANGED without a proof is checked (C5 counter)" "$d" --
+
+# R8': the head of the AGENT's branch counts, not the checkout of the repo
+fresh headb
+(cd "$d/code" && g checkout -q -b unreviewed/x && echo b >>a.rs && g commit -q -am change && g checkout -q -)
+docs_both
+expect 0 "green" "green: no code change in the checkout, no --head (the old blind spot)" "$d" --
+expect 1 "documentation did not" "red: --head sees the commit on the branch while main is checked out (R8')" "$d" -- --head unreviewed/x --docs-head "$DB"
+expect 0 "green" "green: --head sees the code and the docs head has the docs" "$d" -- --head unreviewed/x
+expect 2 "bad input" "bad --head ref" "$d" -- --head nope/none
+out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --head HEAD 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ]; then echo "ok   --head without --code"; else echo "FAIL head pairing rc=$rc"; fails=$((fails + 1)); fi
+
+# --docs-head: the docs are read at that commit, not in the working tree
+fresh dhead; code_change; docs_both
+DH="$(base "$d/docs")"
+(cd "$d/docs" && echo "see [x](nowhere.md)" >>docs/de/a.md && echo "see [x](nowhere.md)" >>docs/en/a.md)
+expect 0 "green" "green: --docs-head ignores the dirty working tree (the old state of the branch head is read)" "$d" -- --docs-head "$DH"
+expect 1 "broken link" "red: without --docs-head the working tree is read" "$d" --
+
+# N1: .gitattributes export-ignore / export-subst of the author's branch must not hide the docs from the gate (no `git archive`)
+fresh gattr; code_change; docs_both
+(cd "$d/docs" && echo "kaputt [x](nowhere.md) fs-old" >>docs/de/a.md && echo "broken [x](nowhere.md) fs-old" >>docs/en/a.md &&
+  printf 'docs/** export-ignore\ntodo/** export-ignore\nmkdocs.yml export-ignore\n' >.gitattributes && g add . && g commit -q -am attr)
+DH="$(base "$d/docs")"
+expect 1 "broken link" "red: export-ignore on docs/** does not hide a broken link (--docs-head)" "$d" -- --docs-head "$DH" --old fs-old
+expect 1 "old name 'fs-old' still in docs/de/a.md" "red: export-ignore does not hide the old name (--docs-head)" "$d" -- --docs-head "$DH" --old fs-old
+
+# B1: working-tree-encoding / filter of the author's .gitattributes must not hide the docs (attributes read from the empty tree)
+fresh enc; code_change; docs_both
+(cd "$d/docs" && echo "kaputt [x](nowhere.md) fs-old" >>docs/de/a.md && echo "broken [x](nowhere.md) fs-old" >>docs/en/a.md && g commit -q -am enc1 &&
+  printf 'docs/** working-tree-encoding=UTF-16\ntodo/** filter=lfs\n' >.gitattributes && g add .gitattributes && g commit -q -m enc2)
+DH="$(base "$d/docs")"
+expect 1 "broken link" "red: working-tree-encoding=UTF-16 does not hide a broken link (B1)" "$d" -- --docs-head "$DH" --old fs-old
+expect 1 "old name 'fs-old' still in docs/de/a.md" "red: working-tree-encoding does not hide the old name (B1)" "$d" -- --docs-head "$DH" --old fs-old
+
+# Broken links are RED everywhere the gate reads (counter-checks): in README.md and conventions/ (outside docs/), a missing target file, a link with an anchor to a missing file;
+# a link to an existing file with an anchor is not red.
+fresh linkout; code_change; docs_both
+(cd "$d/docs" && mkdir -p conventions && echo "see [x](gone.md)" >README.md && echo "see [y](../docs/de/missing.md#top)" >conventions/c.md && g add . && g commit -q -am out)
+expect 1 "broken link 'gone.md' in README.md" "red: broken link in README.md (outside docs/)" "$d" --
+expect 1 "broken link '../docs/de/missing.md' in conventions/c.md" "red: broken link with an anchor to a missing file in conventions/" "$d" --
+fresh linkok; code_change; docs_both
+(cd "$d/docs" && echo "see [x](a.md#top) and [y](#here)" >>docs/de/a.md && echo "see [x](a.md)" >>docs/en/a.md && g commit -q -am okl)
+expect 0 "green" "green: a link with an anchor to an existing file" "$d" --
+
+# mkdocs is run WITHOUT the quiet flag and WARNING / ERROR lines are red even with rc 0 (a quiet or blind build hid them)
+mkdir -p "$tmp/binq" "$tmp/binwarn"
+printf '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\nfor a in "$@"; do case "$a" in -q|--quiet) echo "ERROR: -q was given" >&2; exit 1;; esac; done\nexit 0\n' >"$tmp/binq/mkdocs"
+printf '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\necho "INFO    -  Cleaning site directory"\necho "WARNING -  Doc file a.md contains a link to missing.md"\nexit 0\n' >"$tmp/binwarn/mkdocs"
+chmod +x "$tmp/binq/mkdocs" "$tmp/binwarn/mkdocs"
+fresh noq; code_change; docs_both
+out="$(PATH="$tmp/binq:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ]; then echo "ok   mkdocs is called without the quiet flag"; else echo "FAIL mkdocs got the quiet flag: rc=$rc $out"; fails=$((fails + 1)); fi
+out="$(PATH="$tmp/binwarn:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "WARNING -  Doc file a.md" <<<"$out"; then echo "ok   red: a WARNING line of mkdocs with rc 0"; else echo "FAIL mkdocs WARNING line: rc=$rc $out"; fails=$((fails + 1)); fi
+out="$(PATH="$tmp/empty" FS_MKDOCS="$tmp/binwarn/mkdocs" "$py" -I "$here/doku-mitziehen" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "WARNING" <<<"$out"; then echo "ok   FS_MKDOCS (the .venv of fs-documentation) is used when mkdocs is not on PATH"; else echo "FAIL FS_MKDOCS: rc=$rc $out"; fails=$((fails + 1)); fi
+
+# a docs clone that is BEHIND origin/main is skipped (never green) without --docs-head; with --docs-head (a fresh state) it is checked
+fresh behind; code_change; docs_both
+(cd "$d/docs" && g branch -q behind-mark HEAD~1 && g update-ref refs/remotes/origin/main HEAD && echo "newer on main" >todo/x.md && g add . && g commit -q -m mainonly && g update-ref refs/remotes/origin/main HEAD && g reset -q --hard HEAD~1)
+out="$(PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --json "$d/behind.json" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && grep -qF "behind origin/main" <<<"$out" && grep -q '"status": "skipped"' "$d/behind.json"; then echo "ok   a clone behind origin/main is skipped, never green"; else echo "FAIL behind origin/main: rc=$rc $out"; fails=$((fails + 1)); fi
+
+# C1: git older than 2.40 (no `--attr-source`) is `skipped: git too old`, rc 2, status skipped, never green and no vague error (a fake git answers --version)
+realgit="$(command -v git)"
+mkdir -p "$tmp/oldgit"
+printf '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "git version 2.39.5"; exit 0; fi\nexec %s "$@"\n' "$realgit" >"$tmp/oldgit/git"
+chmod +x "$tmp/oldgit/git"
+out="$(PATH="$tmp/oldgit:$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --docs-head "$DH" --json "$d/old.json" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && grep -q 'skipped: git too old' <<<"$out" && grep -q '"status": "skipped"' "$d/old.json" && ! grep -q 'unknown option' <<<"$out"; then echo "ok   git 2.39 is skipped (git too old), rc 2"; else echo "FAIL old git: rc=$rc $out"; fails=$((fails + 1)); fi
+out="$(PATH="$tmp/oldgit:$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --json "$d/old2.json" 2>&1)"; rc=$?
+if [ "$rc" -ne 2 ] || ! grep -q 'git too old' <<<"$out"; then echo "ok   without --docs-head the old git does not matter"; else echo "FAIL old git without --docs-head: rc=$rc $out"; fails=$((fails + 1)); fi
+
+# A3: a symlink of the author's branch is written as a plain text file, never followed
+fresh symb; code_change; docs_both
+(cd "$d/docs" && ln -s "$tmp/victim" docs/de/leak.md && ln -s "$tmp/victim" docs/en/leak.md && g add . && g commit -q -am sym)
+DH="$(base "$d/docs")"
+out="$(PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --docs-head "$DH" --json "$d/symb.json" 2>&1)"
+if [ -z "$(find "$tmp" -maxdepth 1 -name 'doku-mitziehen-*' 2>/dev/null)" ] && ! grep -q 'Traceback' <<<"$out"; then echo "ok   symlink of the branch does not break the gate"; else echo "FAIL symlink branch: $out"; fails=$((fails + 1)); fi
+mkdir -p "$tmp/chk" && (cd "$d/docs" && python3 -I - "$here" "$DH" "$tmp/chk" <<'PY'
+import importlib.machinery, importlib.util, os, sys
+here, dh, dest = sys.argv[1:4]
+loader = importlib.machinery.SourceFileLoader("dm", os.path.join(here, "doku-mitziehen"))
+spec = importlib.util.spec_from_loader("dm", loader)
+m = importlib.util.module_from_spec(spec)
+loader.exec_module(m)
+m.checkout_tree(".", dh, dest)
+p = os.path.join(dest, "docs/de/leak.md")
+sys.exit(0 if os.path.isfile(p) and not os.path.islink(p) else 1)
+PY
+)
+crc=$?
+if [ "$crc" -eq 0 ]; then echo "ok   a symlink is checked out as a text file (A3)"; else echo "FAIL symlink checked out as link"; fails=$((fails + 1)); fi
+
+# K5: --code-base / --docs-base go through resolve(): no option injection
+fresh inj; code_change; docs_both
+out="$("${tool[@]}" --docs "$d/docs" --docs-base="--output=$tmp/pwn5" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && [ ! -e "$tmp/pwn5" ]; then echo "ok   --docs-base option injection refused"; else echo "FAIL docs-base injection rc=$rc"; fails=$((fails + 1)); fi
+out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base="--output=$tmp/pwn5b" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && [ ! -e "$tmp/pwn5b" ] && [ ! -e "$tmp/pwn5b..HEAD" ] && [ ! -e "$d/pwn5b..HEAD" ]; then echo "ok   --code-base option injection refused"; else echo "FAIL code-base injection rc=$rc"; fails=$((fails + 1)); fi
+
+# K6: an open item replaced by a literal copy of an old ticked line (no proof) is red; a vanished open item is red
+fresh k6; code_change; docs_both
+(cd "$d/docs" && sed -i 's/^- \[ \] \*\*GRUNDSACHE\*\* second$/- [x] **GRUNDSACHE** first (commit abc1234)/' todo/checklisten/fs-test.md && g commit -q -am k6)
+expect 1 "" "red: a literal copy of an old tick replaces an open item (K6)" "$d" --
+fresh k6b; code_change; docs_both
+(cd "$d/docs" && sed -i '/\*\*GRUNDSACHE\*\* second$/d' todo/checklisten/fs-test.md && g commit -q -am k6b)
+expect 1 "an open item disappeared" "red: an open item vanished (K6)" "$d" --
+fresh k6c; code_change; docs_both
+(cd "$d/docs" && sed -i 's/^- \[ \] \*\*GRUNDSACHE\*\* second$/- [x] **GRUNDSACHE** second (commit 1234abc)/' todo/checklisten/fs-test.md && g commit -q -am k6c)
+expect 0 "green" "green: an open item ticked with a proof stays fine (K6)" "$d" --
+
+# A2: an open item that foreign work removed BEFORE --docs-base is not red for this agent, even with an older --proof-base
+fresh a2
+(cd "$d/docs" && sed -i '/\*\*GRUNDSACHE\*\* second$/d' todo/checklisten/fs-test.md && g commit -q -am foreign)
+PB="$DB"; DB="$(base "$d/docs")"
+code_change; docs_both
+expect 0 "green" "green: an open item removed before --docs-base is not this agent's problem (A2)" "$d" -- --proof-base "$PB"
+
+# A4: `todo/** -diff` of the docs must not hide a removed tick
+fresh a4; code_change; docs_both
+(cd "$d/docs" && printf 'todo/** -diff\n' >.gitattributes && sed -i '/\*\*GRUNDSACHE\*\* first/d' todo/checklisten/fs-test.md && g add . && g commit -q -am a4)
+expect 1 "a ticked item was removed" "red: -diff in .gitattributes does not hide a removed tick (A4)" "$d" --
+
+if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

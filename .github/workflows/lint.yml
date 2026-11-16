@@ -21,7 +21,19 @@ jobs:
       - name: shellcheck
         run: shellcheck -x -S warning scripts/*.sh templates/site/*.sh scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh actions/*/*.sh
       - name: python
-        run: python3 -I -m py_compile actions/plan/plan.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py scripts/typing-test/summary.py tests/typing-test/caret.py tests/typing-test/glyphs.py
+        run: python3 -I -m py_compile actions/plan/plan.py actions/library-release/notes.py scripts/check-no-pkill scripts/check-mkdocs-quiet scripts/check-signing-env actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py scripts/typing-test/summary.py tests/typing-test/caret.py tests/typing-test/glyphs.py
+  # Released history is never rewritten: this job needs ALL history and tags (a flat clone is "skipped", rc 2, and the job is red). It exists only in
+  # the CI of fs-release itself: the reusable ci.yml / check.yml run in the CALLING repos, keep their flat clone and do not call this script.
+  changelog-released:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+      - name: released CHANGELOG sections equal their tags
+        run: bash scripts/test_changelog_released.sh
   packaging-tests:
     runs-on: ubuntu-24.04
     steps:
@@ -30,7 +42,7 @@ jobs:
           persist-credentials: false
       - name: no composite action calls another fs-release action by a moving ref
         run: |
-          # actions/ must not say `uses: FreeSynergy/fs-release/...@ref` (a pinned action would pull later main states of the
+          # actions/ must not say `uses: FreeSynergy/fs-release/...@<ref>` (a pinned action would pull later main states of the
           # other one): call the shared script by path from $GITHUB_ACTION_PATH instead. Reusable workflows cannot use `./`
           # (it means the caller's repo) and are pinned by scripts/pin-refs.sh at release time.
           if grep -rnE 'uses:[[:space:]]*FreeSynergy/fs-release/' actions; then echo "::error::composite action refers to fs-release by @ref"; exit 1; fi

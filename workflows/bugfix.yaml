@@ -1,10 +1,11 @@
 # A bug report from the user to a release: reproduce red, fix, green, release (the one Opus review sits in release-flow). Agents never push, tag or
-# merge. Order: `Workflow bugfix, step <id>, parameters repo, branch, head, delta, finding` (docs/prompt-template.md). FS profile: see README.md.
+# merge. Order: `Workflow bugfix, step <id>, parameters tag, repo, branch, head, delta, finding` (docs/prompt-template.md). FS profile: see README.md.
+# Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: bugfix
-  version: 0.0.6
+  version: 0.0.8
   title: From a user finding to a fixed and released bug
 do:
   - finding:
@@ -17,7 +18,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's finding (what was done, what was expected, what happened) is taken as it is.
   - reproduce:
-      call: build-ai:0.0.6@fs
+      call: build-ai:0.0.8@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -30,7 +31,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent writes a test that fails for exactly this bug (red); repeat until it is red for the right reason. Commands one at a time ([BASH]), local commits ([COMMIT]).
   - fix:
-      call: build-ai:0.0.6@fs
+      call: build-ai:0.0.8@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -44,7 +45,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent changes the code in its own worktree and commits locally ([COMMIT]); no push, no tag; the report follows [BERICHT] (finding, cause, fix, gates).
   - green:
-      call: gates:0.0.6@fs
+      call: gates:0.0.8@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -71,7 +72,17 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.6
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          tag: ${ .input.tag }
+          prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

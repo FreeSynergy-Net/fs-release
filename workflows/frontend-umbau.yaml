@@ -1,16 +1,18 @@
 # Convert existing building blocks and Frontends to the layers of ADR 0074: theme contract with fixed block names, DTCG tokens, no fixed colors or spacings in blocks or Frontends, arrangement separate. Goal: new Frontends are built quickly from blocks.
 # The ADR is conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md in fs-documentation.
-# One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters repo,
+# Gate before replacing painted copies by Blinc blocks: bruecke, alle-stile-erweitern, stil-vollstaendigkeit, zwei-stile (plan-theme-bruecke.md).
+# One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters contract, tag, repo,
 # branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
+# Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: frontend-umbau
-  version: 0.0.6
+  version: 0.0.8
   title: Convert one group of building blocks to the layers of ADR 0074
 do:
   - texte:
-      call: texts-convert-ai:0.0.6@fs
+      call: texts-convert-ai:0.0.8@fs
       with:
         group: ${ .input.group }
         repo: ${ .input.repo }
@@ -24,7 +26,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: First the texts, then the tokens, in the same run per crate. The agent moves every fixed text of the group to `Words` with MF2 messages (ADR 0057, not Fluent), German and English together; own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT].
   - texts-check:
-      call: texts-check:0.0.6@fs
+      call: texts-check:0.0.8@fs
       with:
         group: ${ .input.group }
       export:
@@ -49,7 +51,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a red `texts-check` goes back to texte, only green texts go on to the token steps.
   - count:
-      call: count-fixed-values:0.0.6@fs
+      call: count-fixed-values:0.0.8@fs
       with:
         group: ${ .input.group }
       export:
@@ -61,7 +63,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Script - counts in the group the fixed colors, fixed spacings and block names that are not in the contract (ADR 0074, conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md); whatever the numbers are, they are written down as the starting state.
   - assign:
-      call: assign-tokens:0.0.6@fs
+      call: assign-tokens:0.0.8@fs
       with:
         group: ${ .input.group }
         counted: ${ $context.count }
@@ -73,8 +75,93 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent maps every counted value to a DTCG token and every block to its fixed contract name (WAI-ARIA, Open UI); a value without a fitting token is listed, not invented.
+  - bruecke:
+      call: theme-bridge-ai:0.0.8@fs
+      with:
+        group: ${ .input.group }
+        mapping: ${ $context.assign }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Before a painted copy is replaced by a real Blinc block - the agent gives every Blinc block of the group its fixed contract name with parts and states (WAI-ARIA, Open UI) and the `blinc` entry (class and state selectors) and maps the DTCG tokens to the Blinc theme slots, the generated style sheet and the wrapper; nothing may stay in the Blinc default look (ADR 0074, one style for everything). Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md. Own worktree, local commits, no push, no tag.
+  - alle-stile-erweitern:
+      call: styles-extend-ai:0.0.8@fs
+      with:
+        group: ${ .input.group }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Fixed step of the flow that introduces a block, part or state - a new version of the theme contract, and EVERY existing style gets an explicit entry for it (mostly only assigning tokens; no silent gaps). Own worktree, local commits, no push, no tag.
+  - stil-vollstaendigkeit:
+      call: stil-vollstaendigkeit:0.0.8@fs
+      with:
+        contract: ${ .input.contract }
+      export:
+        as: '${ $context + { vollstaendig: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: scripts/stil-vollstaendigkeit - theme contract times all styles, every block with all parts and states has an explicit entry in every style; a missing one is `red`, no release.
+  - vollstaendig-again:
+      switch:
+        - runden:
+            when: '${ $context.vollstaendig.red and ($context.vollstaendig.runde // 0) >= 3 }'
+            then: umbau-eskalation
+        - red:
+            when: '${ $context.vollstaendig.red }'
+            then: alle-stile-erweitern
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a missing entry goes back to alle-stile-erweitern (from the third red round, `runde` >= 3, to the person in `umbau-eskalation`), otherwise on to zwei-stile.
+  - zwei-stile:
+      call: zwei-stile:0.0.8@fs
+      with:
+        group: ${ .input.group }
+      export:
+        as: '${ $context + { stile2: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Script scripts/zwei-stile (no network, no AI) - the gate BEFORE the painted copies are replaced (convert) - every block of the contract names of the group that is already reached through an adapter (Blinc blocks; own blocks still carry fixed values before `convert` and are not drawn here) is drawn once in two styles (Craft and a second one, light and dark); a block whose picture does not change is RED (it does not hang on the style); the exception list only holds reasons of content (e.g. icons). Order - contract, stil-vollstaendigkeit, zwei-stile. Self test with counter-checks. Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md section 4.
+  - zwei-stile-again:
+      switch:
+        - runden:
+            when: '${ $context.stile2.red and ($context.stile2.runde // 0) >= 3 }'
+            then: umbau-eskalation
+        - red:
+            when: '${ $context.stile2.red }'
+            then: bruecke
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Control flow - a block that does not follow the style goes back to bruecke (from the third red round, `runde` >= 3, to the person in `umbau-eskalation`), otherwise on to the images before the change and to convert.
   - before:
-      call: render-images:0.0.6@fs
+      call: render-images:0.0.8@fs
       with:
         group: ${ .input.group }
         state: before
@@ -85,7 +172,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Renders the images of the group before the change (the reference for the pixel comparison).
   - convert:
-      call: convert-ai:0.0.6@fs
+      call: convert-ai:0.0.8@fs
       with:
         group: ${ .input.group }
         mapping: ${ $context.assign }
@@ -100,7 +187,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent replaces fixed colors, spacings and names by tokens and contract names and keeps the arrangement in its own layer. Own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT]. The loop back from `repeat` runs until the script counts 0 fixed colors and spacings.
   - recount:
-      call: count-fixed-values:0.0.6@fs
+      call: count-fixed-values:0.0.8@fs
       with:
         group: ${ .input.group }
       export:
@@ -112,7 +199,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - the same count as at the start; the result is `fixed` (colors and spacings still fixed).
   - gates:
-      call: gates:0.0.6@fs
+      call: gates:0.0.8@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -122,7 +209,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh ([GATES]), the one definition of the checks; the result is `red` or not.
   - same-pictures:
-      call: pixel-compare:0.0.6@fs
+      call: pixel-compare:0.0.8@fs
       with:
         group: ${ .input.group }
       export:
@@ -147,14 +234,35 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - fixed values left, red gates or a changed picture go back to convert, otherwise on to the release.
   - release:
+      then: end
       run:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.6
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          tag: ${ .input.tag }
+          prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: release-flow.yaml holds the one Opus review of this head (opus-ja; NEIN goes back to convert with the findings as the order), then CI; the person merges and releases, agents never do. There is no second review here.
+  - umbau-eskalation:
+      set:
+        todo: umbau-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The completeness check or the two-style gate was red three times (`runde` >= 3); the person decides what is wrong, the contract, the styles or the adapter. This flow ends.

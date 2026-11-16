@@ -24,7 +24,7 @@ The key ring (`GNUPGHOME`, mode 0700) and the passphrase file (0600) are created
 
 ## Internal action references (2026-11-11)
 
-Composite actions in `actions/` never call another fs-release action by `uses: FreeSynergy/fs-release/...@ref` (a pinned action would pull later `main` states of the other one). `sbom` and `licence-check` run the shared `actions/install-tools/install.sh` by path (`$GITHUB_ACTION_PATH/../install-tools/install.sh`), so they always use the script of their own commit. `lint.yml` fails on any such `uses:` in `actions/`. Known limit: the reusable workflows (`release.yml`, `check.yml`, `_release-*.yml`) still call actions and each other with `@main`: `./` in a reusable workflow means the CALLER's repository, and a commit cannot name its own SHA, so `scripts/pin-refs.sh <tag>` rewrites them on the release commit.
+Composite actions in `actions/` never call another fs-release action by `uses: FreeSynergy/fs-release/...@ref` (a pinned action would pull later `main` states of the other one). `sbom` and `licence-check` run the shared `actions/install-tools/install.sh` by path (`$GITHUB_ACTION_PATH/../install-tools/install.sh`), so they always use the script of their own commit. `lint.yml` fails on any such `uses:` in `actions/`. Known limit: the reusable workflows (`release.yml`, `check.yml`, `_release-*.yml`) cannot use a relative ref and so name actions and each other by an explicit ref (the full SHA of a reviewed `main` state, no longer `@main`): `./` in a reusable workflow means the CALLER's repository, and a commit cannot name its own SHA, so `scripts/pin-refs.sh <sha>` rewrites them in a second commit.
 
 ## Blinc lock rule (always on)
 
@@ -84,6 +84,7 @@ draft -> Pre-release, only when SHA256SUMS.txt, every file and every `.asc` are 
 `packages.toml` and starts `sign`. **No secret and nothing cross-repo:** direction is pull (fs-catalog reads public releases), so no
 token for fs-catalog is passed to the program repos. Delay between publish and catalog: up to 15 minutes (plus the sign run).
 Drafts and releases with missing files are skipped with a warning, never a red run.
+As an event (`net.freesynergy.release.published`, catalog in `workflows/README.md`) this is the follow-up of an already approved push (no gate is skipped); the 15-minute schedule stays unchanged as the safety net, no token is added. Red runs are reported per repo by `_notify-red.yml` (docs/notify-red.md).
 
 Recommendation: switch on "Immutable releases" (repo Settings, General) in every program repo, so a published release and its
 assets can never be changed or replaced, not even by an owner. Not switched on by this workflow; the repo owner does it.

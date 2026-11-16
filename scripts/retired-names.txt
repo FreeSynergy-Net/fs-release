@@ -1,0 +1,3 @@
+# Names of repos, crates and programs that were given up by a rename. One `old -> new  # reason` per line. A name on the left is never
+# given out again, and no later rename may take a name on the left as its new name (ADR 0080: the redirect of the old repo name would
+# break). The list is written by `scripts/umbenennen retire` as a step of the flow `umbenennen` and read by its dry run.
