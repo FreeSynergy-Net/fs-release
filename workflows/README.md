@@ -26,7 +26,7 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
 
 **Die Flows.**
 - Release und Bau: `release-flow` (lift, gates, Review, Tag, Push, CI, ff main, Release, bump, sign), `lift`, `catalog-bump`,
-  `cleanup-targets`, `agent-run`, `bugfix`, `review`.
+  `cleanup-targets`, `agent-run`, `bugfix`, `review`. `lift` nimmt die Bibliotheken mit `--components`, `--interfaces`, `--types` oder `--repo NAME=vX.Y.Z` (wiederholbar: fs-types, fs-objects, fs-rpc, fs-jscalendar); `--types` / `fs-types=` verschiebt die Abhängigkeit vom Repo fs-interfaces nach fs-types (ADR 0092/0093); der Schritt `commit` setzt Identität FreeSynergy und die Fußzeile `Co-Authored-By` (`FS_LIFT_COAUTHOR`), `pins` hebt nie.
 - Frontend und Bilder: `frontend-round` (mit dem objektiven Schritt `menue-vergleich`, s. u.), `frontend-umbau` (Bestand auf die Schichten nach ADR 0074), `dossier`, `icon-round`,
   `picture-acceptance`.
 - Neues Programm: `programm-neu` (17 Schritte in P0 bis P6, s. u.), `programm-grundgeruest` (Fließband für die Grundsachen jedes Programms, s. u.).
@@ -111,7 +111,7 @@ mechanics as a script, abort protection) are step rules in `agent-run` and `revi
 looks up the existing ADRs (`entscheidung`, `user-decision`).
 
 **The flows.**
-- Release and build: `release-flow` (lift, gates, review, tag, push, CI, ff main, release, bump, sign), `lift`, `catalog-bump`, `cleanup-targets`, `agent-run`, `bugfix`, `review`.
+- Release and build: `release-flow` (lift, gates, review, tag, push, CI, ff main, release, bump, sign), `lift`, `catalog-bump`, `cleanup-targets`, `agent-run`, `bugfix`, `review`. `lift` takes the libraries with `--components`, `--interfaces`, `--types` or `--repo NAME=vX.Y.Z` (repeatable: fs-types, fs-objects, fs-rpc, fs-jscalendar); `--types` / `fs-types=` also moves the dependency from the repo fs-interfaces to the repo fs-types (ADR 0092/0093); the step `commit` sets the identity FreeSynergy and the `Co-Authored-By` footer (`FS_LIFT_COAUTHOR`), `pins` never lowers.
 - Frontend and pictures: `frontend-round` (with the objective step `menue-vergleich`), `frontend-umbau`, `dossier`, `icon-round`, `picture-acceptance`.
 - New program: `programm-neu` (17 steps in P0 to P6), `programm-grundgeruest` (assembly line for the basics of every program).
 - New style: `stil-neu` (a style in fs-components-styles: dossier with dossier gate, style contract, tokens light/dark, blocks one by one, gates completeness, contrast, distance r >= 0.25, theme guard, picture gate, Opus review, picture OK of the user, release through the strategy). TODO: the scripts `stil-vollstaendigkeit` and `zwei-stile` do not exist; until then the Rust tests `block_tokens.rs` and `blocks_styles.rs` of fs-components run. The names `contrast-gate`, `theme-guard` (guard) and `picture-gate` are specifications without a script; without a result the flow goes to `eskalation`, never to green.

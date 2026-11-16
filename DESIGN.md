@@ -160,9 +160,9 @@ The slug and sha are validated before they touch a path (letters, digits, `.`, `
 - Two chains on the same release at once are not protected against (no lock file).
 
 ## `fs-release lift` and the flow (`crates/fs-release`)
-`fs-release lift <repo> --components vX --interfaces vY` is one deterministic command, no LLM. Steps (each one a `Task`, the
+`fs-release lift <repo> --components vX --interfaces vY [--types vZ | --repo NAME=vX.Y.Z ...]` is one deterministic command, no LLM. Steps (each one a `Task`, the
 same trait the flow uses, so a later workflow file can call them by name): `deps` (tag on every crate, via
-`scripts/set_components_tag.py <tag> <root> [fs-repo]`), `lock` (`cargo update --workspace`; offline through the throw-away
+`scripts/set_components_tag.py <tag> <root> [fs-repo]`, `fs-types` via `--move fs-types <tag> <root>`; the lift of fs-interfaces never touches fs-types), `lock` (`cargo update --workspace`; offline through the throw-away
 `gitconfig-local-tags`, `--online` for real tags; the lock is checked to hold the asked tags), `lock-gate`
 (`check_blinc_lock.py`), `fmt`, `clippy` (pedantic, pinned toolchain), `clippy-stable` (explicit CI-strict run: stable toolchain, `--locked`), `rules` (`check_rust_rules.py`), `tests`, and with `--commit` `commit`
 (only after all green; a local-tags `Cargo.lock` is never committed). Cargo goes through `build-slot.sh`, one call after the

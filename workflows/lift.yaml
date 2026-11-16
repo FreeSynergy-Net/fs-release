@@ -17,7 +17,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Set the git tag of every fs-components / fs-interfaces dependency in the workspace.
+        freesynergy.net:summary: "Set the git tag of every dependency on the asked libraries in the workspace (`--components`, `--interfaces`, `--types` or `--repo NAME=vX.Y.Z`: fs-components, fs-interfaces, fs-types, fs-objects, fs-rpc, fs-jscalendar). fs-interfaces never touches fs-types; fs-types is moved to the repo FreeSynergy/fs-types (`set_components_tag.py --move`)."
   - lock:
       call: lock:0.0.10@fs
       metadata:
@@ -25,7 +25,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: cargo update --workspace, then prove Cargo.lock holds the asked tags.
+        freesynergy.net:summary: "cargo update --workspace, then prove Cargo.lock holds the asked tags (`github.com/FreeSynergy/<name>?tag=<tag>#` for every asked library, also fs-types)."
   - lock-gate:
       call: lock-gate:0.0.10@fs
       metadata:
@@ -108,4 +108,4 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Only after every check was green; commits the changed Cargo.toml files (and Cargo.lock when online).
+        freesynergy.net:summary: "Only after every check was green; commits the changed Cargo.toml files, the pinned workflows (and Cargo.lock when online) with the identity FreeSynergy <support@freesynergy.net> set explicitly and the footer Co-Authored-By from FS_LIFT_COAUTHOR (default Claude Sonnet 5.5)."
