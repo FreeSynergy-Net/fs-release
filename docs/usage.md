@@ -283,6 +283,18 @@ features each package declares; a feature no package declares fails the plan run
 
 `workflows/trait-delta.yaml` drafts and fixes the data interface of ONE program (capnp schema, Rust trait folder, capability) before its release. Inputs: `programm`, `trait` (`<programm>_v1`), `standard` (AS2, JSCalendar, JSContact, ... or `eigen`), `vorbild` and `features` as the reference, `ordner` (draft folder), `probe` (probe crate under `.scratch/probe/`), plus `repo`, `branch` and the docs inputs. Order of the steps (26): standard research, Opus draft, compile probe (through `build-slot.sh`, own target), Opus review (line 1 `JA` or `NEIN`, bound to the folder hash, up to three rounds), `hash-weiche` (the fixpoint applies only to the hash of the JA), the strategy sets the fixpoint (`tools/hash-ordner.sh` into `sperren/<trait>.sha256`), conformance test and fake against the fixed folder, documentation, `release-tor`. Place (binding): the trait folder `<trait>_v<n>/` lies in the program repo in the crate that carries the trait as public API (input `ziel_crate`, example `fs-people-directory/src/person_directory_v1`); `draft/` of the testdata crate only while it is a draft, and when the fixpoint is set it moves to the fixed place; the capnp contract always lies in `fs-interfaces/schema/`. The hash lock is a working fixpoint; the feature freeze is set only by the user. A locked trait is not changed by this flow: a new capability is a `<x>_v2` or a part trait (before the first release a locked trait is replaced by a v2 without further ado). The basics (`grundfassung`, `programm-grundgeruest`) may start with a minimal contract and run in parallel. A BASIC VERSION (`grundfassung`: only window + "what is coming" + docs, stores no data through the contract) may release as v0.0.1 without the trait lock, the contract is visibly marked "draft" in README/catalog; `release_frei` is mandatory before the first feature release (data through the contract) (decision b7). `kern-umbau` changes the inside of a program and keeps the trait. The `@fs` calls have no script yet (specification, a real run is not proven).
 
+## Feature list of a program (`feature-liste`)
+
+`workflows/feature-liste.yaml` writes the COMPLETE feature list of one program (rule [FEATURE-LISTE]) to `todo/features/<x>.md` in
+fs-documentation: all functions of the models from the dossier, sorted, each marked `heute | als Nächstes | später` (field "Stufe",
+format of `todo/features/people.md`), plus a bridge table `Standard | Vertrag | Was fehlt`. Inputs: `programm` (name after the naming
+rule, ADR 0087), `dossier` (path; without one the step `dossier-kurz` researches a short dossier from official sources, nothing
+copied, ADR 0013), `repo` (read only), `docs`, `docs_branch`. An Opus SAMPLE checks lines against code, trait fixpoint and plan
+before anything is published; the references (user documentation, catalog diff) come after it, the fast-forward of the docs main
+branch is the human step `veroeffentlichen`. The list is German only, not published and not checked by `check-docs.sh`; the user
+documentation stays short with a picture and takes its "today" and "what comes" from the stages of the list. `grundfassung` calls the
+flow as step 1b; it also runs alone. The `@fs` calls have no script yet (specification, a real run is not proven).
+
 ## Required package metadata
 
 The plan step fails early unless every package that owns binaries declares `authors`, `description`,

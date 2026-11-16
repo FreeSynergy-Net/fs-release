@@ -1,0 +1,189 @@
+# Complete feature list of ONE program (rule [FEATURE-LISTE]): every function of the models, sorted, each marked `heute | als Nächstes | später`, filed in fs-documentation `todo/features/<x>.md`.
+# Own flow (plan katalog K3, step 1b): `grundfassung` calls it as step 1b, but it is also used WITHOUT `grundfassung` (bring the 5 existing lists up to the stage field, re-compare before the feature freeze, the programs marked "later").
+# Aim is the docs repo (branch `unreviewed/<docs-branch>`), not the program repo. Text only: no code, no slot. Agents never push, tag or merge; the fast-forward of the docs main branch is the human step `veroeffentlichen` (through the strategy's helper).
+# Feature list != user documentation: the user documentation (docs/de and docs/en `programs/apps/<x>/index.md`) is short, with a picture, published; the feature list is complete, sorted, German only (ADR 0011), internal (`todo/`, not published, not checked by check-docs.sh).
+# The user documentation "what it can do today" and "what comes" are an EXCERPT of the stages `heute` and `als Nächstes` of the list, never an own enumeration; `später` stands only in the list. Both have ONE source: the dossier.
+# Inputs: programm (name after the naming rule, ADR 0087), dossier (path of the model dossier of the program, e.g. docs/de/programs/apps/<x>/frontends/*/latest/features.md; may be missing), repo (the program repo, read only), docs (worktree of fs-documentation), docs_branch (`unreviewed/...-features-<programm>`).
+# Order: `Workflow feature-liste, step <id>, parameters programm, dossier, repo, docs, docs_branch` (docs/prompt-template.md). FS profile: see README.md.
+# Every check is green only when it says so (`red == false`); a missing result is never green.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: feature-liste
+  version: 0.0.10
+  title: Complete feature list of a program - model dossier, sorted list with stages, bridge table, Opus sample, docs branch, references
+do:
+  - name-pruefen:
+      call: name-check:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the program name follows the naming rule (ADR 0087 and namensregel.md: programs plural, lower case, prefix fs-, e.g. fs-draw, fs-messages); the file is `todo/features/<name without fs->.md`; a retired or forbidden old form is red. No agent renames a name \"back\" or \"simpler\"."
+  - dossier-lage:
+      call: dossier-present:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { lage: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (no AI) - is the dossier path given and is there a file with at least one function? Result `fehlt` true or false. Known gap (plan K3): fs-forms, fs-resources, fs-activities and fs-registry have NO dossier; texts, calendars, draw, maps, messages, people, broadcast, files and tasks (en only) have one under docs/*/programs/apps/<x>/frontends/."
+  - dossier-weiche:
+      switch:
+        - fehlt:
+            when: '${ $context.lage.fehlt }'
+            then: dossier-kurz
+        - da:
+            then: liste
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a missing dossier (`fehlt`) goes to `dossier-kurz`, an existing one goes on to `liste`."
+  - dossier-kurz:
+      call: research-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        dossier: ${ .input.dossier }
+      then: liste
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Haiku or Sonnet (research, reads and writes notes only, never code) - a SHORT model dossier for the program when none exists: the functions of the models, each with its official source (official documentation, release notes, manuals); what is not proven is marked [nicht belegt]; nothing is copied (ADR 0013: no code, no text, no logos taken over), no foreign pictures quoted, own words; Pictures first: pictures of the models are only referred to by source, the design of our frontend goes through reference pictures and the picture OK (`picture-acceptance`). The larger dossier with states, menus and workflows is the flow `dossier` and is not replaced by this."
+  - liste:
+      call: feature-list-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        dossier: ${ .input.dossier }
+        repo: ${ .input.repo }
+        docs: ${ .input.docs }
+        branch: ${ .input.docs_branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet (text only, no slot) - writes `todo/features/<x>.md` in the format of `todo/features/people.md` lines 7-8: header with date, order, models and legend; per area a list `- [x]` built or `- [ ]` planned/missing, each line `Feature - models - state with us - priority - benefit`, PLUS the NEW field `Stufe: heute | als Nächstes | später`. Sorted per area `heute`, then `als Nächstes`, then `später`. ALL functions of the models, none left out because they are small or niche. The state with us is read from the program repo (`repo`, read only: core, trait fixpoint under `sperren/`, README \"What it can do today\"), never guessed; a function that is only in the trait or in the plan is `[ ]` marked `geplant (Trait)` or `geplant (Plan §)`, not `[x]` (the assessment `bewertung.md` found 14 wrong assignments of exactly this kind). German only. The file is not published and not checked by check-docs.sh. Local commit ([COMMIT]), report per [BERICHT]."
+  - bruecke:
+      call: bridge-table-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        docs: ${ .input.docs }
+        branch: ${ .input.docs_branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet (text only) - rule [BRUECKE-BEIDE-SEITEN]: a section in the same file, per program a table `Standard | Vertrag | Was fehlt` (which standard applies, e.g. AS2, JSCalendar, JSContact; which contract exists: Rust trait with fixpoint `sperren/*.sha256`, capnp in fs-interfaces `schema/`, server and client crates; what is missing in the feature list or in the head). Missing capabilities (known at the time of the plan: data, workflows, paint, decisions in fs-interfaces) are named, not hidden. Nothing invented: an entry without a source in the repo or the dossier is marked [nicht belegt]."
+  - index:
+      call: index-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        docs: ${ .input.docs }
+        branch: ${ .input.docs_branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet (text only) - keeps the index `todo/features/README.md`: one line per list (`- [<x>](<x>.md)`), the reference to `bewertung.md` stays; the freeze rule there stays unchanged (only the user sets the feature freeze; the lists are input, not a decision)."
+  - stichprobe:
+      call: sample-opus:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        repo: ${ .input.repo }
+        docs: ${ .input.docs }
+        branch: ${ .input.docs_branch }
+      export:
+        as: '${ $context + { stichprobe: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Opus SAMPLE per list (the assessment found 14 wrong assignments in 5 lists): at least 8 to 10 lines against code, trait fixpoint and plan (state with us, `[x]` against `[ ]`, stage), plus the bridge table against `fs-interfaces`; every line checked has a proof (file and line). Result `red` true when a wrong assignment is found, with the list of findings; `runde` counts the red rounds (+1 on red, reset on green). Opus reads and judges, never writes the list itself."
+  - stichprobe-again:
+      switch:
+        - runden:
+            when: '${ $context.stichprobe.red and ($context.stichprobe.runde // 0) >= 3 }'
+            then: eingabe-fehler
+        - red:
+            when: '${ $context.stichprobe.red }'
+            then: liste
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - from a third red round (`runde` >= 3) the person decides (`eingabe-fehler`); a red sample goes back to `liste` (the agent fixes the lines found), green goes on."
+  - verweise:
+      call: reference-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        docs: ${ .input.docs }
+        branch: ${ .input.docs_branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet (text only) - short references: in the user documentation `programs/apps/<x>/index.md` (de and en) the sections \"what it can do today\" and \"what comes\" are an EXCERPT of the stages `heute` and `als Nächstes` of the list (no own enumeration, `später` is not named); and a DIFF for fs-catalog (description en and de where it changes, written as a patch file in the report, NOT pushed; the catalog change itself is `catalog-bump` after a release). The feature list itself is not linked from the published pages (`todo/` is outside `docs_dir`)."
+  - gates:
+      call: check-docs:0.0.10@fs
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (no AI) - `check-docs.sh` and `check-public-paths.sh` in a FRESH worktree of the docs branch (rule [FRISCH], never the main checkout), as far as the change touches `docs/` (the references); `todo/` itself is not checked by check-docs.sh, so the list itself is covered by the Opus sample. The result is `red` or not; rc is kept; missing script or tool = `skipped`, never green."
+  - gates-again:
+      switch:
+        - red:
+            when: ${ $context.gates.red }
+            then: verweise
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red docs gate goes back to `verweise`, otherwise on to `veroeffentlichen`."
+  - veroeffentlichen:
+      call: docs-main:0.0.10@fs
+      with:
+        branch: ${ .input.docs_branch }
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The human or the coordinator (through the strategy's helper, b7) brings the green branch `unreviewed/...-features-<programm>` into the docs main branch by fast-forward only, after the Opus sample and the green gate; the agent never pushes, tags or merges. The feature freeze stays untouched: only the user sets it."
+  - eingabe-fehler:
+      set:
+        todo: eingabe-fehler
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The sample was red three times or the input is bad; sending the agent back to `liste` cannot fix that, so the person looks at it (a missing source, a contradiction between dossier and code, an open question). This flow ends."
