@@ -84,6 +84,14 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Every .github/workflows/*.yml parses as YAML (and passes actionlint when installed); skipped, never green, without PyYAML.
         freesynergy.net:may-fail: red is recorded, the commit is blocked
+  - lock-sources:
+      call: lock-sources:0.0.9@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Lock check `scripts/gates-lock.sh` (one source per shared library in every Cargo.lock, scripts/lock-sources.toml). Warning first, error later: a lift to V1+ (fs-types from the repo FreeSynergy/fs-types, one tag of each library) ALSO raises the fs-release pin in .github/workflows/check.yml to the tag >= 0.0.10 and sets `strict = true` in the repo's `.fs-lock-sources.toml` (optionally `only_from_enabled = true`); after that the same step is red on a second source. These two edits are done by the person or agent that lifts; the step only reports."
   - commit:
       call: commit:0.0.9@fs
       if: ${ .input.commit }

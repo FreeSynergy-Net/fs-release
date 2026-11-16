@@ -9,7 +9,8 @@ or the same version from two git URLs/tags/commits) are an error: the message na
 each one (a package without a source is the workspace member itself). Exit codes: 0 green (or nothing to check: no Cargo.lock),
 1 violation, 2 usage/read error. A repo root is searched for every Cargo.lock outside target/ and .git.
 V1+ addition (`--only-from`, config `only_from_enabled`, env FS_LOCK_ONLY_FROM=1; default OFF): a library listed in `[only_from]`
-(fs-types) must come from that repo only, also when it appears once.
+(fs-types) must come from that repo only, also when it appears once (an entry without `source`, the workspace member itself, is fine).
+A repo's own `.fs-lock-sources.toml` can set only `strict` and `only_from_enabled`; anything else in it is ignored.
 Whether a violation is a warning or red is decided by the caller (scripts/gates.sh, switch `strict`), not here.
 """
 import os, re, sys, tomllib
@@ -30,7 +31,9 @@ def repo_of(source: str) -> str:
 def load_config(path: Path, repo_root: Path | None, only_from: bool) -> dict:
     cfg = tomllib.loads(path.read_text(encoding="utf-8"))
     if repo_root is not None and (repo_root / ".fs-lock-sources.toml").is_file():
-        cfg.update(tomllib.loads((repo_root / ".fs-lock-sources.toml").read_text(encoding="utf-8")))
+        own = tomllib.loads((repo_root / ".fs-lock-sources.toml").read_text(encoding="utf-8"))
+        # a repo may flip only its two switches; the library list and [only_from] come ONLY from scripts/lock-sources.toml
+        cfg.update({k: v for k, v in own.items() if k in ("strict", "only_from_enabled")})
     cfg["only_from_on"] = only_from or bool(cfg.get("only_from_enabled")) or os.environ.get("FS_LOCK_ONLY_FROM") == "1"
     return cfg
 
@@ -61,6 +64,8 @@ def check_lock(text: str, label: str, cfg: dict) -> list:
         want = cfg.get("only_from", {}).get(lib)
         if cfg["only_from_on"] and want:
             for e in entries:
+                if not e.get("source"):  # a workspace member (e.g. fs-types inside the repo fs-types itself) is not a foreign source
+                    continue
                 if repo_of(e.get("source", "")) != norm(want):
                     errors.append(f"ERROR {label}: `{lib}` {e['version']} comes from {e.get('source') or '(path)'}, V1+ allows only {want}\n"
                                   f"      pulled by: " + ", ".join(pullers(pkgs, lib, e)))

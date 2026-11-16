@@ -78,7 +78,7 @@ fn lift_is_red_at_yaml_check_for_the_broken_file_and_green_for_the_valid_one() {
         if have_yaml() { "ok" } else { "skipped" },
         "{s:?}"
     );
-    assert_eq!(r.steps.len(), 9);
+    assert_eq!(r.steps.len(), 10);
     if !have_yaml() {
         return;
     }

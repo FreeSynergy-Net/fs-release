@@ -7,8 +7,8 @@ set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tool="$here/check_lock_sources.py"; gate="$here/gates-lock.sh"
 fx="$here/../tests/fixtures/lock-sources"
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$here/../.test-tmp"; tmp="$(TMPDIR="${TEST_TMPDIR:-$here/../.test-tmp}" mktemp -d)"  # never /tmp (RAM, rule [PLATTE])
+trap 'rm -rf "$tmp"; rmdir "$here/../.test-tmp" 2>/dev/null' EXIT
 fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
@@ -54,5 +54,16 @@ cp "$fx/green.lock" "$tmp/g/Cargo.lock"
 bash "$gate" "$tmp/g" >"$tmp/o" 2>&1 && ok "gate: green lock is green with strict" || bad "gate: green lock must pass strict: $(cat "$tmp/o")"
 printf 'not toml [[' > "$tmp/g/Cargo.lock"
 bash "$gate" "$tmp/g" >"$tmp/o" 2>&1 && bad "gate: unreadable lock must be red" || ok "gate: unreadable lock is red"
+# condition 1: a repo file cannot change the library list or [only_from]; condition 2: a workspace member (no source) is no violation
+mkdir -p "$tmp/c1"; cp "$fx/red-two-sources.lock" "$tmp/c1/Cargo.lock"
+printf 'strict = true\nlibraries = []\n[only_from]\nfs-types = "https://github.com/x/y"\n' > "$tmp/c1/.fs-lock-sources.toml"
+expect "repo file with libraries = [] does not switch the check off" 1 "$tmp/c1"
+bash "$gate" "$tmp/c1" >"$tmp/o" 2>&1 && bad "gate: repo file libraries = [] with strict must stay red" || ok "gate: repo file libraries = [] with strict stays red"
+cp "$fx/red-v1plus.lock" "$tmp/c1/Cargo.lock"
+printf 'only_from_enabled = true\n[only_from]\nfs-types = "https://github.com/FreeSynergy/fs-interfaces"\n' > "$tmp/c1/.fs-lock-sources.toml"
+expect "repo file cannot replace [only_from] (still red)" 1 "$tmp/c1"
+printf 'version = 4\n\n[[package]]\nname = "fs-types"\nversion = "0.0.1"\n' > "$tmp/c1/Cargo.lock"; rm "$tmp/c1/.fs-lock-sources.toml"
+expect "workspace member fs-types (no source) is no violation with --only-from" 0 --only-from "$tmp/c1"
+mkdir -p "$tmp/e"; : > "$tmp/e/Cargo.lock"; expect "an empty Cargo.lock is green" 0 --only-from "$tmp/e"
 [ "$fails" -eq 0 ] || { echo "$fails failed"; exit 1; }
 echo "all ok"

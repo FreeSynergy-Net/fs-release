@@ -164,6 +164,9 @@ impl World {
             "check_rust_rules.py",
             "set_components_tag.py",
             "check_yaml.py",
+            "check_lock_sources.py",
+            "gates-lock.sh",
+            "lock-sources.toml",
         ] {
             fs::copy(real.join(f), dir.join("scripts").join(f)).unwrap();
         }

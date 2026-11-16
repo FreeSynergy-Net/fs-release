@@ -141,6 +141,27 @@ impl Task<LiftEnv<'_>> for YamlCheck {
     }
 }
 
+/// `scripts/gates-lock.sh`: every shared library in exactly one source per Cargo.lock (warning first, red with `strict`).
+pub struct LockSources;
+
+impl Task<LiftEnv<'_>> for LockSources {
+    fn name(&self) -> &'static str {
+        "lock-sources"
+    }
+
+    fn continue_on_red(&self) -> bool {
+        true
+    }
+
+    fn run(&self, env: &LiftEnv) -> Result<String, Stop> {
+        let args = vec![
+            env.script("gates-lock.sh"),
+            env.opts.repo_dir.display().to_string(),
+        ];
+        verdict("lock-sources", &env.exec("bash", args, vec![])?)
+    }
+}
+
 /// The explicit CI-strict run: the current stable toolchain, the lock as it is (`--locked`), pedantic, all targets. The pinned
 /// toolchain of `gates.sh` does not know the newest lints (`items_after_statements`, `assert!(is_empty)` in tests, ...); GitHub CI does.
 pub struct ClippyStable;
