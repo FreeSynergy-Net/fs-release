@@ -2,6 +2,7 @@
 """Gate doku-mitziehen: a change of code, names, interfaces or behaviour pulls the documentation along in the same run.
 
   python3 -I scripts/doku-mitziehen --docs <fs-documentation clone> --docs-base <sha> [--code <repo> --code-base <sha>]
+        [--head REF] [--docs-head REF] [--proof-base REF]
         [--program NAME] [--old NAME]... [--new NAME]... [--allow GLOB]... [--state FILE] [--json FILE]
 
 Deterministic, no network, no AI. Checks (every problem is one line `red: <reason>`):
@@ -16,6 +17,12 @@ Deterministic, no network, no AI. Checks (every problem is one line `red: <reaso
                      default = folder name of --code) must have changed too; it must exist, every `- [x]` line needs a proof in
                      parentheses, and no `- [x]` line may disappear (done items stay). A change of the program without its checklist = red.
   7. mkdocs          `mkdocs build --strict` of the clone; when mkdocs is missing or broken the result is `skipped`, never green.
+--head REF: the head of the code to measure (branch or commit of the AGENT's work, resolved to a commit hash in the code repo); the code change is
+`--code-base..<that commit>`, never the checkout of the repo (a repo with `main` checked out and the commit only on the agent's branch is still seen).
+With --head the uncommitted state of the repo is not counted. --docs-head REF does the same for the docs clone: the docs are read from that commit
+(`git archive` into a temporary folder), the docs change is `--docs-base..<that commit>`. Without them HEAD and the working tree count, as before.
+--proof-base REF (default --docs-base): the base for the proof check; ONLY ticked lines that are new or changed against the checklist at that base
+need a proof (old entries never block foreign work); a ticked item that disappears is red against --docs-base as before.
 The docs clone is only read (the mkdocs build goes to a temporary folder). NOTE: `mkdocs build` runs the hooks and plugins named in
 the mkdocs.yml of the clone, i.e. code of the author's branch; use it only on the own docs repo.
 Round counter: the state file (default `<git dir of the docs clone>/doku-mitziehen-runde`, found with `git rev-parse --absolute-git-dir`,
@@ -46,11 +53,20 @@ def git(repo, *args):
     return r.stdout
 
 
-def changed(repo, base, paths=None):
-    args = ["diff", "--name-only", f"{base}..HEAD"]
+def resolve(repo, ref):
+    """A branch name or commit -> the full commit hash (read only); a bad ref is bad input."""
+    if not ref or ref.startswith("-"):
+        raise ValueError(f"bad ref {ref!r}")
+    return git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}").strip()
+
+
+def changed(repo, base, paths=None, head=None):
+    args = ["diff", "--name-only", f"{base}..{head or 'HEAD'}"]
     if paths:
         args += ["--", *paths]
     out = git(repo, *args).split("\n")
+    if head:
+        return sorted({p for p in out if p})
     # committed changes plus uncommitted ones of the working tree (the run commits last)
     out += git(repo, "diff", "--name-only", "HEAD", *(["--", *paths] if paths else [])).split("\n")
     out += git(repo, "ls-files", "--others", "--exclude-standard", *(["--", *paths] if paths else [])).split("\n")
@@ -75,8 +91,8 @@ def allowed(rel, allow):
 def check_changed(a, problems):
     if not a.code:
         return
-    code = changed(a.code, a.code_base)
-    docs = changed(a.docs, a.docs_base, list(DOC_ROOTS))
+    code = changed(a.code, a.code_base, None, a.head)
+    docs = changed(a.docs, a.docs_base, list(DOC_ROOTS), a.docs_head)
     if code and not docs:
         problems.append(f"red: the code repo changed ({len(code)} file(s)) but the documentation did not - pull the docs along")
 
@@ -87,7 +103,7 @@ TICKED = re.compile(r"^\s*- \[[xX]\] ")
 # Not every parenthesis counts (`(z. B. fs-text "gespeichert")` is a remark, not a proof).
 _HASH = r"(?<![0-9A-Za-z])(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}(?![0-9A-Za-z])"
 _TAG = r"(?<![0-9A-Za-z.])v\d+\.\d+\.\d+(?![0-9A-Za-z])"
-_PATH = r"[\w.\-]+(?:/[\w.\-]+)*\.(?:png|jpe?g|svg|webp|gif|pdf|md|rs|ya?ml|toml|sh|py|txt|json)(?![0-9A-Za-z])"
+_PATH = r"[\w.\-*]+(?:/[\w.\-*]+)*\.(?:png|jpe?g|svg|webp|gif|pdf|md|rs|ya?ml|toml|sh|py|txt|json)(?![0-9A-Za-z])"
 PROOF = re.compile(r"\([^()]*(?:" + _HASH + "|" + _TAG + "|" + _PATH + r")[^()]*\)")
 
 
@@ -95,34 +111,39 @@ def check_checklist(a, problems):
     """The checklist of the program moves with the program (todo/checklisten/<program>.md of the docs clone)."""
     if not a.code:
         return
-    if not changed(a.code, a.code_base):
+    if not changed(a.code, a.code_base, None, a.head):
         return
     program = a.program or os.path.basename(os.path.realpath(a.code))
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", program):
         raise ValueError(f"bad --program {program!r}")
     rel = f"todo/checklisten/{program}.md"
-    path = os.path.join(a.docs, rel)
+    path = os.path.join(a.root, rel)
     if not os.path.isfile(path):
         problems.append(f"red: the program {program} changed but its checklist {rel} does not exist")
         return
-    if rel not in changed(a.docs, a.docs_base, [rel]):
+    if rel not in changed(a.docs, a.docs_base, [rel], a.docs_head):
         problems.append(f"red: the program {program} changed but its checklist {rel} was not updated (tick, add or note the change)")
     boxes = 0
+    # only ticked lines that are NEW or CHANGED against the proof base need a proof; old entries never block foreign work
+    try:
+        old_ticked = {l.strip() for l in git(a.docs, "show", f"{a.proof_base}:{rel}").split("\n") if TICKED.match(l)}
+    except ValueError:
+        old_ticked = set()  # the file did not exist at the base: everything is new
     for n, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
         if CHECKBOX.match(line):
             boxes += 1
-            if TICKED.match(line) and not PROOF.search(line):
-                problems.append(f"red: {rel}:{n} is ticked without a proof in parentheses (commit hash of 7-40 hex characters, tag vX.Y.Z or picture / file path)")
+            if TICKED.match(line) and line.strip() not in old_ticked and not PROOF.search(line):
+                problems.append(f"red: {rel}:{n} is ticked without a proof in parentheses (new or changed line; commit hash of 7-40 hex characters, tag vX.Y.Z or picture / file path)")
     if boxes == 0:
         problems.append(f"red: {rel} has no `- [ ]` / `- [x]` item")
-    diff = git(a.docs, "diff", a.docs_base, "--", rel).split("\n")
+    diff = git(a.docs, "diff", a.docs_base if not a.docs_head else f"{a.docs_base}..{a.docs_head}", "--", rel).split("\n")
     for line in diff:
         if line.startswith("-") and not line.startswith("---") and TICKED.match(line[1:].lstrip()):
             problems.append(f"red: {rel}: a ticked item was removed or reworded ({line[1:].strip()[:60]}); done items stay")
 
 
 def check_de_en(a, problems):
-    files = changed(a.docs, a.docs_base, ["docs/de", "docs/en"])
+    files = changed(a.docs, a.docs_base, ["docs/de", "docs/en"], a.docs_head)
     have = set(files)
     for f in files:
         if not f.endswith(".md"):
@@ -134,9 +155,9 @@ def check_de_en(a, problems):
 
 def check_names(a, problems):
     texts = {}
-    for rel in doc_files(a.docs):
+    for rel in doc_files(a.root):
         if not allowed(rel, a.allow):
-            texts[rel] = open(os.path.join(a.docs, rel), encoding="utf-8", errors="replace").read()
+            texts[rel] = open(os.path.join(a.root, rel), encoding="utf-8", errors="replace").read()
     for old in a.old:
         pat = re.compile(r"(?<![\w-])" + re.escape(old) + r"(?![\w-])")
         for rel, text in texts.items():
@@ -150,12 +171,12 @@ def check_names(a, problems):
 
 
 def check_links(a, problems):
-    for rel in doc_files(a.docs):
+    for rel in doc_files(a.root):
         if not rel.endswith(".md"):
             continue
-        base = os.path.dirname(os.path.join(a.docs, rel))
+        base = os.path.dirname(os.path.join(a.root, rel))
         in_code = False
-        for n, line in enumerate(open(os.path.join(a.docs, rel), encoding="utf-8", errors="replace"), 1):
+        for n, line in enumerate(open(os.path.join(a.root, rel), encoding="utf-8", errors="replace"), 1):
             if line.lstrip().startswith("```"):
                 in_code = not in_code
             if in_code:
@@ -174,7 +195,7 @@ def check_mkdocs(a, problems, skipped):
         return
     with tempfile.TemporaryDirectory() as out:
         r = subprocess.run(
-            ["mkdocs", "build", "--strict", "-q", "-f", os.path.join(a.docs, "mkdocs.yml"), "-d", out],
+            ["mkdocs", "build", "--strict", "-q", "-f", os.path.join(a.root, "mkdocs.yml"), "-d", out],
             capture_output=True,
             text=True,
         )
@@ -228,6 +249,9 @@ def main(argv):
     p.add_argument("--docs-base", required=True)
     p.add_argument("--code")
     p.add_argument("--code-base")
+    p.add_argument("--head")
+    p.add_argument("--docs-head")
+    p.add_argument("--proof-base")
     p.add_argument("--program")
     p.add_argument("--old", action="append", default=[])
     p.add_argument("--new", action="append", default=[])
@@ -242,15 +266,38 @@ def main(argv):
         print("bad input: --code and --code-base belong together")
         write_json(a, "skipped", False, 0, ["bad input: --code and --code-base belong together"], [])
         return 2
+    if a.head and not a.code:
+        print("bad input: --head needs --code")
+        write_json(a, "skipped", False, 0, ["bad input: --head needs --code"], [])
+        return 2
     problems, skipped = [], []
+    tmpdocs = None
     try:
+        a.root = a.docs
+        if a.head:
+            a.head = resolve(a.code, a.head)
+        if a.docs_head:
+            a.docs_head = resolve(a.docs, a.docs_head)
+            tmpdocs = tempfile.mkdtemp(prefix="doku-mitziehen-")
+            tar = subprocess.run(["git", "-C", a.docs, "archive", a.docs_head], capture_output=True)
+            if tar.returncode != 0:
+                raise ValueError(f"git archive {a.docs_head}: {tar.stderr.decode(errors='replace').strip()}")
+            subprocess.run(["tar", "-x", "-C", tmpdocs], input=tar.stdout, check=True)
+            a.root = tmpdocs
+        if a.proof_base:
+            a.proof_base = resolve(a.docs, a.proof_base)
+        else:
+            a.proof_base = a.docs_base
         for check in (check_changed, check_checklist, check_de_en, check_names, check_links):
             check(a, problems)
         check_mkdocs(a, problems, skipped)
-    except (ValueError, OSError) as e:
+    except (ValueError, OSError, subprocess.CalledProcessError) as e:
         print(f"bad input: {e}")
         write_json(a, "skipped", False, 0, [f"bad input: {e}"], [])
         return 2
+    finally:
+        if tmpdocs:
+            shutil.rmtree(tmpdocs, ignore_errors=True)
     for s in skipped:
         print(f"skipped: {s}")
     for line in problems:

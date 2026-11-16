@@ -25,10 +25,11 @@ fn escalates(text: &str, again: &str, back: &str) -> bool {
     b.contains("then: eskalation") && b.contains(">= 3") && b.contains(&format!("then: {back}"))
 }
 
-const ORDER: [&str; 31] = [
+const ORDER: [&str; 33] = [
     "handoffs-lesen",
     "posteingang-lesen",
     "checklisten-lesen",
+    "zaehler-start",
     "straenge",
     "agenten-starten",
     "einsammeln",
@@ -38,8 +39,9 @@ const ORDER: [&str; 31] = [
     "gates-sammeln",
     "gates-again",
     "abgelehnt-gate",
-    "korrektur",
+    "korrektur-stand",
     "korrektur-zaehlen",
+    "korrektur",
     "korrektur-einsammeln",
     "korrektur-weiche",
     "doku",
@@ -78,7 +80,7 @@ fn round_is_sound(t: &str) -> bool {
     let review = step_body(t, "pruefung");
     let ga = step_body(t, "gates-again");
     let gp = step_body(t, "gates-pruefen");
-    in_order(t, &ORDER[..30])
+    in_order(t, &ORDER[..32])
         && starts_in_background(t)
         && step_body(t, "doku").contains("name: doku-mitziehen")
         && step_body(t, "doku").contains("actor: ai")
@@ -93,9 +95,14 @@ fn round_is_sound(t: &str) -> bool {
         && pos(t, "gates-again") < pos(t, "abgelehnt-gate")
         && step_body(t, "gates-again").find("- eskaliert:").is_some_and(|e| e < step_body(t, "gates-again").find("- red:").unwrap_or(0))
         // the corrections are counted for the whole round; from the third one the round ends
-        && step_body(t, "korrektur-zaehlen").contains("korrekturen")
-        && step_body(t, "korrektur-weiche").contains("$context.korrekturen.runde")
-        && escalates(t, "korrektur-weiche", "gates-pruefen")
+        // R10: the counter is kept in the flow, read BEFORE an agent starts, a missing counter is no 0
+        && step_body(t, "zaehler-start").contains("runde: 0")
+        && step_body(t, "korrektur-zaehlen").contains("$context.korrekturen.runde + 1")
+        && step_body(t, "korrektur-stand").contains("$context.korrekturen.runde | type) != \"number\"")
+        && step_body(t, "korrektur-stand").contains("$context.korrekturen.runde >= 3")
+        && escalates(t, "korrektur-stand", "korrektur-zaehlen")
+        && !t.contains("korrekturen.runde // 0")
+        && !t.contains("count-corrections")
         && gp.contains("name: testlauf")
         && gp.contains("actor: ai")
         // R7: the gates run per finished head of EVERY step, not once with the data of the round start
@@ -359,18 +366,31 @@ fn counter_a_docs_gate_of_the_round_start_an_escalated_gate_or_no_correction_cou
         ),
         1
     )));
-    // no counter for the corrections
-    let kw = step_body(&t, "korrektur-weiche");
+    // no counter for the corrections, a missing counter taken as 0, a higher limit, no check before the agents start
+    let ks = step_body(&t, "korrektur-stand");
     assert!(!round_is_sound(&t.replacen(
-        &kw,
-        &kw.replace("$context.korrekturen.runde", "$context.x"),
+        &ks,
+        &ks.replace("$context.korrekturen.runde >= 3", "$context.x >= 3"),
         1
     )));
     assert!(!round_is_sound(&t.replacen(
-        &kw,
-        &kw.replace(">= 3", ">= 99"),
+        &ks,
+        &ks.replace(">= 3", ">= 99"),
         1
     )));
+    assert!(!round_is_sound(&t.replacen(
+        &ks,
+        &ks.replace("| type) != \"number\"", "// 0) != 7"),
+        1
+    )));
+    assert!(!round_is_sound(&t.replacen("runde: 0\n", "runde: 7\n", 1)));
+    assert!(!round_is_sound(&t.replace(
+        "$context.korrekturen.runde + 1",
+        "($context.korrekturen.runde // 0) + 1"
+    )));
+    assert!(!round_is_sound(
+        &t.replace("korrektur-stand:", "korrektur-weg:")
+    ));
 }
 
 #[test]

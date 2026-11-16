@@ -70,8 +70,16 @@ fresh remark; code_change; docs_both
 expect 1 "is ticked without a proof" "red: a remark in parentheses is no proof" "$d" --
 
 fresh shorthex; code_change; docs_both
-(cd "$d/docs" && echo '- [x] **GRUNDSACHE** sixth (abc12)' >>todo/checklisten/fs-test.md && echo '- [x] **GRUNDSACHE** seventh (defaced)' >>todo/checklisten/fs-test.md && g commit -q -am p)
-expect 1 "is ticked without a proof" "red: 5 hex characters and a hex-only word are no proof" "$d" --
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** sixth (abc12)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: 5 hex characters are no proof (K3, own case)" "$d" --
+
+fresh hexword; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** seventh (defaced)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: a hex-only word without a digit is no proof (K3, own case)" "$d" --
+
+fresh hex6; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** seventh b (abc1234)' >>todo/checklisten/fs-test.md && echo '- [x] **GRUNDSACHE** six (abc123)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 ":6 is ticked without a proof" "red: exactly 6 hex characters are no proof, 7 are (line 5 ok, line 6 red)" "$d" --
 
 fresh bigx; code_change; docs_both
 (cd "$d/docs" && echo '- [X] **GRUNDSACHE** eighth' >>todo/checklisten/fs-test.md && g commit -q -am p)
@@ -165,5 +173,41 @@ sf="$(g -C "$d/docs" rev-parse --absolute-git-dir)/doku-mitziehen-runde"
 PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --json "$d/sym.json" >/dev/null 2>&1; rc=$?
 if [ "$rc" -eq 2 ] && [ ! -s "$tmp/victim" ] && grep -qF '"status": "skipped"' "$d/sym.json"; then echo "ok   a symlinked state file is refused (skipped, never green)"; else
   echo "FAIL symlink state: rc=$rc"; fails=$((fails + 1)); fi
+
+# C4: a glob in a picture path is a proof (`*-de-*.png`)
+fresh glob; code_change; docs_both
+# shellcheck disable=SC2016
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** pictures (`.scratch/wiki-0013-bilder/*-de-*.png` und `*-en-*.png`)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 0 "green" "green: a picture path with * is a proof (C4)" "$d" --
+fresh noglob; code_change; docs_both
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** nothing (*-de-*)' >>todo/checklisten/fs-test.md && g commit -q -am p)
+expect 1 "is ticked without a proof" "red: a bare glob without a file ending is no proof (C4 counter)" "$d" --
+
+# C5: an OLD ticked line without a proof (before the base) never blocks; a NEW or CHANGED one does
+fresh oldline
+(cd "$d/docs" && echo '- [x] **GRUNDSACHE** old item (README)' >>todo/checklisten/fs-test.md && g commit -q -am old)
+DB="$(base "$d/docs")"
+code_change; docs_both
+expect 0 "green" "green: an old ticked line without a proof does not block (C5)" "$d" --
+(cd "$d/docs" && sed -i 's/old item (README)/old item reworded (README)/' todo/checklisten/fs-test.md && g commit -q -am rw)
+expect 1 "is ticked without a proof" "red: the same old line CHANGED without a proof is checked (C5 counter)" "$d" --
+
+# R8': the head of the AGENT's branch counts, not the checkout of the repo
+fresh headb
+(cd "$d/code" && g checkout -q -b unreviewed/x && echo b >>a.rs && g commit -q -am change && g checkout -q -)
+docs_both
+expect 0 "green" "green: no code change in the checkout, no --head (the old blind spot)" "$d" --
+expect 1 "documentation did not" "red: --head sees the commit on the branch while main is checked out (R8')" "$d" -- --head unreviewed/x --docs-head "$DB"
+expect 0 "green" "green: --head sees the code and the docs head has the docs" "$d" -- --head unreviewed/x
+expect 2 "bad input" "bad --head ref" "$d" -- --head nope/none
+out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --head HEAD 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ]; then echo "ok   --head without --code"; else echo "FAIL head pairing rc=$rc"; fails=$((fails + 1)); fi
+
+# --docs-head: the docs are read at that commit, not in the working tree
+fresh dhead; code_change; docs_both
+DH="$(base "$d/docs")"
+(cd "$d/docs" && echo "see [x](nowhere.md)" >>docs/de/a.md && echo "see [x](nowhere.md)" >>docs/en/a.md)
+expect 0 "green" "green: --docs-head ignores the dirty working tree (the old state of the branch head is read)" "$d" -- --docs-head "$DH"
+expect 1 "broken link" "red: without --docs-head the working tree is read" "$d" --
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

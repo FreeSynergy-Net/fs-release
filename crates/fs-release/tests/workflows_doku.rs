@@ -48,6 +48,7 @@ fn gate_is_sound(text: &str) -> bool {
             "suchen",
             "schreiben",
             "docs-check",
+            "kopf",
             "gate",
             "gate-again",
             "eskalation",
@@ -56,6 +57,11 @@ fn gate_is_sound(text: &str) -> bool {
         && gate.contains("kind: objective")
         && gate.contains("doku-mitziehen:0.0.7@fs")
         && gate.contains("docs_base")
+        // R8': the gate measures the head of the agent's branch, resolved per step
+        && gate.contains("head: ${ $context.kopf.head }")
+        && step_body(text, "kopf").contains("resolve-head")
+        && step_body(text, "kopf").contains("branch: ${ .input.branch")
+        && gate.contains("proof_base: ${ .input.docs_base }")
         && gate.contains("program: ${ .input.programm")
         && gate.contains("todo/checklisten/<programm>.md")
         && step_body(text, "schreiben").contains("never delete a ticked item")
@@ -136,6 +142,16 @@ fn counter_a_gate_by_the_agent_or_without_escalation_is_caught() {
         &t.replace("then: eskalation", "then: continue")
     ));
     assert!(!gate_is_sound(&t.replace(">= 3", ">= 99")));
+    // R8': no head binding (the gate would measure the checkout of the repo) is caught
+    assert!(!gate_is_sound(
+        &t.replace("head: ${ $context.kopf.head }", "zz: 1")
+    ));
+    assert!(!gate_is_sound(
+        &t.replace("call: resolve-head:0.0.7@fs", "call: other:0.0.7@fs")
+    ));
+    assert!(!gate_is_sound(
+        &t.replace("proof_base: ${ .input.docs_base }", "zz: 1")
+    ));
     // checklist rule: the gate without the program (no checklist check) or without the author's duty is caught
     assert!(!gate_is_sound(&t.replace(
         "        program: ${ .input.programm",

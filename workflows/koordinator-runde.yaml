@@ -1,5 +1,5 @@
 # ENTWURF / DRAFT - SPECIFICATION, NOT RUNNABLE, NOT PART OF 0.0.7: almost every `@fs` name of this flow has no script (`resolve-head`, `collect-gates`, `collect-docs`,
-# `count-corrections`, `select-rejected`, `collect-verdicts`, ...), the approval gates are open (A3') and no SW 1.0 run exists. It describes the intended round; do not run it.
+# `select-rejected`, `collect-verdicts`, ...), the approval gates are open (A3') and no SW 1.0 run exists. It describes the intended round; do not run it.
 # One round of the coordinator session (the short-lived coordinator the strategy starts). FS profile: see README.md.
 # Start: the handoffs (fs-documentation todo/handoff-*.md) and the inbox are read, strands and priorities are taken over.
 # Work: ONE agent per work step, in the BACKGROUND (Sonnet builds and tests, Opus reviews, Haiku searches and never codes).
@@ -72,6 +72,17 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "One query - gh search issues --owner FreeSynergy --label rot --state open. Empty = silence. Red = bugfix or agent-run for exactly this run; a gate is never bypassed."
+  - zaehler-start:
+      set:
+        runde: 0
+      export:
+        as: '${ $context + { korrekturen: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The correction counter of the round lives IN this flow (`korrekturen.runde`, starts at 0) and is passed on from step to step; no script and no caller state. `korrektur-stand` reads it BEFORE a correction agent is started, `korrektur-zaehlen` raises it by one. A missing or non-numeric counter is no 0: it ends in `eskalation`."
   - straenge:
       call: take-over-strands:0.0.7@fs
       with:
@@ -231,6 +242,33 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Picks the work steps whose gate is red (`red == true` in `gates`): the result is a list of `{ repo, branch, delta, findings }`, one entry per rejected branch, with the findings of exactly this branch; exactly these branches are corrected (`korrektur`), nobody else."
+  - korrektur-stand:
+      switch:
+        - ohne-stand:
+            when: '${ ($context.korrekturen.runde | type) != "number" }'
+            then: eskalation
+        - grenze:
+            when: '${ $context.korrekturen.runde >= 3 }'
+            then: eskalation
+        - weiter:
+            then: korrektur-zaehlen
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow BEFORE any correction agent starts: the counter of the round is read from the context (`korrekturen.runde`); a missing or non-numeric counter goes to `eskalation` (never counted as 0), and from the third correction round (`runde >= 3`, three have run) the round ends in `eskalation` without starting a fourth agent. Gate rejections and review rejections both pass here."
+  - korrektur-zaehlen:
+      set:
+        runde: ${ $context.korrekturen.runde + 1 }
+      export:
+        as: '${ $context + { korrekturen: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Raises the counter of the round by one, in the flow itself (jq, no script), right before `korrektur` starts the agents. Reached only through `korrektur-stand`, so the counter exists and is below 3."
   - korrektur:
       for:
         each: schritt
@@ -258,18 +296,6 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Every red or rejected branch is fixed by ONE agent through agent-run for exactly this branch with its own findings (never the branch of the round start, never by the coordinator, and never through bugfix.yaml: that flow ends in release-flow with review, tag, push and release, which a round must not start). `publish: false`: the run ends after the clean-up without a human push step. Background, its message goes to the coordinator; then `korrektur-einsammeln`, then the gates run again on the new heads. Gate and review output are passed as the named field `findings` (data), not as free text of the order."
-  - korrektur-zaehlen:
-      call: count-corrections:0.0.7@fs
-      with:
-        abgelehnt: ${ $context.abgelehnt }
-      export:
-        as: '${ $context + { korrekturen: . } }'
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Counts the correction rounds of the whole round (gates and reviews together) in the state of the round (`korrekturen.runde`, a specification: the count is the contract, the state is the caller's). Whatever the tests report, the round never starts more than 3 correction rounds: `korrektur-weiche` sends the fourth to `eskalation`; no endless loop of agent starts."
   - korrektur-einsammeln:
       call: collect-agent-reports:0.0.7@fs
       with:
@@ -285,9 +311,6 @@ do:
         freesynergy.net:summary: "Waits event driven for the reports of ALL fixing agents, one per rejected branch (no sleep, no pgrep)."
   - korrektur-weiche:
       switch:
-        - grenze:
-            when: '${ ($context.korrekturen.runde // 0) >= 3 }'
-            then: eskalation
         - komplett:
             when: '${ $context.berichte.alle == true }'
             then: gates-pruefen
@@ -298,7 +321,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - from the third correction round of the round (`korrekturen >= 3`) the round ends in `eskalation`; the gates run again only after every fixing agent has reported; otherwise eskalation."
+        freesynergy.net:summary: "Control flow - the gates run again only after every fixing agent has reported; otherwise eskalation. The limit of three correction rounds is `korrektur-stand` (BEFORE the agents start)."
   - doku:
       for:
         each: schritt
@@ -423,13 +446,13 @@ do:
         ergebnisse: ${ $context.urteile }
       export:
         as: '${ $context + { abgelehnt: . } }'
-      then: korrektur
+      then: korrektur-stand
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Picks the work steps whose review said NO (`verdict == NEIN` in `urteile`), with the findings of exactly this branch (BERICHT.md of the reviewed head); the list goes to `korrektur`."
+        freesynergy.net:summary: "Picks the work steps whose review said NO (`verdict == NEIN` in `urteile`), with the findings of exactly this branch (BERICHT.md of the reviewed head); the list goes to `korrektur-stand` and then to `korrektur`."
   - regel-check:
       call: coordinator-rule-check:0.0.7@fs
       export:

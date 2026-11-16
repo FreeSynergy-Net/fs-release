@@ -90,6 +90,7 @@ do:
           version: 0.0.7
         input:
           repo: ${ .input.repos[0] }
+          branch: ${ .input.branch }
           delta: ${ .input.delta }
           docs: ${ .input.docs }
           docs_base: ${ .input.docs_base }
