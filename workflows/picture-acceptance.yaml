@@ -1,4 +1,5 @@
 # Pictures of a Frontend: model (Vorbild) against ours, two verdicts. FS profile: see README.md.
+# [THEME-WAECHTER]: pictures count as evidence only with a green theme guard (`waechter.red == false`, see testlauf); without it the verdict is not asked for.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -11,6 +12,7 @@ do:
       with:
         model: ${ .input.model }
         ours: ${ .input.ours }
+        waechter: ${ .input.waechter }
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service

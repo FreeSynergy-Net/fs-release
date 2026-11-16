@@ -407,6 +407,35 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Renders our pictures of the frontend (as in frontend-round `images`); whatever they look like, the state changes to shown."
+  - bilder-waechter:
+      call: theme-waechter-check:0.0.8@fs
+      with:
+        frontend: ${ .input.programm }
+        images: ${ $context.images }
+      export:
+        as: '${ $context + { waechter: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "SPECIFICATION, NOT RUNNABLE (no script yet). Theme guard (rule [THEME-WAECHTER] of testlauf): every rendered picture carries the requested theme and a token colour at a fixed place matches it; no shared theme state between the picture tests. A wrong theme is red; a missing result is not green."
+  - waechter-weiche:
+      switch:
+        - gruen:
+            when: '${ $context.waechter.red == false }'
+            then: bilder
+        - rot:
+            when: '${ $context.waechter.red == true }'
+            then: stufe-3
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only `red == false` shows the pictures to the picture gate; pictures with a red guard go back to stufe-3 with the finding, pictures without a guard result are an escalation. Pictures without a green guard never count as evidence."
   - bilder:
       run:
         workflow:
@@ -417,6 +446,7 @@ do:
           programm: ${ .input.programm }
           model: ${ .input.model }
           ours: ${ $context.images }
+          waechter: ${ $context.waechter }
       export:
         as: '${ $context + { bild: . } }'
       metadata:

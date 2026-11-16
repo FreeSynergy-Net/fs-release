@@ -10,6 +10,10 @@
 # [PROZESSE] no `pkill` / `killall` (and no `kill $(pgrep ...)`) with patterns: several agents share one machine, a pattern kill ends the processes of OTHER agents.
 # An agent ends only its OWN processes, through the PID of the build-slot.sh process it started itself (`scripts/build-slot.sh ... & pid=$!`, then `kill "$pid"`).
 # Script check: `scripts/check-no-pkill` (red = a pattern kill in workflows/, scripts/, actions/ or .github/; self test scripts/test_check_no_pkill.sh).
+# [THEME-WAECHTER] (pixel-checked picture tests): picture tests must not share a global theme state (each test sets and restores its own theme); every picture result
+# carries the REQUESTED theme, and a token colour at a fixed place of the picture must match that theme; a wrong theme is RED. Pictures of a run whose Theme-Waechter is
+# missing or was red do NOT count as evidence (acceptance gate). STATUS: specification, not runnable: the `@fs` name `theme-waechter-check` has no script yet (it needs the
+# picture tests of the frontend and its theme tokens); the structure is checked by tests/workflows_doku.rs (with counter-checks), the check itself is not.
 # Order: `Workflow testlauf, step <id>, parameters repo, branch, head, delta, scope`. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -67,8 +71,25 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Runs for the changed parts only: build-slot.sh cargo test -p <crate> --test <file>; the time of each run is measured. Carries red, runde and seconds."
+  - theme-waechter:
+      call: theme-waechter-check:0.0.8@fs
+      with:
+        repo: ${ .input.repo }
+        ziel: ${ $context.ziel }
+        lauf: ${ $context.gezielt }
+      export:
+        as: '${ $context + { waechter: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "SPECIFICATION, NOT RUNNABLE (no script yet). Theme guard of picture tests with a pixel check: no shared theme state between the tests, every picture result carries the requested theme, a token colour at a fixed place must match that theme; a wrong theme is red. Result `red` (true | false); a run without picture tests has `red: false` and `bilder: 0`. A missing result is not green. Pictures of a run without a green guard do not count as evidence."
   - gezielt-again:
       switch:
+        - theme:
+            when: '${ $context.waechter.red != false }'
+            then: fix
         - runden:
             when: '${ ($context.gezielt.red and ($context.gezielt.runde // 0) >= 3) }'
             then: eskalation

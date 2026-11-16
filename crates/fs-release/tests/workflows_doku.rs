@@ -447,3 +447,101 @@ fn counter_resolve_head_paths_of_the_other_form_are_caught() {
         &t.replace("${ $context.kopf.head }", "${ $context.kopf }")
     ));
 }
+
+/// [THEME-WAECHTER]: `testlauf` runs the theme guard after the targeted tests and a guard that is red or missing counts as red; `programm-grundgeruest` shows
+/// pictures to the picture gate only after a green guard (red goes back, no result escalates); the acceptance flow carries the guard. The guard script does not
+/// exist yet: the steps say so (specification, not runnable). Each part has a counter-check on a changed copy.
+fn theme_guard_is_wired(testlauf: &str, belt: &str, accept: &str) -> bool {
+    let tl = step_names(testlauf);
+    let pos = |n: &str| tl.iter().position(|x| x == n);
+    let again = step_body(testlauf, "gezielt-again");
+    let bl = step_names(belt);
+    let bpos = |n: &str| bl.iter().position(|x| x == n);
+    let weiche = step_body(belt, "waechter-weiche");
+    pos("gezielt")
+        .zip(pos("theme-waechter"))
+        .zip(pos("gezielt-again"))
+        .is_some_and(|((a, b), c)| a < b && b < c)
+        && again.contains("waechter.red != false")
+        && again
+            .find("waechter.red")
+            .zip(again.find("gezielt.red == false"))
+            .is_some_and(|(x, y)| x < y)
+        && step_body(testlauf, "theme-waechter").contains("SPECIFICATION, NOT RUNNABLE")
+        && bpos("bilder-erzeugen")
+            .zip(bpos("bilder-waechter"))
+            .zip(bpos("waechter-weiche"))
+            .zip(bpos("bilder"))
+            .is_some_and(|(((a, b), c), d)| a < b && b < c && c < d)
+        && weiche.contains("waechter.red == false")
+        && weiche.contains("then: bilder")
+        && weiche.contains("then: stufe-3")
+        && weiche.contains("then: eskalation")
+        && step_body(belt, "bilder").contains("waechter: ${ $context.waechter }")
+        && accept.contains("[THEME-WAECHTER]")
+        && accept.contains("waechter: ${ .input.waechter }")
+}
+
+#[test]
+fn the_theme_guard_is_wired_into_testlauf_and_the_picture_gate() {
+    let (t, b, a) = (
+        read("testlauf"),
+        read("programm-grundgeruest"),
+        read("picture-acceptance"),
+    );
+    assert!(theme_guard_is_wired(&t, &b, &a));
+    // counter-checks: every change that lets pictures count without a green guard is caught
+    let cases: [(&str, String, String, String); 7] = [
+        (
+            "guard step renamed",
+            t.replace("theme-waechter:", "theme-x:"),
+            b.clone(),
+            a.clone(),
+        ),
+        (
+            "red guard not red",
+            t.replace("waechter.red != false", "waechter.red == true"),
+            b.clone(),
+            a.clone(),
+        ),
+        (
+            "guard result ignored",
+            t.replace(
+                "waechter.red != false }'\n            then: fix",
+                "waechter.red != false }'\n            then: kopf",
+            ),
+            b.clone(),
+            a.clone(),
+        ),
+        (
+            "pictures skip the guard",
+            t.clone(),
+            b.replace("then: bilder\n        - rot", "then: fertig\n        - rot"),
+            a.clone(),
+        ),
+        (
+            "red guard goes on",
+            t.clone(),
+            b.replace("waechter.red == false", "waechter.red != true"),
+            a.clone(),
+        ),
+        (
+            "no result is not an escalation",
+            t.clone(),
+            b.replacen("then: eskalation", "then: bilder", 99),
+            a.clone(),
+        ),
+        (
+            "acceptance without the guard",
+            t.clone(),
+            b.clone(),
+            a.replace("waechter: ${ .input.waechter }", ""),
+        ),
+    ];
+    for (name, t2, b2, a2) in cases {
+        assert!(
+            !theme_guard_is_wired(&t2, &b2, &a2),
+            "{name} was not caught"
+        );
+    }
+}
