@@ -61,7 +61,7 @@ rendered text the same on every runner). It is merged with `apt-packages` into o
 ## Release
 
 Push a tag `vX.Y.Z` (SemVer; a pre-release such as `v1.0.0-rc.1` is marked as pre-release). The tag version must equal the
-`version` in `Cargo.toml`, otherwise the plan job fails. The result is a **draft** release; publishing is always a manual step.
+`version` in `Cargo.toml`, otherwise the plan job fails. The tag is the approval (we set it only after the picture OK and the review YES); the `publish` job then makes the draft a **pre-release** once every file and signature checks out.
 
 ```yaml
 # .github/workflows/release.yml

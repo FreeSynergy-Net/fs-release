@@ -170,7 +170,7 @@ jobs:
   # After the draft: publish as Pre-release, only when every file and signature is there.
   publish:
     needs: [plan, finalize]
-    if: ${{ needs.finalize.result == 'success' }}
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.finalize.result == 'success' }}
     uses: FreeSynergy/fs-release/.github/workflows/_release-publish.yml@f1211066d0072c6319678659e845c19ae4384bd0
     permissions:
       contents: write

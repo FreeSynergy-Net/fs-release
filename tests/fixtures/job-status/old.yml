@@ -1,0 +1,20 @@
+on: push
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    steps: [{ run: "true" }]
+  container:
+    needs: plan
+    if: false
+    runs-on: ubuntu-24.04
+    steps: [{ run: "true" }]
+  finalize:
+    needs: [plan, container]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps: [{ run: "true" }]
+  publish:
+    needs: [plan, finalize]
+    if: ${{ needs.finalize.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps: [{ run: "true" }]
