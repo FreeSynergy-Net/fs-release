@@ -2,7 +2,7 @@
 
 ## 0.0.10 (candidate, no tag)
 
-- `stil-neu` (flow, Glass plan section 5, strategy 16 Nov): new style in fs-components-styles - dossier with dossier gate, style contract (`stil-vollstaendigkeit`), tokens light/dark, blocks one by one, gates contrast, distance r >= 0.25, theme guard, picture gate, Opus review, picture OK of the user, release through the strategy. Test `tests/workflows_stil_neu.rs`. TODO: the scripts `stil-vollstaendigkeit` and `zwei-stile` do not exist (the steps run the Rust tests `block_tokens.rs` and `blocks_styles.rs` of fs-components); `contrast-gate`, `theme-guard`, `picture-gate` are specifications.
+- `stil-neu` (flow, Glass plan section 5, strategy 16 Nov): new style in fs-components-styles - dossier with dossier gate, style contract (`stil-vollstaendigkeit`), tokens light/dark, blocks one by one, gates contrast, distance r >= 0.25, theme guard, picture gate, Opus review, picture OK of the user, release through the strategy. Test `tests/workflows_stil_neu.rs`. TODO: the scripts `stil-vollstaendigkeit` and `zwei-stile` do not exist (the steps run the Rust tests `block_tokens.rs` and `blocks_styles.rs` of fs-components); `contrast-gate`, `theme-guard`, `picture-gate` are specifications without a script (also the step `waechter`). Opus review fixes: `bild-ok-again` goes on only on an empty `befunde` list, a missing picture OK goes to `eskalation` (never to the release); `review-again` sends a missing verdict to `eskalation`; tests with counter-checks for `bild-ok-again`, `bilder-again` and `picture-gate`.
 
 ## 0.0.9
 

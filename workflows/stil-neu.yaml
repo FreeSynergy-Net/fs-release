@@ -154,7 +154,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Rule [THEME-WAECHTER]: the picture tests share no global theme state; every picture result carries the theme it was drawn with, and a test that sets the theme restores it. Carries red and runde."
+        freesynergy.net:summary: "Rule [THEME-WAECHTER]: the picture tests share no global theme state; every picture result carries the theme it was drawn with, and a test that sets the theme restores it. Specification, no script yet (`theme-guard`). Carries red and runde."
   - checks-again:
       switch:
         - runden:
@@ -244,16 +244,19 @@ do:
             when: '${ $context.review.verdict == "NEIN" and ($context.review.runde // 0) >= 3 }'
             then: eskalation
         - nein:
-            when: '${ $context.review.verdict != "JA" }'
+            when: '${ $context.review.verdict == "NEIN" }'
             then: tokens
         - ja:
+            when: '${ $context.review.verdict == "JA" }'
             then: continue
+        - ohne-urteil:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a NO goes back to `tokens` (the gates run again, the head changes), from the third NO to `eskalation`; only a JA goes on."
+        freesynergy.net:summary: "Control flow - a NO goes back to `tokens` (the gates run again, the head changes), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
   - bild-ok:
       call: user-acceptance:0.0.9@fs
       with:
@@ -274,13 +277,16 @@ do:
             when: '${ $context.abnahme.befunde != null and ($context.abnahme.befunde | length) > 0 }'
             then: tokens
         - angenommen:
+            when: '${ $context.abnahme.befunde != null and ($context.abnahme.befunde | length) == 0 }'
             then: continue
+        - ohne-ergebnis:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - findings of the user go back to `tokens` (new head, gates again); an empty list goes on."
+        freesynergy.net:summary: "Control flow - findings of the user go back to `tokens` (new head, gates again); only an empty list (not a missing result) goes on; a missing result goes to `eskalation`, never to the release."
   - freigabe:
       listen:
         to:

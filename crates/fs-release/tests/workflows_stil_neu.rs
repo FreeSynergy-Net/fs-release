@@ -4,6 +4,19 @@
 mod support;
 use support::workflows::{in_order, read, step_body};
 
+/// A missing result must never reach `continue`: the last (unconditional) case of the switch goes to `eskalation`, and no unconditional case continues.
+fn ends_in_escalation(body: &str) -> bool {
+    let switch = body.split("metadata:").next().unwrap();
+    let cases: Vec<&str> = switch.split("\n        - ").skip(1).collect();
+    let unconditional = |c: &&str| !c.contains("when:");
+    cases
+        .last()
+        .is_some_and(|c| unconditional(c) && c.contains("then: eskalation"))
+        && !cases
+            .iter()
+            .any(|c| unconditional(c) && c.contains("then: continue"))
+}
+
 fn style_flow_is_sound(text: &str) -> bool {
     let order = [
         "dossier",
@@ -44,6 +57,14 @@ fn style_flow_is_sound(text: &str) -> bool {
         && step_body(text, "checks-again").contains("then: eskalation")
         && step_body(text, "checks-again").contains("then: tokens")
         && step_body(text, "bilder").contains("byte-identical")
+        && step_body(text, "bilder").contains("call: picture-gate:")
+        && step_body(text, "bilder-again").contains("then: tokens")
+        && step_body(text, "bilder-again").contains("then: eskalation")
+        && ends_in_escalation(&step_body(text, "bild-ok-again"))
+        && step_body(text, "bild-ok-again").contains("then: tokens")
+        && step_body(text, "bild-ok-again").contains("| length) == 0")
+        && ends_in_escalation(&step_body(text, "review-again"))
+        && step_body(text, "review-again").contains("then: tokens")
         && step_body(text, "review").contains("gate: opus-ja")
         && step_body(text, "review").contains("head: ${ $context.kopf.head }")
         && step_body(text, "bild-ok").contains("actor: human")
@@ -114,5 +135,45 @@ fn counter_a_release_without_the_strategy_gate_or_by_an_agent_is_caught() {
         &ok,
         &ok.replace("gate: human", "gate: none"),
         1
+    )));
+}
+
+#[test]
+fn counter_the_loops_back_and_the_picture_gate_are_guarded() {
+    let t = read("stil-neu");
+    assert!(ends_in_escalation(&step_body(&t, "bild-ok-again")));
+    for step in ["bild-ok-again", "bilder-again"] {
+        let body = step_body(&t, step);
+        let broken = body.replace("then: tokens", "then: continue");
+        assert!(
+            !style_flow_is_sound(&t.replacen(&body, &broken, 1)),
+            "{step}"
+        );
+    }
+    assert!(!style_flow_is_sound(
+        &t.replace("call: picture-gate:", "call: other-gate:")
+    ));
+}
+
+#[test]
+fn counter_a_missing_picture_ok_or_verdict_never_reaches_the_release() {
+    let t = read("stil-neu");
+    let ok = step_body(&t, "bild-ok-again");
+    // the old form: the default `angenommen` continues without a result
+    let old = ok.replace(
+        "        - ohne-ergebnis:\n            then: eskalation\n",
+        "",
+    );
+    let old = old.replace(
+        "            when: '${ $context.abnahme.befunde != null and ($context.abnahme.befunde | length) == 0 }'\n",
+        "",
+    );
+    assert_ne!(old, ok);
+    assert!(!ends_in_escalation(&old));
+    assert!(!style_flow_is_sound(&t.replacen(&ok, &old, 1)));
+    let rv = step_body(&t, "review-again");
+    assert!(!ends_in_escalation(&rv.replace(
+        "        - ohne-urteil:\n            then: eskalation\n",
+        ""
     )));
 }
