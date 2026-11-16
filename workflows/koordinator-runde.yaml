@@ -588,13 +588,38 @@ do:
       call: push-unreviewed:0.0.8@fs
       with:
         branches: ${ $context.aufraeumen.branch }
-      then: end
+      export:
+        as: '${ $context + { push: . } }'
+      then: doku-marke-weiche
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: strategie-ok
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Gate `strategie-ok`, behind the report: after the approval of the strategy (event net.freesynergy.approval with source net.freesynergy.strategie and data.actor human; never an agent, CI job or worktree) the person pushes ONLY the one `unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM>` branch of the tidy-up. Never main, never a tag, never a merge. An agent never pushes (Spezifikation, Skript folgt: `push-unreviewed`)."
+  - doku-marke-weiche:
+      switch:
+        - gepusht:
+            when: '${ $context.push.ok == true }'
+            then: doku-marke
+        - sonst:
+            then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the mark of the tidy-up moves only when the push result says `ok == true`; a failed, refused or missing push result ends the round with the mark unchanged (the findings are looked at again next time)."
+  - doku-marke:
+      run:
+        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.aufraeumen.marke_kopf } --repo ${ .input.repo }${ if $context.aufraeumen.marke_opus then " --bekannt-aus -" else "" end }'
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "After the reported push: moves the mark of the tidy-up to `marke_kopf` (state file outside the checkout; with `--bekannt-aus -` only if Opus ran). Writes only the state file. For a tidy-up inside `release-flow` the person's push step does the same call (Spezifikation, Skript folgt)."
   - eskalation:
       set:
         todo: runde-eskalation
