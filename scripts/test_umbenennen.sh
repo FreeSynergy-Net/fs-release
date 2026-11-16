@@ -30,7 +30,7 @@ mk() { # mk <dir>: the world before the rename
   printf '[package]\nname = "fs-wiki"\n' >"$1/fs-wiki/Cargo.toml"
   printf 'jobs:\n  b:\n    steps:\n      - run: cargo build -p fs-wiki-*\n' >"$1/fs-wiki/.github/workflows/release.yml"
   printf '[dependencies]\nfs-wiki-core = { git = "https://github.com/FreeSynergy/fs-wiki", tag = "v0.0.10" }\n' >"$1/fs-app/Cargo.toml"
-  printf '[[package]]\nname = "fs-wiki"\nkind = "program"\n' >"$1/fs-catalog/packages.toml"
+  printf '[[package]]\nid = "fs-wiki"\nkind = "program"\n' >"$1/fs-catalog/packages.toml"
   printf 'Das Wiki fs-wiki ist ein Programm. Nicht fs-wikipedia.\n' >"$1/fs-documentation/docs/de/wiki.md"
   : >"$1/retired.txt"
 }
@@ -56,7 +56,7 @@ mkdir "$w/fs-text"
 # shellcheck disable=SC2046
 expect 1 "already exists" "red: a checkout of the new name exists" -- dry-run --old fs-wiki --new fs-text --repos "$w/fs-wiki" "$w/fs-app" "$w/fs-text"
 rmdir "$w/fs-text"
-printf '[[package]]\nname = "fs-text"\n' >>"$w/fs-catalog/packages.toml"
+printf '[[package]]\nid = "fs-text"\n' >>"$w/fs-catalog/packages.toml"
 # shellcheck disable=SC2046
 expect 1 "catalog already has an entry" "red: catalog entry of the new name exists" -- dry-run $(args "$w")
 
@@ -73,7 +73,7 @@ printf '[package]\nname = "fs-text-core"\n' >"$v/fs-wiki/crates/fs-text-core/Car
 printf '[package]\nname = "fs-text"\n' >"$v/fs-wiki/Cargo.toml"
 printf 'jobs:\n  b:\n    steps:\n      - run: cargo build -p fs-text-*\n' >"$v/fs-wiki/.github/workflows/release.yml"
 printf '[dependencies]\nfs-text-core = { git = "https://github.com/FreeSynergy/fs-text", tag = "v0.0.11" }\n' >"$v/fs-app/Cargo.toml"
-printf '[[package]]\nname = "fs-text"\nreplaces = ["fs-wiki"]\n' >"$v/fs-catalog/packages.toml"
+printf '[[package]]\nid = "fs-text"\nreplaces = ["fs-wiki"]\n' >"$v/fs-catalog/packages.toml"
 printf 'Das Programm fs-text.\n' >"$v/fs-documentation/docs/de/wiki.md"
 printf 'fs-wiki -> fs-text  # ADR 0080\n' >"$v/retired.txt"
 # shellcheck disable=SC2046
@@ -101,10 +101,10 @@ expect 1 "old name still in the docs" "red: old name in docs" -- after $(args "$
 expect 0 "green" "old name in an allowed history page" -- after $(args "$v") --allow 'docs/de/wiki.md'
 printf 'Das Programm fs-text.\n' >"$v/fs-documentation/docs/de/wiki.md"
 
-printf '[[package]]\nname = "fs-text"\n' >"$v/fs-catalog/packages.toml"
+printf '[[package]]\nid = "fs-text"\n' >"$v/fs-catalog/packages.toml"
 # shellcheck disable=SC2046
 expect 1 "has no replaces" "red: replaces missing" -- after $(args "$v")
-printf '[[package]]\nname = "fs-text"\nreplaces = ["fs-wiki"]\n' >"$v/fs-catalog/packages.toml"
+printf '[[package]]\nid = "fs-text"\nreplaces = ["fs-wiki"]\n' >"$v/fs-catalog/packages.toml"
 
 : >"$v/retired.txt"
 # shellcheck disable=SC2046
@@ -160,5 +160,123 @@ ln -s "$victim" "$xs/freesynergy/umbenennen-fs-wiki-fs-text-runde"
 out="$(XDG_STATE_HOME="$xs" "${tool[@]}" after "${nostate[@]}" 2>&1)"; rc=$?
 if [ "$rc" -eq 2 ] && [ ! -s "$victim" ]; then echo "ok   a symlinked state file is refused (rc 2) and the target stays untouched"; else
   echo "FAIL symlink state: rc=$rc"; fails=$((fails + 1)); fi
+
+# --- the catalog is read by `id` (not `name`): an entry with only a display name `fs-wiki` is no catalog hit
+c="$tmp/w3"; mk "$c"
+printf '[[package]]\nname = "fs-wiki"\n' >"$c/fs-catalog/packages.toml"
+# shellcheck disable=SC2046
+expect 0 "catalog: 0" "catalog by id: a display name fs-wiki is no entry" -- dry-run $(args "$c")
+mk "$c"
+# shellcheck disable=SC2046
+expect 0 "catalog: 1" "catalog by id: id = fs-wiki is the entry (counter-check of the line above)" -- dry-run $(args "$c")
+
+# --- more places: .desktop, Cargo.lock, source strings, FS_<OLD>_ROOT
+d="$tmp/w4"; mk "$d"
+mkdir -p "$d/fs-wiki/packaging" "$d/fs-wiki/src"
+printf '[Desktop Entry]\nName=Wiki\nExec=fs-wiki %%U\n' >"$d/fs-wiki/packaging/net.freesynergy.Wiki.desktop"
+printf '[[package]]\nname = "fs-wiki-core"\nversion = "0.0.10"\n' >"$d/fs-wiki/Cargo.lock"
+printf 'const ROOT: &str = "FS_WIKI_ROOT";\nconst DIR: &str = ".local/share/fs-wiki";\nfn m() { eprintln!("fs-wiki: failed"); }\nuse fs_wiki_core::x;\nlet fs_wikipedia = 1;\n' >"$d/fs-wiki/src/main.rs"
+# shellcheck disable=SC2046
+expect 0 "desktop: 1" "dry run lists the .desktop file (Exec=)" -- dry-run $(args "$d")
+# shellcheck disable=SC2046
+expect 0 "lock: 1" "dry run lists Cargo.lock" -- dry-run $(args "$d")
+# shellcheck disable=SC2046
+expect 0 "source: 4" "dry run lists source strings (env, path, message, snake path), not fs_wikipedia" -- dry-run $(args "$d")
+# shellcheck disable=SC2046
+expect 1 "old name still in the source" "after: red for a source string" -- after $(args "$d")
+# shellcheck disable=SC2046
+expect 1 "old name still in the desktop file" "after: red for the .desktop file" -- after $(args "$d")
+# shellcheck disable=SC2046
+expect 1 "old name still in the lock" "after: red for Cargo.lock" -- after $(args "$d")
+
+# --- keep (L2): kept with grund and bereich, the others stay open, stale patterns are red, bad input is rc 2
+kj='[{"pattern":"FS_WIKI_ROOT","grund":"Datenpfad bleibt","bereich":"sonstiges"},{"pattern":"packaging/.*desktop Name|Exec=fs-wiki","grund":"Binary als Link","bereich":"PROGRAM"}]'
+# shellcheck disable=SC2046
+expect 0 "kept: 2" "keep: two hits kept on purpose" -- dry-run $(args "$d") --keep "$kj"
+# shellcheck disable=SC2046
+expect 0 "source: 3" "keep: the other source hits stay open" -- dry-run $(args "$d") --keep "$kj"
+# shellcheck disable=SC2046
+expect 0 "bereich=PROGRAM" "keep: bereich is in the result" -- dry-run $(args "$d") --keep "$kj"
+# shellcheck disable=SC2046
+expect 0 "grund=Binary als Link" "keep: grund is in the result" -- dry-run $(args "$d") --keep "$kj"
+# shellcheck disable=SC2046
+expect 1 "matches no hit" "keep: a stale pattern is red" -- dry-run $(args "$d") --keep '[{"pattern":"NOTHING_LIKE_THIS","grund":"x","bereich":"Typ"}]'
+# shellcheck disable=SC2046
+expect 2 "bereich" "keep: an unknown bereich is bad input" -- dry-run $(args "$d") --keep '[{"pattern":"a","grund":"x","bereich":"Zeug"}]'
+# shellcheck disable=SC2046
+expect 2 "--keep" "keep: not JSON is bad input" -- dry-run $(args "$d") --keep 'nope'
+# the [[bin]] name line of a Cargo.toml is told apart from the [package] name line by its section
+printf '[package]\nname = "fs-wiki"\n[[bin]]\nname = "fs-wiki"\n' >"$d/fs-wiki/Cargo.toml"
+kb='[{"pattern":"\\[\\[bin\\]\\] name = \"fs-wiki\"","grund":"Binary als Link","bereich":"PROGRAM"}]'
+js="$tmp/keep.json"
+"${tool[@]}" dry-run $(args "$d") --keep "$kb" --json "$js" >/dev/null
+if python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if len(d["plan"]["kept"])==1 and len([c for c in d["plan"]["crates"] if c["file"]=="Cargo.toml"])==1 else 1)' "$js"; then
+  echo "ok   keep: only the [[bin]] line is kept, the [package] line stays a crate hit"; else echo "FAIL keep by section"; fails=$((fails + 1)); fi
+# after: green only when every remaining hit is kept (everything else renamed)
+e="$tmp/w5"; mk "$e"; rm -rf "$e/fs-wiki/crates/fs-wiki-core"
+printf '[package]\nname = "fs-text"\n[[bin]]\nname = "fs-wiki"\n' >"$e/fs-wiki/Cargo.toml"
+printf '[[package]]\nid = "fs-text"\nreplaces = ["fs-wiki"]\n' >"$e/fs-catalog/packages.toml"
+printf 'x\n' >"$e/fs-documentation/docs/de/wiki.md"; printf 'fs-wiki -> fs-text\n' >"$e/retired.txt"
+printf 'jobs: {}\n' >"$e/fs-wiki/.github/workflows/release.yml"; printf 'fs-text = 1\n' >"$e/fs-app/Cargo.toml"
+# shellcheck disable=SC2046
+expect 1 "crate 'fs-wiki' still named" "after: the bin name is open without keep" -- after $(args "$e")
+# shellcheck disable=SC2046
+expect 0 "kept: 1" "after: green when the only hit is kept" -- after $(args "$e") --keep "$kb"
+# shellcheck disable=SC2046
+expect 1 "stale entry" "after: a kept name that vanished is red" -- after $(args "$e") --keep '[{"pattern":"Exec=fs-wiki","grund":"x","bereich":"PROGRAM"}]'
+
+# --- allow works in the dry run too
+printf 'Siehe fs-wiki.\n' >"$d/fs-documentation/docs/de/wiki.md"
+# shellcheck disable=SC2046
+expect 0 "allowed: 1" "allow in the dry run: the history page is allowed" -- dry-run $(args "$d") --allow 'docs/de/wiki.md'
+# shellcheck disable=SC2046
+expect 0 "docs: 0" "allow in the dry run: no open docs hit" -- dry-run $(args "$d") --allow 'docs/de/wiki.md'
+
+# --- git: only tracked files are hits, untracked ones are a warning; a repo outside --repos is searched on origin/main
+g="$tmp/w6"; mk "$g"
+gitc() { git -C "$1" -c user.name=t -c user.email=t@example.invalid "${@:2}"; }
+mkrepo() { git init -q -b unreviewed/t "$1"; gitc "$1" add -A; gitc "$1" commit -q -m x; git -C "$1" update-ref refs/remotes/origin/main HEAD; }
+printf 'fs-wiki-tmp\n' >"$g/fs-wiki/.gitignore.tmp"; rm "$g/fs-wiki/.gitignore.tmp"
+mkrepo "$g/fs-wiki"
+printf 'notes: fs-wiki\n' >"$g/fs-wiki/NOTES.txt"
+printf 'build/\n' >"$g/fs-wiki/.gitignore"; mkdir -p "$g/fs-wiki/build"; printf 'fs-wiki\n' >"$g/fs-wiki/build/out.txt"
+mkdir -p "$g/fs-other"; printf 'fs-wiki wird gebraucht\n' >"$g/fs-other/README.md"; mkrepo "$g/fs-other"
+# shellcheck disable=SC2046
+expect 0 "untracked: 1" "git: an untracked file naming the old name is only a warning" -- dry-run $(args "$g")
+# shellcheck disable=SC2046
+expect 0 "warn: 1 untracked" "git: the warning is printed" -- dry-run $(args "$g")
+# shellcheck disable=SC2046
+expect 0 "source: 0" "git: untracked and ignored files are not hits" -- dry-run $(args "$g")
+# shellcheck disable=SC2046
+expect 0 "outside: 1" "outside: fs-other on origin/main names the old name" -- dry-run $(args "$g")
+# shellcheck disable=SC2046
+expect 0 "repo=$g/fs-other" "outside: the repo and file are listed" -- dry-run $(args "$g")
+# shellcheck disable=SC2046
+expect 0 "kept: 1" "outside: kept by a pattern with the repo name" -- dry-run $(args "$g") --keep '[{"pattern":"fs-other README.md","grund":"gehoert dem anderen Repo","bereich":"sonstiges"}]'
+# shellcheck disable=SC2046
+expect 0 "outside: 0" "outside: --repos names the repo, so it is not searched twice" -- dry-run --old fs-wiki --new fs-text --repos "$g/fs-wiki" "$g/fs-other" --world "$g"
+printf 'wieder fs-wiki\n' >"$g/fs-other/README.md"
+# a change that is not on origin/main (not committed) does not count: the search reads origin/main
+# shellcheck disable=SC2046
+expect 0 "outside: 1" "outside: only origin/main counts, not the working tree" -- dry-run $(args "$g")
+
+# --- rename (L1 scaffold): git mv of the crate folders, word boundary, keep lines skipped, idempotent, never on main
+r="$tmp/w7"; mk "$r"; mkdir -p "$r/fs-wiki/crates/fs-wiki" "$r/fs-wiki/src"
+printf '[package]\nname = "fs-wiki"\n[[bin]]\nname = "fs-wiki"\n' >"$r/fs-wiki/crates/fs-wiki/Cargo.toml"
+printf 'use fs_wiki_core::x; // fs-wikipedia stays\nconst P: &str = "fs-wiki-core";\n' >"$r/fs-wiki/src/lib.rs"
+printf '[[package]]\nname = "fs-wiki-core"\n' >"$r/fs-wiki/Cargo.lock"
+mkrepo "$r/fs-wiki"
+rk='[{"pattern":"\\[\\[bin\\]\\] name = \"fs-wiki\"","grund":"Binary als Link","bereich":"PROGRAM"}]'
+"${tool[@]}" rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --keep "$rk" >"$tmp/rename.out" 2>&1; rc=$?
+if [ "$rc" -eq 0 ] && [ -d "$r/fs-wiki/crates/fs-text" ] && [ -d "$r/fs-wiki/crates/fs-text-core" ] && [ ! -d "$r/fs-wiki/crates/fs-wiki-core" ] \
+  && grep -q 'use fs_text_core::x; // fs-wikipedia stays' "$r/fs-wiki/src/lib.rs" && grep -q '"fs-text-core"' "$r/fs-wiki/src/lib.rs" \
+  && grep -q 'name = "fs-text-core"' "$r/fs-wiki/Cargo.lock" \
+  && [ "$(grep -c 'name = "fs-text"' "$r/fs-wiki/crates/fs-text/Cargo.toml")" -eq 1 ] && grep -q '^name = "fs-wiki"' "$r/fs-wiki/crates/fs-text/Cargo.toml"; then
+  echo "ok   rename: crates moved, words replaced, fs-wikipedia and the kept [[bin]] line untouched"; else echo "FAIL rename: rc=$rc"; cat "$tmp/rename.out"; fails=$((fails + 1)); fi
+before="$(git -C "$r/fs-wiki" status --porcelain | sort | md5sum)"
+expect 0 "nothing to do" "rename twice is a no-op" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --keep "$rk"
+if [ "$before" = "$(git -C "$r/fs-wiki" status --porcelain | sort | md5sum)" ]; then echo "ok   rename twice changes nothing"; else echo "FAIL rename twice changed files"; fails=$((fails + 1)); fi
+git -C "$r/fs-wiki" checkout -q -b main 2>/dev/null
+expect 1 "only in a worktree branch" "rename refuses on main" -- rename --old fs-wiki --new fs-other --repos "$r/fs-wiki"
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
