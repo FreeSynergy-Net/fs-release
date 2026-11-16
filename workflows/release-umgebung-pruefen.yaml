@@ -1,0 +1,46 @@
+# Report on the GitHub environment `release-signing` in every repo that calls release.yml of fs-release (docs/usage.md, "Approval for the signing job").
+# Read only: `scripts/check_release_env.sh` makes GET calls of `gh api` and never changes anything; the environments are set up by the owner on GitHub (step `einrichten`).
+# Order: `Workflow release-umgebung-pruefen for <repos>` (inputs repos, org, env, tag, sha, strict; docs/prompt-template.md). FS profile: see README.md.
+# Run it by the helper of the strategy (the agents do not call `gh`); rc 0 = report (WARN and FEHLT are the finding), rc 2 = call or gh error (401/403/5xx is never "fehlt").
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: release-umgebung-pruefen
+  version: 0.0.10
+  title: Check the signing environment release-signing in all calling repos - report only
+do:
+  - pruefen:
+      call: check-release-env:0.0.10@fs
+      with:
+        repos: ${ .input.repos }
+        org: ${ .input.org }
+        env: ${ .input.env }
+        tag: ${ .input.tag }
+        sha: ${ .input.sha }
+        strict: ${ .input.strict }
+      export:
+        as: '${ $context + { bericht: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Script `scripts/check_release_env.sh` (bash, GET calls of `gh api` only, a write flag is refused; self test `scripts/test_check_release_env.sh` with a mock gh and mutants) - one line per repo: environment exists (404 = fehlt), required reviewer >= 1, tag rule `v*`, GPG_PRIVATE_KEY and GPG_PASSPHRASE as environment secrets, the same names as repository secrets (hint: double holding), calls release.yml (info); result OK, WARN (no protection, secrets only in the repository) or FEHLT. Section fs-release: rulesets (empty = Tag-Schutz fehlt) and whether the tag points at the expected commit. rc 0 = report, rc 2 = call or gh error (401/403/5xx is not 404), with `strict` rc 1 if a repo is not OK. Only names of secrets, never values."
+  - melden:
+      call: report-to-strategy:0.0.10@fs
+      with:
+        bericht: ${ $context.bericht }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Hands the table (workflow, run, result) to the strategy; names every repo that is WARN or FEHLT and the rulesets finding. The AI changes nothing on GitHub and does not call `gh` itself.
+  - einrichten:
+      call: owner-sets-environment:0.0.10@fs
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: owner
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The owner creates or repairs the environment on GitHub (docs/usage.md steps 1 to 4 and 6; reviewer = the owner, tag rule v*, secrets as environment secrets) and a ruleset for the tags of fs-release; then the workflow is run again until every repo is OK.

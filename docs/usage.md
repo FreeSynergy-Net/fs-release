@@ -164,6 +164,22 @@ Structure test: `scripts/check-signing-env [files...]` (also run by `scripts/tes
 `environment:` is RED, and so is any other job that touches `GPG_*` secrets (only the call of `release.yml` / `_release-finalize.yml` may hand them on). Pass the mirror
 and site workflows as arguments to check them as well.
 
+Check of the setup on GitHub (report only): workflow `release-umgebung-pruefen`, script `scripts/check_release_env.sh` (self test `scripts/test_check_release_env.sh` with a mock `gh`;
+it makes GET calls of `gh api` only and refuses every write flag; secrets appear by name only). The helper of the strategy runs it (agents do not call `gh`):
+`scripts/check_release_env.sh --org FreeSynergy --env release-signing --tag v0.0.10 --sha a084f8b96ecac9c1eccbeca9244ae7fa2bd9a38a [--repos texts,packages,...] [--strict] [--out file]`.
+
+| Column | Meaning |
+| --- | --- |
+| `env` | the environment exists (`environments/release-signing`; only a 404 means `fehlt`) |
+| `reviewers` | reviewers in the protection rule `required_reviewers` (must be at least 1) |
+| `tag_rule` | deployment branch policy with a tag policy `v*` |
+| `env_sec` / `repo_sec` | `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` among the environment secrets / repository secrets (2/2; both places complete is a hint "double holding") |
+| `release` | the repo calls `release.yml` of fs-release (info; `unbekannt` without access) |
+| `result` | `OK` (environment, reviewer, tag rule, both environment secrets), `WARN` (environment without protection or secrets only in the repository), `FEHLT` (404) |
+
+Section fs-release: `rulesets` (empty = "Tag-Schutz fehlt") and, with `--tag` and `--sha`, whether the tag points at the expected commit. Exit code: 0 = report made (WARN and FEHLT are the
+finding), 1 = with `--strict` at least one repo is not OK, 2 = call or gh error (401, 403, 5xx, network: never reported as "fehlt").
+
 ### Pipeline
 
 1. `plan`: validates the tag (SemVer) and Cargo version, builds one JSON plan.
