@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Dossier-Gate (Entscheidung der Strategie, 16.11.): `belegt` gegen `[offen]` in den Dossier-Dateien.
+
+usage: python3 -I scripts/dossier-gate <Datei oder Ordner> [...]
+exit 0 green, 1 red (each defect on its own line `datei:zeile: Zustand: grund`), 2 bad input (no file, no table; never green).
+Read only, no network, no AI. Self test: bash scripts/test_dossier_gate.sh.
+
+Table (in a .md file of the dossier, e.g. states.md): header cells `Zustand`, `belegt`, `Quelle` (any order, more columns allowed).
+  belegt = `ja`      -> Quelle names a source (not empty, not `-`, not `ohne Vorbild`).
+  belegt = `[offen]` -> Quelle says `ohne Vorbild` (own version, eigene Fassung); no source needed.
+  anything else      -> red: a state that is neither belegt nor marked `ohne Vorbild`.
+A file with the line `Rolle: Zweitvorbild` is a second model (e.g. Microsoft Store without a Windows machine):
+its gaps are only hinweis, never red. A folder argument checks its *.md files; files without the table are listed, not checked.
+"""
+import glob
+import os
+import re
+import sys
+
+HEAD = ("zustand", "belegt", "quelle")
+OWN = "ohne vorbild"
+SEP = re.compile(r":?-{3,}:?")
+SECOND = re.compile(r"^\s*Rolle:\s*Zweitvorbild\s*$", re.M | re.I)
+NO_SOURCE = ("", "-", "—")
+
+
+def cells(line):
+    s = line.strip()
+    if not (s.startswith("|") and s.endswith("|") and len(s) > 1):
+        return None
+    return [c.strip() for c in s[1:-1].split("|")]
+
+
+def plain(text):
+    return re.sub(r"[*_`]", "", text).strip().lower()
+
+
+def judge(zustand, belegt, quelle):
+    """(verdict, reason); verdict is 'belegt', 'ohne-vorbild' or 'rot'."""
+    b, q = plain(belegt), plain(quelle)
+    if not plain(zustand):
+        return "rot", "Zustand ohne Namen"
+    if b in ("ja", "belegt"):
+        if OWN in q:
+            return "rot", "belegt und zugleich 'ohne Vorbild'"
+        if q in NO_SOURCE:
+            return "rot", "belegt ohne Quelle"
+        return "belegt", ""
+    if b == "[offen]":
+        if OWN in q:
+            return "ohne-vorbild", ""
+        return "rot", "[offen] ohne Markierung 'ohne Vorbild' in Quelle"
+    return "rot", f"belegt ist {belegt.strip()!r}, erlaubt: ja oder [offen]"
+
+
+def tables(lines):
+    """[(zeile der Kopfzeile, rows)]; a row is (zeile, zustand, belegt, quelle)."""
+    found, i = [], 0
+    while i < len(lines):
+        head = cells(lines[i])
+        sep = cells(lines[i + 1]) if i + 1 < len(lines) else None
+        names = [plain(c) for c in head] if head else []
+        if head and sep and all(SEP.fullmatch(c) for c in sep) and all(k in names for k in HEAD):
+            def pick(cs, key):
+                k = names.index(key)
+                return cs[k] if k < len(cs) else ""
+
+            rows, j = [], i + 2
+            while j < len(lines) and cells(lines[j]) is not None:
+                cs = cells(lines[j])
+                rows.append((j + 1, pick(cs, "zustand"), pick(cs, "belegt"), pick(cs, "quelle")))
+                j += 1
+            found.append((i + 1, rows))
+            i = j
+        else:
+            i += 1
+    return found
+
+
+def collect(args):
+    files, missing = [], []
+    for a in args:
+        if os.path.isdir(a):
+            files += sorted(glob.glob(os.path.join(a, "*.md")))
+        elif os.path.isfile(a):
+            files.append(a)
+        else:
+            missing.append(a)
+    return files, missing
+
+
+def main(argv):
+    if len(argv) < 2:
+        print("usage: python3 -I scripts/dossier-gate <Datei oder Ordner> [...]")
+        return 2
+    files, missing = collect(argv[1:])
+    if missing:
+        for m in missing:
+            print(f"{m}: nicht gefunden")
+        return 2
+    counts = {"belegt": 0, "ohne-vorbild": 0, "rot": 0, "hinweis": 0}
+    red_lines, notes, found_total = [], [], 0
+    for path in files:
+        name = os.path.basename(path)
+        try:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"{name}: nicht lesbar ({e.__class__.__name__})")
+            return 2
+        found = tables(text.splitlines())
+        if not found:
+            notes.append(f"{name}: ohne Tabelle Zustand | belegt | Quelle (nicht geprueft)")
+            continue
+        second = bool(SECOND.search(text))
+
+        def blocking(line, zustand, reason):
+            if second:
+                counts["hinweis"] += 1
+                notes.append(f"{name}:{line}: {zustand}: Zweitvorbild, nicht massgeblich: {reason}")
+            else:
+                counts["rot"] += 1
+                red_lines.append(f"{name}:{line}: {zustand}: {reason}")
+
+        for start, rows in found:
+            found_total += 1
+            if not rows:
+                blocking(start, "(Tabelle)", "Tabelle ohne Zeilen")
+            for line, zustand, belegt, quelle in rows:
+                verdict, reason = judge(zustand, belegt, quelle)
+                if verdict == "rot":
+                    blocking(line, zustand.strip() or "(leer)", reason)
+                else:
+                    counts[verdict] += 1
+    if found_total == 0:
+        print("dossier-gate: keine Tabelle Zustand | belegt | Quelle gefunden, nichts geprueft")
+        return 2
+    for line in red_lines + notes:
+        print(line)
+    print(f"dossier-gate: belegt {counts['belegt']}, ohne Vorbild {counts['ohne-vorbild']}, "
+          f"rot {counts['rot']}, hinweis {counts['hinweis']}")
+    red = counts["rot"] > 0
+    print("red" if red else "green")
+    return 1 if red else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

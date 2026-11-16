@@ -1,6 +1,8 @@
 # ENTWURF / DRAFT - SPECIFICATION, NOT RUNNABLE, NOT PART OF 0.0.7: nearly all `@fs` names have no script (`trait-lock`, `trait-verify`, `core-ai`, ...), the approval gate `strategie-ok`
 # is open (A3') and no SW 1.0 run exists. It describes the intended belt; do not run it.
 # Conveyor belt (ADR 0087 item 7): every program gets the basics - it starts, does simple things and ends; the frontends come with it.
+# Dossier gate (decision of the strategy, 16.11.): a state is `belegt` (with a source) or `[offen]`. Only belegt states demand a source; a [offen] state runs as
+# `ohne Vorbild` (own version, eigene Fassung); the picture gate takes the class `ohne Vorbild`; a second model (Zweitvorbild) does not block; foreign pictures are never quoted, only notes in the dossier.
 # Stage 1 in parallel: (a) dossier and documentation (model apps, menus, workflows), (b) research (standards, data model, crates, licence, state of care;
 # Haiku, read and write of notes only). Stage 2: Opus plan with a FIXED trait (hash locked), then the gate `strategie-ok` (counts only from an authorised sender, step `absender`).
 # Stage 3 in parallel (Sonnet): core (trait, typed storage after ADR 0086, CLI) and frontend (block assignment first, test data against the trait).
@@ -53,16 +55,28 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script check without AI: the dossier has states, menus and workflows of the model apps; the research file names standards, data model, crates, licence and state of care with a source each. Carries red and runde."
+  - dossier-gate:
+      call: dossier-gate:0.0.8@fs
+      with:
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { gate: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Dossier gate (decision of the strategy, 16.11.): scripts/dossier-gate (python3 -I, read only, no AI; script built with the self test scripts/test_dossier_gate.sh, the flow name dossier-gate@fs is not runnable yet). Every row of the table `Zustand | belegt | Quelle` is either belegt with a source (`ja`), or `[offen]` marked `ohne Vorbild` (own version, eigene Fassung, no source needed). Any other row is red, and so is a belegt row without source. Gaps of a second model (line `Rolle: Zweitvorbild`) are hinweis, never red. rc 2 (no table, bad input) is NOT green. The script keeps no state: the flow counts `runde`. Carries red and runde."
   - stufe-1-again:
       switch:
         - runden:
-            when: '${ ($context.stufe1check.red and ($context.stufe1check.runde // 0) >= 3) }'
+            when: '${ (($context.stufe1check.red == true or $context.gate.red == true) and (($context.stufe1check.runde // 0) >= 3 or ($context.gate.runde // 0) >= 3)) }'
             then: eskalation
         - red:
-            when: '${ $context.stufe1check.red == true }'
+            when: '${ ($context.stufe1check.red == true or $context.gate.red == true) }'
             then: stufe-1
         - green:
-            when: '${ $context.stufe1check.red == false }'
+            when: '${ ($context.stufe1check.red == false and $context.gate.red == false) }'
             then: continue
         - ohne-ergebnis:
             then: eskalation
@@ -454,7 +468,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Picture gate: the model and our picture side by side; the strategy and the user give their verdict. The result `accepted` is read by `bilder-again`; without `accepted == true` nothing is green and no release follows."
+        freesynergy.net:summary: "Picture gate: the model and our picture side by side; the strategy and the user give their verdict. A picture of class `ohne Vorbild` (dossier gate: [offen] marked as own version) has no model picture: it is shown as our own version alone, and no foreign picture is quoted. The result `accepted` is read by `bilder-again`; without `accepted == true` nothing is green and no release follows."
   - bilder-again:
       switch:
         - ja:
