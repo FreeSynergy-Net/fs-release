@@ -39,7 +39,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy/fs-release/actions/setup-rust@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
+      - uses: FreeSynergy/fs-release/actions/setup-rust@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           toolchain: pinned
           components: rustfmt,clippy
@@ -64,7 +64,7 @@ jobs:
           python3 -I "$RUNNER_TEMP/check_rust_rules.py" "$PWD"
       - name: Licences (cargo-deny)
         if: inputs.licences
-        uses: FreeSynergy/fs-release/actions/licence-check@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
+        uses: FreeSynergy/fs-release/actions/licence-check@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           working-directory: ${{ inputs.working-directory }}
 
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy/fs-release/actions/setup-rust@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
+      - uses: FreeSynergy/fs-release/actions/setup-rust@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           toolchain: ${{ inputs.msrv }}
           working-directory: ${{ inputs.working-directory }}

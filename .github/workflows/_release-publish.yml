@@ -14,7 +14,7 @@ jobs:
   publish:
     runs-on: ubuntu-24.04
     steps:
-      - uses: FreeSynergy/fs-release/actions/publish-release@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
+      - uses: FreeSynergy/fs-release/actions/publish-release@f1211066d0072c6319678659e845c19ae4384bd0
         with:
           tag: ${{ inputs.tag }}
           repo: ${{ github.repository }}
