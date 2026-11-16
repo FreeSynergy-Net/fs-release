@@ -37,19 +37,19 @@ jobs:
           pattern: dist-*
           merge-multiple: true
           path: dist
-      - uses: FreeSynergy/fs-release/actions/sbom@f1211066d0072c6319678659e845c19ae4384bd0
+      - uses: FreeSynergy/fs-release/actions/sbom@85daca82da4f24eb02edb0f7e2ef0a3616c5c80b
         with:
           name: ${{ fromJSON(inputs.plan).name }}
           version: ${{ fromJSON(inputs.plan).version }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
       # Order matters: package signatures change the files, so they come before the checksums.
-      - uses: FreeSynergy/fs-release/actions/sign-files@f1211066d0072c6319678659e845c19ae4384bd0
+      - uses: FreeSynergy/fs-release/actions/sign-files@85daca82da4f24eb02edb0f7e2ef0a3616c5c80b
         with:
           mode: packages
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      - uses: FreeSynergy/fs-release/actions/checksums@f1211066d0072c6319678659e845c19ae4384bd0
-      - uses: FreeSynergy/fs-release/actions/sign-files@f1211066d0072c6319678659e845c19ae4384bd0
+      - uses: FreeSynergy/fs-release/actions/checksums@85daca82da4f24eb02edb0f7e2ef0a3616c5c80b
+      - uses: FreeSynergy/fs-release/actions/sign-files@85daca82da4f24eb02edb0f7e2ef0a3616c5c80b
         with:
           mode: detached
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -58,7 +58,7 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*
-      - uses: FreeSynergy/fs-release/actions/draft-release@f1211066d0072c6319678659e845c19ae4384bd0
+      - uses: FreeSynergy/fs-release/actions/draft-release@85daca82da4f24eb02edb0f7e2ef0a3616c5c80b
         with:
           tag: ${{ fromJSON(inputs.plan).tag }}
           name: ${{ fromJSON(inputs.plan).name }}
