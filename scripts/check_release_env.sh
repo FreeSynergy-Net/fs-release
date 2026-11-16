@@ -13,9 +13,10 @@
 #   env_sec    GPG_PRIVATE_KEY and GPG_PASSPHRASE among the secrets of the environment (count of 2)
 #   repo_sec   the same names among the repository secrets (both present next to complete env secrets = double holding, a hint, not an error)
 #   release    the repo calls fs-release/.github/workflows/release.yml (info only; looks at .github/workflows/release*.yml; "unbekannt" without access)
-#   result     OK = environment + reviewer + tag rule + both env secrets; WARN = environment without protection or secrets only in the repo; FEHLT = 404
-# Section fs-release: rulesets (empty = "Tag-Schutz fehlt") and, with --tag, whether git/ref/tags/<tag> points at --sha (prefix compare).
-# Exit code: 0 = report made (also with WARN/FEHLT: that is the finding); 1 = with --strict at least one repo is not OK;
+#   result     OK = environment + reviewer + tag rule + both env secrets; WARN = environment without protection or secrets only in the repo; FEHLT = 404;
+#              nicht nötig = 404 and the repo does not call release.yml (not counted; release = unbekannt stays FEHLT)
+# Section fs-release: rulesets (only evaluated at status ok; 404/empty/no array = "Tag-Schutz unbekannt"; [] = "Tag-Schutz fehlt") and, with --tag, whether git/ref/tags/<tag> points at --sha (prefix compare).
+# Exit code: 0 = report made (also with WARN/FEHLT: that is the finding); 1 = with --strict at least one repo is not OK (nicht nötig excluded) or the tag is a MISMATCH;
 #            2 = call or gh error (401, 403, 5xx, network, no jq/gh): NEVER reported as "fehlt", only a 404 means "fehlt".
 set -euo pipefail
 
@@ -24,7 +25,7 @@ repos="texts,packages,people,calendars,tasks,groups,maps,capnpc,interfaces,types
 required=(GPG_PRIVATE_KEY GPG_PASSPHRASE)
 gh_bin="${GH:-gh}"
 
-usage() { sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 die() { echo "check_release_env: $*" >&2; exit 2; }
 
 while [ "$#" -gt 0 ]; do
@@ -108,11 +109,13 @@ for r in ${repos//,/ }; do
   # (1) the environment
   api_strict "$base/environments/$env_name"
   if [ "$API_ST" = 404 ]; then
-    note="environment missing (404): GitHub creates it unprotected at the first run"
+    if [ "$call" = nein ]; then res="nicht nötig"; note="no release.yml call, environment not needed (404)"
+    else note="environment missing (404): GitHub creates it unprotected at the first run"; fi
   else
     env_s="ja"; envjson="$API_OUT"
     # (2) protection: required_reviewers with >= 1 reviewer; deployment branch policy with the tag policy v*
     rev="$(jq -r '[.protection_rules[]? | select(.type=="required_reviewers") | .reviewers[]?] | length' <<<"$envjson" 2>/dev/null || echo 0)"
+    case "$rev" in ""|*[!0-9]*) rev=0 ;; esac  # broken or empty JSON: never counts as reviewer
     trule="nein"
     if [ "$(jq -r '.deployment_branch_policy.custom_branch_policies // false' <<<"$envjson" 2>/dev/null)" = true ]; then
       api_strict "$base/environments/$env_name/deployment-branch-policies"
@@ -129,14 +132,18 @@ for r in ${repos//,/ }; do
     if [ "$ecount" -lt "${#required[@]}" ] && [ "$rcount" -gt 0 ]; then note="$note secrets only in the repository (arrive unprotected);"; fi
     if [ "$ecount" -eq "${#required[@]}" ] && [ "$rcount" -gt 0 ]; then note="$note hint: same secrets also in the repository (double holding, delete the repository ones);"; fi
   fi
-  [ "$res" = OK ] || not_ok=$((not_ok + 1))
+  [ "$res" = OK ] || [ "$res" = "nicht nötig" ] || not_ok=$((not_ok + 1))
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo" "$env_s" "$rev" "$trule" "$esec" "$rsec" "$call" "$res" "${note# }" >>"$rows"
 done
 
 # fs-release itself: rulesets and the tag
 api_strict "repos/$org/fs-release/rulesets"
-if [ "$(jq -r 'length' <<<"$API_OUT" 2>/dev/null || echo 0)" -eq 0 ]; then rs="Tag-Schutz fehlt (no rulesets)"
-else rs="rulesets: $(jq -r 'length' <<<"$API_OUT") (target tag: $(jq -r '[.[] | select(.target=="tag")] | length' <<<"$API_OUT" 2>/dev/null || echo 0))"; fi
+rs="Tag-Schutz unbekannt (rulesets: no usable answer)"
+if [ "$API_ST" = ok ] && jq -e 'type=="array"' <<<"$API_OUT" >/dev/null 2>&1; then
+  if [ "$(jq -r 'length' <<<"$API_OUT")" -eq 0 ]; then rs="Tag-Schutz fehlt (no rulesets)"
+  else rs="rulesets: $(jq -r 'length' <<<"$API_OUT") (target tag: $(jq -r '[.[] | select(.target=="tag")] | length' <<<"$API_OUT"))"; fi
+fi
+mismatch=0
 tagline="tag: not asked (--tag)"
 if [ -n "$tag" ]; then
   api_strict "repos/$org/fs-release/git/ref/tags/$tag"
@@ -146,7 +153,7 @@ if [ -n "$tag" ]; then
     if [ "$typ" = tag ]; then api_strict "repos/$org/fs-release/git/tags/$got"; got="$(jq -r '.object.sha // ""' <<<"$API_OUT")"; fi
     if [ -z "$sha" ]; then tagline="tag $tag points at ${got:0:12} (no --sha given)"
     elif [ -n "$got" ] && [ "${got#"$sha"}" != "$got" ]; then tagline="tag $tag points at the expected commit ${got:0:12}: OK"
-    else tagline="tag $tag points at ${got:0:12}, expected $sha: MISMATCH"; fi
+    else tagline="tag $tag points at ${got:0:12}, expected $sha: MISMATCH"; mismatch=1; fi
   fi
 fi
 
@@ -158,12 +165,12 @@ report() {
   echo
   echo "fs-release: $rs"
   echo "fs-release: $tagline"
-  echo "summary: $(grep -c . "$rows") repos, not OK: $not_ok"
+  echo "summary: $(grep -c . "$rows") repos, not OK: $not_ok (nicht nötig does not count)"
   echo
   echo "# TSV"
   echo "$hdr"
   cat "$rows"
 }
 if [ -n "$out" ]; then report | tee "$out"; else report; fi
-[ "$strict" -eq 0 ] || [ "$not_ok" -eq 0 ] || exit 1
+[ "$strict" -eq 0 ] || { [ "$not_ok" -eq 0 ] && [ "$mismatch" -eq 0 ]; } || exit 1
 exit 0

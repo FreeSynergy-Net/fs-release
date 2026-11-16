@@ -22,8 +22,8 @@ shift
 path=""
 while [ "$#" -gt 0 ]; do case "$1" in -H) shift 2 ;; *) path="$1"; shift ;; esac; done
 f="$MOCK_DIR/fx/${path//\//_}"
-if [ -f "$f.json" ]; then cat "$f.json"
-elif [ -f "$f.err" ]; then cat "$f.err" >&2; exit 1
+if [ -f "$f.err" ]; then [ ! -f "$f.errout" ] || cat "$f.errout"; cat "$f.err" >&2; exit 1
+elif [ -f "$f.json" ]; then cat "$f.json"
 else echo "gh: Not Found (HTTP 404)" >&2; exit 1; fi
 MOCK
 chmod +x "$tmp/bin/gh"
@@ -51,6 +51,12 @@ mkrepo() {
     reponly) fx "${R}_${r}_$ENVP" "{\"name\":\"release-signing\",\"protection_rules\":[$rev],\"deployment_branch_policy\":$bp}"; fx "${R}_${r}_$ENVP"_deployment-branch-policies "$pol"; es="$none"; rs="$both" ;;
     norev) fx "${R}_${r}_$ENVP" "{\"name\":\"release-signing\",\"protection_rules\":[{\"type\":\"required_reviewers\",\"reviewers\":[]}],\"deployment_branch_policy\":$bp}"; fx "${R}_${r}_$ENVP"_deployment-branch-policies "$pol" ;;
     notag) fx "${R}_${r}_$ENVP" "{\"name\":\"release-signing\",\"protection_rules\":[$rev],\"deployment_branch_policy\":$bp}"; fx "${R}_${r}_$ENVP"_deployment-branch-policies '{"total_count":1,"branch_policies":[{"name":"main","type":"branch"}]}' ;;
+    envbad) fx "${R}_${r}_$ENVP" '{not json' ;;
+    envempty) fx "${R}_${r}_$ENVP" '' ;;
+    brtag) fx "${R}_${r}_$ENVP" "{\"name\":\"release-signing\",\"protection_rules\":[$rev],\"deployment_branch_policy\":$bp}"; fx "${R}_${r}_$ENVP"_deployment-branch-policies '{"total_count":1,"branch_policies":[{"name":"v*","type":"branch"}]}' ;;
+    nocust) fx "${R}_${r}_$ENVP" "{\"name\":\"release-signing\",\"protection_rules\":[$rev],\"deployment_branch_policy\":{\"protected_branches\":false,\"custom_branch_policies\":false}}"; fx "${R}_${r}_$ENVP"_deployment-branch-policies "$pol" ;;
+    nocall404) es=""; fx "${R}_${r}_contents_.github_workflows" '[{"type":"file","name":"ci.yml"}]' ;;
+    unk404) es=""; fxe "${R}_${r}_contents_.github_workflows" 'gh: Resource not accessible (HTTP 403)' ;;
     e403) fxe "${R}_${r}_$ENVP" 'gh: Resource not accessible by personal access token (HTTP 403)' ;;
   esac
   fx "${R}_${r}_actions_secrets" "$rs"
@@ -61,7 +67,12 @@ setup() {
   M="$tmp/m$((++n))"; rm -rf "$M"; mkdir -p "$M/fx"; : >"$M/calls.log"
   mkrepo a "$1"; mkrepo b ok
   local rsd='[{"id":1,"target":"tag"}]'
-  fx "${R}_fs-release_rulesets" "${2:-$rsd}"
+  case "${2-$rsd}" in
+    404) fxe "${R}_fs-release_rulesets" 'gh: Not Found (HTTP 404)'
+         printf '%s' '{"message":"Not Found","documentation_url":"https://docs.github.com","status":"404"}' >"$M/fx/${R}_fs-release_rulesets.errout" ;;
+    404arr) fxe "${R}_fs-release_rulesets" 'gh: Not Found (HTTP 404)'; printf '%s' "$rsd" >"$M/fx/${R}_fs-release_rulesets.errout" ;;
+    *) fx "${R}_fs-release_rulesets" "${2-$rsd}" ;;
+  esac
   fx "${R}_fs-release_git_ref_tags_v0.0.10" "{\"object\":{\"sha\":\"${3:-a084f8b96ecac9c1eccbeca9244ae7fa2bd9a38a}\",\"type\":\"commit\"}}"
 }
 n=0; fails=0
@@ -104,6 +115,33 @@ suite() {
   chk "empty rulesets: Tag-Schutz fehlt" "has 'Tag-Schutz fehlt'"
   setup ok '[{"id":1,"target":"tag"}]' 'ffffffffffffffffffffffffffffffffffffffff'; run "$s" "${args[@]}"
   chk "wrong tag commit: MISMATCH" 'has MISMATCH'
+  for v in envbad envempty; do
+    setup $v; run "$s" "${args[@]}"
+    chk "environment JSON $v: WARN, 0 reviewers (jq error never counts)" "row a | grep -q WARN && grep -qP '^fs-a\\tja\\t0\\t' <<<\"\$o\""
+    chk "environment JSON $v: rc 0, no jq noise" '[ "$rc" -eq 0 ] && ! grep -qi "jq:" "$M/stderr"'
+  done
+  setup brtag; run "$s" "${args[@]}"
+  chk "policy v* of type branch: no tag rule, WARN" 'row a | grep -q WARN && row a | grep -q "no tag rule"'
+  setup nocust; run "$s" "${args[@]}"
+  chk "custom_branch_policies false with policy list: no tag rule, WARN" 'row a | grep -q WARN && row a | grep -q "no tag rule"'
+  setup nocall404; run "$s" "${args[@]}" --strict
+  chk "404 and no release.yml call: nicht nötig, not FEHLT" 'row a | grep -q "nicht nötig" && ! row a | grep -q FEHLT'
+  chk "nicht nötig does not count: --strict rc 0, not OK: 0" '[ "$rc" -eq 0 ] && has "not OK: 0"'
+  setup missing; run "$s" "${args[@]}"
+  chk "404 and release.yml call: FEHLT, not nicht nötig" 'row a | grep -q FEHLT && ! row a | grep -q "nicht nötig"'
+  setup unk404; run "$s" "${args[@]}" --strict
+  chk "404 and release unbekannt: FEHLT (safe), --strict rc 1" 'row a | grep -q FEHLT && row a | grep -q unbekannt && [ "$rc" -eq 1 ]'
+  setup ok 404; run "$s" "${args[@]}"
+  chk "rulesets 404 with error JSON: Tag-Schutz unbekannt, no count" "has 'Tag-Schutz unbekannt' && ! has 'rulesets: [0-9]' && [ \"\$rc\" -eq 0 ]"
+  setup ok 404arr; run "$s" "${args[@]}"
+  chk "rulesets 404 even with an array body: Tag-Schutz unbekannt" "has 'Tag-Schutz unbekannt' && ! has 'rulesets: [0-9]'"
+  setup ok '{"message":"x","a":1,"b":2}'; run "$s" "${args[@]}"
+  chk "rulesets ok but not an array: Tag-Schutz unbekannt" "has 'Tag-Schutz unbekannt' && ! has 'rulesets: [0-9]'"
+  setup ok ''; run "$s" "${args[@]}"
+  chk "rulesets empty answer: Tag-Schutz unbekannt, no empty count" "has 'Tag-Schutz unbekannt' && ! has 'target tag: )'"
+  setup ok '[{"id":1,"target":"tag"}]' 'ffffffffffffffffffffffffffffffffffffffff'; run "$s" "${args[@]}"
+  chk "MISMATCH without --strict: rc 0" '[ "$rc" -eq 0 ]'
+  run "$s" "${args[@]}" --strict; chk "MISMATCH with --strict: rc 1" '[ "$rc" -eq 1 ]'
   setup ok; run "$s" --repos a --out "$M/out.txt" --tag v0.0.10
   chk "--out writes the report to the file" 'grep -q "# TSV" "$M/out.txt"'
   setup ok; run "$s" --repos a --bogus; chk "unknown argument: rc 2" '[ "$rc" -eq 2 ]'
@@ -129,4 +167,14 @@ mut "tag rule not checked" 's/ \&\& \[ "\$trule" = ja \] \&\& \[ "\$ecount"/ \&\
 mut "environment secrets not checked" 's/ \&\& \[ "\$ecount" -eq "\${#required\[@\]}" \]; then res="OK"/; then res="OK"/'
 mut "write call allowed" 's|^  ghapi_guard "\$@"$|  "$gh_bin" api -X POST "repos/x/y" >/dev/null 2>\&1 \|\| true|'
 mut "rulesets empty not reported" 's/Tag-Schutz fehlt/Tag-Schutz ok/'
+mut "MA: jq error counts as reviewer" 's/<<<"\$envjson" 2>\/dev\/null || echo 0)"/<<<"$envjson" 2>\/dev\/null || echo 1)"/'
+mut "empty reviewer answer kept" '/never counts as reviewer/d'
+mut "MB: branch policy v* counts as tag rule" 's/ and \.type=="tag"//'
+mut "ME: policy list read without custom_branch_policies" 's/\(custom_branch_policies \/\/ false.*\)= true \]/\1!= x ]/'
+mut "nicht nötig for every 404" 's/if \[ "\$call" = nein \]; then res=/if true; then res=/'
+mut "nicht nötig also for unbekannt" 's/if \[ "\$call" = nein \]; then res=/if [ "$call" != ja ]; then res=/'
+mut "nicht nötig counted as not OK" 's/ || \[ "\$res" = "nicht nötig" \]//'
+mut "rulesets read at any status" 's/if \[ "\$API_ST" = ok \] \&\& jq -e/if true \&\& jq -e/'
+mut "rulesets: array type not checked" 's/ \&\& jq -e .type=="array". <<<"\$API_OUT" >\/dev\/null 2>\&1//'
+mut "tag MISMATCH not counted for --strict" 's/; mismatch=1; fi/; fi/'
 if [ "$total" -eq 0 ]; then echo "all ok"; else echo "$total failed"; exit 1; fi

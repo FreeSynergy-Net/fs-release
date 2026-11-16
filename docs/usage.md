@@ -175,10 +175,10 @@ it makes GET calls of `gh api` only and refuses every write flag; secrets appear
 | `tag_rule` | deployment branch policy with a tag policy `v*` |
 | `env_sec` / `repo_sec` | `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` among the environment secrets / repository secrets (2/2; both places complete is a hint "double holding") |
 | `release` | the repo calls `release.yml` of fs-release (info; `unbekannt` without access) |
-| `result` | `OK` (environment, reviewer, tag rule, both environment secrets), `WARN` (environment without protection or secrets only in the repository), `FEHLT` (404) |
+| `result` | `OK` (environment, reviewer, tag rule, both environment secrets), `WARN` (environment without protection or secrets only in the repository), `FEHLT` (404; the repo calls `release.yml` or `release` is `unbekannt`), `nicht nötig` (404 and no workflow calls `release.yml`; not counted as not OK) |
 
-Section fs-release: `rulesets` (empty = "Tag-Schutz fehlt") and, with `--tag` and `--sha`, whether the tag points at the expected commit. Exit code: 0 = report made (WARN and FEHLT are the
-finding), 1 = with `--strict` at least one repo is not OK, 2 = call or gh error (401, 403, 5xx, network: never reported as "fehlt").
+Section fs-release: `rulesets` (evaluated only on status ok and an array; a 404 or an empty/odd answer = "Tag-Schutz unbekannt"; `[]` = "Tag-Schutz fehlt") and, with `--tag` and `--sha`, whether the tag points at the expected commit. Exit code: 0 = report made (WARN and FEHLT are the
+finding), 1 = with `--strict` at least one repo is not OK (`nicht nötig` excluded) or the tag is a MISMATCH, 2 = call or gh error (401, 403, 5xx, network: never reported as "fehlt").
 
 ### Pipeline
 
