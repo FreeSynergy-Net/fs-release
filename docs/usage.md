@@ -329,6 +329,16 @@ Capabilities `fs-components` must offer, so that every program defines its menus
 
 If one of these is missing, the round does not work around it in the program: it starts a component run in fs-components (the
 workflow of the component care; none exists as a file yet, so `workflow-pflege` writes it first) and builds on the result.
+## Basics of a program (`grundfassung`)
+
+`workflows/grundfassung.yaml` is the slim flow for the first version of a program (scaffold, window with name, icon and a
+"what comes" list, package metadata, user documentation stub, callers, gates, picture OK, catalog proposal). Inputs: `programm`
+(name after the naming rule, ADR 0087), `beschreibung`, `was_kommt`, `icon` (path or `placeholder`), `frontend_art`, `repo`.
+The user creates the repository; the flow prepares the scaffold in an own worktree and makes no `gh` call. The callers are
+`check.yml` and `release.yml` at `@v0.0.10` (`scripts/pin-refs.sh --dir <repo> v0.0.10`), `.fs-lock-sources.toml` has
+`strict = true`, the AppStream metadata is schema 1 without `<icon>` until fs-packages 0.0.19. The catalog entry is only a diff
+for fs-catalog (not pushed); the tag is set through the strategy after the picture OK and the review YES. The `@fs` calls have no
+script yet (specification, a real run is not proven). `programm-grundgeruest` stays for the feature work.
 
 ## Required package metadata
 

@@ -1,0 +1,247 @@
+# Slim basics for a program: scaffold, window with name, icon and `was_kommt`, package metadata, user documentation stub, callers, gates, picture OK, catalog proposal.
+# Replaces nothing: `programm-grundgeruest` (draft, not runnable) stays for the feature work; `programm-neu` stays the entry for NEW programs with an interface decision.
+# The USER creates the repository; this flow prepares the scaffold in an own worktree and creates no repository. Agents never push, tag or merge; the tag goes through the strategy's helper after the review YES.
+# Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, was_kommt, icon, frontend_art, repo, branch, head, delta, tag, vorbild, dossier, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
+# Inputs: programm (name after the naming rule, ADR 0087), beschreibung (one sentence), was_kommt (list), icon (path or `placeholder`), frontend_art (e.g. Einfach), repo (name; the user creates it).
+# Every check is green only when it says so (`red == false`); a missing result is never green.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: grundfassung
+  version: 0.0.10
+  title: Basics of a program in short - scaffold, window, metadata, user documentation, callers, gates, picture OK, catalog proposal
+do:
+  - name-pruefen:
+      call: name-check:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the program name follows the naming rule (ADR 0087 and namensregel.md: programs plural, lower case, prefix fs-, e.g. fs-draw, fs-messages; data repos singular, capitalised); a retired or forbidden old form is red. No agent renames a name \"back\" or \"simpler\"."
+  - repo-lage:
+      call: ask:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: repo-vom-nutzer
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The USER creates the repository (or says it exists); this flow creates no repository and makes no `gh` call. Only the scaffold is prepared in an own worktree and branch `unreviewed/<name>`."
+  - recherche:
+      call: research-haiku:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        vorbild: ${ .input.vorbild }
+        dossier: ${ .input.dossier }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Haiku (reads and writes notes only, never code) - a model dossier of at most one page for the FIRST frontend: states, menus, three workflows; existing dossiers under docs/*/programs/apps/<x>/frontends/ are used first. Foreign pictures are never quoted."
+  - geruest:
+      call: scaffold-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        beschreibung: ${ .input.beschreibung }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet, one slot - the scaffold of the program as a Rust crate or workspace: engine and frontend separate (ADR 0021), every source file starts with the `//! Pattern:` line and a `//!` head, no file longer than 300 lines (ADR 0043), the existing core stays as it is. MANDATORY: the binary crate knows `--version` (prints `<programm> <crate version>`, exit 0) and `--help` (exit 0); an unknown option exits 2 with a message (pattern: main.rs of fs-texts, our own code); the release smoke test calls `/usr/bin/<programm> --version` (fs-people failed on `unknown option --version`). Local commits ([COMMIT]), report per [BERICHT]."
+  - fenster:
+      call: window-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        icon: ${ .input.icon }
+        was_kommt: ${ .input.was_kommt }
+        frontend_art: ${ .input.frontend_art }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - the frontend crate built from fs-components (blocks first, none painted by hand): a window with the name, the icon (path or placeholder) and the list `was_kommt`; elements that do not work yet are locked with \"kommt noch\" (ADR 0066), no grey window without a reason, STOP-KI wherever AI is used. Engine and frontend stay two crates."
+  - manifest:
+      call: manifest-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        beschreibung: ${ .input.beschreibung }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - the package metadata in `Cargo.toml` (authors, description, license, repository, rust-version) and the AppStream metadata in schema 1 WITHOUT `<icon>` (the icon comes with fs-packages 0.0.19 and schema 2); no invented fields."
+  - nutzer-doku:
+      call: user-doc-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        beschreibung: ${ .input.beschreibung }
+        was_kommt: ${ .input.was_kommt }
+        docs: ${ .input.docs }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - the user documentation stub in fs-documentation, docs/de and docs/en `programs/apps/<x>/index.md`: what it is, what it can do today, what comes, picture. The picture is a placeholder until the picture OK; own work only, no foreign logos."
+  - aufrufer:
+      call: callers-ai:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - `.github/workflows/check.yml` and `release.yml` as callers of fs-release at `@v0.0.10` (examples/callers), pinned with `scripts/pin-refs.sh --dir <repo> v0.0.10`; `release.yml` with `kind: app`; the plan proposes `macos: false` and `windows-targets: \"\"` for a first version; this is a proposal, the strategy confirms it (open question)."
+  - lock-sources:
+      call: lock-sources-file:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - `.fs-lock-sources.toml` with `strict = true` (the lock check of fs-release, ADR 0092 rule 2); a Cargo.lock with the pinned sources is checked in."
+  - changelog-readme:
+      call: changelog-readme-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        beschreibung: ${ .input.beschreibung }
+        was_kommt: ${ .input.was_kommt }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - README (en, de) and CHANGELOG (en, de) of the new program: a first entry, what it is, what comes; no promise beyond `was_kommt`."
+  - binary-test:
+      call: binary-smoke:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { binary: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Binary test through build-slot.sh - `<programm> --version` exits 0 and the output contains the crate version, `--help` exits 0, an unknown option exits 2 with a message; the result is `red` or not. It mirrors the smoke test of the release flow (deb job, ubuntu:24.04 x86_64/aarch64)."
+  - gates:
+      call: gates:0.0.10@fs
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/gates.sh ([GATES]) through build-slot.sh, one at a time: cargo fmt --check, clippy (pedantic, -D warnings), tests (--locked), check-rust-rules; the result is `red` or not, rc is kept."
+  - gates-again:
+      switch:
+        - red:
+            when: ${ $context.gates.red or $context.binary.red }
+            then: geruest
+        - green:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red gates or a red binary test go back to geruest, otherwise on to the documentation gate."
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.10
+        input:
+          repo: ${ .input.repo }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory gate (rule doku-mitziehen) as a check AFTER nutzer-doku - sub-workflow doku-mitziehen.yaml checks only places and consistency; red stops before the picture."
+  - bild:
+      call: window-picture:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { images: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script/test run - a picture of the window (testlauf with the theme guard, [THEME-WAECHTER]: a picture without a green guard is no evidence) and the picture for the user documentation; where the guard script is missing the result is missing and the flow does not go on to the picture OK."
+  - picture-ok:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: picture-acceptance
+          version: 0.0.10
+        input:
+          model: ${ .input.vorbild }
+          ours: ${ $context.images }
+      export:
+        as: '${ $context + { verdict: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: bild-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Picture OK of the user (window and documentation picture), taken as it is. Without a verdict the flow stops; it never goes on to the release without it."
+  - katalog-vorschlag:
+      call: catalog-proposal-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        beschreibung: ${ .input.beschreibung }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - a DIFF for fs-catalog (two entries, program and frontend; schema 1 until fs-packages 0.0.19, description en and de), written as a patch file in the report; it is NOT pushed. The catalog change itself is `catalog-bump` after the release."
+  - release:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: release-flow
+          version: 0.0.10
+        input:
+          repo: ${ .input.repo }
+          tag: ${ .input.tag }
+          prerelease: true
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "release-flow.yaml holds the ONE Opus review of this head (bound to exactly this head, green branch CI of all workflows first), then tag, CI, release; the tag is set only by the strategy's helper after the picture OK and the review YES, never by an agent. There is no second review here."
