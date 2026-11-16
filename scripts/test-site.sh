@@ -25,9 +25,9 @@ printf '%s\n' "# allowed signing keys" "$appr" > "$t/allowed"
 [ -n "$sub2" ] && [ "$sub2" != "$appr2" ] && ok "setup: second approver has a separate signing subkey" || bad "setup: subkey"
 
 # --- the folder (written here: no placeholder pages are kept in git; the input of site-bauen is a folder a person approved)
-mkdir -p "$t/src/de"
-printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>t</title><meta http-equiv="Content-Security-Policy" content="img-src data:"><style>p{color:#111}</style></head><body><p>hello</p><a href="https://example.org/x">out</a> <a href="/de/">de</a></body></html>\n' > "$t/src/index.html"
-printf '<!doctype html>\n<html lang="de"><head><meta charset="utf-8"><title>t</title></head><body><p>hallo</p></body></html>\n' > "$t/src/de/index.html"
+mkdir -p "$t/src/de"; printf 'p{color:#111}\n@media (prefers-color-scheme:dark){p{color:#eee}}\n' > "$t/src/s.css"
+printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \047self\047; script-src \047none\047"><title>t</title><link rel="stylesheet" href="s.css"></head><body><p>hello</p><a href="https://example.org/x">out</a> <a href="/de/">de</a></body></html>\n' > "$t/src/index.html"
+printf '<!doctype html>\n<html lang="de"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \047self\047"><title>t</title></head><body><p>hallo</p></body></html>\n' > "$t/src/de/index.html"
 # the one place of the host names: site.toml (fixture values only; no template, script or test other than fixtures names a host)
 mktoml() { # file primary mode [alias]
   printf 'schema = 1\npurpose = "website"\n[names]\nprimary = "%s"\naliases = [%s]\n[dns]\nrecords = ["A", "AAAA", "CAA"]\n[acme]\nmethod = "http-01"\n[csp]\nmode = "%s"\n' "$2" "${4:+\"$4\"}" "$3" > "$1"; }
@@ -90,6 +90,119 @@ fc shell-type install.sh 'rm -rf /'
 fc php-type x.php '<?php ?>'
 fc js-in-static app.js 'alert(1)'
 fc no-extension README 'x'
+# B4: the bypasses of the Opus re-review (each was GREEN before the allowlist) and the rest of the allowlist; each must be red
+fc svg-style-img index.html '<svg><style><img src=x onerror=alert(1)></style></svg>'
+fc svg-style-plain index.html '<svg><style>p{color:red}</style></svg>'
+fc math-style-img index.html '<math><style><img src=x onerror=alert(1)></style></math>'
+fc noscript-title index.html '<noscript><p title="</noscript><img src=x onerror=alert(1)>"></p></noscript>'
+fc backslash-src index.html '<img src="\\fremd.example/x.png">'
+fc backslash-src2 index.html '<img src="/\fremd.example/x.png">'
+fc backslash-href index.html '<a href="\\fremd.example/">x</a>'
+fc css-escape-url style.css 'a{background:u\72l(https://x.test/a.png)}'
+fc css-escape-url2 style.css 'a{background:url(\68ttps://x.test/a.png)}'
+fc css-escape-import style.css '@\69mport "https://x.test/a.css";'
+fc css-font-face style.css '@font-face{font-family:x;src:local(x)}'
+fc css-image-set style.css 'a{background:image-set("a.png" 1x)}'
+fc svg-set-href index.html '<svg><image><set attributeName="href" to="https://x.test/a.png"/></image></svg>'
+fc svg-animate index.html '<svg><a><animate attributeName="href" values="java&#x73;cript:alert(1)"/></a></svg>'
+fc svg-file logo.svg '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+fc style-element index.html '<style>p{color:red}</style>'
+fc style-attr-plain index.html '<p style="color:red">x</p>'
+fc template index.html '<template><img src=x onerror=alert(1)></template>'
+fc xmp index.html '<xmp><img src=x onerror=1></xmp>'
+fc textarea index.html '<textarea></textarea><img src=x onerror=1>'
+fc comment index.html '<!-- x --><p>x</p>'
+fc comment-bang index.html '<!--><img src=x onerror=1>-->'
+fc cdata index.html '<![CDATA[ x ]]>'
+fc second-doctype index.html '<!DOCTYPE html>'
+fc stray-lt index.html '<p>a < b</p>'
+fc attr-single-quote index.html "<a href='x.html'>x</a>"
+fc attr-slash-separator index.html '<a/href="x.html"/title="y">x</a>'
+fc attr-twice index.html '<a href="x.html" href="https://x.test/">x</a>'
+fc unknown-attr index.html '<p data-x="1">x</p>'
+fc unknown-tag index.html '<blink>x</blink>'
+fc form index.html '<form action="x"><input type="text"></form>'
+fc input-text index.html '<input type="text">'
+fc base index.html '<base href="https://x.test/">'
+fc meta-set-cookie index.html '<meta http-equiv="set-cookie" content="a=b">'
+fc link-preload index.html '<link rel="preload" href="a.css" as="style">'
+fc link-stylesheet-abs index.html '<link rel="stylesheet" href="https://x.test/a.css">'
+fc link-stylesheet-slashes index.html '<link rel="stylesheet" href="//x.test/a.css">'
+fc img-ext-colon index.html '<img src="http://x.test/a.png">'
+fc href-entity-colon index.html '<a href="javascript&colon;alert(1)">x</a>'
+fc href-ws-js index.html '<a href="java	script:alert(1)">x</a>'
+fc href-ftp index.html '<a href="ftp://x.test/f">x</a>'
+fc xml-xhtml-root sitemap.xml '<html xmlns="http://www.w3.org/1999/xhtml"><body><img src=x onerror=alert(1)></body></html>'
+fc xml-cdata-script sitemap.xml '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><x:script xmlns:x="http://www.w3.org/1999/xhtml">alert(1)</x:script></urlset>'
+# the page's own CSP: required, first in head, strict
+nocsp() { # name replacement-for-the-CSP-meta
+  rm -rf "$t/f-$1"; cp -r "$t/src" "$t/f-$1"; python3 -I - "$t/f-$1/index.html" "$2" <<'PY'
+import re, sys
+p, rep = sys.argv[1:3]
+s = open(p).read(); s = re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*>', lambda _: rep, s); open(p, "w").write(s)
+PY
+  red "folder: $1 is refused" "$B" check "$t/f-$1"; }
+nocsp csp-missing ''
+nocsp csp-unsafe-inline "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self' 'unsafe-inline'\">"
+nocsp csp-external-host '<meta http-equiv="Content-Security-Policy" content="default-src https://x.test">'
+nocsp csp-no-default "<meta http-equiv=\"Content-Security-Policy\" content=\"img-src 'self'\">"
+nocsp csp-wildcard '<meta http-equiv="Content-Security-Policy" content="default-src *">'
+nocsp csp-empty '<meta http-equiv="Content-Security-Policy" content="">'
+rm -rf "$t/f-csp-late"; cp -r "$t/src" "$t/f-csp-late"; python3 -I - "$t/f-csp-late/index.html" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+m = re.search(r'<meta http-equiv="Content-Security-Policy"[^>]*>', s); s = s.replace(m.group(0), ""); s = s.replace('<link rel="stylesheet" href="s.css">', '<link rel="stylesheet" href="s.css">' + m.group(0)); open(p, "w").write(s)
+PY
+red "folder: csp-late (after the style sheet link) is refused" "$B" check "$t/f-csp-late"
+rm -rf "$t/f-csp-de"; cp -r "$t/src" "$t/f-csp-de"; sed -i 's#<meta http-equiv="Content-Security-Policy"[^>]*>##' "$t/f-csp-de/de/index.html"; red "folder: csp missing on a sub page is refused" "$B" check "$t/f-csp-de"
+# what the exporter fs-text-html writes (frame, short navigation, table, task box, footnote, callout, sitemap) must still pass
+rm -rf "$t/f-exp"; cp -r "$t/src" "$t/f-exp"; cat > "$t/f-exp/de/index.html" <<'EOF'
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T &amp; U</title>
+<meta name="description" content="a &lt; b &quot;q&quot; &#39;s&#39;">
+<link rel="canonical" href="https://one.example.org/de/">
+<link rel="alternate" hreflang="en" href="https://one.example.org/">
+<link rel="stylesheet" href="/s.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip</a>
+<header><p class="site">S</p><nav class="langs" aria-label="L"><ul><li><a href="/" hreflang="en" lang="en" aria-current="true">English</a></li></ul></nav></header>
+<div class="layout"><nav class="side" aria-label="N"><ul><li><a href="/de/" aria-current="page">x</a></li></ul></nav>
+<main id="main"><h1 id="t">T</h1><p>a &lt; b <a href="mailto:x@example.org?subject=a&amp;b=c">m</a><sup id="fnref-1"><a href="#fn-1">1</a></sup></p>
+<table><thead><tr><th scope="col" class="al-l">h</th></tr></thead><tbody><tr><td class="al-r">c</td></tr></tbody></table>
+<ul><li class="task"><label><input type="checkbox" disabled checked> x</label></li></ul>
+<img src="a.png" alt="" width="10" height="10" loading="lazy"><details open><summary>s</summary><p>x</p></details><hr><br>
+<aside role="note" class="callout"><p class="callout-title">t</p></aside><pre><code>a &lt;b&gt;</code></pre><ol start="3"><li id="fn-1">n</li></ol>
+</main></div>
+<footer><p>f</p></footer>
+</body>
+</html>
+EOF
+printf 'PNG' > "$t/f-exp/a.png"
+printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url><loc>https://one.example.org/</loc><xhtml:link rel="alternate" hreflang="de" href="https://one.example.org/de/"/></url></urlset>\n' > "$t/f-exp/sitemap.xml"
+grn "folder: what the exporter writes passes (frame, nav, table, task box, footnote, callout, sitemap)" "$B" check "$t/f-exp"
+# mutations of the checker (on a copy): the bypass turns GREEN when its rule is taken out, so the red cases above really come from that rule
+mkdir -p "$t/mut2"; cp "$here"/site-bauen.sh "$here"/site-lib.sh "$here"/site_manifest.py "$here"/site-tar-pruefen.py "$t/mut2/"
+mutate() { # name sed-expression: a changed copy of site-pruefen.py
+  cp "$here/site-pruefen.py" "$t/mut2/site-pruefen.py"; sed -i "$2" "$t/mut2/site-pruefen.py"
+  if cmp -s "$here/site-pruefen.py" "$t/mut2/site-pruefen.py"; then bad "mutation $1: the sed did not apply (the script changed: adjust the test)"; fi
+}
+mutate tags 's/^HTML_TAGS = {"html"/HTML_TAGS = {"svg", "style", "math", "noscript", "template", "xmp", "html"/'
+grn "mutation control: with svg/style/math on the tag list the svg-style markup is GREEN (the tag allowlist is what refuses it; the strict grammar is a second wall for the img bypass)" "$t/mut2/site-bauen.sh" check "$t/f-svg-style-plain"
+red "mutation: the tag list changed, the svg-style-img bypass is still red (the strict tag grammar is a second, independent wall)" "$t/mut2/site-bauen.sh" check "$t/f-svg-style-img"
+mutate backslash 's/if "\\\\" in value or CTRL.search(value) or re.search(r"\\s", value):/if False:/'
+grn "mutation control: without the backslash rule the backslash address is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-backslash-src"
+mutate csp 's/if not rest or rest\[0\]\[0\] != "meta" or (rest\[0\]\[1\].get("http-equiv") or "").lower() != "content-security-policy":/if False:/'
+grn "mutation control: without the required CSP meta a page without it is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-csp-missing"
+mutate cspvalue 's/if not toks\[1:\] or any(t not in ("'"'self'"'", "'"'none'"'") for t in toks\[1:\]):/if False:/'
+grn "mutation control: without the policy value rule unsafe-inline is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-csp-unsafe-inline"
+mutate css 's/^CSS_BAD = .*/CSS_BAD = (/; s/^           "<", .*$/           )/'
+grn "mutation control: without the CSS rules the escaped url( is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-css-escape-url"
 cp -r "$t/src" "$t/bad-link"; ln -s /etc/passwd "$t/bad-link/x.txt"; red "folder: symlink refused" "$B" check "$t/bad-link"
 cp -r "$t/src" "$t/bad-dlink"; ln -s /etc "$t/bad-dlink/dir"; red "folder: symlink to a folder refused" "$B" check "$t/bad-dlink"
 cp -r "$t/src" "$t/bad-name"; : > "$t/bad-name/a b.html"; red "folder: unsafe file name refused" "$B" check "$t/bad-name"

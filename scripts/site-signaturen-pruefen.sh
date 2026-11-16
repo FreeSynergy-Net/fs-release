@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pattern: none. Checks the signatures of a signed site folder (step `signatures-check`; also what the person runs before delivering).
-#   site-signaturen-pruefen.sh <dist-dir> <release-pubkey.asc> <name-version>        e.g. ... dist release-key.asc helfa.org-0.0.1
+#   site-signaturen-pruefen.sh <dist-dir> <release-pubkey.asc> <name-version>        e.g. ... dist release-key.asc example.org-0.0.1
 # The folder must hold exactly: the four files of site-bauen, approval.txt, each with its `.asc`, plus approval.txt.approver.asc (the approver's
 # own signature, checked by site-freigabe-pruefen.sh against the approver's key, not here). Each `.asc` must verify against the public release key
 # (private keyring made of this key only) and be made by exactly its fingerprint. A missing file, a foreign file or a missing signature is RED.
