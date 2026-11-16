@@ -1,0 +1,380 @@
+# Trait delta: the data interface (capnp schema + Rust trait + capability) of ONE program, drafted next to the basics and locked BEFORE the release (practice of the trait round groups_v1 / person_directory_v1, plan K1-K4 "Bridge: order per wave" T1-T4).
+# DRAFT / SPECIFICATION: the `@fs` calls have no script yet (named: `trait-lage`, `trait-lock`, `trait-verify`, `trait-release-gate`); a real run is not proven. Agents never push, tag or merge; no `gh` call.
+# Order: `Workflow trait-delta, step <id>, parameters programm, trait, standard, vorbild, features, ordner, probe, repo, branch, head, delta, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
+# Inputs: programm (name after the naming rule, ADR 0087), trait (`<programm>_v1`, e.g. `tasks_v1`; the name is a capability or data, not a kind of app), standard (AS2, JSCalendar, JSContact, ValueFlows, ... or `eigen`), vorbild (model dossier) and features (feature list of the program: what the trait must carry) as the reference, ordner (draft folder, default `.scratch/pilot-<x>/<trait>`), probe (throw-away probe crate under `.scratch/probe/<name>`).
+# Order: standard-recherche -> Opus draft -> compile probe -> Opus review (line 1 YES/NO) -> the strategy fixes the folder (hash) -> conformance test / fake -> docs -> release only after the lock. Every check is green only when it says so (`red == false`); a missing result goes to `eskalation`, never on.
+# Delimitation. `programm-grundgeruest` / `grundfassung`: the basics may start with a MINIMAL contract (only what the first window shows) and run in parallel to this flow (the draft starts with step 1 of the basics, the scaffold is built against the draft, the review of the basics checks the server against the LOCKED trait); their release-flow starts only when this flow ended `green` (`release_frei`). `kern-umbau` (the rebuild of an existing core onto the new core / ADR 0086 storage; named in the plan, no file in fs-release 489e0be4, not proven) changes the INSIDE of a program and keeps the trait as it is; this flow changes or creates the OUTSIDE (the contract). A change of a locked trait is never part of `kern-umbau`.
+# Rules. (1) A locked folder (`sperren/<trait>.sha256`) changes only on the word of the user or the decision of the strategy: this flow starts a locked trait only as `<x>_v2` or as a part trait (step `gesperrt-weiche`). (2) The hash lock is a WORKING FIXPOINT (rules.md [FIXPUNKT]): it makes parallel runs build against the same state and may be moved (release, change, Opus look, new hash). The FEATURE FREEZE (the final lock) is set only on the word of the user after the hand test, his collection of ideas and the feature comparison: no agent and no strategy sets it, nobody says "done" or "frozen". (3) Rule "interfaces before release": before the FIRST release a locked trait is replaced by a v2 without further ado (no users, no migration): the old folder stays as `sperren/alt/` hash history, not as a copy. (4) [BRUECKE-BEIDE-SEITEN]: the data interface and the standard are built at the same time as the basics and the frontend, never from the surface alone. (5) capnp only append-only (evolution rule in the head of every file). (6) Files at most 300 lines, one `//! Pattern:` line each, `#[non_exhaustive]` only on enums, no default methods (as in the trait round). (7) No backup copies of what git holds ([PLATTE]); probe sources and every target under `/srv/FreeSynergy/.scratch/...`, never under /tmp ([EIGENES-TARGET]); build and test only through build-slot.sh, at most one slot.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: trait-delta
+  version: 0.0.10
+  title: Trait delta - standard research, Opus draft, compile probe, Opus review, lock by the strategy, conformance fake, docs, release only after the lock
+do:
+  - name-pruefen:
+      call: name-check:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        trait: ${ .input.trait }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the program name follows the naming rule (ADR 0087, namensregel.md: programs plural, lower case, prefix fs-; a retired or forbidden old form is red) and the trait is called `<programm>_v1` / `<programm>_v2` after a capability or data, not after a kind of app. No agent renames a name \"back\" or \"simpler\"."
+  - lage:
+      call: trait-lage:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        trait: ${ .input.trait }
+        ordner: ${ .input.ordner }
+      export:
+        as: '${ $context + { lage: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, read only - what exists: `sperren/<trait>.sha256` (locked or not, with the hash), `schema/<x>.capnp` and `capabilities.txt` in fs-interfaces, the trait folders of the other programs (place: in the program repo `crates/<programm>-<x>/src/<trait>/` with `mod.rs`, `api.rs`, `errors.rs`, `shared.rs` and the topic files, like `person_directory_v1` in fs-people and `appointments_v1` in `fs-calendars-testdata/src/draft/`; the draft lies first in `ordner`), the fs-types tag in force. Returns `gesperrt`, `hash`, `capnp`, `tag`; a missing result is red."
+  - gesperrt-weiche:
+      switch:
+        - gesperrt:
+            when: '${ $context.lage.gesperrt == true }'
+            then: v2-oder-loesen
+        - frei:
+            when: '${ $context.lage.gesperrt == false }'
+            then: standard-recherche
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a locked trait goes to `v2-oder-loesen`, a free one to the research; a missing result goes to `eskalation`."
+  - v2-oder-loesen:
+      call: ask:0.0.10@fs
+      with:
+        trait: ${ .input.trait }
+        hash: ${ $context.lage.hash }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Decision of the strategy (or the user): the locked folder stays UNCHANGED. Either a NEW trait (`<x>_v2` or a part trait; before the first release replaced without further ado, rule 3) or the fixpoint is released, changed, looked at by Opus and set again with a new hash (rules.md [FIXPUNKT]; the change report names the hash before and after). Without a decision the flow stops here; nothing in the locked folder is touched."
+  - standard-recherche:
+      call: standard-research-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        standard: ${ .input.standard }
+        vorbild: ${ .input.vorbild }
+        features: ${ .input.features }
+      export:
+        as: '${ $context + { standard: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet (reads sources, writes notes only) - WHICH standard carries the data of the program (AS2, JSCalendar, JSContact, ValueFlows, ... or `eigen`, then with the reason) and the mapping: which trait field is carried by which standard property, what is an own profile (extension), what the standard does not know. Source and version of the standard with a link; the feature list names what the trait must carry (marks today / next / later). A foreign standard text is never quoted at length. Output: a note `standard.md` next to the draft; open points become QUESTIONS (at most three in the report), not guesses."
+  - entwurf:
+      call: trait-draft-opus:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        trait: ${ .input.trait }
+        ordner: ${ .input.ordner }
+        standard: ${ $context.standard }
+      export:
+        as: '${ $context + { entwurf: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Opus - the draft in `ordner`: (a) the capnp schema (append-only evolution rule in the head, the standard named in lines 7-8 as in surveys.capnp) and the line in `capabilities.txt`, (b) the Rust trait folder in the layout of the existing traits (`mod.rs` with the pattern line, `api.rs`, `errors.rs`, `shared.rs`, topic files; new files instead of growing a file over 300 lines), types shared by several programs in fs-types (stand-in module until the fs-types tag), (c) the trait documentation (what it is, which capability, which rights, which standard property carries which field), (d) a delta note `<trait>-delta.md` (what is new, why, source ADR/answer). A first version may be MINIMAL (what the first frontend needs) but never wrong; later fields come append-only. Every decision cites its source."
+  - probe-bau:
+      call: probe-crate-ai:0.0.10@fs
+      with:
+        ordner: ${ .input.ordner }
+        probe: ${ .input.probe }
+        trait: ${ .input.trait }
+      export:
+        as: '${ $context + { probebau: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - a throw-away probe crate under `.scratch/probe/<name>` (`#[path]` onto the draft folder, fs-types per tag, the stand-in as one module), with a null provider as `dyn` and a small FAKE plus test data that exercise the trait (the conformance rules of the draft as tests). The target lies under `.scratch/target/...`, never under /tmp. The draft itself is not changed here."
+  - kompilierprobe:
+      call: compile-probe:0.0.10@fs
+      with:
+        ordner: ${ .input.ordner }
+        probe: ${ .input.probe }
+      export:
+        as: '${ $context + { probe: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script through build-slot.sh (one slot, one command each, own CARGO_HOME and target): capnp generates, `cargo check --all-targets`, `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`, `RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps`, `cargo fmt --check`, `cargo test`, file length and pattern line (check-rust-rules.sh). Result `red` or not, rc and the hash of the folder (`tools/hash-ordner.sh`) are kept; carries red and runde."
+  - probe-weiche:
+      switch:
+        - runden:
+            when: '${ ($context.probe.red == true and ($context.probe.runde // 0) >= 3) }'
+            then: eskalation
+        - rot:
+            when: '${ $context.probe.red == true }'
+            then: entwurf
+        - gruen:
+            when: '${ $context.probe.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red probe goes back to `entwurf` with the error lines as the order, from the third red round to `eskalation`; only `red == false` goes on to the review."
+  - review:
+      call: trait-review-opus:0.0.10@fs
+      with:
+        ordner: ${ .input.ordner }
+        hash: ${ $context.probe.hash }
+        probe: ${ .input.probe }
+        standard: ${ $context.standard }
+      export:
+        as: '${ $context + { review: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Opus, read only (rules [REVIEW] [BERICHT]): line 1 is `JA` or `NEIN` for the FOLDER HASH of the probe (another hash = a new review), then the findings file:line, BLOCKER against small points, the conditions word for word, not proven. Checks: the standard is carried (mapping complete, nothing invented), the contract is minimal and honest (no field without a user, no hidden state), the rules of this flow (head comment), consumed ports instead of foreign tables, evolution append-only, files and pattern lines, the report of the probe is for this hash. 2-3 rounds are expected (the trait round of groups needed six). A missing verdict or any other value is not a JA."
+  - review-weiche:
+      switch:
+        - runden:
+            when: '${ $context.review.verdict == "NEIN" and ($context.review.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.review.verdict == "NEIN" }'
+            then: auflagen-fix
+        - ja:
+            when: '${ $context.review.verdict == "JA" and $context.review.hash == $context.probe.hash }'
+            then: continue
+        - anderer-hash:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO goes to `auflagen-fix`, from the third NO to `eskalation`; a JA counts only for exactly the hash of the probe; a missing verdict, a JA for another hash or any other value is NOT a JA and goes to `eskalation`."
+  - auflagen-fix:
+      call: conditions-fix-ai:0.0.10@fs
+      with:
+        ordner: ${ .input.ordner }
+        auflagen: ${ $context.review.auflagen }
+      export:
+        as: '${ $context + { fix: . } }'
+      then: kompilierprobe
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - the conditions of the review WORD FOR WORD, nothing more and nothing less; a change in meaning goes back as a question. Changes only the draft folder and its delta note; afterwards `kompilierprobe` runs again (new hash, new review) - no review of a head without a probe for this head."
+  - hash:
+      call: trait-hash:0.0.10@fs
+      with:
+        ordner: ${ .input.ordner }
+      export:
+        as: '${ $context + { sperre: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (`tools/hash-ordner.sh <ordner>`, read only) - the reproducible SHA-256 of the draft folder as it was reviewed; it must be the hash of the JA; returns `sha256` and `trait` (`$context.sperre`)."
+  - strategie-fixpunkt:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.approval
+              subject: ${ $context.sperre.sha256 }
+      export:
+        as: '${ $context + { freigabe: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The strategy sets the working fixpoint on the Opus JA: the approval event carries the subject = the hash of the reviewed folder; an approval for another hash does not open the gate. A decision of the strategy is enough (no user word); the FEATURE FREEZE is NOT set here and not by an agent, only by the user after the hand test, his ideas and the feature comparison."
+  - absender:
+      switch:
+        - berechtigt:
+            when: '${ ($context.freigabe.subject == $context.sperre.sha256) and (($context.freigabe.source // "") == "net.freesynergy.strategie" or ($context.freigabe.source // "") == "net.freesynergy.nutzer") and (($context.freigabe.data.actor // "") == "human") }'
+            then: sperrdatei
+        - fremd:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the approval counts only from an authorised sender (`source` strategy or user, `data.actor` is `human`, the subject is the hash); anything else goes to `eskalation` (the hash alone is readable by agents and proves nothing about the sender)."
+  - sperrdatei:
+      call: trait-lock:0.0.10@fs
+      with:
+        trait: ${ .input.trait }
+        ordner: ${ .input.ordner }
+        hash: ${ $context.sperre.sha256 }
+      export:
+        as: '${ $context + { fixpunkt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script of the coordinator side - writes `sperren/<trait>.sha256` (hash, place, predecessor in `sperren/alt/`, content in one line, reviews, next round; `gesetzt: <date>, strategy`), outside every agent worktree; the word is \"fixpoint\", never \"frozen\". The folder is then built against, not changed ([FIXPUNKT-ORDNER]: a later run that touches it reports before and after)."
+  - konformitaet:
+      call: conformance-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        trait: ${ .input.trait }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+      export:
+        as: '${ $context + { konf: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet - the conformance test and the fake in the program repo (test data crate or `draft/<trait>/` like `fs-calendars-testdata`), built AGAINST the locked folder: every rule of the trait documentation is a test, with mutants for the rules that matter; the folder is not changed. Local commits ([COMMIT]), report per [BERICHT]; missing data sources are reported, never greyed out silently."
+  - gates:
+      call: gates:0.0.10@fs
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/gates.sh ([GATES]) through build-slot.sh, one at a time: cargo fmt --check, clippy (pedantic, -D warnings), tests (--locked), check-rust-rules; the result is `red` or not, rc is kept; carries red and runde."
+  - gates-weiche:
+      switch:
+        - runden:
+            when: '${ $context.gates.red == true and ($context.gates.runde // 0) >= 3 }'
+            then: eskalation
+        - rot:
+            when: '${ $context.gates.red == true }'
+            then: konformitaet
+        - gruen:
+            when: '${ $context.gates.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red gates go back to `konformitaet`, from the third red round to `eskalation`; a missing result goes to `eskalation`."
+  - trait-unveraendert:
+      call: trait-verify:0.0.10@fs
+      with:
+        ordner: ${ .input.ordner }
+        hash: ${ $context.sperre.sha256 }
+      export:
+        as: '${ $context + { unveraendert: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the hash of the folder is still the locked one (the conformance work did not touch the trait); a difference is red and goes to `eskalation`, because only the strategy moves the fixpoint."
+  - unveraendert-weiche:
+      switch:
+        - rot:
+            when: '${ $context.unveraendert.red != false }'
+            then: eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - anything but a green check of the hash goes to `eskalation`."
+  - doku:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-mitziehen
+          version: 0.0.10
+        input:
+          repo: ${ .input.repo }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      export:
+        as: '${ $context + { doku: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory gate (rule doku-mitziehen) - the reference in the documentation: the trait page (what it carries, which standard, which capability) in docs/de and docs/en, the user documentation of the program, the line in the capability list; where a decision changes, an ADR addendum (workflow adr-write, not invented: the existing ADRs are searched first, rules.md `ADRs zuerst prüfen`). Sub-workflow doku-mitziehen checks only places and consistency; red stops here."
+  - release-tor:
+      call: trait-release-gate:0.0.10@fs
+      with:
+        trait: ${ .input.trait }
+        hash: ${ $context.sperre.sha256 }
+        ordner: ${ .input.ordner }
+      export:
+        as: '${ $context + { tor: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the gate before every release of the program: `sperren/<trait>.sha256` exists, equals the folder hash, equals the schema and capability state in fs-interfaces, and the conformance gates and the docs gate are green. Only then `release_frei` is true; a basics flow (`grundfassung`, `programm-grundgeruest`) hands its head to `release-flow` only with `release_frei == true`. The tag is set by the strategy's helper, never by an agent."
+  - fertig:
+      set:
+        status: green
+        release_frei: ${ $context.tor.release_frei == true }
+        sha256: ${ $context.sperre.sha256 }
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The only way to a green result: probe green, review JA for this hash, fixpoint set by the strategy, conformance and gates green, trait unchanged, docs green. Sets `status: green`; `release_frei` says whether the release gate is open."
+  - eskalation:
+      set:
+        todo: trait-delta-eskalation
+        status: escalated
+        eskaliert: true
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check or the review was red for the third time, a result or the sender was missing, a locked folder was touched: the flow stops and the person decides. The report names the last red lines and the open questions (at most three). This flow ends with `eskaliert: true`; the caller stops there."
+output:
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), release_frei: ($context.ergebnis.release_frei // false), sha256: ($context.ergebnis.sha256 // null) } }'

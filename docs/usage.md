@@ -279,6 +279,10 @@ A package without a `generate-rpm` table gets a default one (its binaries to `/u
 left untouched, so add `assets` there (the default is not merged in). Note: `features` is passed to every package build, filtered to the
 features each package declares; a feature no package declares fails the plan run.
 
+## Trait delta (`trait-delta`)
+
+`workflows/trait-delta.yaml` drafts and fixes the data interface of ONE program (capnp schema, Rust trait folder, capability) before its release. Inputs: `programm`, `trait` (`<programm>_v1`), `standard` (AS2, JSCalendar, JSContact, ... or `eigen`), `vorbild` and `features` as the reference, `ordner` (draft folder), `probe` (probe crate under `.scratch/probe/`), plus `repo`, `branch` and the docs inputs. Order of the steps: standard research, Opus draft, compile probe (through `build-slot.sh`, own target), Opus review (line 1 `JA` or `NEIN`, bound to the folder hash, up to three rounds), the strategy sets the fixpoint (`tools/hash-ordner.sh` into `sperren/<trait>.sha256`), conformance test and fake against the fixed folder, documentation, `release-tor`. The hash lock is a working fixpoint; the feature freeze is set only by the user. A locked trait is not changed by this flow: a new capability is a `<x>_v2` or a part trait (before the first release a locked trait is replaced by a v2 without further ado). The basics (`grundfassung`, `programm-grundgeruest`) may start with a minimal contract and run in parallel; their `release-flow` starts only when `release_frei` is true. `kern-umbau` changes the inside of a program and keeps the trait. The `@fs` calls have no script yet (specification, a real run is not proven).
+
 ## Required package metadata
 
 The plan step fails early unless every package that owns binaries declares `authors`, `description`,
