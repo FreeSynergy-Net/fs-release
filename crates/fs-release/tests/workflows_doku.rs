@@ -368,6 +368,42 @@ fn pin_refs_passes_its_self_test() {
     run_self_test("test_pin_refs.sh");
 }
 
+#[test]
+fn library_release_passes_its_self_test() {
+    run_self_test("test_library_release.sh");
+}
+
+#[test]
+fn the_pattern_kill_check_passes_its_self_test() {
+    run_self_test("test_check_no_pkill.sh");
+}
+
+/// The rule [PROZESSE] (no `pkill` / `killall`, only the own PID of the own build-slot.sh process) stands in `testlauf`, `agent-run` and
+/// `koordinator-runde`, and `testlauf` has the check step; the real tree has no pattern kill.
+#[test]
+fn the_process_rule_is_in_the_flows_and_the_tree_is_clean() {
+    for f in ["testlauf", "agent-run", "koordinator-runde"] {
+        let t = read(f);
+        assert!(
+            t.contains("pkill") && t.contains("killall") && t.contains("PID"),
+            "{f}: rule missing"
+        );
+    }
+    let t = read("testlauf");
+    assert!(step_names(&t).first().is_some_and(|n| n == "prozess-regel"));
+    assert!(t.contains("scripts/check-no-pkill") && t.contains("[PROZESSE]"));
+    let out = Command::new("python3")
+        .arg("-I")
+        .arg(root().join("scripts/check-no-pkill"))
+        .output()
+        .expect("python3");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+}
+
 /// K4: `resolve-head` has ONE output form, `{ head: <sha> }`; every caller keeps it as `kopf` and reads `$context.kopf.head`.
 fn resolve_head_paths_are_sound(text: &str) -> bool {
     !text.contains("resolve-head")

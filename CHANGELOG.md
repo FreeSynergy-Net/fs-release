@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.8
+
+- Version 0.0.8 in all crates, all flows, `chains/release.chain.yaml` and all `@fs` calls (crate version = tag).
+- Library mode of `release.yml` (strategy decision): an empty `binaries` (pure library) no longer fails the plan; the plan checks tag = Cargo workspace version = non-empty CHANGELOG section (`actions/library-release/notes.py`), the platform jobs, `finalize` and `publish` are skipped (no artefacts, so no binary packages and no signature, no secret) and the job `library` (`actions/library-release`) creates a draft with the notes of the CHANGELOG section and publishes it as Pre-release (`dry-run` creates nothing, an existing release is refused). Caller example `examples/callers/library-release.yml` (pinned to a SHA, for fs-components). Self test `scripts/test_library_release.sh` with counter-checks (wrong tag name, version differs, missing/empty/blank section, a signing or platform step in library mode) and mutations. Works only with a pin SHA that contains the new actions (pin round after the merge).
+- Opus round 8 conditions: C1 `doku-mitziehen` needs git >= 2.40 for `--docs-head` (`--attr-source`), the version is checked before the run and an older git is `skipped: git too old` (rc 2), the error label of a failing `checkout-index` is fixed (was `-f`); C2 `fetch-depth: 0` / `fetch-tags` are removed from `ci.yml` again, `scripts/test_changelog_released.sh` runs only locally and in agent worktrees (header says so); C3 the counter-test takes the tag count and the oldest tag independently (`for-each-ref`, `git tag --sort`), a loop over only the newest tag is red; C4 a tag without a section of its own is allowed only through the explicit list `NO_OWN_SECTION` (`v0.0.1`), a stale entry is red.
+- `scripts/pin-refs.sh` accepts only a 40-character SHA or `vX.Y.Z` (rc 2 otherwise, no file changed); self test `scripts/test_pin_refs.sh` (a valid SHA changes exactly the `uses:` lines, `x#e`, `a&b`, empty, short, upper case = rc 2; mutation). Docs of `unreviewed/pin-refs-docs` are included.
+- Rule [PROZESSE]: no `pkill` / `killall` with patterns; an agent ends only its own processes through the PID of its build-slot.sh process. `testlauf` has the step `prozess-regel`, `agent-run` and `koordinator-runde` name the rule, `scripts/check-no-pkill` finds a pattern kill in workflows/, scripts/, actions/, .github/ and is red (self test `scripts/test_check_no_pkill.sh` with planted cases and a mutation).
+
 ## 0.0.7
 
 - Version 0.0.7 in all crates, all flows, `chains/release.chain.yaml` and all `@fs` calls (crate version = tag).

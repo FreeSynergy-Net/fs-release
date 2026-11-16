@@ -7,6 +7,9 @@
 # The full run is `scripts/workspace-test-background` (self test: scripts/test_workspace_test_background.sh): `start` returns at once, `wait` blocks on a lock (no
 # polling loop) with a timeout of 2 hours and returns the result file contract {head, red, runde, seconds, exit, summary}; a timeout, a failed wait or no result goes to `eskalation`. A red head started again is run again and counted (`runde`), so a fix without a new commit ends in `runde` 3 and `eskalation`.
 # Every full run is bound to the CURRENT head (resolved right before the run, after any `fix` commit), never to the head of the start.
+# [PROZESSE] no `pkill` / `killall` (and no `kill $(pgrep ...)`) with patterns: several agents share one machine, a pattern kill ends the processes of OTHER agents.
+# An agent ends only its OWN processes, through the PID of the build-slot.sh process it started itself (`scripts/build-slot.sh ... & pid=$!`, then `kill "$pid"`).
+# Script check: `scripts/check-no-pkill` (red = a pattern kill in workflows/, scripts/, actions/ or .github/; self test scripts/test_check_no_pkill.sh).
 # Order: `Workflow testlauf, step <id>, parameters repo, branch, head, delta, scope`. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -15,6 +18,16 @@ document:
   version: 0.0.8
   title: "Targeted tests while working, the full workspace run only as an end gate, in the background and timed"
 do:
+  - prozess-regel:
+      call: no-pkill-check:0.0.8@fs
+      export:
+        as: '${ $context + { prozess: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script without AI (`scripts/check-no-pkill`): RED when a script or workflow of the repo uses `pkill`, `killall` or a kill fed by a pgrep result. A test run never ends processes by a pattern; it ends only its own through the PID of its build-slot.sh process. The result is advisory data for the report; a red result stops nothing that runs, the fix is the removal of the pattern kill."
   - geaendert:
       call: changed-parts:0.0.8@fs
       with:

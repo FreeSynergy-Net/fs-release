@@ -1,0 +1,23 @@
+# Copy to <library repo>/.github/workflows/release.yml (pure library: no binaries, no packages, no signature).
+# Every tag vX.Y.Z creates a GitHub Pre-release whose notes are the section `## X.Y.Z` (or `## <name> X.Y.Z`) of CHANGELOG.md.
+# The run fails (before anything is created) unless tag = Cargo workspace version = non-empty CHANGELOG section.
+# Pin to a full commit SHA of a reviewed state of fs-release (NOT @main); the SHA must contain library mode (bundle 0.0.8 or later).
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    # the called workflow can only have the rights its caller grants; library mode needs contents: write for the release only
+    permissions:
+      contents: write
+    uses: FreeSynergy/fs-release/.github/workflows/release.yml@0000000000000000000000000000000000000000   # replace by the reviewed SHA
+    with:
+      # binaries stays EMPTY: that is library mode
+      name: fs-components            # release title "<name> <tag>" (default - repository name)
+      # working-directory: "."
+      # dry-run: false

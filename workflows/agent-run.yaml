@@ -12,6 +12,9 @@
 # gates once per head (a green result for exactly this head is reused, the head hash is in the report); the order names the
 # files to read; mechanics (fmt, rule check, push, tag, release, clean-up) is a script of the coordinator, not an agent; after
 # a timeout (rc=124) find the cause first, then restart with a continuation prompt (WIP commit), never repeat blindly.
+# [PROZESSE] no `pkill` / `killall` (and no `kill $(pgrep ...)`) with patterns: several agents share one machine, a pattern kill ends the processes of OTHER agents.
+# An agent ends only its OWN processes, through the PID of the build-slot.sh process it started itself (`scripts/build-slot.sh ... & pid=$!`, then `kill "$pid"`).
+# Script check: `scripts/check-no-pkill` (red = a pattern kill in workflows/, scripts/, actions/ or .github/; self test scripts/test_check_no_pkill.sh).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net

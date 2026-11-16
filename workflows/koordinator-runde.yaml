@@ -10,7 +10,7 @@
 # step `einsammeln` waits event driven for every started agent, `einsammeln-weiche` sends an incomplete round to `eskalation`, which still secures and reports.
 # The results are collected, the gates are checked, and the strategy gets ONE bundled report (only final states, red, approval gates).
 # End: secure what is running (WIP commit, push unreviewed/*), handoff-update, one report. Rule check (RED on a breach): the coordinator does not build
-# or test itself, does not wait in loops (sleep, pgrep) and does not read big logs. Calls `doku-mitziehen`. Agents never push, tag or merge; no main, no tag.
+# or test itself, does not wait in loops (sleep, pgrep), does not end processes by a pattern (no `pkill`/`killall`: only its own PIDs, see [PROZESSE] in testlauf and agent-run) and does not read big logs. Calls `doku-mitziehen`. Agents never push, tag or merge; no main, no tag.
 # Every result (gates, docs, review, rule check) is green only when it says so; a missing result is never green.
 # Work stock (strategy order): the checklists of the programs (fs-documentation todo/checklisten/<programm>.md, read by `checklisten-lesen`) are read
 # with the handoffs; the open GRUNDSACHE items are the work stock of the round (`straenge` makes work steps of them). A change of a program without its checklist is RED (doku-mitziehen).
@@ -462,7 +462,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Rule check of the round, RED on a breach - the coordinator built or tested itself (cargo, build-slot.sh in its own process list), waited in loops (sleep, pgrep) or read big logs. Reads the command log of the round; the verdict is a script, not the coordinator's word."
+        freesynergy.net:summary: "Rule check of the round, RED on a breach - the coordinator built or tested itself (cargo, build-slot.sh in its own process list), waited in loops (sleep, pgrep), ended processes by a pattern (`pkill`, `killall`; rule [PROZESSE]: only the own PID of the own build-slot.sh process, script `scripts/check-no-pkill` over the repo) or read big logs. Reads the command log of the round; the verdict is a script, not the coordinator's word."
   - regel-weiche:
       switch:
         - gruen:

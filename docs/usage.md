@@ -92,7 +92,7 @@ Full examples: [`examples/callers/`](../examples/callers/) (fs-capnpc as CLI, fs
 
 | Input | Default | Meaning |
 |-------|---------|---------|
-| `binaries` | required | comma separated binary names |
+| `binaries` | empty | comma separated binary names; **empty = library mode** (see below) |
 | `kind` | `cli` | `cli`, `daemon`, `app`: selects default formats (below) |
 | `app-id` | | reverse-DNS id; needed for AppImage, Flatpak, macOS bundle |
 | `app-name`, `description`, `name` | Cargo values | display name, one-liner, artefact base name |
@@ -115,6 +115,22 @@ Packaging metadata stays in the app repo: `[package.metadata.deb]` and `[package
 (without them sensible defaults are generated), optional `wix/main.wxs`, `packaging/<app-id>.desktop`,
 `packaging/<app-id>.png|svg` (AppImage), `packaging/icon.icns` (macOS app).
 
+### Library mode (no binaries)
+
+A pure library has nothing to build, package or sign. Leave `binaries` **empty** and the same `release.yml` runs in library mode
+(caller example: [`examples/callers/library-release.yml`](../examples/callers/library-release.yml), pinned to a full SHA, not `@main`):
+
+- `plan` does not fail on an empty list. It checks (`actions/library-release/notes.py`) that the tag is `vX.Y.Z` (SemVer), that the tag version equals the
+  `[workspace.package] version` of `Cargo.toml` (or `[package] version`) and that `CHANGELOG.md` has a **non-empty** section `## X.Y.Z` (or `## <name> X.Y.Z`).
+  Any other state is red before a job starts.
+- The platform jobs, `finalize` (SBOM, signatures, checksums, provenance) and `publish` are skipped; there are no artefacts, so **no binary packages and no
+  signature are needed**, and no secret is passed. Only the job `library` runs, with `contents: write` and its own `GITHUB_TOKEN`.
+- `library` creates a draft whose notes are exactly that CHANGELOG section (not generated notes) and publishes it as **Pre-release** (0.0.N is always a pre-release,
+  ADR 0064); `dry-run: true` creates nothing; a release that already exists is never touched.
+- Self test with counter-checks and mutations: `scripts/test_library_release.sh` (wrong tag name, version differs from the tag, missing or empty section, a platform or
+  signing step in library mode all turn it red).
+- The library actions arrive with the pin round after the merge (`scripts/pin-refs.sh <sha>`): a caller can use library mode only with a SHA that contains it.
+
 ### Pipeline
 
 1. `plan`: validates the tag (SemVer) and Cargo version, builds one JSON plan.
@@ -126,7 +142,7 @@ Packaging metadata stays in the app repo: `[package.metadata.deb]` and `[package
 
 Inside fs-release, nested workflows and composite actions are referenced as `FreeSynergy/fs-release/...@<full commit SHA>` (a reviewed state of `main`)
 (GitHub cannot say "same ref as my caller" across repositories). Before tagging a release of fs-release run
-`scripts/pin-refs.sh v1.0.0`, commit, tag; callers then use `@v1`. Callers may also use `@main` while developing. Inside fs-release itself (`.github/workflows/*.yml`) the references are pinned to the full commit SHA of a reviewed state of `main` (the jobs with the signing key must never run a moving ref); raise the SHA on purpose when the actions change.
+`scripts/pin-refs.sh v1.0.0`, commit, tag. Callers may also use `@main` while developing. Inside fs-release itself (`.github/workflows/*.yml`) the references are pinned to the full commit SHA of a reviewed state of `main` (the jobs with the signing key must never run a moving ref); raise the SHA on purpose when the actions change.
 
 **Mandatory after every merge that changes `.github/workflows/_release-*.yml` or `actions/`:** a commit cannot contain its own SHA, so `release.yml`, `ci.yml` and `check.yml` still point at the older commit and the signing job (`GPG_PRIVATE_KEY`) runs whatever refs that older commit holds. Two levels exist (`release.yml` -> `_release-*.yml` -> `actions/`): a change in `actions/` needs two pin rounds (first `_release-*` onto the new state, then `release.yml` onto that pin commit). The SHA is a fast-forward commit, not a merge commit, so say so in the commit text. Raise the SHA to that commit in a second, reviewed commit (`scripts/pin-refs.sh <sha>`) and check that `git grep '@main' .github/workflows` is empty at the commit the SHA names. The flows `release-flow` and `umbenennen` name this step in their release steps.
 

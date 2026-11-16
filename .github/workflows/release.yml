@@ -1,9 +1,14 @@
 # Reusable release pipeline: plan -> platform jobs -> signed, attested draft -> Pre-release (fs-catalog pulls it from there). Usage: docs/usage.md
+# LIBRARY MODE: with an empty `binaries` (pure library, no packages) the plan carries `library: true`, every platform job, `finalize` (SBOM,
+# signatures, checksums, provenance) and `publish` are skipped, and the job `library` creates the Pre-release whose notes are the CHANGELOG section
+# of the tag version. The plan fails unless tag = Cargo workspace version = non-empty CHANGELOG section. No artefacts, so no binary packages and no
+# signature; the job `library` sees no secret (only its own GITHUB_TOKEN with contents: write). The actions used here exist only from the pin
+# round after the merge (scripts/pin-refs.sh): until then the SHA below does not contain library mode.
 name: release
 on:
   workflow_call:
     inputs:
-      binaries: { type: string, required: true, description: "Comma separated binary names" }
+      binaries: { type: string, default: "", description: "Comma separated binary names; empty = library mode (no packages, notes from CHANGELOG.md)" }
       app-id: { type: string, default: "", description: "Reverse-DNS id, e.g. net.freesynergy.CapnpCompiler (AppImage, Flatpak, macOS bundle)" }
       app-name: { type: string, default: "", description: "Human readable name (default - project name)" }
       description: { type: string, default: "", description: "One line (default - Cargo description)" }
@@ -98,7 +103,7 @@ jobs:
 
   flatpak:
     needs: plan
-    if: inputs.flatpak
+    if: inputs.flatpak && !fromJSON(needs.plan.outputs.plan).library
     uses: FreeSynergy/fs-release/.github/workflows/_release-flatpak.yml@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
     with:
       plan: ${{ needs.plan.outputs.plan }}
@@ -106,7 +111,7 @@ jobs:
 
   container:
     needs: [plan, linux]
-    if: inputs.container
+    if: inputs.container && !fromJSON(needs.plan.outputs.plan).library
     uses: FreeSynergy/fs-release/.github/workflows/_release-container.yml@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
     permissions:
       contents: read
@@ -119,7 +124,7 @@ jobs:
 
   mobile:
     needs: plan
-    if: inputs.android || inputs.ios
+    if: (inputs.android || inputs.ios) && !fromJSON(needs.plan.outputs.plan).library
     uses: FreeSynergy/fs-release/.github/workflows/_release-mobile.yml@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
     with:
       plan: ${{ needs.plan.outputs.plan }}
@@ -128,7 +133,7 @@ jobs:
 
   finalize:
     needs: [plan, linux, windows, macos, flatpak, container, mobile]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') }}
+    if: ${{ !cancelled() && needs.plan.result == 'success' && !fromJSON(needs.plan.outputs.plan).library && !contains(needs.*.result, 'failure') }}
     uses: FreeSynergy/fs-release/.github/workflows/_release-finalize.yml@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
     permissions:
       contents: write
@@ -140,6 +145,26 @@ jobs:
     secrets:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+  # Library mode: no artefacts, no signature, no secret; draft with the notes of the CHANGELOG section, then Pre-release.
+  library:
+    needs: plan
+    if: fromJSON(needs.plan.outputs.plan).library
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/library-release@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
+        with:
+          tag: ${{ fromJSON(needs.plan.outputs.plan).tag }}
+          name: ${{ inputs.name }}
+          working-directory: ${{ inputs.working-directory }}
+          dry-run: ${{ inputs.dry-run }}
+          token: ${{ github.token }}
 
   # After the draft: publish as Pre-release, only when every file and signature is there.
   publish:

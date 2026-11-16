@@ -1,0 +1,25 @@
+name: library-release
+description: Release of a pure library: check tag = workspace version = non-empty CHANGELOG section, create the Pre-release with the notes of that section. No artefacts, no signatures.
+inputs:
+  tag: { description: "Release tag", required: true }
+  name: { description: "Release name prefix (default - repository name)", default: "" }
+  working-directory: { description: "Directory of the Cargo workspace and CHANGELOG.md", default: "." }
+  dry-run: { description: "Check only, create nothing", default: "false" }
+  token: { description: "Token with contents write", required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        NAME: ${{ inputs.name }}
+        WORKDIR: ${{ inputs.working-directory }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        NOTES="$RUNNER_TEMP/notes.md"
+        export NOTES
+        python3 -I "$GITHUB_ACTION_PATH/notes.py" "$WORKDIR" "$TAG" "$NOTES"
+        "$GITHUB_ACTION_PATH/release.sh"

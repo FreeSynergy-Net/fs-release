@@ -3,7 +3,7 @@ description: Validate the release tag (SemVer) and turn the caller inputs into o
 inputs:
   tag: { description: "Release tag (default - the ref name)", default: "" }
   name: { description: "Artefact base name", default: "" }
-  binaries: { description: "Comma separated binary names", required: true }
+  binaries: { description: "Comma separated binary names; empty = library mode (no packages, tag/version/CHANGELOG checked)", default: "" }
   ignore-binaries: { description: "Binaries under crates/ that are deliberately not packaged (* = all)", default: "" }
   cargo-package: { description: "Cargo package (-p) for workspaces", default: "" }
   working-directory: { description: "Directory of the Cargo workspace", default: "." }
@@ -50,3 +50,10 @@ runs:
         WINDOWS_FORMATS: ${{ inputs.windows-formats }}
         MACOS_FORMATS: ${{ inputs.macos-formats }}
       run: python3 -I "$GITHUB_ACTION_PATH/plan.py"
+    # Library mode (no binaries): tag = workspace version = non-empty CHANGELOG section, checked in the plan so a wrong tag stops before any job.
+    - if: inputs.binaries == ''
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        WORKDIR: ${{ inputs.working-directory }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../library-release/notes.py" "$WORKDIR" "${TAG:-$GITHUB_REF_NAME}"

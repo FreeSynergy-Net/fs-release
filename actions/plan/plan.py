@@ -2,7 +2,7 @@
 """Turn the caller's release inputs into one validated JSON plan (pattern: Facade over inputs).
 
 All values arrive as environment variables (see action.yml). Output: `plan` and
-`version` on $GITHUB_OUTPUT. Fails on a tag that is not `vMAJOR.MINOR.PATCH[-pre][+build]`.
+`version` on $GITHUB_OUTPUT. Fails on a tag that is not `vMAJOR.MINOR.PATCH[-pre][+build]`. Empty `binaries` = library mode (`library: true`, no platform job; a binary plan has no `library` key, which counts as false).
 """
 import json
 import os
@@ -74,7 +74,18 @@ def main():
         fail("kind must be cli, daemon or app")
     binaries = csv(env("BINARIES"))
     if not binaries:
-        fail("input 'binaries' is empty")
+        # Library mode: nothing to build, package or sign; the plan only carries the tag and every platform job stays off.
+        # (tag = Cargo version = non-empty CHANGELOG section is checked by actions/library-release/notes.py in the plan action.)
+        name = env("NAME") or env("GITHUB_REPOSITORY").rsplit("/", 1)[-1] or "library"
+        plan = {
+            "tag": tag, "version": version, "version_core": core, "prerelease": "-" in version, "library": True,
+            "name": name, "binaries": [], "workdir": env("WORKDIR", "."),
+            "has_linux": False, "has_windows": False, "has_macos": False, "has_arch": False,
+        }
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write(f"plan={json.dumps(plan, separators=(',', ':'))}\nversion={version}\n")
+        print(json.dumps(plan, indent=2))
+        return
 
     workdir = env("WORKDIR", ".")
     pkgs = cargo_packages(workdir)
