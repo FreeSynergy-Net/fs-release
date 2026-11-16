@@ -1,7 +1,9 @@
 # Names of repos, crates and programs that were given up by a rename. One `old -> new  # reason` per line. A name on the left is never
 # given out again, and no later rename may take a name on the left as its new name (ADR 0080: the redirect of the old repo name would
 # break). The list is written by `scripts/umbenennen retire` as a step of the flow `umbenennen` and read by its dry run.
-fs-history -> fs-activity  # ADR 0087
+fs-history -> fs-activities  # ADR 0087
+fs-activity -> fs-activities  # ADR 0087 Nachtrag
+fs-text -> fs-texts  # names wave 2026-11-16 (crate)
 fs-hub -> fs-registry  # names wave 2026-11-16
 fs-store -> fs-packages  # names wave 2026-11-16
 fs-wiki -> fs-texts  # names wave 2026-11-16
@@ -11,3 +13,4 @@ fs-whiteboard -> fs-draw  # names wave 2026-11-16
 fs-streaming -> fs-broadcast  # names wave 2026-11-16
 fs-surveys -> fs-forms  # names wave 2026-11-16
 fs-catalog -> Catalog  # names wave 2026-11-16
+# fs-packages -> Repository: bewusste EINMALIGE Ausnahme von ADR 0080 (der Name fs-packages geht an das Programm; es gibt keine Nutzer; Nutzerentscheidung 16.11.; siehe ADR 0087 Nachtrag)
