@@ -1,4 +1,4 @@
-//! Pattern: Strategy (the step `pins`: raise the fs-release pins of the lifted repo to the first tag with the lock check).
+//! Pattern: Strategy (the step `pins`, before `lock-sources`: raise the fs-release pins of the lifted repo to the first tag with the lock check).
 
 use fs_release_chain::outcome::Stop;
 

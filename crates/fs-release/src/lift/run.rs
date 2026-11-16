@@ -18,8 +18,8 @@ pub fn tasks<'a>(opts: &LiftOpts) -> Vec<Box<dyn Task<LiftEnv<'a>>>> {
         Box::new(checks::Rules),
         Box::new(checks::Tests),
         Box::new(checks::YamlCheck),
-        Box::new(checks::LockSources),
         Box::new(pins::Pins),
+        Box::new(checks::LockSources),
     ];
     if opts.commit {
         v.push(Box::new(commit::Commit));
