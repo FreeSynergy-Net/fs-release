@@ -32,12 +32,15 @@ pub fn tasks<'a>(opts: &LiftOpts) -> Vec<Box<dyn Task<LiftEnv<'a>>>> {
 pub fn run(opts: &LiftOpts, runner: &dyn Runner) -> (Report, i32) {
     let started = std::time::Instant::now();
     let mut rep = super::report::start(opts, runner);
-    let ok = if opts.components.is_none() && opts.interfaces.is_none() {
+    let ok = if opts.wanted().is_empty() {
         rep.steps = vec![crate::task::Record {
             name: "setup".into(),
             status: "red".into(),
             detail: String::new(),
-            first_error: Some("nothing to lift: give --components and/or --interfaces".into()),
+            first_error: Some(
+                "nothing to lift: give --components, --interfaces, --types or --repo NAME=TAG"
+                    .into(),
+            ),
             secs: 0.0,
         }];
         false

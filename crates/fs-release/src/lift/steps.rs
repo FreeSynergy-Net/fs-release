@@ -9,14 +9,7 @@ use crate::task::Task;
 
 /// The repos whose dependency is lifted, with the tag the caller asked for.
 fn wanted(env: &LiftEnv) -> Vec<(&'static str, String)> {
-    let o = env.opts;
-    [
-        ("fs-components", &o.components),
-        ("fs-interfaces", &o.interfaces),
-    ]
-    .into_iter()
-    .filter_map(|(n, t)| t.clone().map(|t| (n, t)))
-    .collect()
+    env.opts.wanted()
 }
 
 /// `vX.Y.Z` and nothing else: no branch, no rev, no range.
@@ -31,8 +24,10 @@ fn valid_tag(tag: &str) -> bool {
             .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
 }
 
-/// Sets the git tag of every dependency on fs-components / fs-interfaces, in every crate of the workspace, to exactly the
-/// given one (the helper script edits line by line and lets the TOML parser judge the result).
+/// Sets the git tag of every dependency on the asked libraries (fs-components, fs-interfaces, fs-types, fs-objects, fs-rpc, fs-jscalendar), in
+/// every crate of the workspace, to exactly the given one (the helper script edits line by line and lets the TOML parser judge the result).
+/// `fs-interfaces` never drags a `fs-types` along (ADR 0093); `fs-types` goes through `set_components_tag.py --move`, which also moves it
+/// from the repo fs-interfaces to the repo fs-types.
 pub struct Deps;
 
 impl Task<LiftEnv<'_>> for Deps {
@@ -49,13 +44,13 @@ impl Task<LiftEnv<'_>> for Deps {
                     "{tag:?} is not a tag like v0.0.12 ({repo})"
                 )));
             }
-            let args = vec![
-                "-I".to_string(),
-                env.script("set_components_tag.py"),
-                tag.clone(),
-                env.opts.repo_dir.display().to_string(),
-                repo.to_string(),
-            ];
+            let root = env.opts.repo_dir.display().to_string();
+            let mut args = vec!["-I".to_string(), env.script("set_components_tag.py")];
+            if repo == "fs-types" {
+                args.extend(["--move".into(), repo.into(), tag.clone(), root]);
+            } else {
+                args.extend([tag.clone(), root, repo.to_string()]);
+            }
             let o = env.exec("python3", args, vec![])?;
             match o.code {
                 0 => {
@@ -68,7 +63,7 @@ impl Task<LiftEnv<'_>> for Deps {
         }
         if found == 0 {
             return Err(Stop::red(
-                "no dependency on fs-components / fs-interfaces found in the workspace",
+                "no dependency on any of the asked libraries found in the workspace",
             ));
         }
         Ok(notes.join("; "))

@@ -51,9 +51,15 @@ struct LiftArgs {
     /// Tag of fs-components, `vX.Y.Z`.
     #[arg(long)]
     components: Option<String>,
-    /// Tag of fs-interfaces, `vX.Y.Z`.
+    /// Tag of fs-interfaces, `vX.Y.Z` (the same as `--repo fs-interfaces=vX.Y.Z`).
     #[arg(long)]
     interfaces: Option<String>,
+    /// Tag of fs-types, `vX.Y.Z` (the same as `--repo fs-types=vX.Y.Z`): the dependency also moves from the repo fs-interfaces to the repo fs-types.
+    #[arg(long)]
+    types: Option<String>,
+    /// A library and its tag, `NAME=vX.Y.Z`, repeatable: fs-components, fs-interfaces, fs-types, fs-objects, fs-rpc, fs-jscalendar.
+    #[arg(long = "repo", value_name = "NAME=TAG")]
+    repos: Vec<String>,
     /// Use the real tags on GitHub instead of the local-tags git config.
     #[arg(long)]
     online: bool,
@@ -111,18 +117,34 @@ pub fn main_with(args: Vec<String>) -> i32 {
     }
 }
 
-fn opts(a: &LiftArgs) -> LiftOpts {
+fn opts(a: &LiftArgs) -> Result<LiftOpts, String> {
     let mut o = LiftOpts::new(a.repo.clone(), a.release_dir.clone());
-    o.components.clone_from(&a.components);
-    o.interfaces.clone_from(&a.interfaces);
+    for (name, tag) in [
+        ("fs-components", &a.components),
+        ("fs-interfaces", &a.interfaces),
+        ("fs-types", &a.types),
+    ] {
+        if let Some(t) = tag {
+            o.set_lib(name, t)?;
+        }
+    }
+    for r in &a.repos {
+        o.set_lib_arg(r)?;
+    }
     o.online = a.online;
     o.commit = a.commit;
     o.git_config.clone_from(&a.git_config);
-    o
+    Ok(o)
 }
 
 fn lift_cmd(a: &LiftArgs) -> i32 {
-    let o = opts(a);
+    let o = match opts(a) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("fs-release lift: {e}");
+            return 2;
+        }
+    };
     let (rep, code) = lift::run(&o, &SystemRunner::default());
     let red: Vec<String> = rep
         .steps
@@ -197,7 +219,13 @@ fn one(s: &StepArgs, which: usize) -> i32 {
 fn full(l: &LiftArgs, f: &FlowArgs) -> i32 {
     let mut a = l.clone();
     a.commit = true;
-    let o = opts(&a);
+    let o = match opts(&a) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("fs-release flow: {e}");
+            return 2;
+        }
+    };
     with_ctx(f, &l.repo, &l.release_dir, |ctx| {
         flow::run(&o, ctx, &SystemRunner::default())
     })

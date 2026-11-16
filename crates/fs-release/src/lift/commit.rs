@@ -104,13 +104,11 @@ impl Task<LiftEnv<'_>> for Commit {
         if !o.ok() {
             return Err(Stop::red(format!("git add: {}", o.first_error())));
         }
-        let (c, i) = (
-            env.opts.components.as_deref(),
-            env.opts.interfaces.as_deref(),
-        );
-        let what: Vec<String> = [("fs-components", c), ("fs-interfaces", i)]
+        let what: Vec<String> = env
+            .opts
+            .wanted()
             .into_iter()
-            .filter_map(|(n, t)| t.map(|t| format!("{n} {t}")))
+            .map(|(n, t)| format!("{n} {t}"))
             .collect();
         let o = env.exec(
             "git",

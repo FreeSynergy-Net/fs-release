@@ -29,6 +29,8 @@ pub struct Report {
     pub dirty: Vec<String>,
     pub components: Option<String>,
     pub interfaces: Option<String>,
+    /// The other libraries asked for (`fs-types`, `fs-objects`, `fs-rpc`, `fs-jscalendar`) with their tags.
+    pub repos: std::collections::BTreeMap<String, String>,
     pub online: bool,
     pub ok: bool,
     /// `rustc --version` of the pinned toolchain (`RUST_VERSION`) and of `stable` (used by `clippy-stable`).
@@ -85,6 +87,7 @@ pub fn start(opts: &LiftOpts, runner: &dyn Runner) -> Report {
         dirty: vec![],
         components: opts.components.clone(),
         interfaces: opts.interfaces.clone(),
+        repos: opts.repos.clone(),
         online: opts.online,
         ok: false,
         toolchain: String::new(),
@@ -173,9 +176,14 @@ impl Report {
             ),
             format!("- branch `{}`, head `{}`", self.branch, self.head),
             format!(
-                "- components {}, interfaces {}, {mode}",
+                "- components {}, interfaces {}{}, {mode}",
                 self.components.as_deref().unwrap_or("-"),
-                self.interfaces.as_deref().unwrap_or("-")
+                self.interfaces.as_deref().unwrap_or("-"),
+                self.repos
+                    .iter()
+                    .map(|(n, t)| format!(", {n} {t}"))
+                    .collect::<Vec<_>>()
+                    .concat()
             ),
             format!(
                 "- toolchain pinned: {}; stable: {}",

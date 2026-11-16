@@ -1,5 +1,6 @@
 //! Pattern: Value object (what one lift is asked to do, and what a lift step sees while it runs).
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use fs_release_chain::outcome::Stop;
@@ -10,6 +11,16 @@ pub const BUILD_SLOT: &str = "/srv/FreeSynergy/.scratch/build-slot.sh";
 /// Throw-away git config that maps the GitHub URLs of fs-components / fs-interfaces to the local repos (tags not pushed yet).
 pub const LOCAL_TAGS: &str = "/srv/FreeSynergy/.scratch/gitconfig-local-tags";
 
+/// The libraries a lift can move, in the order the steps handle them (ADR 0092/0093: `fs-types` is its own repo from V1+).
+pub const LIBS: [&str; 6] = [
+    "fs-components",
+    "fs-interfaces",
+    "fs-types",
+    "fs-objects",
+    "fs-rpc",
+    "fs-jscalendar",
+];
+
 /// What one lift is asked to do.
 #[derive(Debug, Clone)]
 pub struct LiftOpts {
@@ -19,6 +30,8 @@ pub struct LiftOpts {
     pub components: Option<String>,
     /// `vX.Y.Z` for the fs-interfaces dependency (None: leave it).
     pub interfaces: Option<String>,
+    /// `vX.Y.Z` for the other libraries (`fs-types`, `fs-objects`, `fs-rpc`, `fs-jscalendar`), by name; see [`LiftOpts::set_lib`].
+    pub repos: BTreeMap<String, String>,
     /// Real tags from GitHub. Without it the local-tags git config is used (nothing leaves this machine).
     pub online: bool,
     /// The fs-release checkout (scripts, `RUST_VERSION`).
@@ -43,6 +56,7 @@ impl LiftOpts {
             repo_dir,
             components: None,
             interfaces: None,
+            repos: BTreeMap::new(),
             online: false,
             release_dir,
             git_config: PathBuf::from(LOCAL_TAGS),
@@ -55,6 +69,61 @@ impl LiftOpts {
             env: vec![],
             commit: false,
         }
+    }
+
+    /// Asks for `name` at `tag` (`--repo fs-types=v0.0.1`). The two long-standing options are the same thing under their own names.
+    ///
+    /// # Errors
+    /// The name is not one of [`LIBS`], or the library was asked for twice (also through `--components` / `--interfaces` / `--types`).
+    pub fn set_lib(&mut self, name: &str, tag: &str) -> Result<(), String> {
+        if !LIBS.contains(&name) {
+            return Err(format!(
+                "unknown library {name:?}: use one of {}",
+                LIBS.join(", ")
+            ));
+        }
+        let slot = match name {
+            "fs-components" => &mut self.components,
+            "fs-interfaces" => &mut self.interfaces,
+            _ => {
+                if self.repos.contains_key(name) {
+                    return Err(format!("{name} given twice"));
+                }
+                self.repos.insert(name.to_string(), tag.to_string());
+                return Ok(());
+            }
+        };
+        if slot.is_some() {
+            return Err(format!("{name} given twice"));
+        }
+        *slot = Some(tag.to_string());
+        Ok(())
+    }
+
+    /// Splits `NAME=TAG` and calls [`set_lib`](Self::set_lib).
+    ///
+    /// # Errors
+    /// No `=`, or what `set_lib` says.
+    pub fn set_lib_arg(&mut self, arg: &str) -> Result<(), String> {
+        let (name, tag) = arg
+            .split_once('=')
+            .ok_or_else(|| format!("--repo {arg:?}: use NAME=vX.Y.Z (e.g. fs-types=v0.0.1)"))?;
+        self.set_lib(name.trim(), tag.trim())
+    }
+
+    /// Every library the lift is asked to move, with its tag, in the order of [`LIBS`].
+    #[must_use]
+    pub fn wanted(&self) -> Vec<(&'static str, String)> {
+        LIBS.iter()
+            .filter_map(|&n| {
+                let t = match n {
+                    "fs-components" => self.components.clone(),
+                    "fs-interfaces" => self.interfaces.clone(),
+                    _ => self.repos.get(n).cloned(),
+                };
+                t.map(|t| (n, t))
+            })
+            .collect()
     }
 
     /// Where the report goes.
@@ -145,5 +214,66 @@ impl LiftEnv<'_> {
             .join(name)
             .display()
             .to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LiftOpts;
+
+    fn opts() -> LiftOpts {
+        LiftOpts::new("/x".into(), "/y".into())
+    }
+
+    #[test]
+    fn repo_arguments_fill_the_named_slots_and_wanted_keeps_the_order_of_libs() {
+        let mut o = opts();
+        for a in [
+            "fs-types=v0.0.1",
+            "fs-interfaces=v0.0.27",
+            "fs-rpc=v0.0.2",
+            "fs-components=v0.0.25",
+        ] {
+            o.set_lib_arg(a).unwrap();
+        }
+        assert_eq!(o.components.as_deref(), Some("v0.0.25"));
+        assert_eq!(o.interfaces.as_deref(), Some("v0.0.27"));
+        let names: Vec<_> = o
+            .wanted()
+            .into_iter()
+            .map(|(n, t)| format!("{n}={t}"))
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "fs-components=v0.0.25",
+                "fs-interfaces=v0.0.27",
+                "fs-types=v0.0.1",
+                "fs-rpc=v0.0.2"
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_names_duplicates_and_bad_arguments_are_errors() {
+        let mut o = opts();
+        assert!(o
+            .set_lib_arg("fs-wiki=v0.0.1")
+            .unwrap_err()
+            .contains("unknown library"));
+        assert!(o
+            .set_lib_arg("fs-types")
+            .unwrap_err()
+            .contains("NAME=vX.Y.Z"));
+        o.set_lib_arg("fs-types=v0.0.1").unwrap();
+        assert!(o
+            .set_lib_arg("fs-types=v0.0.2")
+            .unwrap_err()
+            .contains("twice"));
+        o.interfaces = Some("v0.0.1".into());
+        assert!(o
+            .set_lib_arg("fs-interfaces=v0.0.2")
+            .unwrap_err()
+            .contains("twice"));
     }
 }

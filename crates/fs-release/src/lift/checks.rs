@@ -158,7 +158,14 @@ impl Task<LiftEnv<'_>> for LockSources {
             env.script("gates-lock.sh"),
             env.opts.repo_dir.display().to_string(),
         ];
-        let ok = verdict("lock-sources", &env.exec("bash", args, vec![])?)?;
+        // A lift that moves fs-types (V1+) also asks the lock check for "fs-types only from the repo FreeSynergy/fs-types".
+        let only_from = env.opts.wanted().iter().any(|(n, _)| *n == "fs-types");
+        let extra = if only_from {
+            vec![("FS_LOCK_ONLY_FROM".to_string(), "1".to_string())]
+        } else {
+            vec![]
+        };
+        let ok = verdict("lock-sources", &env.exec("bash", args, extra)?)?;
         // From the lift run to V1+ (FS_LIFT_V1PLUS=1) the step is red until the repo has the new pin and `strict = true`.
         let v1plus = env
             .opts

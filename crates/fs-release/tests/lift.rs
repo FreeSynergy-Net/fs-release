@@ -400,3 +400,95 @@ fn the_footer_value_is_configurable_and_an_invalid_one_stops_before_anything_is_
         assert_eq!(git(&w.work(), &["rev-parse", "HEAD"]), before, "{bad:?}");
     }
 }
+
+#[test]
+fn the_fs_interfaces_lift_alone_leaves_fs_types_where_it_is() {
+    let w = World::new();
+    w.with_types_over_interfaces();
+    let (r, code) = run(&w, &w.opts()); // components v0.2.0, interfaces v0.2.0, no fs-types asked
+    assert_eq!(code, 0, "{}", r.markdown());
+    let a = w.read("crates/a/Cargo.toml");
+    assert!(
+        a.contains("fs-types = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.1.0\" }"),
+        "{a}"
+    );
+    assert!(a.contains("fs-interfaces = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.2.0\" }"), "{a}");
+}
+
+#[test]
+fn asking_for_fs_types_moves_it_to_its_own_repo_and_the_lock_holds_exactly_that_source() {
+    let w = World::new();
+    w.with_types_over_interfaces();
+    let mut o = w.opts();
+    o.set_lib_arg("fs-types=v0.2.0").unwrap();
+    let (r, code) = run(&w, &o);
+    assert_eq!(code, 0, "{}", r.markdown());
+    let a = w.read("crates/a/Cargo.toml");
+    assert!(
+        a.contains(
+            "fs-types = { git = \"https://github.com/FreeSynergy/fs-types\", tag = \"v0.2.0\" }"
+        ),
+        "{a}"
+    );
+    assert!(a.contains("fs-interfaces = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.2.0\" }"), "{a}");
+    let lock = w.read("Cargo.lock");
+    assert!(
+        lock.contains("github.com/FreeSynergy/fs-types?tag=v0.2.0#"),
+        "{lock}"
+    );
+    assert!(!lock.contains("fs-interfaces?tag=v0.1.0"), "{lock}");
+    assert!(
+        step(&r, "lock").detail.contains("fs-types v0.2.0"),
+        "{}",
+        r.markdown()
+    );
+    assert_eq!(step(&r, "lock-sources").status, "ok", "{}", r.markdown());
+    assert!(r.markdown().contains("fs-types v0.2.0"));
+    let json: serde_json::Value =
+        serde_json::from_str(&w.read(".fs-release/lift-report.json")).unwrap();
+    assert_eq!(json["repos"]["fs-types"], "v0.2.0");
+}
+
+#[test]
+fn a_fs_types_tag_that_does_not_exist_is_red_at_the_lock() {
+    let w = World::new();
+    w.with_types_over_interfaces();
+    let mut o = w.opts();
+    o.set_lib_arg("fs-types=v9.9.9").unwrap();
+    let (r, code) = run(&w, &o);
+    assert_eq!(code, 1);
+    assert_eq!(step(&r, "deps").status, "ok");
+    assert_eq!(step(&r, "lock").status, "red");
+    assert_eq!(step(&r, "tests").status, "skipped");
+}
+
+#[test]
+fn a_program_without_fs_types_and_a_fs_types_request_alone_is_red_at_deps() {
+    let w = World::new();
+    let mut o = w.opts();
+    o.components = None;
+    o.interfaces = None;
+    o.set_lib_arg("fs-types=v0.2.0").unwrap();
+    let (r, code) = run(&w, &o);
+    assert_eq!(code, 1);
+    assert_eq!(step(&r, "deps").status, "red", "{}", r.markdown());
+}
+
+#[test]
+fn the_command_line_takes_repo_name_tag_and_refuses_unknown_names_and_doubles() {
+    let w = World::new();
+    let go = |extra: &[&str]| {
+        let mut v: Vec<String> = ["fs-release", "lift"].map(String::from).to_vec();
+        v.push(w.work().display().to_string());
+        v.extend(extra.iter().map(|s| (*s).to_string()));
+        fs_release::cli::main_with(v)
+    };
+    assert_eq!(go(&["--repo", "fs-wiki=v0.0.1"]), 2);
+    assert_eq!(go(&["--repo", "fs-types"]), 2);
+    assert_eq!(go(&["--types", "v0.0.1", "--repo", "fs-types=v0.0.2"]), 2);
+    assert_eq!(
+        go(&["--interfaces", "v0.0.1", "--repo", "fs-interfaces=v0.0.2"]),
+        2
+    );
+    assert_eq!(git(&w.work(), &["status", "--porcelain"]), "");
+}

@@ -84,6 +84,10 @@ fn upstream(dir: &Path, versions: &[(&str, &str, &str)]) {
     git(dir, &["init", "--quiet", "-b", "main"]);
     for (tag, name, deps) in versions {
         crate_files(dir, name, deps);
+        if *name == "fs-interfaces" {
+            // Like the real repo up to v0.0.26: the crate `fs-types` lives inside it.
+            crate_files(&dir.join("crates/fs-types"), "fs-types", "");
+        }
         git(dir, &["add", "-A"]);
         git(dir, &["commit", "--quiet", "--allow-empty", "-m", tag]);
         git(dir, &["tag", tag]);
@@ -124,8 +128,12 @@ impl World {
                 ("v0.2.0", "fs-interfaces", ""),
             ],
         );
+        upstream(
+            &r.join("up/fs-types"),
+            &[("v0.1.0", "fs-types", ""), ("v0.2.0", "fs-types", "")],
+        );
         let mut cfg = String::new();
-        for n in ["fs-components", "fs-interfaces", "Blinc"] {
+        for n in ["fs-components", "fs-interfaces", "fs-types", "Blinc"] {
             let _ = writeln!(
                 cfg,
                 "[url \"{}\"]\n\tinsteadOf = https://github.com/FreeSynergy/{n}",
@@ -264,6 +272,18 @@ impl World {
         o.env
             .push(("CARGO_NET_GIT_FETCH_WITH_CLI".into(), "true".into()));
         o
+    }
+
+    /// Crate `a` also depends on `fs-types` from the repo fs-interfaces (v0.1.0), the way every program did before V1+; committed.
+    pub fn with_types_over_interfaces(&self) {
+        let p = self.work().join("crates/a/Cargo.toml");
+        let t = fs::read_to_string(&p).unwrap();
+        let dep = "fs-types = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.1.0\" }\n";
+        fs::write(&p, format!("{t}{dep}")).unwrap();
+        git(
+            &self.work(),
+            &["commit", "--quiet", "-am", "fs-types over fs-interfaces"],
+        );
     }
 
     pub fn read(&self, rel: &str) -> String {
