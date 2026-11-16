@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: review
-  version: 0.0.6
+  version: 0.0.7
   title: Opus reviews one head and writes a report with JA or NEIN
 do:
   - request:
-      call: review-request:0.0.6@fs
+      call: review-request:0.0.7@fs
       with:
         head: ${ .input.head }
         delta: ${ .input.delta }
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes the file Opus reads (diff, gate output) for exactly the head ${ .input.head }.
   - read:
-      call: review-ai:0.0.6@fs
+      call: review-ai:0.0.7@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -39,7 +39,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Opus only reads ([REVIEW]); it changes no code, writes only BERICHT.md and runs only the named tests, never the whole workspace while the slots are busy ([GATES]). Check list by kind - code - rules of the order, tests with a counter-test per rule, files <= 300 lines, no stray files, no orphan processes; workflow files - actor/gate/kind per step, sub-workflows exist at the version; docs - sources, DE/EN in step; icons or images - license and look. Findings as file:line, blocker versus small point, and what is not proven. [EFFIZIENZ] - only the delta with the file list of the order is read, not the whole repo; the gate result of exactly this head (head hash in the build report) is reused, not run again; only the files the order names and what they directly need are read; after a timeout or rc=124 the cause is checked first (lock holders, orphans, slot queue), then the review restarts with a continuation prompt, never blindly.
   - verdict:
-      call: verdict:0.0.6@fs
+      call: verdict:0.0.7@fs
       with:
         report: BERICHT.md
       export:
@@ -51,7 +51,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Line 1 of the report is JA or NEIN ([BERICHT]) for the push of release-<version> and the tag after green CI; a JA names exactly one head and is void for any other, NEIN comes with findings. The result of the step is `verdict` (JA | NEIN) and `runde` (the number of NEIN reports of this delta so far, counted by the verdict command in the reports of the delta); the workflow returns `verdict`, `runde` and `head` to the caller, which jumps back on NEIN and escalates from the third NEIN.
   - bind:
-      call: approval:0.0.6@fs
+      call: approval:0.0.7@fs
       with:
         head: ${ .input.head }
       metadata:

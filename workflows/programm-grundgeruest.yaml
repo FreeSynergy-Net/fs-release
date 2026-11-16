@@ -1,3 +1,5 @@
+# ENTWURF / DRAFT - SPECIFICATION, NOT RUNNABLE, NOT PART OF 0.0.7: nearly all `@fs` names have no script (`trait-lock`, `trait-verify`, `core-ai`, ...), the approval gate `strategie-ok`
+# is open (A3') and no SW 1.0 run exists. It describes the intended belt; do not run it.
 # Conveyor belt (ADR 0087 item 7): every program gets the basics - it starts, does simple things and ends; the frontends come with it.
 # Stage 1 in parallel: (a) dossier and documentation (model apps, menus, workflows), (b) research (standards, data model, crates, licence, state of care;
 # Haiku, read and write of notes only). Stage 2: Opus plan with a FIXED trait (hash locked), then the gate `strategie-ok` (counts only from an authorised sender, step `absender`).
@@ -12,7 +14,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: programm-grundgeruest
-  version: 0.0.6
+  version: 0.0.7
   title: "Conveyor belt for the basics of a program: dossier and research, fixed trait, core and frontend, review, pictures, docs"
 do:
   - stufe-1:
@@ -20,13 +22,13 @@ do:
         compete: false
         branches:
           - dossier-doku:
-              call: dossier-ai:0.0.6@fs
+              call: dossier-ai:0.0.7@fs
               with:
                 programm: ${ .input.programm }
                 vorbild: ${ .input.vorbild }
                 dossier: ${ .input.dossier }
           - recherche:
-              call: research-haiku:0.0.6@fs
+              call: research-haiku:0.0.7@fs
               with:
                 programm: ${ .input.programm }
                 topics: standards, data model, crates, licence, state of care
@@ -40,7 +42,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Two branches at the same time. (a) dossier-doku (Sonnet): dossier with states, menus and workflows of the model apps, documentation. (b) recherche (Haiku, only reading and writing notes, never code): standards, data model, crates, licence, state of care. Both write into the dossier folder."
   - stufe-1-check:
-      call: grundgeruest-stufe1-check:0.0.6@fs
+      call: grundgeruest-stufe1-check:0.0.7@fs
       with:
         dossier: ${ .input.dossier }
       export:
@@ -71,7 +73,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to stufe-1, from the third red round to eskalation; only `red == false` goes on, a missing result goes to eskalation."
   - adr-suche:
-      call: adr-search:0.0.6@fs
+      call: adr-search:0.0.7@fs
       with:
         docs: ${ .input.docs }
         terms: 0086, 0087, 0085, ${ .input.programm }
@@ -84,7 +86,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/adr-search on fs-documentation origin/main (conventions/decisions) for the terms of the program, at least ADR 0086 (typed storage), 0087 (generic names), 0085 (normalisation); the hits are input of the plan."
   - plan:
-      call: plan-ai:0.0.6@fs
+      call: plan-ai:0.0.7@fs
       with:
         dossier: ${ .input.dossier }
         adrs: ${ $context.adrs }
@@ -98,7 +100,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus writes the plan with a FIXED trait (result field `trait` = the path of the trait file; the public interface of the program as a Rust trait file, signatures final), the data model as typed tables (ADR 0086) and the split into core and frontend. Model: Opus."
   - plan-check:
-      call: grundgeruest-plan-check:0.0.6@fs
+      call: grundgeruest-plan-check:0.0.7@fs
       export:
         as: '${ $context + { plancheck: . } }'
       metadata:
@@ -127,7 +129,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to plan, from the third red round to eskalation; only `red == false` goes on, a missing result goes to eskalation."
   - trait-sperre:
-      call: trait-lock:0.0.6@fs
+      call: trait-lock:0.0.7@fs
       with:
         trait: ${ $context.plan.trait }
         lock_dir: ${ .input.lock_dir }
@@ -172,14 +174,14 @@ do:
         compete: false
         branches:
           - kern:
-              call: core-ai:0.0.6@fs
+              call: core-ai:0.0.7@fs
               with:
                 programm: ${ .input.programm }
                 trait: ${ $context.sperre.trait }
                 storage: typed tables after ADR 0086
                 cli: start, simple commands, stop
           - frontend:
-              call: frontend-ai:0.0.6@fs
+              call: frontend-ai:0.0.7@fs
               with:
                 programm: ${ .input.programm }
                 vorbild: ${ .input.vorbild }
@@ -194,7 +196,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Two Sonnet branches at the same time, each in its own worktree. (a) kern: the trait, typed storage after ADR 0086 (no JSON, no blob), the CLI. (b) frontend: first the block assignment (scripts/baustein-zuordnung), then test data against the trait, no own data model. Neither branch changes the trait."
   - trait-unveraendert:
-      call: trait-verify:0.0.6@fs
+      call: trait-verify:0.0.7@fs
       with:
         trait: ${ $context.sperre.trait }
         expected: ${ $context.sperre.sha256 }
@@ -228,7 +230,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: testlauf
-          version: 0.0.6
+          version: 0.0.7
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -263,7 +265,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red tests go back to stufe-3, from the third red round to eskalation; only `status == green` goes on; a missing result is NOT green. Red tests no longer slip through."
   - speicher-check:
-      call: storage-typed-check:0.0.6@fs
+      call: storage-typed-check:0.0.7@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -276,7 +278,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script check (ADR 0086): no JSON and no blob column in the schema except `original`; every field of the trait has a typed column; round trip import - store - export loses nothing. Carries red and runde."
   - lauf-check:
-      call: lifecycle-smoke:0.0.6@fs
+      call: lifecycle-smoke:0.0.7@fs
       with:
         repo: ${ .input.repo }
       export:
@@ -311,7 +313,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-mitziehen
-          version: 0.0.6
+          version: 0.0.7
         input:
           repo: ${ .input.repo }
           delta: ${ .input.delta }
@@ -342,7 +344,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - doku-mitziehen ended with `eskaliert` or without `status == green`: the belt goes to `eskalation`, never on to the review. Only green goes on."
   - kopf:
-      call: resolve-head:0.0.6@fs
+      call: resolve-head:0.0.7@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -359,7 +361,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.6
+          version: 0.0.7
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -393,7 +395,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a NO goes back to stufe-3 with the findings as the order (new commits mean new gates, new docs, a new head and a new review); from the third NO (`runde`) the belt ends in `eskalation`; only a JA goes on to the picture gate; a missing verdict (null) or any other value is NOT a JA and goes to `eskalation` - never an endless loop back to stufe-3."
   - bilder-erzeugen:
-      call: render-images:0.0.6@fs
+      call: render-images:0.0.7@fs
       with:
         frontend: ${ .input.programm }
       export:
@@ -409,7 +411,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: picture-acceptance
-          version: 0.0.6
+          version: 0.0.7
         input:
           programm: ${ .input.programm }
           model: ${ .input.model }

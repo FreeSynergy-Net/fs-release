@@ -7,7 +7,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: release-flow
-  version: 0.0.6
+  version: 0.0.7
   title: Release a branch of a program as a pre-release and bring it into the catalog
 do:
   - lift:
@@ -15,7 +15,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: lift
-          version: 0.0.6
+          version: 0.0.7
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -27,7 +27,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-mitziehen
-          version: 0.0.6
+          version: 0.0.7
         input:
           repo: ${ .input.repo }
           delta: ${ .input.delta }
@@ -58,7 +58,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review (`eskalation` ends it with `eskaliert: true` for the caller). Only green goes on."
   - gates:
-      call: gates:0.0.6@fs
+      call: gates:0.0.7@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -66,7 +66,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh on a fresh clone, the one definition of the checks.
   - review-request:
-      call: review-request:0.0.6@fs
+      call: review-request:0.0.7@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -86,7 +86,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews the head and writes the approval file; a new head makes a JA invalid.
   - tag:
-      call: tag:0.0.6@fs
+      call: tag:0.0.7@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -94,7 +94,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Annotated tag v<version> on the approved head, locally.
   - push:
-      call: push:0.0.6@fs
+      call: push:0.0.7@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -114,7 +114,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: CI of the pushed branch release-<version> must be green for exactly this head; red stops the flow.
   - main-ff:
-      call: merge-ff:0.0.6@fs
+      call: merge-ff:0.0.7@fs
       with:
         into: main
       metadata:
@@ -128,7 +128,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: publish-doc
-          version: 0.0.6
+          version: 0.0.7
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -165,7 +165,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The sender side of the event the step release waits for - the last job of release.yml sends it, only after publish was green and the Pre-release is really published (a draft sends nothing). It follows the approved push; no gate is skipped. No secret, no command in data.
   - bump:
-      call: bump:0.0.6@fs
+      call: bump:0.0.7@fs
       with:
         workflow: bump.yml
         repo: FreeSynergy/fs-catalog

@@ -1,4 +1,4 @@
-//! Pattern: none (test). The 0.0.6 rules of the workflow files: the [EFFIZIENZ] step rules, the place of `rules.md`, the decision flow
+//! Pattern: none (test). The 0.0.7 rules of the workflow files: the [EFFIZIENZ] step rules, the place of `rules.md`, the decision flow
 //! (ADR search first), texts before tokens in `frontend-umbau`, jumps back as `switch` with `then`. Each rule has a counter-test.
 
 mod support;

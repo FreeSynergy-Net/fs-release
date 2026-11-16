@@ -9,7 +9,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: frontend-round
-  version: 0.0.6
+  version: 0.0.7
   title: A Frontend round from the research dossier to the release
 do:
   - dossier:
@@ -17,7 +17,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: dossier
-          version: 0.0.6
+          version: 0.0.7
         input:
           vorbild: ${ .input.vorbild }
           bestand: ${ .input.bestand }
@@ -32,7 +32,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The research dossier of the Frontend exists and passes check-docs (sub-workflow dossier.yaml, research by the agent, check-docs by the machine); repeat until it does. The sub-workflow holds block analysis (bausteine.md, objective check baustein-zuordnung with the share of new blocks, red goes back to research). It ends with the human publish into the docs main branch, so the step carries that gate.
   - gap-list:
-      call: gap-list:0.0.6@fs
+      call: gap-list:0.0.7@fs
       with:
         frontend: ${ .input.frontend }
         dossier: ${ .input.dossier }
@@ -43,7 +43,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Compares dossier (states, dialogs, menus, shortcuts, workflows, gaps) with our Frontend and writes the list of what is missing.
   - stil-analyse:
-      call: stil-analyse:0.0.6@fs
+      call: stil-analyse:0.0.7@fs
       with:
         frontend: ${ .input.frontend }
         dossier: ${ .input.dossier }
@@ -54,7 +54,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Step 2 of the fixed order (after the block analysis of the dossier, before the composition) - the style analysis of the model gives tokens and style rules per block id of bausteine.md (ADR 0074, DTCG tokens, rules per named part and state); no fixed colours or spaces in the block or the Frontend; repeat until every block id of the table has its rules.
   - stil-check:
-      call: style-check:0.0.6@fs
+      call: style-check:0.0.7@fs
       with:
         dossier: ${ .input.dossier }
       export:
@@ -82,7 +82,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a block id without rules goes back to stil-analyse (from the third red round to the person), green goes on to the images.
   - stil-sichern:
-      call: style-save-ai:0.0.6@fs
+      call: style-save-ai:0.0.7@fs
       with:
         frontend: ${ .input.frontend }
         dossier: ${ .input.dossier }
@@ -93,7 +93,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Every model that is rebuilt yields a style, saved as a style file (DTCG tokens plus the rule entries of the theme contract) when it does not exist yet, English name (Calm, Office, Craft ...), fair reference to the model named in the description (what it is based on), source and licence of the reference named, nothing copied (ADR 0013, ADR 0074 section 3). Own worktree, local commits, no push, no tag. Whenever a style exists or is added it styles EVERY block of the theme contract with all parts and states (an explicit entry each, no silent gaps).
   - stil-sichern-check:
-      call: style-save-check:0.0.6@fs
+      call: style-save-check:0.0.7@fs
       with:
         frontend: ${ .input.frontend }
       export:
@@ -105,7 +105,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script (no network, no AI) - the style file of the model exists (or the style already existed), the name is English, source and licence of the reference are named; result `red` and `runde`.
   - stil-vollstaendigkeit:
-      call: stil-vollstaendigkeit:0.0.6@fs
+      call: stil-vollstaendigkeit:0.0.7@fs
       with:
         contract: ${ .input.contract }
       export:
@@ -133,7 +133,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a missing style file, an unnamed reference or a missing contract entry goes back to stil-sichern (from the third red round to the person), green goes on to the images.
   - images:
-      call: render-images:0.0.6@fs
+      call: render-images:0.0.7@fs
       with:
         frontend: ${ .input.frontend }
       export:
@@ -149,7 +149,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: picture-acceptance
-          version: 0.0.6
+          version: 0.0.7
         input:
           model: ${ .input.model }
           ours: ${ $context.images }
@@ -175,7 +175,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - images that are not accepted go back to gap-list with the user's words as the order (the images are rendered from the gap list), accepted ones go on to build.
   - build:
-      call: build-ai:0.0.6@fs
+      call: build-ai:0.0.7@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -188,7 +188,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Step 3 of the fixed order (composition) - the agent builds the gaps in its own worktree, composing only from the block ids of bausteine.md (a new block first, in the crate of its family, with the reason of the table; one block with modules instead of a second copy, ADR 0084 pattern) and the rules of stil-analyse; and commits locally ([COMMIT]); repeat until the gates are green ([GATES], commands one at a time per [BASH]), no push, no tag; report per [BERICHT]. Order - `Workflow frontend-round, step build, parameters repo, branch, head, delta, frontend` (docs/prompt-template.md).
   - gates:
-      call: gates:0.0.6@fs
+      call: gates:0.0.7@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -211,7 +211,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - red gates go back to build, green ones go on to the acceptance.
   - menue-vergleich:
-      call: menue-vergleich:0.0.6@fs
+      call: menue-vergleich:0.0.7@fs
       with:
         dossier: ${ .input.dossier }
         dump: ${ .input.dump }
@@ -238,7 +238,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a deviation without a reason goes back to build (the step that builds the Frontend; the agent either builds the missing entry or writes the reason into the exception list), otherwise on to the acceptance.
   - acceptance:
-      call: click-through:0.0.6@fs
+      call: click-through:0.0.7@fs
       with:
         file: ${ .input.dossier }/acceptance.md
       export:
@@ -250,7 +250,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - reads acceptance.md of the dossier and clicks through every working flow listed there in the running Frontend (virtual session); the result is `red` when a flow fails.
   - acceptance-red:
-      call: explain-red:0.0.6@fs
+      call: explain-red:0.0.7@fs
       if: ${ $context.acceptance.red }
       metadata:
         freesynergy.net:actor: ai
@@ -290,7 +290,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.6
+          version: 0.0.7
         input:
           repo: ${ .input.repo }
           tag: ${ .input.tag }

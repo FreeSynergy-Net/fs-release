@@ -274,7 +274,7 @@ fn testlauf_is_sound(t: &str) -> bool {
         // T3: no dead event wait - a real script with a result file, bound to the CURRENT head (resolved after a fix), with timeout and escalation
         && !t.contains("net.freesynergy.test.done")
         && !end.contains("listen:")
-        && end.contains("workspace-test-background:0.0.6@fs")
+        && end.contains("workspace-test-background:0.0.7@fs")
         && end.contains("action: wait")
         && end.contains("head: ${ $context.kopf.head }")
         && full.contains("action: start")

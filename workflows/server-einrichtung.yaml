@@ -22,7 +22,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: server-einrichtung
-  version: 0.0.6
+  version: 0.0.7
   title: Set up a server on an existing system (way A) - inventory, dry run, human approval, layer, hardening, services, check
 do:
   - variables:
@@ -37,7 +37,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The person writes the variable set of this server - host, hostname, FQDN or domain (optional), network, services, data path, package source address. Plain text, no secrets (credentials stay in the vault). Without a domain the first run is local or LAN only; with one, ACME DNS-01 can be used without open ports. No Tailscale-like service.
   - inventory:
-      call: fs-server-bestand:0.0.6@fs
+      call: fs-server-bestand:0.0.7@fs
       with:
         mode: read-only
         output: bestand.txt
@@ -63,7 +63,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow by script, from the inventory only. A system without systemd, without apt (first throw) or without a supported file system (ext4, xfs; btrfs with subvolume) ends the flow with the reason in the log. A container VServer (OpenVZ, LXC) stays on way A with limits - no file system or kernel change, no snapshots - and the limits are reported. A wish for a disk change or a restart into another system is not this flow - the log names the separate workflows (B kexec, C provider rescue, D disk rebuild).
   - plan:
-      call: fs-server-plan:0.0.6@fs
+      call: fs-server-plan:0.0.7@fs
       with:
         mode: dry-run
         variables: ${ .input }
@@ -90,7 +90,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a red dry run (variable missing or not resolvable) goes back to variables, green goes on to the approval.
   - plan-approval:
-      call: confirm-plan:0.0.6@fs
+      call: confirm-plan:0.0.7@fs
       with:
         file: plan.txt
       export:
@@ -115,7 +115,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a NO goes back to variables, a YES goes on to the layer.
   - package-source:
-      call: fs-server-source:0.0.6@fs
+      call: fs-server-source:0.0.7@fs
       with:
         address: ${ .input.source_address }
         format: apt-deb822
@@ -129,7 +129,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Enters the package source (ADR 0078) as deb822 freesynergy.sources with Signed-By; the first address is the github.io address of FreeSynergy/fs-packages, later packages.freesynergy.net by switching the variable. The key is checked against the fingerprint 16A4...4342 BEFORE it is trusted; a mismatch is red and the file is removed. Expected - the file, apt update without error, exit code 0. Idempotent.
   - data-directory:
-      call: fs-server-layer:0.0.6@fs
+      call: fs-server-layer:0.0.7@fs
       with:
         path: ${ .input.data_path }
         default: /srv/freesynergy
@@ -157,7 +157,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - red in the layer goes back to package-source (the steps are idempotent, a repeat is safe); after three red runs the script stops and the person reads the log. Green goes on to hardening.
   - hardening-check:
-      call: fs-server-hardening:0.0.6@fs
+      call: fs-server-hardening:0.0.7@fs
       with:
         mode: report
       export:
@@ -169,7 +169,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Only reads and reports - key-only SSH login (checked and reported, never switched off by us), open ports against the firewall base rules, state of unattended-upgrades (installed only in schedule). Expected - a report in the log, exit code 0, nothing changed.
   - hardening-apply:
-      call: fs-server-hardening:0.0.6@fs
+      call: fs-server-hardening:0.0.7@fs
       with:
         mode: apply
         ssh: keep-port-and-keys
@@ -181,7 +181,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Changes only after this gate - the person confirms the report of hardening-check. Sets the firewall base rules (the running SSH port stays open, so no lock-out; no rule is active before the check that the current session is allowed) SSH settings are not changed; password login on is reported, the person decides. Expected - the changed files and rules in the log, exit code 0.
   - kanidm:
-      call: fs-server-service:0.0.6@fs
+      call: fs-server-service:0.0.7@fs
       with:
         package: kanidmd
         unit: kanidmd.service
@@ -196,7 +196,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: First service - kanidmd from OUR package source (apt install kanidmd). The systemd unit stays as the package ships it (DynamicUser); only the configuration is written from the variables (domain or LAN name, bind address, data under the data path), no secret in the file or on the command line. Then enable and start. Expected - package installed, config written, unit active, exit code 0. Other services from the variable list follow the same pattern as further steps.
   - reboot-needed:
-      call: fs-server-reboot-report:0.0.6@fs
+      call: fs-server-reboot-report:0.0.7@fs
       with:
         marker: /run/reboot-required
         compare: running-and-installed-kernel
@@ -209,7 +209,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: After the steps that change packages or the kernel, the script reports whether /run/reboot-required exists and the running kernel against the newest installed one (uname -r against the installed image). The person decides about the reboot, never automatic, and there is no jump back; a reboot is done by the person outside this flow and the check can be run again afterwards. Expected - two lines in the log, exit code 0, nothing changed.
   - check:
-      call: fs-server-check:0.0.6@fs
+      call: fs-server-check:0.0.7@fs
       with:
         services: ${ .input.services }
         ports: from-plan
@@ -238,7 +238,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a red check goes back to kanidm up to three times (idempotent); then the case `red-goes-on` (still red, `tries` >= 3) leaves the loop on purpose and the log shows the red lines to the person; `green` is only a green check. A restart of the machine or a reinstall is never a jump back, it is a human gate.
   - schedule:
-      call: fs-server-timer:0.0.6@fs
+      call: fs-server-timer:0.0.7@fs
       with:
         unit: freesynergy-security-updates.timer
         runs: gate-none-steps
@@ -249,7 +249,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The person sets up, once, unattended-upgrades and a systemd timer ON the server for security updates (steps with gate none). Without an AI, the log as always. Only steps that need no approval run by schedule; everything with a gate waits for the person. Expected - timer enabled, next run shown, exit code 0.
   - hand-back:
-      call: return-log:0.0.6@fs
+      call: return-log:0.0.7@fs
       then: end
       with:
         files: [bestand.txt, plan.txt, protocol.log]

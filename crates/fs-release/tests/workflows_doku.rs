@@ -54,7 +54,7 @@ fn gate_is_sound(text: &str) -> bool {
         ],
     ) && gate.contains("actor: machine")
         && gate.contains("kind: objective")
-        && gate.contains("doku-mitziehen:0.0.6@fs")
+        && gate.contains("doku-mitziehen:0.0.7@fs")
         && gate.contains("docs_base")
         && gate.contains("program: ${ .input.programm")
         && gate.contains("todo/checklisten/<programm>.md")
@@ -130,7 +130,7 @@ fn the_sub_workflow_has_the_checks_a_red_loop_and_a_human_publish() {
 #[test]
 fn counter_a_gate_by_the_agent_or_without_escalation_is_caught() {
     let t = read("doku-mitziehen");
-    let by_ai = t.replacen("call: doku-mitziehen:0.0.6@fs", "call: docs-ai:0.0.6@fs", 1);
+    let by_ai = t.replacen("call: doku-mitziehen:0.0.7@fs", "call: docs-ai:0.0.7@fs", 1);
     assert!(!gate_is_sound(&by_ai));
     assert!(!gate_is_sound(
         &t.replace("then: eskalation", "then: continue")
