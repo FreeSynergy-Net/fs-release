@@ -209,7 +209,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Mandatory closing step (rule doku-aufraeumen): sub-workflow doku-aufraeumen.yaml sweeps the whole docs repo (orphans, dead links, doubles, old names, stale branches) and prepares the branch unreviewed/doku-aufraeumen-<datum>; the push waits for the strategy's approval (gate strategie-ok, the person). A red or escalated tidy-up ends this flow with `eskaliert: true` (step aufraeumen-weiter)."
+        freesynergy.net:summary: "Mandatory closing step (rule doku-aufraeumen): sub-workflow doku-aufraeumen.yaml checks the docs by machine (dead links, anchors, old names, temp, de/en, ADR status) and, since the mark, only the pages of THIS repo's changed topics (input repo; no AI for unchanged pages); a branch unreviewed/doku-aufraeumen-<datum> only if something changed; the push waits for the strategy's approval (gate strategie-ok, the person). A red or escalated tidy-up ends this flow with `eskaliert: true` (step aufraeumen-weiter)."
   - aufraeumen-weiter:
       switch:
         - eskaliert:

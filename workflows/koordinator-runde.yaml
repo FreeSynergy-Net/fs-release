@@ -551,7 +551,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Sub-workflow doku-aufraeumen.yaml (daily, once per round that is due): inventory, judgement, execution on the branch unreviewed/doku-aufraeumen-<datum>, and the push only after the strategy's approval (gate strategie-ok, the person). Its result goes into the report; it does not change the gates of the round. No agent pushes."
+        freesynergy.net:summary: "Sub-workflow doku-aufraeumen.yaml (daily, once per round that is due): machine inventory first; AI only for pages of changed topics since the mark (none changed = `nichts_zu_tun`, no AI); branch unreviewed/doku-aufraeumen-<datum> only when something changed, and the push only after the strategy's approval (gate strategie-ok, the person). Its result goes into the report; it does not change the gates of the round. No agent pushes."
   - bericht:
       run:
         workflow:
