@@ -7,7 +7,7 @@
 # shellcheck disable=SC2034  # a..f are used inside the quoted ck conditions
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/sss-test.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 SECRETVAL="SECRET-TESTVALUE-7f3a91c2"
 mkdir -p "$tmp/bin" "$tmp/state"
@@ -18,13 +18,16 @@ printf '%s\n' "$*" >>"$MOCK_ARGS"
 in=""
 [ -t 0 ] || in=$(cat)
 [ -z "$in" ] || printf 'STDIN[%s]: %s\n' "$*" "$in" >>"$MOCK_STDIN"
-if [ -n "${MOCK_FAIL_MATCH:-}" ] && [[ "$*" == *"$MOCK_FAIL_MATCH"* ]]; then echo "gh: failure (HTTP ${MOCK_FAIL_CODE:-502})" >&2; exit 1; fi
+if [ -n "${MOCK_FAIL_MATCH:-}" ] && [[ "$*" == *"${MOCK_FAIL_MATCH//<space>/ }"* ]]; then echo "gh: failure (HTTP ${MOCK_FAIL_CODE:-502})" >&2; exit 1; fi
 repo=""
 for ((i = 1; i <= $#; i++)); do [ "${!i}" = -R ] && j=$((i + 1)) && repo=${!j//\//_}; done
 case "$*" in
   "api user --jq .login") echo FreeSynergy ;;
-  "api users/alice --jq .id") echo 4242 ;;
-  "api users/FreeSynergy --jq .id") echo 1 ;;
+  "api user --jq .id") echo 1 ;;
+  "api users/alice --jq "*) echo "4242 User" ;;
+  "api users/FreeSynergy --jq "* | "api users/freesynergy --jq "*) echo "1 User" ;;
+  "api users/someorg --jq "*) echo "77 Organization" ;;
+  "api users/weird --jq "*) echo "abc User" ;;
   "api -X PUT repos/"*"/environments/release-signing --input -") touch "$MOCK_STATE/env" ;;
   "api repos/"*"/environments/release-signing/deployment-branch-policies")
     if [ -n "${MOCK_POLICY_EXISTS:-}" ]; then echo '{"total_count":1,"branch_policies":[{"id":9,"name":"v*","type":"tag"}]}'
@@ -126,6 +129,28 @@ suite() {
   EXTRA="REVIEWER=FreeSynergy"
   run x "" "" --env --repos texts --yes
   ck "reviewer = logged-in account: rc 2 without --allow-self-review" '[ "$rc" = 2 ] && grep -q "prevent_self_review" "$tmp/out"'
+  EXTRA="REVIEWER=freesynergy"
+  run x "" "" --env --repos texts --yes
+  ck "reviewer = logged-in account in other case (freesynergy): still rc 2 (compared by id)" '[ "$rc" = 2 ] && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=someorg"
+  run x "" "" --env --repos texts --yes
+  ck "reviewer is an organisation: rc 2 with message, nothing set" '[ "$rc" = 2 ] && grep -q "Organization" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=weird"
+  run x "" "" --env --repos texts --yes
+  ck "non numeric reviewer id: abort, nothing set" '[ "$rc" != 0 ] && ! grep -q "environments" "$tmp/args" && ! grep -q "secret set" "$tmp/args"'
+  EXTRA="REVIEWER=bad;login"
+  run x "" "" --env --repos texts --yes
+  ck "invalid REVIEWER: rc 2, no environment call" '[ "$rc" = 2 ] && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=alice MOCK_FAIL_MATCH=-X<space>POST"
+  run x "" "" --env --repos texts --yes
+  ck "tag rule POST fails: rc != 0, no secrets set, no delete" '[ "$rc" != 0 ] && ! grep -q "secret set" "$tmp/args" && ! grep -q "secret delete" "$tmp/args"'
+  EXTRA="REVIEWER=alice MOCK_FAIL_MATCH=secret<space>delete MOCK_FAIL_CODE=403"
+  run x "" "" --env --repos texts --yes
+  ck "403 on secret delete: rc != 0, not reported as already absent" '[ "$rc" != 0 ] && ! grep -q "already absent" "$tmp/out"'
+  EXTRA="REVIEWER=alice MOCK_FAIL_MATCH=secret<space>delete MOCK_FAIL_CODE=404"
+  run x "" "" --env --repos texts --yes
+  ck "404 on secret delete is fine (already absent)" 'grep -q "already absent" "$tmp/out"'
+  ck "script runs under set -euo pipefail" 'grep -q "^set -euo pipefail" "$SCRIPT_DIR/set-signing-secrets.sh"'
   EXTRA="REVIEWER=FreeSynergy MOCK_PREVENT=false MOCK_RID=1"
   run x "" "" --env --repos texts --yes --allow-self-review
   ck "--allow-self-review: body false, rc 0" '[ "$rc" = 0 ] && grep -q "\"prevent_self_review\":false" "$tmp/stdin"'
@@ -137,7 +162,7 @@ suite() {
   EXTRA=""
   run x "" "" --ruleset-tags fs-release
   ck "ruleset only: rc 0, no REVIEWER needed, no secrets, POST" '[ "$rc" = 0 ] && grep -q "^api -X POST repos/FreeSynergy/fs-release/rulesets --input -" "$tmp/args" && ! grep -q "secret" "$tmp/args" && [ ! -s "$tmp/gpg" ]'
-  ck "ruleset body: tag, active, refs/tags/v*, deletion + non_fast_forward only" 'grep -q "\"target\":\"tag\"" "$tmp/stdin" && grep -q "\"enforcement\":\"active\"" "$tmp/stdin" && grep -q "\"include\":\[\"refs/tags/v\*\"\]" "$tmp/stdin" && grep -q "\"rules\":\[{\"type\":\"deletion\"},{\"type\":\"non_fast_forward\"}\]" "$tmp/stdin"'
+  ck "ruleset body: tag, active, refs/tags/v*, deletion + non_fast_forward + update, NO creation" 'grep -q "\"target\":\"tag\"" "$tmp/stdin" && grep -q "\"enforcement\":\"active\"" "$tmp/stdin" && grep -q "\"include\":\[\"refs/tags/v\*\"\]" "$tmp/stdin" && grep -q "\"rules\":\[{\"type\":\"deletion\"},{\"type\":\"non_fast_forward\"},{\"type\":\"update\"}\]" "$tmp/stdin" && ! grep -q "creation" "$tmp/stdin"'
   EXTRA="MOCK_RULESET_ID=7"
   run x "" "" --ruleset-tags fs-release
   ck "ruleset idempotent: existing one is updated (PUT /7), not duplicated" '[ "$rc" = 0 ] && grep -q "^api -X PUT repos/FreeSynergy/fs-release/rulesets/7 --input -" "$tmp/args" && ! grep -q -- "-X POST" "$tmp/args"'
@@ -184,7 +209,14 @@ mutant "dry run executes" signing_env_lib.sh 'if [ "$DRY" = 1 ]; then
     printf'
 mutant "failed secret ignored (delete follows)" signing_env_lib.sh "echo \"error: \$r: environment secrets incomplete, the repository secrets were NOT deleted\" >&2; return 1; }" 'true; }'
 mutant "tag rule not idempotent" signing_env_lib.sh 'if [ -n "$ids" ]; then' 'if false; then'
-mutant "ruleset with update rule" signing_env_lib.sh '{type:"deletion"}, {type:"non_fast_forward"}' '{type:"deletion"}, {type:"non_fast_forward"}, {type:"update"}'
+mutant "ruleset without update rule" signing_env_lib.sh '{type:"non_fast_forward"}, {type:"update"}' '{type:"non_fast_forward"}'
+mutant "REVIEWER pattern removed" set-signing-secrets.sh '[[ "$REVIEWER" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] ||' 'true ||'
+mutant "set -e removed" set-signing-secrets.sh 'set -euo pipefail' 'set -uo pipefail'
+mutant "any delete error = already gone" signing_env_lib.sh 'elif [ "$(http_code)" = 404 ]; then' 'elif true; then'
+mutant "tag rule error ignored" signing_env_lib.sh 'env_policy "$r" || return 1' 'env_policy "$r" || true'
+mutant "reviewer id not checked numeric" set-signing-secrets.sh '[[ "$rid" =~ ^[0-9]+$ ]] ||' 'true ||'
+mutant "self review compared by login, case sensitive" set-signing-secrets.sh '[ "$rid" = "$whoid" ]' '[ "$REVIEWER" = "$who" ]'
+mutant "reviewer type not checked" set-signing-secrets.sh '[ "$rtype" = User ] ||' 'true ||'
 mutant "no warning for --repo-secrets" set-signing-secrets.sh 'echo "WARNING: --repo-secrets is deprecated' ': "WARNING: --repo-secrets is deprecated'
 
 echo "total failures: $fails"

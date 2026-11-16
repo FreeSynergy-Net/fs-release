@@ -168,11 +168,12 @@ verify_repo() {
   fi
 }
 
-# Tag ruleset: tags v* cannot be deleted or moved; creating a new tag stays allowed (no `update`, no `creation` rule).
+# Tag ruleset: tags v* cannot be deleted or moved (`deletion`, `non_fast_forward`, `update`: without `update` a tag could still be moved to a successor commit);
+# creating a new tag stays allowed (NO `creation` rule).
 ruleset_tags() {
   local r=$1 base id
   base="repos/$ORG/$r/rulesets"
-  jq -nc --arg n "$RULESET_NAME" '{name:$n, target:"tag", enforcement:"active", conditions:{ref_name:{include:["refs/tags/v*"], exclude:[]}}, rules:[{type:"deletion"}, {type:"non_fast_forward"}]}' >"$TMP/body"
+  jq -nc --arg n "$RULESET_NAME" '{name:$n, target:"tag", enforcement:"active", conditions:{ref_name:{include:["refs/tags/v*"], exclude:[]}}, rules:[{type:"deletion"}, {type:"non_fast_forward"}, {type:"update"}]}' >"$TMP/body"
   gh_do "" api "$base?includes_parents=false" || { explain "$r: list rulesets"; return 1; }
   id=$(jq -r --arg n "$RULESET_NAME" '[.[] | select(.name == $n) | .id] | first // empty' "$TMP/out") || return 1
   if [ -n "$id" ]; then

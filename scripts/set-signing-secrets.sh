@@ -18,7 +18,7 @@
 #   --reviewer LOGIN  or the variable REVIEWER: the account that approves a signing run (REQUIRED for --env, no default; never an agent account).
 #   --allow-self-review  switch prevent_self_review off (default: on, see docs/usage.md); needed when REVIEWER is the account that pushes the tag.
 #   --yes             delete the repository secrets without asking.
-#   --ruleset-tags R  tag ruleset "tags v* immutable" in repository R (tags v* cannot be deleted or moved; new tags can still be created).
+#   --ruleset-tags R  tag ruleset "tags v* immutable" in repository R (rules deletion, non_fast_forward, update: tags v* cannot be deleted or moved; new tags can still be created).
 #                     Alone it does nothing else; with --repos it runs in addition.
 #   --dry-run         only print the gh calls (no value, `<redacted>`), run nothing, read nothing (also no gpg, no gh); rc 0.
 # The signing subkey is exported from the keyring, only the secret SUBKEY (the primary key never leaves the keyring):
@@ -42,7 +42,7 @@ DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-cap
 die() { echo "error: $*" >&2; exit 1; }
 usage() { echo "error: $*" >&2; echo "usage: REVIEWER=<login> $0 [--env|--repo-secrets] [--repos a,b] [--allow-self-review] [--yes] [--ruleset-tags <repo>] [--dry-run]" >&2; exit 2; }
 
-MODE="" DRY=0 YES=0 PREVENT=true RULESET_REPO="" REPOS_ARG="" REVIEWER=${REVIEWER:-} DEV=0
+whoid="" rinfo="" rid="" rtype="" MODE="" DRY=0 YES=0 PREVENT=true RULESET_REPO="" REPOS_ARG="" REVIEWER=${REVIEWER:-} DEV=0
 REPOS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -90,6 +90,7 @@ command -v jq >/dev/null || die "jq is needed"
 if [ "$DRY" = 0 ]; then
   for tool in gh curl; do command -v "$tool" >/dev/null || die "$tool is needed"; done
   who=$(gh api user --jq .login </dev/null) || die "gh is not logged in (gh auth login)"
+  whoid=$(gh api user --jq .id </dev/null) || die "cannot read the id of the logged-in account"
   [ "$who" = "$ORG" ] || die "gh is logged in as '$who', not '$ORG' (gh auth switch -u $ORG)"
 fi
 
@@ -102,11 +103,14 @@ trap 'for f in sub.asc body out err names; do shred -u "$TMP/$f" 2>/dev/null || 
 
 REVIEWER_ID_JSON='"<id of the reviewer>"'
 if [ "$DO_SECRETS" = 1 ] && [ "$MODE" = env ] && [ "$DRY" = 0 ]; then
-  if [ "$PREVENT" = true ] && [ "$REVIEWER" = "$who" ]; then
+  rinfo=$(gh api "users/$REVIEWER" --jq '"\(.id) \(.type)"' </dev/null 2>"$TMP/err") || { explain "user $REVIEWER"; exit 1; }
+  rid=${rinfo%% *} rtype=${rinfo#* }
+  [[ "$rid" =~ ^[0-9]+$ ]] || die "no numeric id for $REVIEWER"
+  [ "$rtype" = User ] || usage "REVIEWER '$REVIEWER' is of type '$rtype', not a User (an organisation cannot approve a run)"
+  # compare by numeric id (logins are case-insensitive): the same account as the one that pushes the tags can never approve its own run
+  if [ "$PREVENT" = true ] && [ "$rid" = "$whoid" ]; then
     usage "REVIEWER is the logged-in account '$who': with prevent_self_review the run that account starts could never be approved; use another account or --allow-self-review"
   fi
-  rid=$(gh api "users/$REVIEWER" --jq .id </dev/null 2>"$TMP/err") || { explain "user $REVIEWER"; exit 1; }
-  [[ "$rid" =~ ^[0-9]+$ ]] || die "no numeric id for $REVIEWER"
   REVIEWER_ID_JSON=$rid
 elif [ "$DO_SECRETS" = 1 ] && [ "$MODE" = env ]; then
   REVIEWER_ID_JSON=$(jq -nc --arg r "$REVIEWER" '"<id of \($r)>"')

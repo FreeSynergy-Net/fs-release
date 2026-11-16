@@ -179,10 +179,25 @@ confirmation: delete the repository secrets of the same names (an error in betwe
 secret names, repository secrets gone): any deviation ends with rc 1. `--repo-secrets` is the old mode (repository secrets), deprecated and unprotected,
 kept only on request.
 
-`prevent_self_review` is ON by default: the account that starts a run cannot approve it, so a second pair of eyes is real. If `REVIEWER` is the account that pushes the tags
-(one account for everything), no run could ever be approved: the script then refuses (rc 2) unless you pass `--allow-self-review`. `--ruleset-tags <repo>` creates (or
-updates) the ruleset "tags v* immutable": target `tag`, `refs/tags/v*`, rules `deletion` and `non_fast_forward` (a tag cannot be deleted or moved; creating a new tag stays
-allowed). It has no bypass actor: to remove a wrong tag, the owner must switch the ruleset off first.
+`prevent_self_review` is ON by default: the account that starts a run cannot approve it, so a second pair of eyes is real. The script compares the reviewer with the
+logged-in account by numeric id (logins are case-insensitive) and checks that the reviewer is a `User` (an organisation is refused, rc 2). `--ruleset-tags <repo>`
+creates (or updates) the ruleset "tags v* immutable": target `tag`, `refs/tags/v*`, rules `deletion`, `non_fast_forward` and `update` (a tag cannot be deleted or moved,
+not even to a successor commit; there is NO `creation` rule, so a new tag can still be created). It has no bypass actor: to remove a wrong tag, the owner must switch
+the ruleset off first.
+
+**Variant b (reviewer FreeSynergy = logged-in gh account = the account that pushes the tags): only with `--allow-self-review`.** Without it every run waits
+forever (the script refuses with rc 2, rightly). RISK: everyone who holds the FreeSynergy token (agents too) can give the approval; until the accounts are
+separated, the only technical protection is the tag rule `v*` (plus the ruleset with `update`). The protection stays ORGANISATIONAL, not technical: GitHub cannot tell
+who approves with the FreeSynergy token; the hard bar in the Claude Code settings (Claude and agents NEVER give a deployment or environment approval) only binds
+Claude and agents and is no GitHub protection rule.
+
+**WARNING, unsigned draft:** the action `sign-files` does NOT sign when the key is empty; it only warns (rc 0). If the environment secret does not arrive in the nested call
+(`release.yml` -> `_release-finalize.yml`), then after the repository secrets are deleted a draft is created silently unsigned. Check after the first test tag: the log of
+`finalize` shows "Signing key fingerprint" and NO line "NOT signed". Only then convert further repositories or delete repository secrets.
+
+Checklist before the first real run: (1) `REVIEWER=FreeSynergy bash scripts/set-signing-secrets.sh --env --allow-self-review --dry-run` and read it;
+(2) for real only `--repos texts`, answer `n` to the delete question (repository secrets stay, rc 1 expected); (3) test tag in fs-texts: the approval appears, the log shows
+"Signing key fingerprint: ...372A583D..." without "NOT signed"; (4) then fs-texts again, answer `y`; (5) the rest of the list without `--yes`, the check output without DEVIATION.
 
 The signing job also checks that it runs for a tag (`github.ref_type == 'tag'`) and that the checkout is the commit of that tag (`git rev-parse HEAD` = `github.sha`).
 A mirror workflow should check the same two things before it signs. Not proven until the first real run: that the environment secrets reach the job inside the
