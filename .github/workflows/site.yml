@@ -7,16 +7,20 @@
 #   Run 2: the same inputs plus `build-run` = the run id of run 1, `approval` and `approval-sig` (the two texts). `build` runs again without a key, `sign`
 #          rebuilds from the same ref, compares byte for byte, and only then loads the key. The signed folder is the artefact `site-signed`.
 # Not part of this file, by design: the delivery to a server (the person does it by hand, no agent has access).
-# TODO(person): create the environment `site-signing` (required reviewer = the person, secrets GPG_PRIVATE_KEY and GPG_PASSPHRASE only there), commit
+# The key: only the step "Place the key" has the secrets in its environment (shell builtins only, writes two 0600 files); the step that signs gets file
+#   paths, so no process holds the key in /proc/<pid>/environ (tests/test-site.sh shim). The check steps run before the key exists on the runner.
+# `if: github.ref == 'refs/heads/main'` does NOT protect anything: whoever can push a branch runs the site.yml OF THAT BRANCH, without the `if`. The wall is the
+#   Deployment-branch rule of the environment `site-signing` (main only) plus the required reviewer and the protected main; secrets exist only there.
+# TODO(person): create the environment `site-signing` (required reviewer = the person, self-review off, deployment branches = main ONLY, secrets GPG_PRIVATE_KEY and GPG_PASSPHRASE only there), commit
 # configs/site/allowed-signing-keys.txt (fingerprints of the approval SUBKEY, one per line) and configs/site/approvers.pgp (the approver's public key
-# ring); the run is red while they are missing.
+# ring), the repository variable SITE_ACME_EMAIL (not a secret; for the configuration hash); the run is red while they are missing.
 name: site
 on:
   workflow_dispatch:
     inputs:
       repository: { type: string, required: true, description: "owner/name of the repository that holds the approved folder state" }
       ref: { type: string, required: true, description: "40-hex commit of the approved folder state" }
-      folder: { type: string, default: ".", description: "folder inside that repository" }
+      folder: { type: string, required: true, description: "explicit sub folder inside that repository, e.g. site-out (never \".\": it holds .git and is always red)" }
       name: { type: string, required: true, description: "artefact name, e.g. example.org" }
       version: { type: string, required: true, description: "version, e.g. 0.0.1" }
       mode: { type: choice, options: [static, passthrough], default: static, description: "passthrough = the person's own HTML with JavaScript (explicit, logged)" }
@@ -93,17 +97,58 @@ jobs:
         run: |
           printf '%s\n' "$APPROVAL" > approval.txt
           printf '%s\n' "$APPROVAL_SIG" > approval.txt.asc
-      - name: Sign (approval check, rebuild comparison, then the key)
+      - name: Check approval, rebuild and sums (NO key anywhere)
         env:
           FOLDER: ${{ inputs.folder }}
           BUILD_RUN: ${{ inputs.build-run }}
+        run: |
+          set -euo pipefail
+          [[ $FOLDER =~ ^[A-Za-z0-9._/-]+$ && $FOLDER != *..* && $FOLDER != /* ]] || { echo "folder is not a plain relative path"; exit 1; }
+          scripts/site-signieren.sh --check-only dist approval.txt approval.txt.asc configs/site/approvers.pgp configs/site/allowed-signing-keys.txt \
+            "$BUILD_RUN" release-signing-key.asc "src/$FOLDER"
+      - name: Hash of the Zentinel configuration (two sides compare it)
+        env:
+          MODE: ${{ inputs.mode }}
+          ACME_EMAIL: ${{ vars.SITE_ACME_EMAIL }}
+        run: |
+          set -euo pipefail
+          # the configuration is NOT in the tarball; it is rendered from the site.toml INSIDE the checked tarball (render.py is deterministic). The person renders
+          # the same way from a verified main and must get the same hashes (written in the protocol, compared on the server).
+          [ -n "$ACME_EMAIL" ] || { echo "repository variable SITE_ACME_EMAIL is not set (TODO person): no configuration hash"; exit 1; }
+          w=$(mktemp -d); tar -xzf dist/*-site.tar.gz -C "$w" --no-same-owner --no-same-permissions ./site.toml
+          opt=(); [ "$MODE" != passthrough ] || opt=(--allow-passthrough)
+          {
+            echo "### Zentinel configuration hashes (site.toml of the checked tarball, ACME e-mail from the variable)"; echo '```'
+            for v in staging production http-only; do
+              python3 -I templates/site/render.py "--$v" "${opt[@]}" --site "$w/site.toml" "$w/$v.kdl" >/dev/null
+              echo "kdl-sha256 $v $(sha256sum "$w/$v.kdl" | cut -d' ' -f1)"
+            done
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Place the key as a file (the only step with the secrets; shell builtins only, no child process)
+        env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          d="$RUNNER_TEMP/site-key"; mkdir -m 700 "$d"
+          printf '%s' "$GPG_PRIVATE_KEY" > "$d/key.asc"
+          printf '%s' "$GPG_PASSPHRASE" > "$d/pass"
+      - name: Sign (approval check and rebuild again, then the key from the file)
+        env:
+          FOLDER: ${{ inputs.folder }}
+          BUILD_RUN: ${{ inputs.build-run }}
+          GPG_PRIVATE_KEY_FILE: ${{ runner.temp }}/site-key/key.asc
+          GPG_PASSPHRASE_FILE: ${{ runner.temp }}/site-key/pass
         run: |
           set -euo pipefail
           [[ $FOLDER =~ ^[A-Za-z0-9._/-]+$ && $FOLDER != *..* && $FOLDER != /* ]] || { echo "folder is not a plain relative path"; exit 1; }
           scripts/site-signieren.sh dist approval.txt approval.txt.asc configs/site/approvers.pgp configs/site/allowed-signing-keys.txt \
             "$BUILD_RUN" release-signing-key.asc "src/$FOLDER"
+      - name: Remove the key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/site-key"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: site-signed

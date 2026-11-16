@@ -414,7 +414,7 @@ SITES=(--allow-passthrough --site "$t/s1.toml" --site "$t/s2.toml" --site "$t/s3
 grn "render: staging is the default" bash -c "'$R' '${SITES[*]}' '$t/s.kdl' >/dev/null 2>&1 || '$R' ${SITES[*]} '$t/s.kdl' >/dev/null 2>&1; grep -q 'staging #true' '$t/s.kdl' && ! grep -q '@[A-Z0-9_]*@' '$t/s.kdl'"
 grn "render: production" bash -c "'$R' --production ${SITES[*]} '$t/p.kdl' >/dev/null 2>&1 && grep -q 'staging #false' '$t/p.kdl'"
 grn "render: names come from the site.toml files: aliases get a route and are in the certificate" bash -c "grep -q 'host \"www.one.example.org\"' '$t/s.kdl' && grep -q 'domains \"one.example.org\" \"www.one.example.org\"' '$t/s.kdl' && [ \$(grep -c 'acme {' '$t/s.kdl') = 3 ]"
-hostfiles=$(cd "$root" && ls scripts/site* templates/site/* .github/workflows/site.yml | grep -v -E '^(scripts/test-site\.sh|templates/site/README\.md)$')
+hostfiles=$(cd "$root" && for f in scripts/site* templates/site/* .github/workflows/site.yml; do case $f in scripts/test-site.sh|templates/site/README.md) ;; *) echo "$f" ;; esac; done)
 [ "$(wc -l <<<"$hostfiles")" -ge 15 ] && grep -q 'site-signaturen-pruefen.sh' <<<"$hostfiles" && grep -q 'site-tar-pruefen.py' <<<"$hostfiles" && ok "host-name grep covers every scripts/site*, templates/site/* (README aside) and site.yml" || bad "host-name grep file list"
 grn "templates and scripts name no host of the three real domains (fixtures only)" bash -c "cd '$root' && ! grep -n -E 'freesynergy\.net|helfa\.org|freeplanetearth\.org' $(tr '\n' ' ' <<<"$hostfiles")"
 for f in scripts/site-signaturen-pruefen.sh scripts/site-tar-pruefen.py; do
