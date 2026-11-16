@@ -5,7 +5,7 @@ use fs_release_chain::outcome::Stop;
 use super::LiftEnv;
 use crate::task::Task;
 
-/// Commits the changed `Cargo.toml` files, and `Cargo.lock` only after an online lift (a local-tags lock is not committed).
+/// Commits the changed `Cargo.toml` files, the workflow files the step `pins` changed, and `Cargo.lock` only after an online lift (a local-tags lock is not committed).
 /// Runs only when every step before it was green.
 pub struct Commit;
 
@@ -30,7 +30,11 @@ impl Task<LiftEnv<'_>> for Commit {
         let files: Vec<&str> = list
             .stdout
             .lines()
-            .filter(|f| f.ends_with("Cargo.toml") || (env.opts.online && *f == "Cargo.lock"))
+            .filter(|f| {
+                f.ends_with("Cargo.toml")
+                    || (env.opts.online && *f == "Cargo.lock")
+                    || (f.starts_with(".github/workflows/") && f.ends_with("yml"))
+            })
             .collect();
         if files.is_empty() {
             return Ok("nothing to commit (already on these tags)".into());

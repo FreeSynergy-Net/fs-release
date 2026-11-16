@@ -24,8 +24,15 @@ fn green_lift_moves_every_crate_to_the_given_tags_and_writes_the_report() {
     let w = World::new();
     let (r, code) = run(&w, &w.opts());
     assert_eq!(code, 0, "{}", r.markdown());
-    assert!(r.steps.iter().all(|s| s.status == "ok"), "{}", r.markdown());
-    assert_eq!(r.steps.len(), 10);
+    // `pins` has nothing to do in a repo without `.github/workflows`: skipped, never ok.
+    assert!(
+        r.steps
+            .iter()
+            .all(|s| s.status == "ok" || (s.name == "pins" && s.status == "skipped")),
+        "{}",
+        r.markdown()
+    );
+    assert_eq!(r.steps.len(), 11);
     assert!(r.toolchain.starts_with("rustc ") && r.toolchain_stable.starts_with("rustc "));
     assert!(w
         .read(".fs-release/lift-report.md")
@@ -238,4 +245,23 @@ fn assert_is_empty_in_a_test_is_red_at_clippy_stable_with_the_first_error_line()
         "{cs:?}"
     );
     assert_eq!(step(&r, "tests").status, "ok");
+}
+
+#[test]
+fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
+    let w = World::new();
+    let wf = w.work().join(".github/workflows");
+    fs::create_dir_all(&wf).unwrap();
+    let check = "jobs:\n  check:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@main\n  other:\n    steps:\n      - uses: actions/checkout@v4\n";
+    fs::write(wf.join("check.yml"), check).unwrap();
+    git(&w.work(), &["add", "-A"]);
+    git(&w.work(), &["commit", "--quiet", "-m", "workflow"]);
+    let (r, _) = run(&w, &w.opts());
+    assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
+    let t = w.read(".github/workflows/check.yml");
+    assert!(t.contains("check.yml@v0.0.10\n") && t.contains("actions/checkout@v4"));
+    assert!(!t.contains("@main"));
+    // A second run finds the tag in place and changes nothing.
+    let (r, _) = run(&w, &w.opts());
+    assert!(step(&r, "pins").detail.contains("already on v0.0.10"));
 }

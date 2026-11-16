@@ -2,7 +2,7 @@
 
 use fs_release_chain::sys::Runner;
 
-use super::{checks, commit, steps, LiftEnv, LiftOpts, Report};
+use super::{checks, commit, pins, steps, LiftEnv, LiftOpts, Report};
 use crate::task::{run_all, Task};
 
 /// The steps in order. The checks after the lock are independent: all of them run, so one report shows every red.
@@ -19,6 +19,7 @@ pub fn tasks<'a>(opts: &LiftOpts) -> Vec<Box<dyn Task<LiftEnv<'a>>>> {
         Box::new(checks::Tests),
         Box::new(checks::YamlCheck),
         Box::new(checks::LockSources),
+        Box::new(pins::Pins),
     ];
     if opts.commit {
         v.push(Box::new(commit::Commit));

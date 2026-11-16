@@ -166,6 +166,7 @@ impl World {
             "check_yaml.py",
             "check_lock_sources.py",
             "gates-lock.sh",
+            "pin-refs.sh",
             "lock-sources.toml",
         ] {
             fs::copy(real.join(f), dir.join("scripts").join(f)).unwrap();

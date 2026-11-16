@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (draft, no version, no tag)
+
+- `scripts/pin-refs.sh --dir <repo> <ref>`: pins the fs-release `uses:` lines in `<repo>/.github/workflows/*.yml` of a FOREIGN repo (the same sed expression, other actions untouched, changed files reported, rc 0; no `.github/workflows` = rc 2); without `--dir` the behaviour is unchanged. Self test `scripts/test_pin_refs.sh` extended (foreign repo fixture with `@main` / `@v0.0.6` / SHA, foreign action kept, idempotent second run, no workflows = rc 2; mutations: anchor removed, pattern widened, `--dir` ignored). New lift step `pins` (after `lock-sources`, before `commit`; `crates/fs-release/src/lift/pins.rs`, `workflows/lift.yaml`): raises the fs-release pins of the lifted repo to v0.0.10 with that script (skipped without workflows, never lowers a pin of v0.0.10 or newer); `commit` also takes the changed `.github/workflows/*.yml`. `check.yml@v0.0.10` plus `strict = true` stays required only at the V1+ lift (`lock-sources`). Not proven: a real lift run on a program repo.
+
 ## 0.0.10
 
 - Lock check (S0, ADR 0092 rule 2, ADR 0093 rule 3): `scripts/check_lock_sources.py`, `scripts/gates-lock.sh` (called by `scripts/gates.sh`) and `scripts/lock-sources.toml`; see the entry "Lock check" below. A repo's own `.fs-lock-sources.toml` can only set `strict` and `only_from_enabled`; a workspace member (no `source`) is no violation of `only_from`. The lift step `lock-sources` (workflows/lift.yaml) is red for the V1+ lift (`FS_LIFT_V1PLUS=1`) when the `check.yml` pin is a tag older than v0.0.10 or `strict = true` is missing.

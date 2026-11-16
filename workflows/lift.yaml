@@ -92,6 +92,14 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Lock check `scripts/gates-lock.sh` (one source per shared library in every Cargo.lock, scripts/lock-sources.toml). Warning first, error later: a lift to V1+ (fs-types from the repo FreeSynergy/fs-types, one tag of each library) ALSO raises the fs-release pin in .github/workflows/check.yml to the tag >= 0.0.10 and sets `strict = true` in the repo's `.fs-lock-sources.toml` (optionally `only_from_enabled = true`); after that the same step is red on a second source. These two edits are done by the person or agent that lifts; the step reports. It becomes RED (not only a report) when the lift is the V1+ lift (env `FS_LIFT_V1PLUS=1`, set by the V1+ round, never earlier so that no repo is blocked before) and the fs-release pin of `.github/workflows/check.yml` is a tag older than v0.0.10 (a `@main` or commit pin is not compared) or `.fs-lock-sources.toml` lacks `strict = true`."
+  - pins:
+      call: pins:0.0.10@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Raise the fs-release pins of the repo to the tag v0.0.10 (the first tag with the lock check): `scripts/pin-refs.sh --dir <repo> v0.0.10` rewrites only the `uses: FreeSynergy/fs-release/...@<ref>` lines of `.github/workflows/*.yml` (`@main`, an old tag or a commit); other actions, comments and all other files stay. Skipped without `.github/workflows`; a repo whose `check.yml` is already on v0.0.10 or newer is left alone (a pin is never lowered). The changed workflow files are committed by the step `commit`. `check.yml@v0.0.10` and `strict = true` are only REQUIRED at the V1+ lift (step `lock-sources`); before, the pin is a plain upgrade of the callers."
   - commit:
       call: commit:0.0.10@fs
       if: ${ .input.commit }

@@ -4,6 +4,7 @@ mod checks;
 mod commit;
 mod lockpin;
 mod opts;
+mod pins;
 mod report;
 mod run;
 mod steps;
