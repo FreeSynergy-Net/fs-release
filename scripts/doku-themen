@@ -2,11 +2,11 @@
 """Thema-Lauf der Doku (inkrementell, NUR LESEN, ohne KI): welche Doku-Seiten zu den Aenderungen seit der Marke gehoeren.
 
   python3 -I scripts/doku-themen --docs <fs-documentation-Klon> --repo <Coderepo> [--state FILE] [--themen docs/topics.toml] [--json FILE]
-  python3 -I scripts/doku-themen --schreibe-marke <sha> [--state FILE] [--bekannt-aus BESTAND.json]
+  python3 -I scripts/doku-themen --schreibe-marke <sha> [--repo <Coderepo>] [--state FILE] [--bekannt-aus BESTAND.json]
   python3 -I scripts/doku-themen --selbsttest
 
 Format der Zuordnung (docs/topics.toml) und der Front-Matter: siehe doku_bestand_lib/themen.py.
-Marke: --state (Vorgabe <repo>/.fs/doku-aufraeumen.state) mit {"marke": sha, "bekannt": [...]}. Die Marke wird NUR nach einem
+Marke: --state (Vorgabe $XDG_STATE_HOME/freesynergy/doku-aufraeumen/<repo>.marke, nie im Checkout) mit {"marke": sha, "bekannt": [...]}. Die Marke wird NUR nach einem
 gruenen Lauf gesetzt (Schritt `marke` des Ablaufs); --bekannt-aus schreibt die Schluessel eines doku-bestand-Inventars
 (JSON-Ausgabe) als entschieden dazu, wenn der Opus-Schritt gelaufen ist.
 
@@ -22,7 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "doku_bestand_lib"))
 
-from themen import GitFehler, lauf, schreibe_marke  # noqa: E402
+from themen import GitFehler, lauf, schreibe_marke, standard_bestand, standard_marke  # noqa: E402
 
 
 def skipped(msg):
@@ -44,17 +44,21 @@ def main(argv):
     ap.add_argument("--bekannt-aus")
     a = ap.parse_args(argv[1:])
     if a.schreibe_marke:
-        if not a.state:
-            return skipped("--state fehlt")
+        state = a.state or (standard_marke(a.repo) if a.repo else None)
+        if not state:
+            return skipped("--state oder --repo fehlt")
+        bekannt_aus = a.bekannt_aus
+        if bekannt_aus == "-" and a.repo:
+            bekannt_aus = standard_bestand(a.repo)
         try:
-            schreibe_marke(a.state, a.schreibe_marke, a.bekannt_aus)
+            schreibe_marke(state, a.schreibe_marke, bekannt_aus)
         except ValueError as e:
             return skipped(str(e))
         print(json.dumps({"status": "ok", "marke": a.schreibe_marke}, ensure_ascii=False))
         return 0
     if not (a.docs and a.repo):
         return skipped("--docs und --repo sind Pflicht")
-    state = a.state or os.path.join(a.repo, ".fs", "doku-aufraeumen.state")
+    state = a.state or standard_marke(a.repo)
     themen = a.themen or os.path.join(a.docs, "docs", "topics.toml")
     if not os.path.isfile(state):
         return skipped(f"{state}: keine Marke (einmal doku-bestand als Vollpruefung, danach --schreibe-marke)")

@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import tempfile
 
-from themen import lauf, schreibe_marke
+from themen import lauf, schreibe_marke, standard_bestand, standard_marke
 
 
 def sh(cwd, *args):
@@ -87,6 +87,24 @@ def selbsttest():
         except ValueError:
             pass
         checks.append((not fehler, "marke: Gegenprobe ohne Marke und mit falschem SHA"))
+        # Marke ausserhalb des Checkouts: $XDG_STATE_HOME/freesynergy/doku-aufraeumen/<repo>.marke, Checkout bleibt sauber
+        alt = os.environ.get("XDG_STATE_HOME")
+        os.environ["XDG_STATE_HOME"] = os.path.join(tmp, "xdg")
+        try:
+            pfad = standard_marke(code)
+            schreibe_marke(pfad, marke_a)
+            sauber = subprocess.run(["git", "-C", code, "status", "--porcelain"], capture_output=True, text=True).stdout.strip()
+            checks += [
+                (pfad == os.path.join(tmp, "xdg", "freesynergy", "doku-aufraeumen", os.path.basename(code) + ".marke"), "marke: Standardpfad im XDG-Zustandsordner"),
+                (os.path.isfile(pfad) and not pfad.startswith(code), "marke: liegt ausserhalb des Checkouts, Ordner angelegt"),
+                (sauber == "", "marke: der Checkout bleibt sauber"),
+                (standard_bestand(code).endswith(".bestand.json") and os.path.dirname(standard_bestand(code)) == os.path.dirname(pfad), "bestand: Inventar neben der Marke"),
+            ]
+        finally:
+            if alt is None:
+                os.environ.pop("XDG_STATE_HOME")
+            else:
+                os.environ["XDG_STATE_HOME"] = alt
         bad = [m for ok, m in checks if not ok] + fehler
         print(json.dumps({"selbsttest": "red" if bad else "green", "fehlend": bad, "pruefungen": len(checks)},
                          ensure_ascii=False))

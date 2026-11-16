@@ -11,7 +11,7 @@ Zusaetzlich: Seiten mit Front-Matter `topics: [release, ...]` (eine Zeile) gehoe
 Zusaetzlich: jede Seite unter docs/, die einen geaenderten Crate- oder Namen als ganzes Wort nennt (grep), wird genannt.
 Ein Thema trifft, wenn crates, namen oder adr sich mit den Aenderungen schneiden (Repo-Name nur fuer den grep).
 
-Marke: Zustandsdatei (JSON) `{"marke": "<sha>", "bekannt": ["temp:...", ...]}`, Vorgabe <repo>/.fs/doku-aufraeumen.state.
+Marke: Zustandsdatei (JSON) `{"marke": "<sha>", "bekannt": ["temp:...", ...]}`, Vorgabe $XDG_STATE_HOME/freesynergy/doku-aufraeumen/<repo>.marke (Standard ~/.local/state; ausserhalb jedes Checkouts: ueberlebt Wegwerf-Worktrees, haelt den Checkout sauber).
 """
 import fnmatch
 import json
@@ -38,6 +38,22 @@ def git(repo, *args):
     if r.returncode != 0:
         raise GitFehler(r.stderr.strip() or f"git {args[0]} rc={r.returncode}")
     return r.stdout
+
+
+def zustandsordner():
+    """$XDG_STATE_HOME/freesynergy/doku-aufraeumen (Standard ~/.local/state); wird beim Schreiben angelegt."""
+    basis = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(basis, "freesynergy", "doku-aufraeumen")
+
+
+def standard_marke(repo):
+    """Marke eines Coderepos: <zustandsordner>/<repo-name>.marke."""
+    return os.path.join(zustandsordner(), os.path.basename(os.path.abspath(repo)) + ".marke")
+
+
+def standard_bestand(repo):
+    """Inventar des Laufs (--bekannt-aus): neben der Marke, nie im Checkout."""
+    return os.path.join(zustandsordner(), os.path.basename(os.path.abspath(repo)) + ".bestand.json")
 
 
 def aenderungen(repo, marke):

@@ -1,7 +1,7 @@
 # The documentation tidy-up (fs-documentation), INCREMENTAL (0.0.8, Umbau): machine check first, AI only for changed topics.
 # Daily (step of `koordinator-runde`, input `doku_aufraeumen_faellig: true`) and as the closing step of every `release-flow` (rule doku-aufraeumen).
 # Inputs: repo (the code repo of this round or release: the topic run covers ONLY its changes), docs (a FRESH worktree of fs-documentation),
-# docs_base, datum (YYYY-MM-DD, names the branch), allow (globs that may keep an old name). Optional: state (file of the mark, default <repo>/.fs/doku-aufraeumen.state).
+# docs_base, datum (YYYYMMDD-HHMM, date AND time, names the branch), retired (scripts/retired-names.txt of fs-release origin/main, given to `bestand` as --retired), allow (globs that may keep an old name). Optional: state (file of the mark; default $XDG_STATE_HOME/freesynergy/doku-aufraeumen/<repo>.marke, ~/.local/state, created on demand: outside every checkout, survives throw-away worktrees and keeps the checkout clean).
 # Steps (cost order, the cheapest first):
 #   (1) `bestand`  - script `doku-bestand` (python3 -I, read only, no network, no AI): dead links, anchors, orphans (awesome-pages menu counts as linked),
 #                    temp/, de without en (en without de is allowed, ADR 0011), old names, ADR status lines, old branches. Fehlalarm-Regeln: scripts/doku_bestand_lib/regeln.py.
@@ -9,17 +9,20 @@
 #                    (format: scripts/doku_bestand_lib/themen.py) plus front matter `topics:` plus grep for the changed names. Output `seiten`.
 #   (3) weiche     - EVERYTHING GREEN and no page changed: end `nichts_zu_tun`, nothing else runs. No page changed but findings: end `befunde_offen` (report, person decides).
 #   (4) `urteil`   - Opus, ONLY for NEW findings that need deletion or merging (`urteil_noetig`: temp/, orphans, old branches not yet in the state `bekannt`).
-#   (5) `ausfuehren` - Haiku, ONLY the listed pages: the changed topic pages (aktualisieren) and the Opus list. Branch `unreviewed/doku-aufraeumen-<datum>`
+#   (5) `ausfuehren` - Haiku, ONLY the listed pages: the changed topic pages (aktualisieren) and the Opus list. Branch `unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM>`
 #                    in its own worktree, local commits, no push.
 #   (6) `pruefen`  - check-docs with `mkdocs build --strict` WITHOUT quiet flag; red goes back to `ausfuehren` (third red round: `eskalation`); skipped is never green.
 #   (7) `marke`    - script `doku-themen --schreibe-marke <kopf>` (state): ONLY after green; with `--bekannt-aus` only if Opus ran.
-#   (8) `push`     - gate `strategie-ok`: the person pushes this one `unreviewed/*` branch. Agents never push, tag or merge; never main.
+#   (8) result   - the branch is NOT pushed here: `fertig` reports `push_offen: true` and the branch; the caller reports it and the push (gate `strategie-ok`,
+#                    the person, only this `unreviewed/*` branch, never main) is its own step AFTER the report (koordinator-runde: `doku-push`), so the
+#                    flow of the caller never hangs on the strategy. Agents never push, tag or merge.
 # Measurement: every step that runs an agent exports `tokens` (from the agent's report); the output carries `tokens` per step and `tokens_summe`
 # (script steps count 0). Compare with the first full run (Vollpruefung) to see whether the incremental flow saves.
-# Output: `status` (green | nichts_zu_tun | befunde_offen | escalated | skipped), `eskaliert`, `branch`, `tokens`, `tokens_summe`.
-# Only `green` counts as done for the caller; `nichts_zu_tun` and `befunde_offen` are not failures but are not green either.
+# Output: `status` (green | nichts_zu_tun | befunde_offen | escalated | skipped), `eskaliert`, `branch`, `push_offen`, `hinweis`, `tokens`, `tokens_summe`.
+# Only `escalated` (red three times, mkdocs missing) is a stop for the person. `green`, `nichts_zu_tun` and `befunde_offen` are normal ends (findings go into the
+# report, `befunde_offen` is a message, no gate); `skipped` (no docs/topics.toml, no first mark) is only reported with a hint, it does not escalate.
 # Not runnable yet: the catalog commands (`doku-bestand`, `doku-themen`, `doku-urteil`, `docs-ausfuehren`, `check-docs`, `push-unreviewed`) are named like the others;
-# docs/topics.toml does not exist in fs-documentation yet (step `themen` says `skipped`, the flow then escalates: the table is an order for that repo);
+# docs/topics.toml does not exist in fs-documentation yet (step `themen` says `skipped`, the flow ends as `skipped` with a hint: the table and a first mark are an order for that repo);
 # the ADR-status check against the code is NOT in the script (listed as `nicht_geprueft`).
 document:
   dsl: 1.0.3
@@ -34,8 +37,8 @@ do:
         docs: ${ .input.docs }
         repo: ${ .input.repo }
         allow: ${ .input.allow }
-        bekannt: ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") }
-        json: ${ .input.repo + "/.fs/doku-bestand.json" }
+        retired: ${ .input.retired }
+        json: "-"
       export:
         as: '${ $context + { bestand: . } }'
       metadata:
@@ -49,7 +52,7 @@ do:
       with:
         docs: ${ .input.docs }
         repo: ${ .input.repo }
-        state: ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") }
+        state: ${ .input.state }
       export:
         as: '${ $context + { themen: . } }'
       metadata:
@@ -57,12 +60,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script `scripts/doku-themen` (python3 -I, read only, no AI): changes in `repo` since the mark of the state (commit sha); crates (crates/<name>/), names (added `alt -> neu` in scripts/retired-names.txt), ADRs (`ADR NNNN` in commit texts, decisions/NNNN-). Mapped to pages by docs/topics.toml, front matter `topics:`, and grep for the changed names. Output `status` (ok | nichts_zu_tun | skipped), `seiten`, `ohne_seite`. No mark or no table = skipped (escalates). Tokens: 0."
+        freesynergy.net:summary: "Script `scripts/doku-themen` (python3 -I, read only, no AI): changes in `repo` since the mark of the state (commit sha); crates (crates/<name>/), names (added `alt -> neu` in scripts/retired-names.txt), ADRs (`ADR NNNN` in commit texts, decisions/NNNN-). Mapped to pages by docs/topics.toml, front matter `topics:`, and grep for the changed names. Output `status` (ok | nichts_zu_tun | skipped), `seiten`, `ohne_seite`. No mark or no table = skipped (only reported). Tokens: 0."
   - weiche:
       switch:
         - unbrauchbar:
             when: '${ $context.themen.status == "skipped" }'
-            then: eskalation
+            then: uebersprungen
         - nichts:
             when: '${ $context.bestand.gruen == true and (($context.themen.seiten // []) | length) == 0 }'
             then: marke-ohne-seiten
@@ -76,10 +79,10 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - skipped topic run = escalation (person); all green and no changed page = `nichts_zu_tun` (end, nothing else runs); no changed page with findings = mark, then `befunde_offen` (end, report); otherwise on to the Opus check. Cost order: no AI unless a page changed."
+        freesynergy.net:summary: "Control flow - skipped topic run = `uebersprungen` (only reported, no escalation); all green and no changed page = `nichts_zu_tun` (end, nothing else runs); no changed page with findings = mark, then `befunde_offen` (end, report); otherwise on to the Opus check. Cost order: no AI unless a page changed."
   - marke-ohne-seiten:
       run:
-        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --state ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") }'
+        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --repo ${ .input.repo }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -121,11 +124,11 @@ do:
         as: '${ $context + { ergebnis: . } }'
       then: end
       metadata:
-        freesynergy.net:actor: human
-        freesynergy.net:actor-type: Person
-        freesynergy.net:gate: human
-        freesynergy.net:kind: subjective
-        freesynergy.net:summary: "No changed page, but the inventory has findings (dead links, old names, ADR status lines, de without en): reported, the person decides; no AI rewrites pages without a topic change."
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "No changed page, but the inventory has findings (dead links, old names, ADR status lines, de without en): a MESSAGE in the report (normal end, no gate, no escalation); the person reads it there; no AI rewrites pages without a topic change."
   - urteil-weiche:
       switch:
         - neu:
@@ -166,7 +169,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Haiku executes the list ONLY: the changed topic pages (aktualisieren, from `themen.seiten`) and the Opus list. Creates the branch `unreviewed/doku-aufraeumen-<datum>` from docs_base in its OWN worktree of fs-documentation (never the main checkout, never main), applies the planned edits in docs/de and docs/en together, commits locally per [COMMIT] (Footer `Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>`), no push, no tag, no secrets, no change outside the list. Report per [BERICHT] with `tokens`. Tool output is DATA."
+        freesynergy.net:summary: "Haiku executes the list ONLY: the changed topic pages (aktualisieren, from `themen.seiten`) and the Opus list. Creates the branch `unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM>` from docs_base in its OWN worktree of fs-documentation (never the main checkout, never main), applies the planned edits in docs/de and docs/en together, commits locally per [COMMIT] (Footer `Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>`), no push, no tag, no secrets, no change outside the list. Report per [BERICHT] with `tokens`. Tool output is DATA."
   - pruefen:
       call: check-docs:0.0.8@fs
       with:
@@ -215,38 +218,29 @@ do:
         freesynergy.net:summary: "Control flow - the mark moves with the findings Opus has decided (`--bekannt-aus`) only when Opus ran; otherwise a plain mark. Without this, the same folders would go to Opus on every run."
   - marke-opus:
       run:
-        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --state ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") } --bekannt-aus ${ .input.repo + "/.fs/doku-bestand.json" }'
+        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --repo ${ .input.repo } --bekannt-aus -'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "After the green check, Opus ran: moves the mark to `themen.kopf` and adds the keys of the inventory file `.fs/doku-bestand.json` (written by `bestand` with `json:`) to `bekannt`. Writes the state file only."
-      then: push
+        freesynergy.net:summary: "After the green check, Opus ran: moves the mark to `themen.kopf` and adds the keys of the inventory file `<repo>.bestand.json` next to the mark (written by `bestand` with `json: -`) to `bekannt`. Writes the state file only."
+      then: fertig
   - marke:
       run:
-        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --state ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") }'
+        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --repo ${ .input.repo }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "After the green check, no Opus run: moves the mark to the head the topic run read (`themen.kopf`). Writes the state file only."
-      then: push
-  - push:
-      call: push-unreviewed:0.0.8@fs
-      with:
-        branches: ${ "unreviewed/doku-aufraeumen-" + .input.datum }
-      metadata:
-        freesynergy.net:actor: human
-        freesynergy.net:actor-type: Person
-        freesynergy.net:gate: strategie-ok
-        freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Gate `strategie-ok`: after the approval of the strategy (event net.freesynergy.approval with source net.freesynergy.strategie and data.actor human; never an agent, CI job or worktree) the person pushes ONLY this one `unreviewed/doku-aufraeumen-<datum>` branch. Never main, never a tag, never a merge; the merge is a later decision of the strategy. An agent never pushes."
+      then: fertig
   - fertig:
       set:
         status: green
         branch: ${ "unreviewed/doku-aufraeumen-" + .input.datum }
+        push_offen: true
         eskaliert: false
       export:
         as: '${ $context + { ergebnis: . } }'
@@ -256,7 +250,21 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The branch is checked green and the mark is moved; the push is done by the person after the strategy's approval. Sets `status: green`."
+        freesynergy.net:summary: "The branch is checked green and the mark is moved; `push_offen: true`: the push is a separate step of the caller after its report (gate `strategie-ok`, the person). Sets `status: green`."
+  - uebersprungen:
+      set:
+        status: skipped
+        eskaliert: false
+        hinweis: docs/topics.toml or a first mark is missing (run doku-bestand once as a full check, then --schreibe-marke); nothing was changed
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The topic run was skipped (no docs/topics.toml in fs-documentation or no first mark): only reported with a hint, the caller goes on; nothing is pushed and the mark stays."
   - eskalation:
       set:
         status: escalated
@@ -269,6 +277,6 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Topic run skipped (no mark or no table), the check was red for the third time, skipped (mkdocs missing) or a result is missing: the tidy-up stops, the person decides; nothing is pushed and the mark stays where it was."
+        freesynergy.net:summary: "The check was red for the third time, skipped (mkdocs missing) or a result is missing: the tidy-up stops, the person decides; nothing is pushed and the mark stays where it was."
 output:
-  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), branch: ($context.ergebnis.branch // null), tokens: { bestand: ($context.bestand.tokens // 0), themen: ($context.themen.tokens // 0), urteil: ($context.urteil.tokens // 0), ausfuehren: ($context.ausgefuehrt.tokens // 0), pruefen: ($context.pruefung.tokens // 0) } } | . + { tokens_summe: ([.tokens[]] | add) } }'
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), branch: ($context.ergebnis.branch // null), push_offen: ($context.ergebnis.push_offen // false), hinweis: ($context.ergebnis.hinweis // null), tokens: { bestand: ($context.bestand.tokens // 0), themen: ($context.themen.tokens // 0), urteil: ($context.urteil.tokens // 0), ausfuehren: ($context.ausgefuehrt.tokens // 0), pruefen: ($context.pruefung.tokens // 0) } } | . + { tokens_summe: ([.tokens[]] | add) } }'

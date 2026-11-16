@@ -26,7 +26,7 @@ Anker nach mkdocs-Slug (Nicht-ASCII faellt weg); Quellen in temp/ sind kein Doku
 Nicht geprueft (Spezifikation, nicht lauffaehig): ADR-Status gegen den Code-Stand (`nicht_geprueft`).
 Ausgabe-Felder: status (ok | skipped), gruen (true nur bei anzahl 0 UND vollstaendig gelaufenen Befunden),
 anzahl, befunde, loeschen_neu (Schluessel, die noch keine Entscheidung haben), urteil_noetig (true, wenn loeschen_neu nicht leer).
---bekannt STATE: Zustandsdatei mit `bekannt` (Liste der Schluessel, die schon entschieden sind); fehlt sie, ist alles neu.
+--bekannt STATE (Vorgabe: die Marke des Repos in $XDG_STATE_HOME/freesynergy/doku-aufraeumen/<repo>.marke, falls vorhanden; `--json -` schreibt das Inventar neben die Marke, nie in den Checkout): Zustandsdatei mit `bekannt` (Liste der Schluessel, die schon entschieden sind); fehlt sie, ist alles neu.
 
 rc 0 = Inventar gelaufen (Befunde aendern rc nicht); rc 2 = schlechte Eingabe (status skipped).
 --selbsttest: baut eine Fixture in einem temporaeren Ordner, jede Regel mit Fall und Gegenprobe; rc 1 bei Rot.
@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "do
 from befunde import (find_de_en, find_old_branches, find_old_names, find_statuszeilen,  # noqa: E402
                      find_temp, loesch_schluessel, now_unix, read_retired)
 from links import doc_md_files, pruefe_links, read  # noqa: E402
+from themen import standard_bestand, standard_marke  # noqa: E402
 
 NOT_RUN = "ADR-Status gegen den Code-Stand (Spezifikation: kein Skript liest den Code-Stand)"
 
@@ -104,16 +105,25 @@ def main(argv):
     if retired is None and a.repo:
         retired = os.path.join(a.repo, "scripts", "retired-names.txt")
     if retired is not None and not os.path.isfile(retired):
+        if a.retired is not None:
+            return bad(f"--retired {a.retired}: Datei fehlt (die Liste aus fs-release origin/main)")
         retired = None
+    bekannt = a.bekannt
+    if bekannt is None and a.repo and os.path.isfile(standard_marke(a.repo)):
+        bekannt = standard_marke(a.repo)
+    json_pfad = a.json
+    if json_pfad == "-" and a.repo:
+        json_pfad = standard_bestand(a.repo)
+        os.makedirs(os.path.dirname(json_pfad), exist_ok=True)
     try:
         now = now_unix(a.now)
     except ValueError:
         return bad(f"--now {a.now!r}: kein Datum YYYY-MM-DD")
-    res = inventory(a.docs, retired, now, a.allow, bekannt_aus(a.bekannt))
+    res = inventory(a.docs, retired, now, a.allow, bekannt_aus(bekannt))
     text = json.dumps(res, ensure_ascii=False, indent=2)
     print(text)
-    if a.json:
-        with open(a.json, "w", encoding="utf-8") as f:
+    if json_pfad and json_pfad != "-":
+        with open(json_pfad, "w", encoding="utf-8") as f:
             f.write(text + "\n")
     return 0
 

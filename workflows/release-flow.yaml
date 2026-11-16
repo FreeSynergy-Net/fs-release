@@ -200,7 +200,7 @@ do:
           repo: ${ .input.repo }
           docs: ${ .input.docs }
           docs_base: ${ .input.docs_base }
-          datum: ${ now | strftime("%Y-%m-%d") }
+          datum: ${ now | strftime("%Y%m%d-%H%M") }
           allow: ${ .input.allow }
       export:
         as: '${ $context + { aufraeumen: . } }'
@@ -209,11 +209,11 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Mandatory closing step (rule doku-aufraeumen): sub-workflow doku-aufraeumen.yaml checks the docs by machine (dead links, anchors, old names, temp, de/en, ADR status) and, since the mark, only the pages of THIS repo's changed topics (input repo; no AI for unchanged pages); a branch unreviewed/doku-aufraeumen-<datum> only if something changed; the push waits for the strategy's approval (gate strategie-ok, the person). A red or escalated tidy-up ends this flow with `eskaliert: true` (step aufraeumen-weiter)."
+        freesynergy.net:summary: "Mandatory closing step (rule doku-aufraeumen): sub-workflow doku-aufraeumen.yaml checks the docs by machine (dead links, anchors, old names, temp, de/en, ADR status) and, since the mark, only the pages of THIS repo's changed topics (input repo; no AI for unchanged pages); a branch unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM> only if something changed; the push is not part of this run (result `push_offen`, the person pushes after the strategy's approval). An escalated tidy-up ends this flow with `eskaliert: true` (step aufraeumen-weiter)."
   - aufraeumen-weiter:
       switch:
         - eskaliert:
-            when: '${ $context.aufraeumen.eskaliert == true or $context.aufraeumen.status != "green" }'
+            when: '${ $context.aufraeumen.eskaliert == true or $context.aufraeumen.status == "escalated" }'
             then: eskalation
         - weiter:
             then: continue
@@ -222,10 +222,11 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the closing tidy-up ended with `eskaliert` or without `status == green`: the person decides (eskalation). Only green lets this flow end as released."
+        freesynergy.net:summary: "Control flow - only a tidy-up that ended `escalated` (red three times, mkdocs missing, a result missing) stops this flow (eskalation, the person decides). `green`, `nichts_zu_tun` and `befunde_offen` are normal ends (the findings go into the result), `skipped` is only reported with its `hinweis` (docs/topics.toml and a first mark are missing). The push of the tidy-up branch (`push_offen`) is NOT a step of this flow: the tidy-up runs as its own run, the result names the branch, and the person pushes it after the strategy's approval; so the release never hangs on the strategy."
   - fertig:
       set:
         status: released
+        aufraeumen: ${ $context.aufraeumen }
       export:
         as: '${ $context + { ergebnis: . } }'
       then: end
@@ -249,4 +250,4 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The docs gate escalated (red three times or a check skipped): this flow ends before the review with `eskaliert: true`; the person decides."
 output:
-  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false) } }'
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), aufraeumen: ($context.ergebnis.aufraeumen // null) } }'
