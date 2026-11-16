@@ -6,7 +6,7 @@ Application, `machine` = Service; dazu `freesynergy.net:actor-type`) und `freesy
 `opus-ja`, `human`, oder `none`) und `freesynergy.net:kind` (`objective` = wiederholen, bis das Ziel erreicht ist, z. B.
 Tests grün; `subjective` = Zustand ändern, egal wie das Ergebnis ist, z. B. Bilder zeigen, Urteil einholen). Die Dateien
 sind 1:1 in fs-workflows importierbar: Serverless Workflow 1.0 plus FS-Profil, keine Sonderformen. Alle tragen
-`document.version` = Crate-Version = Tag (0.0.7). Agenten pushen, taggen und mergen nie. Heute sind sie Beschreibung und
+`document.version` = Crate-Version = Tag (0.0.8). Agenten pushen, taggen und mergen nie. Heute sind sie Beschreibung und
 werden nur geprüft (`scripts/check_workflows.py`, Test `crates/fs-release/tests/workflows.rs`; Schrittnamen von `lift` und
 `flow` müssen mit dem Code übereinstimmen). In einem zweiten Schritt liest `fs-release flow` diese Dateien und führt den
 Ablauf daraus aus. Keine Geheimnisse in diese Dateien.
@@ -86,7 +86,7 @@ Application, `machine` = Service; plus `freesynergy.net:actor-type`) and `freesy
 `opus-ja`, `human`, or `none`) and `freesynergy.net:kind` (`objective` = repeat until the goal is reached, e.g. tests
 green; `subjective` = change the state whatever the result, e.g. show images, ask for a verdict). The files import 1:1 into
 fs-workflows: Serverless Workflow 1.0 plus the FS profile, no special forms. All carry `document.version` = crate version
-= tag (0.0.7). Agents never push, tag or merge. For now they are a description and are only checked
+= tag (0.0.8). Agents never push, tag or merge. For now they are a description and are only checked
 (`scripts/check_workflows.py`, test `crates/fs-release/tests/workflows.rs`; the step names of `lift` and `flow` must match
 the code). In a second step `fs-release flow` will read these files and run the process from them. No secrets in these
 files.
@@ -193,7 +193,7 @@ reference, without a check step, a jump to nothing; structure rules: no dead ste
 
 ## Status of the `@fs` names / Status der `@fs`-Namen
 
-A call `<name>:0.0.7@fs` is a **specification, not runnable** unless a script of this repo stands behind it. Only these have a script (with a self test):
+A call `<name>:0.0.8@fs` is a **specification, not runnable** unless a script of this repo stands behind it. Only these have a script (with a self test):
 
 | `@fs` name | script | self test |
 |---|---|---|
