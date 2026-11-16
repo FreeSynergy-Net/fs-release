@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""Inventar der Dokumentation (fs-documentation): was verwaist, tot, doppelt oder veraltet ist. NUR LESEN.
+
+  python3 -I scripts/doku-bestand --docs <fs-documentation-Klon> [--repo <Coderepo>] [--retired FILE]
+        [--now YYYY-MM-DD] [--allow GLOB]... [--bekannt STATE] [--json FILE]
+  python3 -I scripts/doku-bestand --selbsttest
+
+Deterministisch, ohne Netz, ohne KI, schreibt nichts (nur `git for-each-ref`, `git merge-base`, `git rev-parse`).
+Ausgabe: ein JSON-Objekt auf stdout (auch nach --json FILE). Die Entscheidung (behalten, aktualisieren, zusammenlegen,
+loeschen) ist der Schritt `urteil` des Ablaufs doku-aufraeumen, nicht dieses Skript.
+
+Befunde (Schluessel in `befunde`):
+  verwaist       Seite unter docs/, die kein Link erreicht und die weder mkdocs.yml noch ein .pages-Menue einbindet (index.md nie).
+  tote_links     relativer Link in docs/, conventions/ oder README.md, dessen Ziel fehlt.
+  anker_tot      Link mit Anker auf eine vorhandene Datei, deren Ueberschriften diesen mkdocs-Anker nicht haben.
+  temp           Ordner temp/tmp/.tmp oder Datei *.tmp, *.bak, *~ im Klon.
+  de_en_luecke   docs/de/x.md ohne docs/en/x.md (en ohne de ist erlaubt, ADR 0011).
+  alte_namen     alter Name aus --retired (Zeilen `alt -> neu  # Grund`) als ganzes Wort in docs/, conventions/, README.md, ausser --allow.
+  statuszeile    ADR (Ordner decisions, Name 0000-*.md) ohne Zeile `Status: ...` in den ersten zehn Zeilen.
+  branches_alt   lokaler oder Remote-Branch des Klons, letzter Commit aelter als 3 Tage, NICHT in origin/main gemerged.
+
+Fehlalarm-Regeln (doku_bestand_lib/regeln.py, je mit Gegenprobe im Selbsttest): awesome-pages-Menue zaehlt als verlinkt;
+docs/<sprache>/decisions/ fehlt lokal (CI erzeugt es); Links auf conventions/templates/ sind Platzhalter; en ohne de ist erlaubt;
+Anker nach mkdocs-Slug (Nicht-ASCII faellt weg); Quellen in temp/ sind kein Doku-Baum.
+
+Nicht geprueft (Spezifikation, nicht lauffaehig): ADR-Status gegen den Code-Stand (`nicht_geprueft`).
+Ausgabe-Felder: status (ok | skipped), gruen (true nur bei anzahl 0 UND vollstaendig gelaufenen Befunden),
+anzahl, befunde, loeschen_neu (Schluessel, die noch keine Entscheidung haben), urteil_noetig (true, wenn loeschen_neu nicht leer).
+--bekannt STATE: Zustandsdatei mit `bekannt` (Liste der Schluessel, die schon entschieden sind); fehlt sie, ist alles neu.
+
+rc 0 = Inventar gelaufen (Befunde aendern rc nicht); rc 2 = schlechte Eingabe (status skipped).
+--selbsttest: baut eine Fixture in einem temporaeren Ordner, jede Regel mit Fall und Gegenprobe; rc 1 bei Rot.
+"""
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "doku_bestand_lib"))
+
+from befunde import (find_de_en, find_old_branches, find_old_names, find_statuszeilen,  # noqa: E402
+                     find_temp, loesch_schluessel, now_unix, read_retired)
+from links import doc_md_files, pruefe_links, read  # noqa: E402
+
+NOT_RUN = "ADR-Status gegen den Code-Stand (Spezifikation: kein Skript liest den Code-Stand)"
+
+
+def bekannt_aus(path):
+    if not path or not os.path.isfile(path):
+        return set()
+    with open(path, encoding="utf-8") as f:
+        return set(json.load(f).get("bekannt", []))
+
+
+def inventory(docs, retired, now, allow, bekannt=frozenset()):
+    mdfiles = doc_md_files(docs)
+    mk = os.path.join(docs, "mkdocs.yml")
+    nav_text = read(mk) if os.path.exists(mk) else ""
+    verwaist, dead, anker = pruefe_links(docs, mdfiles, nav_text)
+    names = read_retired(retired) if retired else []
+    branches = find_old_branches(docs, now)
+    befunde = {
+        "verwaist": verwaist,
+        "tote_links": dead,
+        "anker_tot": anker,
+        "temp": find_temp(docs),
+        "de_en_luecke": find_de_en(docs),
+        "alte_namen": find_old_names(docs, mdfiles, names, allow),
+        "statuszeile": find_statuszeilen(docs, mdfiles),
+        "branches_alt": branches or [],
+    }
+    nicht = [NOT_RUN]
+    if not retired:
+        nicht.append("alte Namen: keine Liste (--retired fehlt)")
+    if branches is None:
+        nicht.append("branches_alt: origin/main fehlt im Klon, nicht geprueft")
+    anzahl = sum(len(v) for v in befunde.values())
+    neu = [k for k in loesch_schluessel(befunde) if k not in bekannt]
+    return {"status": "ok", "gruen": anzahl == 0 and branches is not None, "anzahl": anzahl,
+            "befunde": befunde, "loeschen_neu": neu, "urteil_noetig": bool(neu), "nicht_geprueft": nicht}
+
+
+def bad(msg):
+    print(json.dumps({"status": "skipped", "fehler": msg}, ensure_ascii=False))
+    return 2
+
+
+def main(argv):
+    if "--selbsttest" in argv:
+        from selbsttest import selbsttest
+        return selbsttest()
+    ap = argparse.ArgumentParser(description="Read-only inventory of fs-documentation (see module docstring).")
+    ap.add_argument("--docs", required=True)
+    ap.add_argument("--repo")
+    ap.add_argument("--retired")
+    ap.add_argument("--now")
+    ap.add_argument("--allow", action="append", default=[])
+    ap.add_argument("--bekannt")
+    ap.add_argument("--json")
+    a = ap.parse_args(argv[1:])
+    if not os.path.isdir(os.path.join(a.docs, "docs")):
+        return bad(f"{a.docs}: kein docs/-Ordner, kein fs-documentation-Klon")
+    retired = a.retired
+    if retired is None and a.repo:
+        retired = os.path.join(a.repo, "scripts", "retired-names.txt")
+    if retired is not None and not os.path.isfile(retired):
+        retired = None
+    try:
+        now = now_unix(a.now)
+    except ValueError:
+        return bad(f"--now {a.now!r}: kein Datum YYYY-MM-DD")
+    res = inventory(a.docs, retired, now, a.allow, bekannt_aus(a.bekannt))
+    text = json.dumps(res, ensure_ascii=False, indent=2)
+    print(text)
+    if a.json:
+        with open(a.json, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
