@@ -1,0 +1,23 @@
+version = 4
+
+[[package]]
+name = "demo-app"
+version = "0.1.0"
+dependencies = ["demo-people", "fs-objects", "fs-types"]
+
+[[package]]
+name = "demo-people"
+version = "0.1.0"
+source = "git+https://github.com/FreeSynergy/demo-people?tag=v0.1.0#1111111111111111111111111111111111111111"
+dependencies = ["fs-types"]
+
+[[package]]
+name = "fs-objects"
+version = "0.0.6"
+source = "git+https://github.com/FreeSynergy/fs-objects?tag=v0.0.6#2222222222222222222222222222222222222222"
+dependencies = ["fs-types"]
+
+[[package]]
+name = "fs-types"
+version = "0.0.1"
+source = "git+https://github.com/FreeSynergy/fs-types?tag=v0.0.1#3333333333333333333333333333333333333333"

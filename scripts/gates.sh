@@ -25,6 +25,8 @@ cargo fmt --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
 cargo test --workspace --all-features
 python3 -I "$rules" "$root"
+# lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
+bash "$here/gates-lock.sh" "$root"
 # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
 bash "$here/gates-files.sh" "$root"
 echo "gates ok: $root at $(git rev-parse --short HEAD 2>/dev/null || echo '?')"

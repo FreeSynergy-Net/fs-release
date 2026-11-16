@@ -1,0 +1,16 @@
+# Configuration of scripts/check_lock_sources.py (rule: one source per library in every Cargo.lock; ADR 0092 rule 2, ADR 0093).
+# Easy to extend: add a name to `libraries`. A repo can override the two switches in its own `.fs-lock-sources.toml` (same keys).
+
+# Libraries that may appear in a Cargo.lock in exactly ONE source (git URL + tag/commit).
+libraries = ["fs-types", "fs-objects", "fs-interfaces", "fs-rpc", "fs-jscalendar"]
+
+# Introduction "warning first, error later": false = scripts/gates.sh prints the violation as a WARNING and stays green;
+# true = the violation is a red gate. Switch a repo to true (in its .fs-lock-sources.toml) when it has been lifted to V1+.
+strict = false
+
+# V1+ addition: `fs-types` may come ONLY from the repo FreeSynergy/fs-types (catches the old way through the fs-interfaces
+# repo, also with one entry). OFF until V1+ is done, so today's repos do not turn red. Env: FS_LOCK_ONLY_FROM=1.
+only_from_enabled = false
+
+[only_from]
+fs-types = "https://github.com/FreeSynergy/fs-types"

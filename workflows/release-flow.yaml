@@ -66,6 +66,14 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh on a fresh clone, the one definition of the checks.
+  - lock-pruefung:
+      call: lock-check:0.0.9@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Lock check (ADR 0092 rule 2, ADR 0093 rule 3), script `scripts/check_lock_sources.py` (also run by scripts/gates.sh through `scripts/gates-lock.sh`): in every Cargo.lock of the repo each of fs-types, fs-objects, fs-interfaces, fs-rpc, fs-jscalendar (list: scripts/lock-sources.toml) appears in exactly ONE source; two sources are an error that names both sources and the packages that pull them. Introduction: warning first, error later - switch `strict` (default false: a WARNING, the gate stays green; true in the repo's own `.fs-lock-sources.toml` once the repo is lifted to V1+, or env FS_LOCK_STRICT=1). V1+ addition, switch `only_from_enabled` (default OFF, env FS_LOCK_ONLY_FROM=1): fs-types only from the repo FreeSynergy/fs-types."
   - review-request:
       call: review-request:0.0.9@fs
       metadata:
