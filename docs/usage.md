@@ -281,11 +281,11 @@ features each package declares; a feature no package declares fails the plan run
 
 `workflows/grundfassung.yaml` is the slim flow for the first version of a program (scaffold, window with name, icon and a
 "what comes" list, package metadata, user documentation stub, callers, gates, picture OK, catalog proposal). Inputs: `programm`
-(name after the naming rule, ADR 0087), `beschreibung`, `was_kommt`, `icon` (path or `placeholder`), `frontend_art`, `repo`.
+(name after the naming rule, ADR 0087), `beschreibung`, `was_kommt`, `icon` (path or `placeholder`), `frontend` (frontend id, e.g. `simple`), `repo`.
 The user creates the repository; the flow prepares the scaffold in an own worktree and makes no `gh` call. The callers are
 `check.yml` and `release.yml` at `@v0.0.10` (`scripts/pin-refs.sh --dir <repo> v0.0.10`), `.fs-lock-sources.toml` has
 `strict = true`, the AppStream metadata is schema 1 without `<icon>` until fs-packages 0.0.19. The catalog entry is only a diff
-for fs-catalog (not pushed); the tag is set through the strategy after the picture OK and the review YES. The `@fs` calls have no
+for fs-catalog (not pushed); the tag is set through the strategy after the picture OK and the review YES. The frontend is its own crate and binary `fs-<programm>-<frontend>` (step `frontend-crate`: manifest `packaging/frontends/<frontend>.metainfo.xml`, starter in `fs-<programm>`, handshake test, `cargo tree` check; ADR 0094 draft). `vertrag-standard` (flow `trait-delta`) and `feature-liste` (flow `feature-liste`, list in fs-documentation `todo/features/<programm>.md`) run before the scaffold; the release waits for the locked trait. First version: Linux only (`macos: false`, `windows-targets: ""`). The `@fs` calls have no
 script yet (specification, a real run is not proven). `programm-grundgeruest` stays for the feature work.
 
 ## Required package metadata
