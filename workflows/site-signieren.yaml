@@ -2,7 +2,7 @@
 # the fixed list, names exactly this hash, this name and version and THIS run, and has not expired. A missing key, approval or signature is RED.
 # Agents never sign, push, tag, merge or log in to a server; the person delivers (ADR 0079). FS profile: see README.md.
 # Two CI runs of .github/workflows/site.yml: run 1 = job `build` (steps build, request; no key); the person signs the approval text that names run 1;
-# run 2 = job `build` again (no key) and job `sign` (steps approval-check, rebuild, sign, signatures-check; environment-protected, the only job with
+# run 2 = job `build` again (no key) and job `sign` (steps approval-check, rebuild, kdl-hash, key-file, sign, signatures-check; environment-protected, the only job with
 # the key; its scripts, the list of allowed signing keys and the approver keyring come from the pinned main). Then the person delivers.
 document:
   dsl: 1.0.3
@@ -70,7 +70,23 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: freigabe-beleg
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Inside scripts/site-signieren.sh, BEFORE the key is loaded and without it in the environment: builds again from the git checkout of the approved folder state and compares every file byte for byte with the delivered folder; the delivered tarball is only what the approved source produces; a difference is red and nothing is signed."
+        freesynergy.net:summary: "CI step `site-signieren.sh --check-only` (the approval check above and this rebuild run in it), no key anywhere on the runner: builds again from the git checkout of the approved folder state and compares every file byte for byte with the delivered folder; the delivered tarball is only what the approved source produces; a difference is red and nothing is signed."
+  - kdl-hash:
+      call: site-kdl-hash:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/site-kdl-hash.sh on the checked tarball (no key): takes ONLY ./site.toml out of it and renders staging, production and http-only with templates/site/render.py; prints `kdl-inputs` (webroot, http-addr, https-addr, acme-email: the defaults /srv/www, 0.0.0.0:80, 0.0.0.0:443 when unset, the e-mail from the repository variable SITE_ACME_EMAIL, missing = red) and `kdl-sha256 <variant> <hash>` into the job summary. The person renders the same way from the pinned main with the SAME four values and compares: the hash depends on them too."
+  - key-file:
+      call: site-key-file:0.0.6@fs
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: freigabe-beleg
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "CI environment `site-signing`: first a step without secrets makes the 0700 folder in the runner temp; then the ONLY step with GPG_PRIVATE_KEY and GPG_PASSPHRASE writes them as two 0600 files with shell builtins only (set, umask, printf and redirection: no child process inherits the secrets, checked in scripts/test-site.sh against site.yml). The signing step gets only the two file paths."
   - sign:
       call: site-signieren:0.0.6@fs
       metadata:
@@ -78,7 +94,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: freigabe-beleg
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "scripts/site-signieren.sh: needs GPG_PRIVATE_KEY (missing = red, not 'not signed'), repeats the approval check and the rebuild comparison first, only then detached .asc for the five files with sign-files/sign.sh; the key exists only in this job (CI environment `site-signing`)."
+        freesynergy.net:summary: "scripts/site-signieren.sh with GPG_PRIVATE_KEY_FILE and GPG_PASSPHRASE_FILE (missing or empty = red, not 'not signed'): repeats the approval check and the rebuild comparison first (so the key file is on the runner's disk while this own code runs, with -I and no content executed: not 'without a key'), only then detached .asc for the five files (the four artefacts of dist plus approval.txt; the approver keeps his own approval.txt.approver.asc) with sign-files/sign.sh (the Release path with the key in the environment still works). The key files exist only in this job (CI environment `site-signing`) and are removed in a last step that always runs (`if: always()`)."
   - signatures-check:
       call: site-signaturen-pruefen:0.0.6@fs
       metadata:
