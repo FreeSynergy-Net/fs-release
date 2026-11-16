@@ -38,7 +38,16 @@ fn script_is_sound(script: &str, yaml: &str) -> bool {
         _ => false,
     };
     // no reset, checkout, stash, pull, push, clean or ref deletion as git commands
-    let forbidden = ["reset", "checkout", "stash", "pull", "push", "clean", "update-ref", "switch"];
+    let forbidden = [
+        "reset",
+        "checkout",
+        "stash",
+        "pull",
+        "push",
+        "clean",
+        "update-ref",
+        "switch",
+    ];
     let no_forbidden = !lines
         .iter()
         .any(|l| l.contains("git") && l.split_whitespace().any(|t| forbidden.contains(&t)));
@@ -67,7 +76,10 @@ fn counter_a_prune_a_plain_merge_or_a_forbidden_git_command_is_caught() {
         &script.replace("merge --ff-only origin/main", "reset --hard origin/main"),
         &yaml
     ));
-    assert!(!script_is_sound(&script, &yaml.replace("gate: none", "gate: human")));
+    assert!(!script_is_sound(
+        &script,
+        &yaml.replace("gate: none", "gate: human")
+    ));
 }
 
 #[test]
