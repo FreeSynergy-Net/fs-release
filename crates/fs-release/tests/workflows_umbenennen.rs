@@ -117,3 +117,34 @@ fn counter_a_rename_approval_of_another_head_or_a_stale_head_or_a_missing_no_is_
         .replacen("  - zz:", "  - github-umbenennen:", 1);
     assert!(!rename_is_sound(&swapped));
 }
+
+/// Lessons L1, L2, L5 of the first rename (review-umbau-activity): the lock check after the write mode, the keep list
+/// in the dry run and the after-check, the docs only after the rename. Each rule has a counter-test.
+fn lessons_are_wired(text: &str) -> bool {
+    in_order(text, &["umbau", "lock", "lock-weiter", "sperre"])
+        && step_body(text, "lock").contains("cargo metadata --locked")
+        && step_body(text, "lock-weiter").contains("then: umbau")
+        && step_body(text, "lock-weiter").contains("then: continue")
+        && step_body(text, "trockenlauf").contains("keep: ${ .input.keep }")
+        && step_body(text, "nachher").contains("keep: ${ .input.keep }")
+        && in_order(text, &["github-umbenennen", "doku-veroeffentlichen"])
+        && step_body(text, "doku-veroeffentlichen").contains("L5")
+}
+
+#[test]
+fn umbenennen_lessons_l1_l2_l5_are_wired() {
+    assert!(lessons_are_wired(&read("umbenennen")));
+}
+
+#[test]
+fn counter_a_lock_check_that_does_not_go_back_or_a_docs_step_before_the_rename_is_caught() {
+    let t = read("umbenennen");
+    assert!(!lessons_are_wired(&t.replace("then: umbau\n        - gruen", "then: continue\n        - gruen")));
+    assert!(!lessons_are_wired(&t.replace("cargo metadata --locked", "cargo check")));
+    assert!(!lessons_are_wired(&t.replace("keep: ${ .input.keep }", "")));
+    let swapped = t
+        .replacen("  - doku-veroeffentlichen:", "  - zz:", 1)
+        .replacen("  - github-umbenennen:", "  - doku-veroeffentlichen:", 1)
+        .replacen("  - zz:", "  - github-umbenennen:", 1);
+    assert!(!lessons_are_wired(&swapped));
+}
