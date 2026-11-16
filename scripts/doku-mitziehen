@@ -16,11 +16,12 @@ Deterministic, no network, no AI. Checks (every problem is one line `red: <reaso
   6. checklist       the code repo changed, so the checklist of the program (docs clone: todo/checklisten/<program>.md, `--program`,
                      default = folder name of --code) must have changed too; it must exist, every `- [x]` line needs a proof in
                      parentheses, and no `- [x]` line may disappear (done items stay). A change of the program without its checklist = red.
-  7. mkdocs          `mkdocs build --strict` of the clone; when mkdocs is missing or broken the result is `skipped`, never green.
+  7. mkdocs          `mkdocs build --strict` (NEVER -q; red on rc != 0 or any output line starting with WARNING or ERROR; mkdocs from $FS_MKDOCS, PATH or the .venv of fs-documentation) of the clone; when mkdocs is missing or broken the result is `skipped`, never green.
 --head REF: the head of the code to measure (branch or commit of the AGENT's work, resolved to a commit hash in the code repo); the code change is
 `--code-base..<that commit>`, never the checkout of the repo (a repo with `main` checked out and the commit only on the agent's branch is still seen).
 With --head the uncommitted state of the repo is not counted. --docs-head REF does the same for the docs clone: the docs are read from that commit
 (`git read-tree` into an own temporary index + `checkout-index` into a temporary folder; never `git archive`, which obeys .gitattributes export-ignore), the docs change is `--docs-base..<that commit>`. Without them HEAD and the working tree count, as before.
+Always check a FRESH worktree of the branch head or of origin/main through --docs-head, never the main checkout: without --docs-head a clone that is behind origin/main is `skipped` (never green).
 Needs git >= 2.40 for --docs-head (`git --attr-source`); with an older git the run is `skipped: git too old` (rc 2, status skipped, never green).
 --proof-base REF (default --docs-base): the base for the proof check; ONLY ticked lines that are new or changed against the checklist at that base
 need a proof (old entries never block foreign work); a ticked item that disappears is red against --docs-base as before.
@@ -239,24 +240,59 @@ def check_links(a, problems):
             for target in LINK.findall(line):
                 if re.match(r"[a-z][a-z0-9+.-]*:", target) or target.startswith("/"):
                     continue
-                if not os.path.exists(os.path.normpath(os.path.join(base, target))):
+                path = re.split(r"[#?]", target, maxsplit=1)[0]
+                if not path:
+                    continue  # a pure anchor of the same page
+                if not os.path.exists(os.path.normpath(os.path.join(base, path))):
                     problems.append(f"red: broken link {target!r} in {rel}:{n}")
 
 
+MKDOCS_VENV = os.environ.get("FS_MKDOCS_VENV", "/srv/FreeSynergy/fs-documentation/.venv/bin/mkdocs")  # FS_MKDOCS_VENV overrides it (tests: a missing one)
+MKDOCS_BAD_LINE = re.compile(r"^\s*(WARNING|ERROR)\b")
+
+
+def find_mkdocs():
+    """The mkdocs to run: $FS_MKDOCS, the one on PATH, else the .venv of fs-documentation; None = not installed."""
+    for cand in (os.environ.get("FS_MKDOCS"), shutil.which("mkdocs"), MKDOCS_VENV):
+        if cand and os.path.isfile(cand) and os.access(cand, os.X_OK):
+            probe = subprocess.run([cand, "--version"], capture_output=True, text=True)
+            if probe.returncode == 0:
+                return cand
+    return None
+
+
 def check_mkdocs(a, problems, skipped):
-    probe = subprocess.run(["mkdocs", "--version"], capture_output=True, text=True) if shutil.which("mkdocs") else None
-    if probe is None or probe.returncode != 0:
+    """`mkdocs build --strict` WITHOUT the quiet flag (quiet hides what the build says: a blind gate). Red on a non-zero rc OR on any output line that begins with
+    WARNING or ERROR. Not installed (and no .venv of fs-documentation) = `skipped`, never green."""
+    mkdocs = find_mkdocs()
+    if mkdocs is None:
         skipped.append("mkdocs: not installed or broken, `mkdocs build --strict` was NOT run")
         return
     with tempfile.TemporaryDirectory() as out:
         r = subprocess.run(
-            ["mkdocs", "build", "--strict", "-q", "-f", os.path.join(a.root, "mkdocs.yml"), "-d", out],
+            [mkdocs, "build", "--strict", "-f", os.path.join(a.root, "mkdocs.yml"), "-d", out],
             capture_output=True,
             text=True,
         )
-    if r.returncode != 0:
-        tail = " | ".join((r.stdout + r.stderr).strip().split("\n")[-3:])
-        problems.append(f"red: mkdocs build --strict failed: {tail}")
+    lines = [ln.strip() for ln in (r.stdout + "\n" + r.stderr).split("\n") if MKDOCS_BAD_LINE.match(ln)]
+    if r.returncode != 0 or lines:
+        shown = " | ".join(lines[:5]) or " | ".join((r.stdout + r.stderr).strip().split("\n")[-3:])
+        problems.append(f"red: mkdocs build --strict failed (rc {r.returncode}, {len(lines)} WARNING/ERROR lines): {shown}")
+
+
+def check_fresh(a, skipped):
+    """Without --docs-head the working tree of the clone is read. A clone that is BEHIND origin/main is blind for what main already has
+    (scripts, pages): the result is `skipped` (never green); use --docs-head (a fresh worktree of the branch head or of origin/main)."""
+    if a.docs_head:
+        return
+    try:
+        behind = subprocess.run(["git", "-C", a.docs, "rev-parse", "--verify", "-q", "origin/main^{commit}"], capture_output=True, text=True)
+        if behind.returncode == 0:
+            anc = subprocess.run(["git", "-C", a.docs, "merge-base", "--is-ancestor", behind.stdout.strip(), "HEAD"], capture_output=True)
+            if anc.returncode != 0:
+                skipped.append("docs clone is behind origin/main (or diverged): check a FRESH worktree with --docs-head, never the main checkout")
+    except OSError:
+        pass
 
 
 def state_path(a):
@@ -346,6 +382,7 @@ def main(argv):
             a.proof_base = a.docs_base
         for check in (check_changed, check_checklist, check_de_en, check_names, check_links):
             check(a, problems)
+        check_fresh(a, skipped)
         check_mkdocs(a, problems, skipped)
     except GitTooOld as e:
         print(f"skipped: {e} (not green)")

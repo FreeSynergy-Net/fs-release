@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Rule check: `mkdocs` is never called with -q / --quiet (a quiet build hides the WARNING lines the gate reads: a blind gate).
+
+  python3 -I scripts/check-mkdocs-quiet [<folder or file>...]     (default: workflows scripts actions .github crates)
+
+Red = a line where `mkdocs` is followed (in the same command, no `|`, `;`, `&` between) by `-q` or `--quiet`, also in a Python argument list
+(`"mkdocs", "build", "-q"`). rc 0 clean, rc 1 red (`red: file:line: text`), rc 2 bad input.
+"""
+import os
+import re
+import sys
+
+QUIET = re.compile(r"mkdocs\b[^|;&\n]*?(?:^|[\s\"',(\[])(?:-q|--quiet)(?=[\s\"',)\]]|$)")
+SELF = {"check-mkdocs-quiet", "test_check_mkdocs_quiet.sh"}
+SKIP_DIRS = {".git", "target", "node_modules", "wt"}
+DEFAULT = ["workflows", "scripts", "actions", ".github", "crates"]
+
+
+def files(paths):
+    for p in paths:
+        if os.path.isfile(p):
+            yield p
+            continue
+        for base, dirs, names in os.walk(p):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+            for n in names:
+                if n not in SELF:
+                    yield os.path.join(base, n)
+
+
+def main(argv):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    paths = argv or [os.path.join(root, d) for d in DEFAULT if os.path.exists(os.path.join(root, d))]
+    for p in paths:
+        if not os.path.exists(p):
+            print(f"bad input: {p} does not exist")
+            return 2
+    red = 0
+    for f in sorted(set(files(paths))):
+        try:
+            lines = open(f, encoding="utf-8").read().splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for i, line in enumerate(lines, 1):
+            if QUIET.search(line):
+                print(f"red: {f}:{i}: {line.strip()}")
+                red += 1
+    if red:
+        print(f"{red} quiet mkdocs call(s): run `mkdocs build --strict` without -q and read the WARNING / ERROR lines")
+        return 1
+    print("ok: no quiet mkdocs call")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

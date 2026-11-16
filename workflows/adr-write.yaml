@@ -43,7 +43,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: check-docs on the ADR; red goes back to work-in.
+        freesynergy.net:summary: "check-docs on the ADR in a FRESH worktree of the branch head or origin/main (never the main checkout, rule [FRISCH] of doku-mitziehen); mkdocs strict WITHOUT the quiet flag, red on rc != 0 or a line starting with WARNING or ERROR; red goes back to work-in."
   - push:
       run:
         workflow:

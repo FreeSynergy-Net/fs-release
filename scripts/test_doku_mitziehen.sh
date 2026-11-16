@@ -14,6 +14,7 @@ g() { git -c user.name=t -c user.email=t@example.org -c commit.gpgsign=false "$@
 mkdir -p "$tmp/bin"
 printf '#!/bin/sh\nexit 0\n' >"$tmp/bin/mkdocs"
 chmod +x "$tmp/bin/mkdocs"
+export FS_MKDOCS_VENV=/nonexistent/mkdocs  # the .venv of fs-documentation must not leak into the fixtures
 mkdir -p "$tmp/empty"
 ln -s "$(command -v git)" "$tmp/empty/git"
 py="$(command -v python3)"
@@ -225,6 +226,35 @@ fresh enc; code_change; docs_both
 DH="$(base "$d/docs")"
 expect 1 "broken link" "red: working-tree-encoding=UTF-16 does not hide a broken link (B1)" "$d" -- --docs-head "$DH" --old fs-old
 expect 1 "old name 'fs-old' still in docs/de/a.md" "red: working-tree-encoding does not hide the old name (B1)" "$d" -- --docs-head "$DH" --old fs-old
+
+# Broken links are RED everywhere the gate reads (counter-checks): in README.md and conventions/ (outside docs/), a missing target file, a link with an anchor to a missing file;
+# a link to an existing file with an anchor is not red.
+fresh linkout; code_change; docs_both
+(cd "$d/docs" && mkdir -p conventions && echo "see [x](gone.md)" >README.md && echo "see [y](../docs/de/missing.md#top)" >conventions/c.md && g add . && g commit -q -am out)
+expect 1 "broken link 'gone.md' in README.md" "red: broken link in README.md (outside docs/)" "$d" --
+expect 1 "broken link '../docs/de/missing.md' in conventions/c.md" "red: broken link with an anchor to a missing file in conventions/" "$d" --
+fresh linkok; code_change; docs_both
+(cd "$d/docs" && echo "see [x](a.md#top) and [y](#here)" >>docs/de/a.md && echo "see [x](a.md)" >>docs/en/a.md && g commit -q -am okl)
+expect 0 "green" "green: a link with an anchor to an existing file" "$d" --
+
+# mkdocs is run WITHOUT the quiet flag and WARNING / ERROR lines are red even with rc 0 (a quiet or blind build hid them)
+mkdir -p "$tmp/binq" "$tmp/binwarn"
+printf '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\nfor a in "$@"; do case "$a" in -q|--quiet) echo "ERROR: -q was given" >&2; exit 1;; esac; done\nexit 0\n' >"$tmp/binq/mkdocs"
+printf '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\necho "INFO    -  Cleaning site directory"\necho "WARNING -  Doc file a.md contains a link to missing.md"\nexit 0\n' >"$tmp/binwarn/mkdocs"
+chmod +x "$tmp/binq/mkdocs" "$tmp/binwarn/mkdocs"
+fresh noq; code_change; docs_both
+out="$(PATH="$tmp/binq:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ]; then echo "ok   mkdocs is called without the quiet flag"; else echo "FAIL mkdocs got the quiet flag: rc=$rc $out"; fails=$((fails + 1)); fi
+out="$(PATH="$tmp/binwarn:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "WARNING -  Doc file a.md" <<<"$out"; then echo "ok   red: a WARNING line of mkdocs with rc 0"; else echo "FAIL mkdocs WARNING line: rc=$rc $out"; fails=$((fails + 1)); fi
+out="$(PATH="$tmp/empty" FS_MKDOCS="$tmp/binwarn/mkdocs" "$py" -I "$here/doku-mitziehen" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "WARNING" <<<"$out"; then echo "ok   FS_MKDOCS (the .venv of fs-documentation) is used when mkdocs is not on PATH"; else echo "FAIL FS_MKDOCS: rc=$rc $out"; fails=$((fails + 1)); fi
+
+# a docs clone that is BEHIND origin/main is skipped (never green) without --docs-head; with --docs-head (a fresh state) it is checked
+fresh behind; code_change; docs_both
+(cd "$d/docs" && g branch -q behind-mark HEAD~1 && g update-ref refs/remotes/origin/main HEAD && echo "newer on main" >todo/x.md && g add . && g commit -q -m mainonly && g update-ref refs/remotes/origin/main HEAD && g reset -q --hard HEAD~1)
+out="$(PATH="$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --json "$d/behind.json" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && grep -qF "behind origin/main" <<<"$out" && grep -q '"status": "skipped"' "$d/behind.json"; then echo "ok   a clone behind origin/main is skipped, never green"; else echo "FAIL behind origin/main: rc=$rc $out"; fails=$((fails + 1)); fi
 
 # C1: git older than 2.40 (no `--attr-source`) is `skipped: git too old`, rc 2, status skipped, never green and no vague error (a fake git answers --version)
 realgit="$(command -v git)"

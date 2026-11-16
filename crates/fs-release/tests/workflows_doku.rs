@@ -550,3 +550,71 @@ fn the_theme_guard_is_wired_into_testlauf_and_the_picture_gate() {
         );
     }
 }
+
+/// [FRISCH] / [RC]: `doku-mitziehen` checks a fresh state (`docs_head` and the resolved `head` are passed to the gate), `check-docs` names the rule, `testlauf` keeps
+/// the exit code (`rc` in the result, green only with `rc == 0`). Counter-checks on changed copies.
+fn fresh_and_rc_are_wired(doku: &str, adr: &str, testlauf: &str) -> bool {
+    let gate = step_body(doku, "gate");
+    let again = step_body(testlauf, "gezielt-again");
+    gate.contains("docs_head: ${ .input.docs_head }")
+        && gate.contains("head: ${ $context.kopf.head }")
+        && doku.contains("[FRISCH]")
+        && doku.contains("WARNING or ERROR")
+        && step_body(adr, "check-docs").contains("FRESH worktree")
+        && testlauf.contains("[RC]")
+        && step_body(testlauf, "gezielt").contains("`rc`")
+        && again.contains("gezielt.rc != 0")
+        && again.contains("gezielt.red == false and $context.gezielt.rc == 0")
+}
+
+#[test]
+fn the_fresh_worktree_and_the_exit_code_rules_are_wired() {
+    let (d, a, t) = (read("doku-mitziehen"), read("adr-write"), read("testlauf"));
+    assert!(fresh_and_rc_are_wired(&d, &a, &t));
+    let cases = [
+        (
+            "gate without docs_head",
+            d.replace("docs_head: ${ .input.docs_head }", ""),
+            a.clone(),
+            t.clone(),
+        ),
+        (
+            "check-docs in the main checkout",
+            d.clone(),
+            a.replace("FRESH worktree", "checkout"),
+            t.clone(),
+        ),
+        (
+            "green without rc",
+            d.clone(),
+            a.clone(),
+            t.replace(
+                "gezielt.red == false and $context.gezielt.rc == 0",
+                "gezielt.red == false",
+            ),
+        ),
+        (
+            "rc ignored for red",
+            d.clone(),
+            a.clone(),
+            t.replace("gezielt.rc != 0", "gezielt.rc != 7"),
+        ),
+        (
+            "no rc in the result",
+            d.clone(),
+            a.clone(),
+            t.replacen("`rc`", "`x`", 9),
+        ),
+    ];
+    for (name, d2, a2, t2) in cases {
+        assert!(
+            !fresh_and_rc_are_wired(&d2, &a2, &t2),
+            "{name} was not caught"
+        );
+    }
+}
+
+#[test]
+fn the_quiet_mkdocs_check_passes_its_self_test() {
+    run_self_test("test_check_mkdocs_quiet.sh");
+}
