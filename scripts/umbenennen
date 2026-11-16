@@ -1,267 +1,130 @@
 #!/usr/bin/env python3
 """Step of the flow `umbenennen`: dry run, after-check and the name lock for the rename of a program (ADR 0080). No network, no AI.
 
-  python3 -I scripts/umbenennen dry-run --old fs-wiki --new fs-text --repos DIR... [--catalog DIR] [--docs DIR]
-                                         [--retired FILE] [--json FILE]
-  python3 -I scripts/umbenennen after   --old fs-wiki --new fs-text --repos DIR... [--catalog DIR] [--docs DIR]
-                                         [--retired FILE] [--allow GLOB]... [--state FILE] [--json FILE]
+  python3 -I scripts/umbenennen dry-run --old fs-wiki --new fs-text --repos DIR... [--catalog DIR] [--docs DIR] [--world DIR]
+                                         [--retired FILE] [--keep JSON|FILE] [--allow GLOB]... [--json FILE]
+  python3 -I scripts/umbenennen after   --old fs-wiki --new fs-text --repos DIR... [--catalog DIR] [--docs DIR] [--world DIR]
+                                         [--retired FILE] [--keep JSON|FILE] [--allow GLOB]... [--state FILE] [--json FILE]
+  python3 -I scripts/umbenennen rename  --old fs-wiki --new fs-text --repos DIR... [--keep JSON|FILE] [--allow GLOB]... [--pins]   (write mode L1, scaffold; refuses on a dirty tree; --pins = only the pin URLs, after the GitHub rename)
   python3 -I scripts/umbenennen retire  --old fs-wiki --new fs-text --retired FILE
 
 `--repos` are checkouts (worktrees) of the repos that may name the old program: the program itself, repos that pin it, CI files.
-`dry-run` only reads and writes the plan: crates `<old>-*` (and the crate `<old>`) with their new names, files in `.github/` that
-name the old name, pins in `Cargo.toml` (git URL `FreeSynergy/<old>` or dependency `<old>-*`), catalog entries (`packages.toml`
-under `--catalog`) that need `replaces = ["<old>"]`, hits in the docs (`--docs`). It is RED (rc 1) when the new name is on the
+`dry-run` only reads and writes the plan. Only files tracked in git count (`git ls-files`); untracked files that name the old name are
+a warning (`untracked`), never a hit. Categories: crates `<old>-*` with their new names (Cargo.toml `name =`), `ci` (.github/), `pins`
+(git URL `FreeSynergy/<old>` or dependency `<old>-*`), `catalog` (entry `id = "<old>"` in `packages.toml`, needs `replaces`),
+`catalogfiles` (other lines of the catalog), `docs` (`--docs`), `source` (any other tracked text file: constants, FS_<OLD>_ROOT,
+paths, messages, README), `lock` (Cargo.lock), `desktop` (*.desktop, Exec=), `outside` (every fs-* checkout in `--world`, default the
+parent of the first repo, that is not among the given repos: `git grep` on origin/main, read only). A hit is a line with the name
+(`fs-x`), its snake form (`fs_x`) or its env form (`FS_X`). `--keep` is a JSON list of {pattern, grund, bereich}: a hit whose
+`<file> [<toml section>] <line>` matches the regular expression `pattern` is `kept` (bewusst belassen, with grund and bereich in the
+JSON), every other hit stays open; a pattern that matches no hit is RED (stale). `--allow` (globs on the file) moves hits to `allowed`,
+in dry-run and after. The dry run lists the open hits and is RED only for name problems and stale `keep` patterns. It is RED (rc 1) when the new name is on the
 retired list (a name that was given up is never given out again, ADR 0080), when the old name is already retired, when a
 directory or a catalog entry of the new name exists, or when the old and new name are equal or not of the form `fs-<x>`.
-`after` is RED when the old name is still named in a crate name, in `.github/`, in a pin, or in the docs (outside `--allow`), or
-when the catalog entry of the new name lacks `replaces = ["<old>"]`. `retire` appends `<old> -> <new>` to the retired list; it
+`after` is RED when any open hit is left (all categories above, outside `--keep` and `--allow`), or when the catalog entry of the new name lacks `replaces = ["<old>"]`. `retire` appends `<old> -> <new>` to the retired list; it
 refuses a name that is already there. A file with the list: one `old -> new  # reason` per line, `#` starts a comment.
 The GitHub rename itself is NOT done here; it is a human step after the approval gate of the flow.
 `after` counts the red rounds: the state file (`--state`, default `<temp folder>/umbenennen-<old>-<new>-runde`, never in a repo) gets +1
-on red and is reset on green; the output has `runde=N`. The JSON has `red`, `runde`, `plan`, `problems`.
+on red and is reset on green; the output has `runde=N`. The JSON has `red`, `runde`, `plan` (open hits per category, `kept`, `allowed`, `untracked`), `problems`, `warnings`.
 rc 0 = green, rc 1 = red (every problem a line `red: ...`), rc 2 = bad input (JSON with `red: null` if `--json` is given),
 rc 3 = `after` red in the third round or later (escalate to the person).
 """
 import argparse
-import fnmatch
 import json
 import os
-import re
 import sys
 
-NAME = re.compile(r"fs-[a-z0-9]+(?:-[a-z0-9]+)*")
-SKIP_DIRS = {".git", "target", "node_modules", "site", ".fs-release"}
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
+from umbenennen_lib.checks import after_problems, clashes, keep_problems, name_problems, retire  # noqa: E402
+from umbenennen_lib.common import BadInput, load_keep  # noqa: E402
+from umbenennen_lib.outside import outside_hits, world_dir  # noqa: E402
+from umbenennen_lib.rename import rename  # noqa: E402
+from umbenennen_lib.scan import CATS, scan, split  # noqa: E402
+from umbenennen_lib.state import counter, private_state_dir  # noqa: E402
 
 
-def words(old):
-    """The old name, also as the start of a longer name (`fs-wiki-core`), but not inside another word (`fs-wikipedia`)."""
-    return re.compile(r"(?<![\w-])" + re.escape(old) + r"(?![a-z0-9])")
+def write_json(path, data):
+    if path:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
 
 
-def crate_re(old):
-    return re.compile(r"(?<![\w-])" + re.escape(old) + r"(?:-[a-z0-9]+)*(?![\w-])")
+def bad(a, msg):
+    print(f"bad input: {msg}")
+    write_json(a.json, {"red": None, "runde": 0, "plan": {}, "problems": [f"bad input: {msg}"]})
+    return 2
 
 
-def walk(root):
-    for base, dirs, names in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
-        for n in names:
-            yield os.path.join(base, n)
+def make_plan(a, keep):
+    hits, untracked = scan(a)
+    warns = []
+    if a.mode != "rename":
+        out, warns = outside_hits(a)
+        hits += out
+    plan, kept, allowed, stale = split(hits, keep, a.allow)
+    total = sum(len(v) for v in plan.values()) + len(kept) + len(allowed)
+    plan.update({"kept": kept, "allowed": allowed, "untracked": untracked})
+    return plan, stale, warns, total
 
 
-def text_of(path):
-    try:
-        with open(path, encoding="utf-8") as f:
-            return f.read()
-    except (OSError, UnicodeDecodeError):
-        return None
-
-
-def read_retired(path):
-    pairs = []
-    if path and os.path.exists(path):
-        for line in open(path, encoding="utf-8"):
-            line = line.split("#", 1)[0].strip()
-            if "->" in line:
-                a, b = (x.strip() for x in line.split("->", 1))
-                pairs.append((a, b))
-    return pairs
-
-
-def toml_names(text):
-    return re.findall(r'^\s*name\s*=\s*"([^"]+)"', text, re.M)
-
-
-def plan(a):
-    """Everything the old name touches (read only)."""
-    old, new = a.old, a.new
-    crates, ci, pins = [], [], []
-    for repo in a.repos:
-        for path in walk(repo):
-            rel = os.path.relpath(path, repo)
-            text = text_of(path)
-            if text is None:
-                continue
-            if os.path.basename(path) == "Cargo.toml":
-                for n in toml_names(text):
-                    if crate_re(old).fullmatch(n):
-                        crates.append({"file": rel, "repo": repo, "old": n, "new": new + n[len(old):]})
-                for n, line in enumerate(text.split("\n"), 1):
-                    if f"FreeSynergy/{old}" in line or re.match(rf"\s*{re.escape(old)}(-[a-z0-9]+)*\s*=", line):
-                        pins.append({"file": rel, "repo": repo, "line": n, "text": line.strip()})
-            if rel.startswith(".github") and words(old).search(text):
-                ci.append({"file": rel, "repo": repo})
-    catalog = []
-    if a.catalog:
-        path = os.path.join(a.catalog, "packages.toml")
-        text = text_of(path) or ""
-        for n in toml_names(text):
-            if n == old:
-                catalog.append({"entry": old, "action": f'add replaces = ["{old}"] to the entry {new}'})
-    docs = []
-    if a.docs:
-        for path in walk(a.docs):
-            if not path.endswith((".md", ".yml", ".yaml")):
-                continue
-            text = text_of(path) or ""
-            for n, line in enumerate(text.split("\n"), 1):
-                if words(old).search(line):
-                    docs.append({"file": os.path.relpath(path, a.docs), "line": n})
-    return {"crates": crates, "ci": ci, "pins": pins, "catalog": catalog, "docs": docs}
-
-
-def name_problems(a, check_retired=True):
-    problems = []
-    for label, n in (("old", a.old), ("new", a.new)):
-        if not NAME.fullmatch(n):
-            problems.append(f"red: the {label} name {n!r} is not of the form fs-<x>")
-    if a.old == a.new:
-        problems.append("red: old and new name are equal")
-    retired = read_retired(a.retired) if check_retired else []
-    for r_old, r_new in retired:
-        if a.new == r_old:
-            problems.append(f"red: the name {a.new!r} was given up ({r_old} -> {r_new}) and is never given out again (ADR 0080)")
-        if a.old == r_old:
-            problems.append(f"red: {a.old!r} is already retired ({r_old} -> {r_new})")
-    return problems
-
-
-def clashes(a):
-    problems = []
-    for repo in a.repos:
-        if os.path.basename(os.path.normpath(repo)) == a.new:
-            problems.append(f"red: a checkout named {a.new!r} already exists ({repo})")
-    if a.catalog:
-        text = text_of(os.path.join(a.catalog, "packages.toml")) or ""
-        if a.new in toml_names(text):
-            problems.append(f"red: the catalog already has an entry {a.new!r}")
-    return problems
-
-
-def catalog_replaces_ok(a):
-    path = os.path.join(a.catalog, "packages.toml")
-    text = text_of(path)
-    if text is None:
-        return [f"red: {path} is not readable"]
-    blocks = re.split(r"^\s*\[\[?[^\]]+\]\]?\s*$", text, flags=re.M)
-    for block in blocks:
-        if re.search(rf'^\s*name\s*=\s*"{re.escape(a.new)}"', block, re.M):
-            if re.search(rf'^\s*replaces\s*=\s*\[[^\]]*"{re.escape(a.old)}"', block, re.M):
-                return []
-            return [f'red: the catalog entry {a.new!r} has no replaces = ["{a.old}"]']
-    return [f"red: the catalog has no entry {a.new!r}"]
-
-
-def pair_is_clean(a, retired):
-    """The pair old -> new is on the list, it is the ONLY entry for the old name, and the new name was not given up since (ADR 0080)."""
-    if (a.old, a.new) not in retired:
-        return False
-    if sum(1 for r_old, _ in retired if r_old == a.old) != 1:
-        return False
-    return not any(r_old == a.new for r_old, _ in retired)
-
-
-def after_problems(a, p):
-    problems = []
-    for c in p["crates"]:
-        problems.append(f"red: crate {c['old']!r} still named in {c['repo']}/{c['file']}")
-    for c in p["ci"]:
-        problems.append(f"red: the old name is still in {c['repo']}/{c['file']}")
-    for c in p["pins"]:
-        problems.append(f"red: pin to the old name in {c['repo']}/{c['file']}:{c['line']}")
-    for d in p["docs"]:
-        if not any(fnmatch.fnmatch(d["file"], g) for g in a.allow):
-            problems.append(f"red: old name still in the docs {d['file']}:{d['line']}")
-    if a.catalog:
-        problems += catalog_replaces_ok(a)
-    retired = read_retired(a.retired)
-    if (a.old, a.new) not in retired:
-        problems.append(f"red: {a.old} -> {a.new} is not on the retired list (the old name must never be given out again)")
-    elif not pair_is_clean(a, retired):
-        problems.append(f"red: the retired list is inconsistent for {a.old} -> {a.new} (another entry for the old name, or the new name was given up since)")
-    return problems
-
-
-def private_state_dir():
-    """A per-user folder (mode 0700) for state files, never the shared /tmp with a predictable name."""
-    base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
-    d = os.path.join(base, "freesynergy")
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    return d
-
-
-def counter(path, red):
-    """Round counter in a state file; it never follows a symlink (O_NOFOLLOW), a refused file raises OSError."""
-    try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-        with os.fdopen(fd) as f:
-            n = int(f.read().strip() or 0)
-    except FileNotFoundError:
-        n = 0
-    except ValueError:
-        n = 0
-    n = n + 1 if red else 0
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(f"{n}\n")
-    return n
-
-
-def retire(a):
-    # The same pair again is a no-op (rc 0): the flow loops back to `umbau` after a red gate or a NO and runs `sperre` again.
-    # Any other entry for the old name (old -> something else) or for the new name as an old one stays red - also for the same pair when the
-    # new name was given up in the meantime (name recycling, ADR 0080) or the list has a second entry for the old name.
-    if a.retired and pair_is_clean(a, read_retired(a.retired)) and not name_problems(a, check_retired=False):
-        print(f"already retired, same pair: {a.old} -> {a.new}")
-        return 0
-    problems = name_problems(a)
-    if problems or not a.retired:
-        print("\n".join(problems) or "bad input: --retired is required")
-        return 1 if problems else 2
-    with open(a.retired, "a", encoding="utf-8") as f:
-        f.write(f"{a.old} -> {a.new}  # renamed, the old name is never given out again (ADR 0080)\n")
-    print(f"retired: {a.old} -> {a.new}")
-    return 0
+def show(a, plan, warns):
+    for key in (*CATS, "kept", "allowed", "untracked"):
+        items = plan[key]
+        print(f"{key}: {len(items)}")
+        if a.mode == "dry-run" or key == "untracked":
+            for it in items:
+                print("  " + ", ".join(f"{k}={v}" for k, v in it.items()))
+    for w in warns:
+        print(w)
+    if plan["untracked"]:
+        print(f"warn: {len(plan['untracked'])} untracked lines name the old name (not in git, not counted as hits)")
 
 
 def main(argv):
     p = argparse.ArgumentParser()
-    p.add_argument("mode", choices=["dry-run", "after", "retire"])
+    p.add_argument("mode", choices=["dry-run", "after", "retire", "rename"])
     p.add_argument("--old", required=True)
     p.add_argument("--new", required=True)
     p.add_argument("--repos", nargs="*", default=[])
     p.add_argument("--catalog")
     p.add_argument("--docs")
+    p.add_argument("--world")
     p.add_argument("--retired")
+    p.add_argument("--keep")
     p.add_argument("--allow", action="append", default=[])
     p.add_argument("--state")
+    p.add_argument("--pins", action="store_true")
     p.add_argument("--json")
     try:
         a = p.parse_args(argv)
     except SystemExit:
         return 2
-    for d in [*a.repos, a.catalog, a.docs]:
+    for d in [*a.repos, a.catalog, a.docs, a.world]:
         if d and not os.path.isdir(d):
-            print(f"bad input: {d} is not a folder")
-            if a.json:
-                with open(a.json, "w", encoding="utf-8") as f:
-                    json.dump({"red": None, "runde": 0, "plan": {}, "problems": [f"bad input: {d} is not a folder"]}, f)
-            return 2
+            return bad(a, f"{d} is not a folder")
     if a.mode == "retire":
         return retire(a)
-    found = plan(a)
+    try:
+        keep = load_keep(a.keep)
+    except BadInput as e:
+        return bad(a, str(e))
+    if a.mode == "rename":
+        names = name_problems(a, check_retired=False)
+        if names:
+            print("\n".join(names))
+            return 1
+        return rename(a, keep)
+    plan, stale, warns, total = make_plan(a, keep)
     problems = name_problems(a, check_retired=a.mode == "dry-run")
     if a.mode == "dry-run":
-        problems += clashes(a)
-        if not found["crates"] and not found["ci"] and not found["pins"] and not found["catalog"] and not found["docs"]:
+        problems += clashes(a) + keep_problems(stale)
+        if not total:
             problems.append(f"red: nothing in the given places names {a.old!r} (wrong folders?)")
     else:
-        problems += after_problems(a, found)
-    for key, items in found.items():
-        print(f"{key}: {len(items)}")
-        if a.mode == "dry-run":
-            for it in items:
-                print("  " + ", ".join(f"{k}={v}" for k, v in it.items()))
+        problems += after_problems(a, plan, stale)
+    show(a, plan, warns)
     for line in problems:
         print(line)
     runde = 0
@@ -270,15 +133,9 @@ def main(argv):
             state = a.state or os.path.join(private_state_dir(), f"umbenennen-{a.old}-{a.new}-runde")
             runde = counter(state, bool(problems))
         except OSError as e:
-            print(f"bad input: the state file cannot be used ({e}); never green without a counter")
-            if a.json:
-                with open(a.json, "w", encoding="utf-8") as f:
-                    json.dump({"red": None, "runde": 0, "plan": {}, "problems": [f"state file: {e}"]}, f)
-            return 2
+            return bad(a, f"the state file cannot be used ({e}); never green without a counter")
         print(f"runde={runde}")
-    if a.json:
-        with open(a.json, "w", encoding="utf-8") as f:
-            json.dump({"red": bool(problems), "runde": runde, "plan": found, "problems": problems}, f)
+    write_json(a.json, {"red": bool(problems), "runde": runde, "plan": plan, "problems": problems, "warnings": warns})
     print("red" if problems else "green")
     if not problems:
         return 0
