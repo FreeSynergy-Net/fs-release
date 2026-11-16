@@ -185,7 +185,7 @@ do:
       with:
         branch: ${ .input.branch }
       export:
-        as: '${ $context + { head: . } }'
+        as: '${ $context + { kopf: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -201,7 +201,7 @@ do:
         input:
           repo: ${ .input.repos[0] }
           branch: ${ .input.branch }
-          head: ${ $context.head }
+          head: ${ $context.kopf.head }
           delta: ${ .input.delta }
       export:
         as: '${ $context + { review: . } }'
@@ -210,7 +210,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Sub-workflow review.yaml for exactly the head hash of step `head` (`$context.head`, resolved after the gates, never a branch name) - the JA is bound to this hash by `bind`; a new head makes it void.
+        freesynergy.net:summary: Sub-workflow review.yaml for exactly the head hash of step `head` (`$context.kopf.head`, resolved after the gates, never a branch name) - the JA is bound to this hash by `bind`; a new head makes it void.
   - review-again:
       switch:
         - rounds:
@@ -233,13 +233,13 @@ do:
           one:
             with:
               type: net.freesynergy.approval
-              subject: ${ $context.head }
+              subject: ${ $context.kopf.head }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: strategie-ok
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The approval gate before the GitHub rename - the strategy OK (approval file, event with the subject `$context.head`) for exactly this head (and this pair old -> new, bound by the plan approval); an approval of another head or subject does not open it; without it nothing is renamed, merged or pushed. The dry run (step `trockenlauf`) can be run alone at any time; it changes nothing and needs no approval.
+        freesynergy.net:summary: The approval gate before the GitHub rename - the strategy OK (approval file, event with the subject `$context.kopf.head`) for exactly this head (and this pair old -> new, bound by the plan approval); an approval of another head or subject does not open it; without it nothing is renamed, merged or pushed. The dry run (step `trockenlauf`) can be run alone at any time; it changes nothing and needs no approval.
   - merge:
       call: merge-ff:0.0.7@fs
       with:

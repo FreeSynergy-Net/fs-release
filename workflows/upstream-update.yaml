@@ -136,13 +136,13 @@ do:
       with:
         branch: ${ .input.branch }
       export:
-        as: '${ $context + { head: . } }'
+        as: '${ $context + { kopf: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Resolves the branch to the commit hash of its tip (git rev-parse, read only; the output is the hash itself) after the local gates. In a run from step 1 there is no input `head` (the head only exists since `pin`): the resolved hash is `$context.head`. Only when the run re-enters at `head` or `review` and the input `head` is given must the hash equal it, otherwise the flow stops. From here on only this hash counts, never the branch name."
+        freesynergy.net:summary: "Resolves the branch to the commit hash of its tip (git rev-parse, read only; the output is the object `{ head: <sha> }`, kept as `$context.kopf`) after the local gates. In a run from step 1 there is no input `head` (the head only exists since `pin`): the resolved hash is `$context.kopf.head`. Only when the run re-enters at `head` or `review` and the input `head` is given must the hash equal it, otherwise the flow stops. From here on only this hash counts, never the branch name."
   - review:
       run:
         workflow:
@@ -152,7 +152,7 @@ do:
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
-          head: ${ $context.head }
+          head: ${ $context.kopf.head }
           delta: ${ .input.delta }
           scope: delta
       export:
@@ -182,7 +182,7 @@ do:
   - tag:
       call: tag:0.0.7@fs
       with:
-        head: ${ $context.head }
+        head: ${ $context.kopf.head }
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -192,7 +192,7 @@ do:
   - push:
       call: push:0.0.7@fs
       with:
-        head: ${ $context.head }
+        head: ${ $context.kopf.head }
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -219,7 +219,7 @@ do:
                 one:
                   with:
                     type: net.freesynergy.ci.green
-                    subject: ${ $context.head }
+                    subject: ${ $context.kopf.head }
             timeout:
               after:
                 hours: 2

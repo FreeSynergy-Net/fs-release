@@ -113,9 +113,9 @@ fn rename_is_sound(text: &str) -> bool {
         && step_body(text, "nachher-again").contains("then: eskalation")
         // B4: the approvals are bound to the checked head and to the pair old -> new
         && step_body(text, "head").contains("resolve-head")
-        && step_body(text, "review").contains("head: ${ $context.head }")
+        && step_body(text, "review").contains("head: ${ $context.kopf.head }")
         && !text.contains(".input.head")
-        && step_body(text, "freigabe").contains("subject: ${ $context.head }")
+        && step_body(text, "freigabe").contains("subject: ${ $context.kopf.head }")
         && step_body(text, "plan-gate").contains("subject: ${ .input.old + \"->\" + .input.new }")
         // B5: the red rounds of `nachher` are counted by the script
         && step_body(text, "nachher-again").contains(">= 3")
@@ -289,14 +289,15 @@ fn counter_a_rename_approval_of_another_head_or_a_stale_head_or_a_missing_no_is_
     assert!(rename_is_sound(&t));
     // B4: the approval without the subject filter, the review on a stale input head
     assert!(!rename_is_sound(
-        &t.replace("subject: ${ $context.head }", "")
+        &t.replace("subject: ${ $context.kopf.head }", "")
     ));
     assert!(!rename_is_sound(
         &t.replace("subject: ${ .input.old + \"->\" + .input.new }", "")
     ));
-    assert!(!rename_is_sound(
-        &t.replace("head: ${ $context.head }", "head: ${ .input.head }")
-    ));
+    assert!(!rename_is_sound(&t.replace(
+        "head: ${ $context.kopf.head }",
+        "head: ${ .input.head }"
+    )));
     // B6: a NO that does not go back, a NO without the escalation
     assert!(!rename_is_sound(&t.replace(
         "then: umbau\n        - ja:",
@@ -343,6 +344,11 @@ fn the_doku_gate_script_passes_its_self_test() {
 }
 
 #[test]
+fn released_changelog_sections_equal_their_tags() {
+    run_self_test("test_changelog_released.sh");
+}
+
+#[test]
 fn the_rename_script_passes_its_self_test() {
     run_self_test("test_umbenennen.sh");
 }
@@ -355,4 +361,41 @@ fn the_background_test_script_passes_its_self_test() {
 #[test]
 fn the_checklist_reader_passes_its_self_test() {
     run_self_test("test_read_checklists.sh");
+}
+
+/// K4: `resolve-head` has ONE output form, `{ head: <sha> }`; every caller keeps it as `kopf` and reads `$context.kopf.head`.
+fn resolve_head_paths_are_sound(text: &str) -> bool {
+    !text.contains("resolve-head")
+        || (text.matches("{ kopf: . }").count() >= text.matches("call: resolve-head").count()
+            && !text.contains("$context.head")
+            && !text.contains("{ head: . }"))
+}
+
+#[test]
+fn every_resolve_head_caller_reads_the_same_output_form() {
+    let dir = root().join("workflows");
+    let mut seen = 0;
+    for e in std::fs::read_dir(&dir).unwrap() {
+        let p = e.unwrap().path();
+        if p.extension().is_some_and(|x| x == "yaml") {
+            let t = std::fs::read_to_string(&p).unwrap();
+            if t.contains("call: resolve-head") {
+                seen += 1;
+                assert!(resolve_head_paths_are_sound(&t), "{}", p.display());
+            }
+        }
+    }
+    assert!(seen >= 5, "the five callers must be found, got {seen}");
+}
+
+#[test]
+fn counter_resolve_head_paths_of_the_other_form_are_caught() {
+    let t = read("umbenennen");
+    assert!(resolve_head_paths_are_sound(&t));
+    assert!(!resolve_head_paths_are_sound(
+        &t.replace("{ kopf: . }", "{ head: . }")
+    ));
+    assert!(!resolve_head_paths_are_sound(
+        &t.replace("$context.kopf.head", "$context.head")
+    ));
 }

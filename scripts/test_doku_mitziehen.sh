@@ -210,4 +210,30 @@ DH="$(base "$d/docs")"
 expect 0 "green" "green: --docs-head ignores the dirty working tree (the old state of the branch head is read)" "$d" -- --docs-head "$DH"
 expect 1 "broken link" "red: without --docs-head the working tree is read" "$d" --
 
+# N1: .gitattributes export-ignore / export-subst of the author's branch must not hide the docs from the gate (no `git archive`)
+fresh gattr; code_change; docs_both
+(cd "$d/docs" && echo "kaputt [x](nowhere.md) fs-old" >>docs/de/a.md && echo "broken [x](nowhere.md) fs-old" >>docs/en/a.md &&
+  printf 'docs/** export-ignore\ntodo/** export-ignore\nmkdocs.yml export-ignore\n' >.gitattributes && g add . && g commit -q -am attr)
+DH="$(base "$d/docs")"
+expect 1 "broken link" "red: export-ignore on docs/** does not hide a broken link (--docs-head)" "$d" -- --docs-head "$DH" --old fs-old
+expect 1 "old name 'fs-old' still in docs/de/a.md" "red: export-ignore does not hide the old name (--docs-head)" "$d" -- --docs-head "$DH" --old fs-old
+
+# K5: --code-base / --docs-base go through resolve(): no option injection
+fresh inj; code_change; docs_both
+out="$("${tool[@]}" --docs "$d/docs" --docs-base "--output=$tmp/pwn5" --code "$d/code" --code-base "$CB" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && [ ! -e "$tmp/pwn5" ]; then echo "ok   --docs-base option injection refused"; else echo "FAIL docs-base injection rc=$rc"; fails=$((fails + 1)); fi
+out="$("${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "--output=$tmp/pwn5b" --state "$d/state" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && [ ! -e "$tmp/pwn5b" ] && [ ! -e "$tmp/pwn5b..HEAD" ] && [ ! -e "$d/pwn5b..HEAD" ]; then echo "ok   --code-base option injection refused"; else echo "FAIL code-base injection rc=$rc"; fails=$((fails + 1)); fi
+
+# K6: an open item replaced by a literal copy of an old ticked line (no proof) is red; a vanished open item is red
+fresh k6; code_change; docs_both
+(cd "$d/docs" && sed -i 's/^- \[ \] \*\*GRUNDSACHE\*\* second$/- [x] **GRUNDSACHE** first (commit abc1234)/' todo/checklisten/fs-test.md && g commit -q -am k6)
+expect 1 "" "red: a literal copy of an old tick replaces an open item (K6)" "$d" --
+fresh k6b; code_change; docs_both
+(cd "$d/docs" && sed -i '/\*\*GRUNDSACHE\*\* second$/d' todo/checklisten/fs-test.md && g commit -q -am k6b)
+expect 1 "an open item disappeared" "red: an open item vanished (K6)" "$d" --
+fresh k6c; code_change; docs_both
+(cd "$d/docs" && sed -i 's/^- \[ \] \*\*GRUNDSACHE\*\* second$/- [x] **GRUNDSACHE** second (commit 1234abc)/' todo/checklisten/fs-test.md && g commit -q -am k6c)
+expect 0 "green" "green: an open item ticked with a proof stays fine (K6)" "$d" --
+
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

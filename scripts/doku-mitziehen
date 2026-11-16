@@ -20,7 +20,7 @@ Deterministic, no network, no AI. Checks (every problem is one line `red: <reaso
 --head REF: the head of the code to measure (branch or commit of the AGENT's work, resolved to a commit hash in the code repo); the code change is
 `--code-base..<that commit>`, never the checkout of the repo (a repo with `main` checked out and the commit only on the agent's branch is still seen).
 With --head the uncommitted state of the repo is not counted. --docs-head REF does the same for the docs clone: the docs are read from that commit
-(`git archive` into a temporary folder), the docs change is `--docs-base..<that commit>`. Without them HEAD and the working tree count, as before.
+(`git read-tree` into an own temporary index + `checkout-index` into a temporary folder; never `git archive`, which obeys .gitattributes export-ignore), the docs change is `--docs-base..<that commit>`. Without them HEAD and the working tree count, as before.
 --proof-base REF (default --docs-base): the base for the proof check; ONLY ticked lines that are new or changed against the checklist at that base
 need a proof (old entries never block foreign work); a ticked item that disappears is red against --docs-base as before.
 The docs clone is only read (the mkdocs build goes to a temporary folder). NOTE: `mkdocs build` runs the hooks and plugins named in
@@ -33,6 +33,7 @@ third round or later (escalate to the person). `--json FILE` writes {"status": "
 "problems": [...], "skipped": [...]} - also for rc 2 (status "skipped", never "green"; for bad input status "skipped" with the line in problems).
 """
 import argparse
+from collections import Counter
 import fnmatch
 import json
 import os
@@ -58,6 +59,17 @@ def resolve(repo, ref):
     if not ref or ref.startswith("-"):
         raise ValueError(f"bad ref {ref!r}")
     return git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}").strip()
+
+
+def checkout_tree(repo, commit, dest):
+    """The tree of a commit into dest through an OWN temporary index (read-tree + checkout-index); never `git archive`, which obeys
+    the .gitattributes (export-ignore, export-subst) of the archived tree - an author could hide files from the gate with it."""
+    with tempfile.TemporaryDirectory(prefix="doku-mitziehen-idx-") as idx:
+        env = {**os.environ, "GIT_INDEX_FILE": os.path.join(idx, "index")}
+        for args in (["read-tree", commit], ["--work-tree=" + dest, "checkout-index", "-a", "-f"]):
+            r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, env=env)
+            if r.returncode != 0:
+                raise ValueError(f"git {args[-1] if args[0] != 'read-tree' else 'read-tree'} {commit}: {r.stderr.strip()}")
 
 
 def changed(repo, base, paths=None, head=None):
@@ -126,16 +138,30 @@ def check_checklist(a, problems):
     boxes = 0
     # only ticked lines that are NEW or CHANGED against the proof base need a proof; old entries never block foreign work
     try:
-        old_ticked = {l.strip() for l in git(a.docs, "show", f"{a.proof_base}:{rel}").split("\n") if TICKED.match(l)}
+        old_lines = git(a.docs, "show", f"{a.proof_base}:{rel}").split("\n")
     except ValueError:
-        old_ticked = set()  # the file did not exist at the base: everything is new
+        old_lines = []  # the file did not exist at the base: everything is new
+    old_ticked = Counter(l.strip() for l in old_lines if TICKED.match(l))
+    old_open = Counter(l.strip() for l in old_lines if CHECKBOX.match(l) and not TICKED.match(l))
+    seen = Counter()
     for n, line in enumerate(open(path, encoding="utf-8", errors="replace"), 1):
         if CHECKBOX.match(line):
             boxes += 1
-            if TICKED.match(line) and line.strip() not in old_ticked and not PROOF.search(line):
+            key = line.strip()
+            seen[key] += 1
+            # an old ticked line is covered once per occurrence in the base; a further copy is new and needs a proof
+            if TICKED.match(line) and seen[key] > old_ticked[key] and not PROOF.search(line):
                 problems.append(f"red: {rel}:{n} is ticked without a proof in parentheses (new or changed line; commit hash of 7-40 hex characters, tag vX.Y.Z or picture / file path)")
     if boxes == 0:
         problems.append(f"red: {rel} has no `- [ ]` / `- [x]` item")
+    for item, n in old_open.items():
+        # an open item of the base stays open, or is ticked with the same text (a new tick, so it has a proof, see above)
+        ticked = re.sub(r"^- \[ \]", "- [x]", item).lower()
+        # a ticked form may have a proof appended: count by prefix, not only literally
+        got = sum(c for k, c in seen.items() if TICKED.match(k) and k.lower().startswith(ticked))
+        new_ticks = max(0, got - sum(c for k, c in old_ticked.items() if k.lower().startswith(ticked)))
+        if seen[item] + new_ticks < n:
+            problems.append(f"red: {rel}: an open item disappeared ({item[:60]}); it stays open or is ticked with a proof")
     diff = git(a.docs, "diff", a.docs_base if not a.docs_head else f"{a.docs_base}..{a.docs_head}", "--", rel).split("\n")
     for line in diff:
         if line.startswith("-") and not line.startswith("---") and TICKED.match(line[1:].lstrip()):
@@ -274,15 +300,15 @@ def main(argv):
     tmpdocs = None
     try:
         a.root = a.docs
+        if a.code_base:
+            a.code_base = resolve(a.code, a.code_base)
+        a.docs_base = resolve(a.docs, a.docs_base)
         if a.head:
             a.head = resolve(a.code, a.head)
         if a.docs_head:
             a.docs_head = resolve(a.docs, a.docs_head)
             tmpdocs = tempfile.mkdtemp(prefix="doku-mitziehen-")
-            tar = subprocess.run(["git", "-C", a.docs, "archive", a.docs_head], capture_output=True)
-            if tar.returncode != 0:
-                raise ValueError(f"git archive {a.docs_head}: {tar.stderr.decode(errors='replace').strip()}")
-            subprocess.run(["tar", "-x", "-C", tmpdocs], input=tar.stdout, check=True)
+            checkout_tree(a.docs, a.docs_head, tmpdocs)
             a.root = tmpdocs
         if a.proof_base:
             a.proof_base = resolve(a.docs, a.proof_base)
