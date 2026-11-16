@@ -589,6 +589,27 @@ grn "mutation control: without the segment and .. rules the prefix /../../etc is
 mutm 's/^SEGMENT = .*/SEGMENT = re.compile(r"[a-z0-9._\\\\-]+")/' backslash
 grn "mutation control: with a backslash allowed in a segment the backslash prefix is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-bs.toml" "$t/x.kdl"
 rm -rf "$mutset"
+# H4: the hash of the Zentinel configuration in the sign job (scripts/site-kdl-hash.sh) depends on site.toml AND on ACME_EMAIL, WEBROOT, HTTP_ADDR, HTTPS_ADDR; fixed values, same hash twice
+K="$here/site-kdl-hash.sh"; TB="$t/dist/helfa.org-0.0.1-site.tar.gz"
+kh() { env -u WEBROOT -u HTTP_ADDR -u HTTPS_ADDR ACME_EMAIL=admin@example.org "$@"; }
+kdiff() { # script var value: the hashes differ from the default run when VAR is set (0 = they differ)
+  local s=$1 v=$2 val=$3
+  [ "$(kh "$s" "$TB" | grep '^kdl-sha256 staging')" != "$(kh env "$v=$val" "$s" "$TB" | grep '^kdl-sha256 staging')" ]; }
+grn "kdl hash: prints the inputs and one hash per variant" bash -c "'$K' '$TB' >/dev/null 2>&1 || true; ACME_EMAIL=admin@example.org '$K' '$TB' | grep -q '^kdl-inputs webroot=/srv/www http-addr=0.0.0.0:80 https-addr=0.0.0.0:443 acme-email=admin@example.org' && [ \$(ACME_EMAIL=admin@example.org '$K' '$TB' | grep -c '^kdl-sha256 ') = 3 ]"
+grn "kdl hash: same inputs, same output (twice)" bash -c "export ACME_EMAIL=admin@example.org; [ \"\$('$K' '$TB')\" = \"\$('$K' '$TB')\" ]"
+grn "kdl hash: the documented defaults are the real ones (set explicitly, the output is identical)" bash -c "export ACME_EMAIL=admin@example.org; unset WEBROOT HTTP_ADDR HTTPS_ADDR; a=\$('$K' '$TB'); b=\$(WEBROOT=/srv/www HTTP_ADDR=0.0.0.0:80 HTTPS_ADDR=0.0.0.0:443 '$K' '$TB'); [ \"\$a\" = \"\$b\" ]"
+grn "kdl hash: another WEBROOT gives another hash" kdiff "$K" WEBROOT /var/www
+grn "kdl hash: another HTTP_ADDR gives another hash" kdiff "$K" HTTP_ADDR 0.0.0.0:8080
+grn "kdl hash: another HTTPS_ADDR gives another hash" kdiff "$K" HTTPS_ADDR 0.0.0.0:8443
+grn "kdl hash: another ACME_EMAIL gives another hash" bash -c "[ \"\$(ACME_EMAIL=a@example.org '$K' '$TB' | grep staging)\" != \"\$(ACME_EMAIL=b@example.org '$K' '$TB' | grep staging)\" ]"
+red "kdl hash: without ACME_EMAIL it is red (no hash from nothing)" env -u ACME_EMAIL "$K" "$TB"
+red "kdl hash: a passthrough tarball needs --allow-passthrough" env ACME_EMAIL=admin@example.org "$K" "$t/dpt/helfa.org-0.0.1-site.tar.gz"
+grn "kdl hash: with --allow-passthrough the passthrough tarball gets its hashes" env ACME_EMAIL=admin@example.org "$K" "$t/dpt/helfa.org-0.0.1-site.tar.gz" --allow-passthrough
+grn "kdl hash: the person's render (render.sh from main, same site.toml, same values) gives the same production hash" bash -c "d=\$(mktemp -d); tar -xzf '$TB' -C \$d ./site.toml; ACME_EMAIL=admin@example.org '$R' --production --site \$d/site.toml \$d/p.kdl >/dev/null 2>&1; h=\$(cut -d' ' -f1 \$d/p.kdl.sha256); rm -rf \$d; ACME_EMAIL=admin@example.org '$K' '$TB' | grep -q \"^kdl-sha256 production \$h\$\""
+mkdir -p "$t/mutk/scripts" "$t/mutk/templates"; cp -r "$T" "$t/mutk/templates/site"; cp "$here"/site_manifest.py "$t/mutk/scripts/"; cp "$K" "$t/mutk/scripts/site-kdl-hash.sh"
+sed -i 's#^export WEBROOT=\${WEBROOT:-/srv/www} #export WEBROOT=/srv/www #' "$t/mutk/scripts/site-kdl-hash.sh"
+cmp -s "$K" "$t/mutk/scripts/site-kdl-hash.sh" && bad "mutation kdl hash: the sed did not apply"
+red "mutation: a script that ignores WEBROOT is found by the WEBROOT test" kdiff "$t/mutk/scripts/site-kdl-hash.sh" WEBROOT /var/www
 # H3: the step that holds the secrets starts no other process (builtins only: set, umask, assignment, printf with redirection), the folder is made by an earlier step
 cat > "$t/secretstep.py" <<'PY'
 import re, sys, yaml

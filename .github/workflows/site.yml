@@ -113,16 +113,12 @@ jobs:
         run: |
           set -euo pipefail
           # the configuration is NOT in the tarball; it is rendered from the site.toml INSIDE the checked tarball (render.py is deterministic). The person renders
-          # the same way from a verified main and must get the same hashes (written in the protocol, compared on the server).
-          [ -n "$ACME_EMAIL" ] || { echo "repository variable SITE_ACME_EMAIL is not set (TODO person): no configuration hash"; exit 1; }
-          w=$(mktemp -d); tar -xzf dist/*-site.tar.gz -C "$w" --no-same-owner --no-same-permissions ./site.toml
+          # the same way from a verified main and must get the same hashes (written in the protocol, compared on the server). The hash also depends on WEBROOT,
+          # HTTP_ADDR, HTTPS_ADDR (unset here = the defaults, which the `kdl-inputs` line shows) and ACME_EMAIL: the person uses the same values.
           opt=(); [ "$MODE" != passthrough ] || opt=(--allow-passthrough)
           {
-            echo "### Zentinel configuration hashes (site.toml of the checked tarball, ACME e-mail from the variable)"; echo '```'
-            for v in staging production http-only; do
-              python3 -I templates/site/render.py "--$v" "${opt[@]}" --site "$w/site.toml" "$w/$v.kdl" >/dev/null
-              echo "kdl-sha256 $v $(sha256sum "$w/$v.kdl" | cut -d' ' -f1)"
-            done
+            echo "### Zentinel configuration hashes (site.toml of the checked tarball, ACME e-mail from the variable, default webroot and addresses)"; echo '```'
+            scripts/site-kdl-hash.sh dist/*-site.tar.gz "${opt[@]}"
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Create the folder for the key (a normal process; NO secrets in this step)
