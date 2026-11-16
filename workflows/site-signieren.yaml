@@ -94,7 +94,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: freigabe-beleg
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "scripts/site-signieren.sh with GPG_PRIVATE_KEY_FILE and GPG_PASSPHRASE_FILE (missing or empty = red, not 'not signed'): repeats the approval check and the rebuild comparison first (so the key file is on the runner's disk while this own code runs, with -I and no content executed: not 'without a key'), only then detached .asc for the five files (the four artefacts of dist plus approval.txt; the approver keeps his own approval.txt.approver.asc) with sign-files/sign.sh (the Release path with the key in the environment still works). The key files exist only in this job (CI environment `site-signing`) and are removed in a last step that always runs (`if: always()`)."
+        freesynergy.net:summary: "scripts/site-signieren.sh with GPG_PRIVATE_KEY_FILE and GPG_PASSPHRASE_FILE (missing = red, not 'not signed'; an empty file is red too): repeats the approval check and the rebuild comparison first (so the key file is on the runner's disk while this own code runs, with -I and no content executed: not 'without a key'), only then detached .asc for the five files (the four artefacts of dist plus approval.txt; the approver keeps his own approval.txt.approver.asc) with sign-files/sign.sh (the Release path with the key in the environment still works). The key files exist only in this job (CI environment `site-signing`) and are removed in a last step that always runs (`if: always()`)."
   - signatures-check:
       call: site-signaturen-pruefen:0.0.6@fs
       metadata:
