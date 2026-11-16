@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Pattern: none. Generates the Zentinel configuration FROM the site.toml files; no host name is written in a template, a script or a test.
-usage: render.py [--staging|--production|--http-only|--test] --site <site.toml> [--site <site.toml> ...] <output.kdl>
+usage: render.py [--staging|--production|--http-only|--test] [--allow-passthrough] --site <site.toml> [--site <site.toml> ...] <output.kdl>
 Environment: ACME_EMAIL (not needed with --http-only/--test), WEBROOT (default /srv/www), HTTP_ADDR (default 0.0.0.0:80), HTTPS_ADDR (default 0.0.0.0:443).
 Per site: certificate for primary name plus aliases (acme.method http-01), one route per name, root <WEBROOT>/<primary>/current, CSP from csp.mode/csp.policy.
+A site with csp.mode "passthrough" (its own scripts run) is REFUSED unless --allow-passthrough says so explicitly: Zentinel 26.11_2 does not send the CSP on static routes.
 Also writes <output.kdl>.sha256. Same input, same bytes. Does no DNS and touches no server. Details: README.md.
 """
 import hashlib
@@ -26,7 +27,7 @@ def die(msg: str) -> None:
 
 
 def main(argv: list[str]) -> None:
-    staging, tpl, variant, out, paths = "true", "zentinel-static.kdl.in", "acme", None, []
+    staging, tpl, variant, out, paths, allow_pass = "true", "zentinel-static.kdl.in", "acme", None, [], False
     it = iter(argv)
     for a in it:
         if a == "--staging":
@@ -37,6 +38,8 @@ def main(argv: list[str]) -> None:
             tpl, variant = "zentinel-static-http-only.kdl.in", "plain"
         elif a == "--test":
             tpl, variant = "zentinel-static-test.kdl.in", "plain"
+        elif a == "--allow-passthrough":
+            allow_pass = True
         elif a == "--site":
             paths.append(next(it, ""))
         elif a.startswith("-"):
@@ -46,7 +49,7 @@ def main(argv: list[str]) -> None:
         else:
             die("only one output file")
     if out is None or not paths or not all(paths):
-        die("usage: render.py [--staging|--production|--http-only|--test] --site <site.toml> [--site ...] <output.kdl>")
+        die("usage: render.py [--staging|--production|--http-only|--test] [--allow-passthrough] --site <site.toml> [--site ...] <output.kdl>")
     email = os.environ.get("ACME_EMAIL", "")
     if variant == "acme" and not email:
         die("ACME_EMAIL is not set")
@@ -54,11 +57,11 @@ def main(argv: list[str]) -> None:
         email = "test@example.org"
     webroot = os.environ.get("WEBROOT", "/srv/www")
     http_addr, https_addr = os.environ.get("HTTP_ADDR", "0.0.0.0:80"), os.environ.get("HTTPS_ADDR", "0.0.0.0:443")
-    if not EMAIL.match(email):
+    if not EMAIL.fullmatch(email):
         die("ACME_EMAIL is not a plain e-mail address")
-    if not (re.match(r"^/[A-Za-z0-9._/-]*$", webroot) and not webroot.endswith("/") and ".." not in webroot):
+    if not (re.fullmatch(r"/[A-Za-z0-9._/-]*", webroot) and not webroot.endswith("/") and ".." not in webroot):
         die("WEBROOT must be an absolute path of plain characters, without trailing slash")
-    if not (ADDR.match(http_addr) and ADDR.match(https_addr)) or http_addr == https_addr:
+    if not (ADDR.fullmatch(http_addr) and ADDR.fullmatch(https_addr)) or http_addr == https_addr:
         die("HTTP_ADDR and HTTPS_ADDR must look like 0.0.0.0:80 and differ")
     sites, seen = [], set()
     for p in paths:
@@ -69,6 +72,9 @@ def main(argv: list[str]) -> None:
         if seen & set(s["names"]):
             die(f"{p}: a name is already used by another site (one domain, one acme block)")
         seen |= set(s["names"])
+        if s["csp_mode"] == "passthrough" and not allow_pass:
+            die(f"{p}: csp.mode is passthrough (the site's own scripts run) and Zentinel 26.11_2 does not deliver the CSP on static routes: refused. "
+                "Say it explicitly with --allow-passthrough (and answer for it) or use mode static")
         sites.append(s)
     acme_blocks, routes = [], []
     for i, s in enumerate(sites):
@@ -81,6 +87,9 @@ def main(argv: list[str]) -> None:
             print(f"WARNING: site {s['primary']} is in passthrough mode (its own scripts run). Zentinel 26.11_2 does NOT send route response-headers for static-files routes "
                   "(measured by test-podman.sh), so the CSP is written into the configuration but not delivered yet. Do not go live with passthrough pages before a version "
                   "that sends it (or another wall) is proven.", file=sys.stderr)
+        if s["csp_mode"] == "static":
+            print(f"NOTE: site {s['primary']}: the CSP header of this configuration is NOT delivered by Zentinel 26.11_2 on static routes (measured). The wall for mode static "
+                  "is the folder check (scripts/site-pruefen.py: allowlist, and a page-own <meta> CSP in every page).", file=sys.stderr)
         for j, n in enumerate(s["names"]):
             routes.append(f'''    route "site{i + 1}-{j + 1}" {{
         matches {{

@@ -53,6 +53,19 @@ tm aliastwice $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.o
 tm recordtype $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\n[dns]\nrecords = ["MX"]\n[acme]\nmethod = "http-01"'
 tm extrakey $'schema = 1\npurpose = "website"\ntoken = "x"\n[names]\nprimary = "a.example.org"\n[acme]\nmethod = "http-01"'
 tm cspquote $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\n[acme]\nmethod = "http-01"\n[csp]\npolicy = "a\\"b"'
+tm nl-primary $'schema = 1\npurpose = "website"\n[names]\nprimary = "one.example.org\\n"\n[acme]\nmethod = "http-01"'
+tm nl-alias $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\naliases = ["b.example.org\\n"]\n[acme]\nmethod = "http-01"'
+tm nl-csp $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\n[acme]\nmethod = "http-01"\n[csp]\npolicy = "default-src self\\n"'
+long=$(python3 -c 'print(".".join(["a" * 60] * 5) + ".example.org")')
+tm toolong "$(printf 'schema = 1\npurpose = "website"\n[names]\nprimary = "%s"\n[acme]\nmethod = "http-01"' "$long")"
+grn "site.toml: the control of the long-name case is a valid name when it is short (the rule is the length)" bash -c "cp -r '$t/src' '$t/f-shortctl' && printf 'schema = 1\\npurpose = \"website\"\\n[names]\\nprimary = \"%s\"\\n[acme]\\nmethod = \"http-01\"\\n' 'a.example.org' > '$t/f-shortctl/site.toml' && '$B' check '$t/f-shortctl'"
+cp -r "$t/src" "$t/f-nlname"; : > "$t/f-nlname/"$'a.html\n'; red "folder: a file name with a line break is refused" "$B" check "$t/f-nlname"
+# mutations of site_manifest.py: the old `$` anchor and the missing length rule turn the cases green
+mkdir -p "$t/mut3"; cp "$here/site_manifest.py" "$t/mut3/site_manifest.py"; sed -i 's/DOMAIN.fullmatch(n)/DOMAIN.match(n + "")/; s/^DOMAIN = re.compile(r"(/DOMAIN = re.compile(r"^(/; s/{2,63}")  # used/{2,63}$")  # used/' "$t/mut3/site_manifest.py"
+grep -q 'DOMAIN.match' "$t/mut3/site_manifest.py" && ok "mutation: the old \`^...\$\` match put into a copy" || bad "mutation: site_manifest sed did not apply"
+grn "mutation control: with the old \`$\` anchor the name with a line break is GREEN" python3 -I "$t/mut3/site_manifest.py" "$t/f-nl-primary/site.toml"
+cp "$here/site_manifest.py" "$t/mut3/site_manifest.py"; sed -i 's/len(n) > 253 or //' "$t/mut3/site_manifest.py"
+grn "mutation control: without the length rule the name of 316 characters is GREEN" python3 -I "$t/mut3/site_manifest.py" "$t/f-toolong/site.toml"
 rm -rf "$t/f-cspm"; cp -r "$t/src" "$t/f-cspm"; mktoml "$t/f-cspm/site.toml" helfa.org passthrough; red "site.toml: csp.mode passthrough in a static check is refused" "$B" check "$t/f-cspm"
 
 # --- folder check: allowlist (mode static). Each case: name | file | content appended (or the whole file for new files)
@@ -370,15 +383,24 @@ T="$root/templates/site"
 export ACME_EMAIL=admin@example.org
 R="$T/render.sh"
 mktoml "$t/s1.toml" one.example.org static www.one.example.org; mktoml "$t/s2.toml" two.example.org static; mktoml "$t/s3.toml" three.example.org passthrough
-SITES=(--site "$t/s1.toml" --site "$t/s2.toml" --site "$t/s3.toml")
+SITES=(--allow-passthrough --site "$t/s1.toml" --site "$t/s2.toml" --site "$t/s3.toml")
 grn "render: staging is the default" bash -c "'$R' '${SITES[*]}' '$t/s.kdl' >/dev/null 2>&1 || '$R' ${SITES[*]} '$t/s.kdl' >/dev/null 2>&1; grep -q 'staging #true' '$t/s.kdl' && ! grep -q '@[A-Z0-9_]*@' '$t/s.kdl'"
 grn "render: production" bash -c "'$R' --production ${SITES[*]} '$t/p.kdl' >/dev/null 2>&1 && grep -q 'staging #false' '$t/p.kdl'"
 grn "render: names come from the site.toml files: aliases get a route and are in the certificate" bash -c "grep -q 'host \"www.one.example.org\"' '$t/s.kdl' && grep -q 'domains \"one.example.org\" \"www.one.example.org\"' '$t/s.kdl' && [ \$(grep -c 'acme {' '$t/s.kdl') = 3 ]"
-grn "templates and scripts name no host of the three real domains (fixtures only)" bash -c "! grep -rn -E 'freesynergy\.net|helfa\.org|freeplanetearth\.org' '$T/render.py' '$T/render.sh' '$T'/*.in '$here/site_manifest.py' '$here/site-bauen.sh' '$here/site-pruefen.py' '$here/site-signieren.sh' '$here/site-freigabe-pruefen.sh' '$root/.github/workflows/site.yml'"
+hostfiles=$(cd "$root" && ls scripts/site* templates/site/* .github/workflows/site.yml | grep -v -E '^(scripts/test-site\.sh|templates/site/README\.md)$')
+[ "$(wc -l <<<"$hostfiles")" -ge 15 ] && grep -q 'site-signaturen-pruefen.sh' <<<"$hostfiles" && grep -q 'site-tar-pruefen.py' <<<"$hostfiles" && ok "host-name grep covers every scripts/site*, templates/site/* (README aside) and site.yml" || bad "host-name grep file list"
+grn "templates and scripts name no host of the three real domains (fixtures only)" bash -c "cd '$root' && ! grep -n -E 'freesynergy\.net|helfa\.org|freeplanetearth\.org' $(tr '\n' ' ' <<<"$hostfiles")"
+for f in scripts/site-signaturen-pruefen.sh scripts/site-tar-pruefen.py; do
+  rm -rf "$t/hm"; mkdir -p "$t/hm/scripts"; (cd "$root" && cp -r --parents $hostfiles "$t/hm/"); echo '# helfa.org' >> "$t/hm/$f"
+  red "mutation: a real host name in $f is found by the grep" bash -c "cd '$t/hm' && ! grep -n -E 'freesynergy\.net|helfa\.org|freeplanetearth\.org' $(tr '\n' ' ' <<<"$hostfiles")"
+done
 grn "render: port 80 is a real 301 redirect (namespace + redirect filter), no page served" bash -c "grep -q 'type \"redirect\"' '$t/s.kdl' && grep -q 'status-code 301' '$t/s.kdl' && grep -q 'namespace \"redirect\"' '$t/s.kdl' && ! grep -q '_port80' '$t/s.kdl'"
 grn "render: roots end in /current of the primary name (what the delivery step swaps)" bash -c "grep -q 'root \"/srv/www/one.example.org/current\"' '$t/s.kdl' && ! grep -q 'root \"/srv/www/www' '$t/s.kdl'"
 grn "render: CSP strict by default, passthrough only for the site that says so (and warns)" bash -c "'$R' ${SITES[*]} '$t/c.kdl' 2>'$t/w' >/dev/null; [ \$(grep -c \"script-src 'self'\" '$t/c.kdl') = 1 ] && [ \$(grep -c \"default-src 'none'\" '$t/c.kdl') = 3 ] && grep -q WARNING '$t/w'"
 grn "render: csp.policy of site.toml replaces the preset" bash -c "printf 'schema = 1\npurpose = \"website\"\n[names]\nprimary = \"four.example.org\"\n[acme]\nmethod = \"http-01\"\n[csp]\npolicy = \"default-src self; img-src https://cdn.example.org\"\n' > '$t/s4.toml' && '$R' --site '$t/s4.toml' '$t/c4.kdl' >/dev/null && grep -q 'img-src https://cdn.example.org' '$t/c4.kdl'"
+red "render: a passthrough site without --allow-passthrough is refused (CSP is not delivered in 26.11_2)" "$R" --site "$t/s1.toml" --site "$t/s3.toml" "$t/x.kdl"
+red "render: the same refusal holds for --http-only and --production" bash -c "'$R' --http-only --site '$t/s3.toml' '$t/x.kdl' || '$R' --production --site '$t/s3.toml' '$t/x.kdl'"
+grn "render: a static site needs no flag and its note says the CSP header is not delivered" bash -c "'$R' --site '$t/s1.toml' '$t/x1.kdl' 2>'$t/w1' >/dev/null && grep -q 'NOT delivered' '$t/w1'"
 red "render: the same name in two sites is refused" "$R" --site "$t/s1.toml" --site "$t/s1.toml" "$t/x.kdl"
 red "render: no --site is refused" "$R" "$t/x.kdl"
 red "render: a bad site.toml is refused" "$R" --site "$t/f-dns01/site.toml" "$t/x.kdl"

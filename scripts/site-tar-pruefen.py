@@ -45,7 +45,7 @@ def main(path: str) -> int:
                 if name.startswith("/"):
                     bad.append(f"{label}: absolute path")
                 comps = rel.split("/") if rel else []
-                if any(not COMP.match(c) for c in comps):
+                if any(not COMP.fullmatch(c) for c in comps):
                     bad.append(f"{label}: unsafe path (empty, '..', dot file or odd characters)")
                 if rel in seen:
                     bad.append(f"{label}: name twice")

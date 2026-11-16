@@ -9,8 +9,8 @@ import re
 import sys
 import tomllib
 
-DOMAIN = re.compile(r"^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
-CSP_CHARS = re.compile(r"^[A-Za-z0-9 ;:'*._/=+,%-]{1,1000}$")
+DOMAIN = re.compile(r"([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}")  # used with fullmatch: `$` would let a trailing line break through
+CSP_CHARS = re.compile(r"[A-Za-z0-9 ;:'*._/=+,%-]{1,1000}")  # fullmatch, see above
 KEYS = {"schema", "purpose", "names", "dns", "acme", "csp"}
 RECORDS = {"A", "AAAA", "CAA"}
 
@@ -40,7 +40,7 @@ def load(path: str) -> dict:
     if len(allnames) > 10 or len(set(allnames)) != len(allnames):
         raise ValueError("names: at most 10, none twice")
     for n in allnames:
-        if not DOMAIN.match(n):
+        if len(n) > 253 or not DOMAIN.fullmatch(n):
             raise ValueError(f"'{n}' is not a plain lower-case domain name")
     dns = m.get("dns", {"records": ["A", "AAAA"]})
     if not isinstance(dns, dict) or set(dns) - {"records"}:
@@ -62,7 +62,7 @@ def load(path: str) -> dict:
     if mode not in ("static", "passthrough"):
         raise ValueError("csp.mode must be static or passthrough")
     policy = csp.get("policy", "")
-    if policy and not (isinstance(policy, str) and CSP_CHARS.match(policy)):
+    if policy and not (isinstance(policy, str) and CSP_CHARS.fullmatch(policy)):
         raise ValueError("csp.policy holds a character that is not allowed (no double quote, backslash, @, & or line break)")
     return {"primary": primary, "names": allnames, "records": rec, "acme": acme["method"], "csp_mode": mode, "csp_policy": policy}
 

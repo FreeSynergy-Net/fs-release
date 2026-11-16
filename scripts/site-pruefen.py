@@ -297,7 +297,7 @@ def main(argv: list[str]) -> int:
                 continue
             if st.st_mode & 0o7000:
                 bad.append(f"{rel}: set-uid, set-gid or sticky bit")
-            if not COMP.match(n):
+            if not COMP.fullmatch(n):
                 bad.append(f"{rel}: unsafe name (dot file or character outside A-Za-z0-9._-)")
             if stat.S_ISREG(st.st_mode):
                 files.append(rel)
@@ -318,7 +318,7 @@ def main(argv: list[str]) -> int:
     files.sort(key=lambda f: f.encode())
     for rel in files:
         p = os.path.join(src, rel)
-        if not COMP.match(os.path.basename(rel)) or os.path.islink(p):
+        if not COMP.fullmatch(os.path.basename(rel)) or os.path.islink(p):
             continue
         ext = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
         if ext not in ok_ext:

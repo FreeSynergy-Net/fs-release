@@ -6,6 +6,8 @@
 // start with `render.sh --http-only` first, DNS set and port 80 reachable, then staging (ACME_STAGING=true, certificates untrusted by browsers),
 // and only then production.
 // Content-Security-Policy per site is a SETTING of its site.toml (csp.mode / csp.policy), the default is strict (no script, nothing from outside).
+// HONEST NOTE: Zentinel 26.11_2 does NOT send these response-headers (CSP, nosniff, referrer) on static-files routes (measured). They are written for the version that does.
+// Until then the wall for mode static is the folder check (page-own <meta> CSP, allowlist); a passthrough site is refused by render.py unless --allow-passthrough.
 // The host names come ONLY from the site.toml files (render.py); nothing is written into this template.
 schema-version "1.0"
 
