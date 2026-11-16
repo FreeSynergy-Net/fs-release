@@ -3,12 +3,12 @@ description: Validate the release tag (SemVer) and turn the caller inputs into o
 inputs:
   tag: { description: "Release tag (default - the ref name)", default: "" }
   name: { description: "Artefact base name", default: "" }
-  binaries: { description: "Comma separated binary names; empty = library mode (no packages, tag/version/CHANGELOG checked)", default: "" }
+  binaries: { description: "Comma separated binary names; must be empty with kind library, and only then", default: "" }
   ignore-binaries: { description: "Binaries under crates/ that are deliberately not packaged (* = all)", default: "" }
   cargo-package: { description: "Cargo package (-p) for workspaces", default: "" }
   working-directory: { description: "Directory of the Cargo workspace", default: "." }
   features: { description: "Cargo features for release builds", default: "" }
-  kind: { description: "cli, daemon or app", default: "cli" }
+  kind: { description: "cli, daemon or app; library = pure library without packages (needs an empty binaries, tag/version/CHANGELOG checked)", default: "cli" }
   app-id: { description: "Reverse-DNS application id", default: "" }
   app-name: { description: "Human readable name", default: "" }
   description: { description: "One-line description", default: "" }
@@ -50,8 +50,8 @@ runs:
         WINDOWS_FORMATS: ${{ inputs.windows-formats }}
         MACOS_FORMATS: ${{ inputs.macos-formats }}
       run: python3 -I "$GITHUB_ACTION_PATH/plan.py"
-    # Library mode (no binaries): tag = workspace version = non-empty CHANGELOG section, checked in the plan so a wrong tag stops before any job.
-    - if: inputs.binaries == ''
+    # Library mode (kind library): tag = workspace version = non-empty CHANGELOG section, checked in the plan so a wrong tag stops before any job.
+    - if: inputs.kind == 'library'
       shell: bash
       env:
         TAG: ${{ inputs.tag }}

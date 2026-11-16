@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Self test of the library mode of release.yml with counter-checks on fixtures (no network, fake `gh`):
 #   notes.py      ok case; wrong tag name, version != tag, missing / empty / blank-only section = rc 1 and no notes file
-#   plan.py       empty binaries gives a library plan (no platform job); a binary release with a bad tag still fails
-#   release.sh    draft first, then Pre-release; an existing release is refused; dry-run creates nothing
+#   plan.py       kind library + empty binaries gives a library plan (no platform job); empty binaries WITHOUT kind library, kind library with
+#                 binaries and a binary release with a bad tag still fail
+#   release.sh    draft first, then Pre-release; an existing release and a leftover draft are refused (named); dry-run creates nothing; a tag commit
+#                 that is not an ancestor of origin/main is refused
 #   release.yml   platform jobs, finalize (SBOM, signatures, secrets) and publish are off in library mode; the job `library` has no secret and no
 #                 sign / checksum / sbom step
 # Mutations on copies (the version check removed, the `library` guard of finalize removed, a secret added to the library job) must turn the tests red.
@@ -55,38 +57,72 @@ run_notes_cases() { # <actions root> <label>
 }
 run_notes_cases "$repo" real
 
-# plan.py
+# plan.py: library mode must be asked for (kind library); an empty binaries WITHOUT it stays an error
 mkdir -p "$tmp/plan"
-out="$(cd "$tmp/plan" && TAG=v0.1.2 BINARIES="" GITHUB_OUTPUT="$tmp/plan/out" GITHUB_REPOSITORY=O/fs-lib python3 -I "$repo/actions/plan/plan.py" 2>&1)"; rc=$?
-if [ "$rc" -eq 0 ] && python3 - "$tmp/plan/out" <<'PY'
+plan_run() { # <actions root> <env assignments...>: runs plan.py, prints rc
+  local r="$1"; shift
+  rm -f "$tmp/plan/out"
+  (cd "$tmp/plan" && env "$@" GITHUB_OUTPUT="$tmp/plan/out" GITHUB_REPOSITORY=O/fs-lib python3 -I "$r/actions/plan/plan.py" >"$tmp/plan/log" 2>&1); echo $?
+}
+plan_cases() { # <actions root> <label>
+  local r="$1" l="$2"
+  [ "$(plan_run "$r" TAG=v0.1.2 KIND=library BINARIES=)" = 0 ] && python3 - "$tmp/plan/out" <<'PY' && ok "$l plan.py: kind library + empty binaries = library plan, no platform" || bad "$l plan.py library plan"
 import json, sys
 line = [l for l in open(sys.argv[1]) if l.startswith("plan=")][0][5:]
 p = json.loads(line)
 assert p["library"] is True and p["binaries"] == [] and not (p["has_linux"] or p["has_windows"] or p["has_macos"] or p["has_arch"]), p
 PY
-then ok "plan.py: empty binaries = library plan, no platform"; else bad "plan.py library: rc=$rc $out"; fi
-(cd "$tmp/plan" && TAG=1.2 BINARIES="" GITHUB_OUTPUT="$tmp/plan/out2" python3 -I "$repo/actions/plan/plan.py" >/dev/null 2>&1); [ $? -eq 1 ] && ok "plan.py: library with a bad tag name is red" || bad "plan.py: bad tag in library mode was accepted"
-(cd "$tmp/plan" && TAG=1.2 BINARIES="x" GITHUB_OUTPUT="$tmp/plan/out3" python3 -I "$repo/actions/plan/plan.py" >/dev/null 2>&1); [ $? -eq 1 ] && ok "plan.py: binary release with a bad tag is still red" || bad "plan.py: binary release lost its tag check"
+  [ "$(plan_run "$r" TAG=v0.1.2 BINARIES=)" = 1 ] && grep -q "kind: library" "$tmp/plan/log" && ok "$l plan.py: empty binaries WITHOUT kind library is an error" || bad "$l plan.py: an app repo with empty binaries was accepted"
+  [ "$(plan_run "$r" TAG=v0.1.2 KIND=cli BINARIES=)" = 1 ] && ok "$l plan.py: kind cli with empty binaries is an error" || bad "$l plan.py: kind cli, empty binaries accepted"
+  [ "$(plan_run "$r" TAG=v0.1.2 KIND=library BINARIES=x)" = 1 ] && ok "$l plan.py: kind library with binaries is an error" || bad "$l plan.py: library + binaries accepted"
+  [ "$(plan_run "$r" TAG=1.2 KIND=library BINARIES=)" = 1 ] && ok "$l plan.py: library with a bad tag name is red" || bad "$l plan.py: bad tag in library mode was accepted"
+  [ "$(plan_run "$r" TAG=1.2 BINARIES=x)" = 1 ] && ok "$l plan.py: binary release with a bad tag is still red" || bad "$l plan.py: binary release lost its tag check"
+}
+plan_cases "$repo" real
 
 # release.sh with a fake gh that records its calls
 mkdir -p "$tmp/bin"
 cat >"$tmp/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "$*" >>"$GH_LOG"
-if [ "$1 $2" = "release view" ]; then [ -n "${GH_EXISTS:-}" ] && exit 0; exit 1; fi
+if [ "$1 $2" = "release view" ]; then
+  [ -z "${GH_EXISTS:-}" ] && exit 1
+  case "$*" in *--json*) [ "$GH_EXISTS" = draft ] && echo true || echo false ;; esac
+  exit 0
+fi
 exit 0
 GH
 chmod +x "$tmp/bin/gh"
 printf '%s\n' '- first' >"$tmp/notes.md"
-PATH="$tmp/bin:$PATH" GH_LOG="$tmp/gh.log" TAG=v0.1.2 REPO=O/fs-lib GH_TOKEN=x NOTES="$tmp/notes.md" bash "$repo/actions/library-release/release.sh" >"$tmp/rel.out" 2>&1; rc=$?
-if [ "$rc" -eq 0 ] && grep -q '^release create v0.1.2 --draft --prerelease --verify-tag .*--notes-file' "$tmp/gh.log" && grep -q '^release edit v0.1.2 --draft=false --prerelease' "$tmp/gh.log"; then ok "release.sh: draft, then Pre-release"; else bad "release.sh: rc=$rc log: $(cat "$tmp/gh.log")"; fi
-if grep -q -- '--generate-notes' "$tmp/gh.log"; then bad "release.sh: generated notes instead of the CHANGELOG"; else ok "release.sh: notes come from the file, not generated"; fi
-: >"$tmp/gh.log"
-GH_EXISTS=1 PATH="$tmp/bin:$PATH" GH_LOG="$tmp/gh.log" TAG=v0.1.2 REPO=O/fs-lib GH_TOKEN=x NOTES="$tmp/notes.md" bash "$repo/actions/library-release/release.sh" >"$tmp/rel.out" 2>&1; rc=$?
-if [ "$rc" -eq 1 ] && ! grep -q 'release create\|release edit' "$tmp/gh.log"; then ok "release.sh: an existing release is refused and untouched"; else bad "release.sh existing: rc=$rc log: $(cat "$tmp/gh.log")"; fi
-: >"$tmp/gh.log"
-DRY_RUN=true PATH="$tmp/bin:$PATH" GH_LOG="$tmp/gh.log" TAG=v0.1.2 REPO=O/fs-lib GH_TOKEN=x NOTES="$tmp/notes.md" bash "$repo/actions/library-release/release.sh" >"$tmp/rel.out" 2>&1; rc=$?
-if [ "$rc" -eq 0 ] && ! grep -q 'release create\|release edit' "$tmp/gh.log"; then ok "release.sh: dry-run creates nothing"; else bad "release.sh dry-run: rc=$rc log: $(cat "$tmp/gh.log")"; fi
+# a clone whose origin/main holds the commit of the tag (good) and a second commit that is NOT on main (bad)
+git init -q "$tmp/clone" && git -C "$tmp/clone" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m one
+good="$(git -C "$tmp/clone" rev-parse HEAD)"
+git -C "$tmp/clone" update-ref refs/remotes/origin/main "$good"
+git -C "$tmp/clone" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m side
+side="$(git -C "$tmp/clone" rev-parse HEAD)"
+# rel <root of the actions> <sha> [env assignments...]: runs release.sh in the clone, prints rc
+rel() {
+  local r="$1" sha="$2"; shift 2
+  : >"$tmp/gh.log"
+  (cd "$tmp/clone" && env "$@" PATH="$tmp/bin:$PATH" GH_LOG="$tmp/gh.log" TAG=v0.1.2 REPO=O/fs-lib GH_TOKEN=x NOTES="$tmp/notes.md" GITHUB_SHA="$sha" bash "$r/actions/library-release/release.sh" >"$tmp/rel.out" 2>&1); echo $?
+}
+release_cases() { # <actions root> <label>
+  local r="$1" l="$2" rc
+  rc="$(rel "$r" "$good" X=1)"
+  if [ "$rc" -eq 0 ] && grep -q '^release create v0.1.2 --draft --prerelease --verify-tag .*--notes-file' "$tmp/gh.log" && grep -q '^release edit v0.1.2 --draft=false --prerelease' "$tmp/gh.log"; then ok "$l release.sh: draft, then Pre-release"; else bad "$l release.sh: rc=$rc log: $(cat "$tmp/gh.log")"; fi
+  if grep -q -- '--generate-notes' "$tmp/gh.log"; then bad "$l release.sh: generated notes instead of the CHANGELOG"; else ok "$l release.sh: notes come from the file, not generated"; fi
+  rc="$(rel "$r" "$good" GH_EXISTS=yes)"
+  if [ "$rc" -eq 1 ] && ! grep -q 'release create\|release edit' "$tmp/gh.log" && grep -q "exists - refusing" "$tmp/rel.out"; then ok "$l release.sh: an existing release is refused and untouched"; else bad "$l release.sh existing: rc=$rc log: $(cat "$tmp/gh.log")"; fi
+  rc="$(rel "$r" "$good" GH_EXISTS=draft)"
+  if [ "$rc" -eq 1 ] && ! grep -q 'release create\|release edit' "$tmp/gh.log" && grep -q "left over" "$tmp/rel.out"; then ok "$l release.sh: a leftover DRAFT is recognised and named"; else bad "$l release.sh draft: rc=$rc out: $(cat "$tmp/rel.out")"; fi
+  rc="$(rel "$r" "$good" DRY_RUN=true)"
+  if [ "$rc" -eq 0 ] && ! grep -q 'release create\|release edit' "$tmp/gh.log"; then ok "$l release.sh: dry-run creates nothing"; else bad "$l release.sh dry-run: rc=$rc log: $(cat "$tmp/gh.log")"; fi
+  rc="$(rel "$r" "$side" X=1)"
+  if [ "$rc" -eq 1 ] && ! grep -q 'release create\|release edit' "$tmp/gh.log" && grep -q "not on main" "$tmp/rel.out"; then ok "$l release.sh: a tag commit that is not on main is refused"; else bad "$l release.sh off-main: rc=$rc log: $(cat "$tmp/gh.log")"; fi
+  rc="$(rel "$r" "$side" DRY_RUN=true)"
+  [ "$rc" -eq 1 ] && ok "$l release.sh: the main check also holds in dry-run" || bad "$l release.sh dry-run off-main: rc=$rc"
+}
+release_cases "$repo" real
 
 # structure of release.yml in library mode
 structure() { # <release.yml> <label>: prints FAIL lines
@@ -131,9 +167,15 @@ mutate() { # <name> <file in the copy> <sed expression> <test kind>
   if cmp -s "$d/$2" "$repo/$2"; then bad "mutation $1 changed nothing"; return; fi
   case "$4" in
     notes) (run_notes_cases "$d" "mut-$1") >"$tmp/mut.out" 2>&1; grep -q '^FAIL' "$tmp/mut.out" && ok "mutation $1 turns the notes cases red" || bad "mutation $1 stayed green" ;;
+    plan) (plan_cases "$d" "mut-$1") >"$tmp/mut.out" 2>&1; grep -q '^FAIL' "$tmp/mut.out" && ok "mutation $1 turns the plan cases red" || bad "mutation $1 stayed green" ;;
+    release) (release_cases "$d" "mut-$1") >"$tmp/mut.out" 2>&1; grep -q '^FAIL' "$tmp/mut.out" && ok "mutation $1 turns the release.sh cases red" || bad "mutation $1 stayed green" ;;
     structure) [ -n "$(structure "$d/$2")" ] && ok "mutation $1 turns the structure check red" || bad "mutation $1 stayed green" ;;
   esac
 }
+mutate explicit actions/plan/plan.py 's/    if kind != "library" and not binaries:/    if False:/' plan
+mutate libbin actions/plan/plan.py 's/    if kind == "library" and binaries:/    if False:/' plan
+mutate onmain actions/library-release/release.sh 's/if ! git merge-base --is-ancestor/if false \&\& ! git merge-base --is-ancestor/' release
+mutate draft actions/library-release/release.sh 's/  if \[\[ "\$state" == "true" \]\]; then/  if false; then/' release
 mutate version actions/library-release/notes.py 's/    if have != version:/    if False:/' notes
 mutate section actions/library-release/notes.py 's/    if notes is None or not notes.strip():/    if notes is None:/' notes
 mutate semver actions/library-release/notes.py 's/    if not tag.startswith("v") or not SEMVER.match(tag\[1:\]):/    if False:/' notes

@@ -17,7 +17,8 @@ jobs:
       contents: write
     uses: FreeSynergy/fs-release/.github/workflows/release.yml@0000000000000000000000000000000000000000   # replace by the reviewed SHA
     with:
-      # binaries stays EMPTY: that is library mode
+      kind: library                  # library mode must be asked for; an empty `binaries` without it is an error (no silent release without packages)
+      # binaries stays EMPTY
       name: fs-components            # release title "<name> <tag>" (default - repository name)
       # working-directory: "."
       # dry-run: false

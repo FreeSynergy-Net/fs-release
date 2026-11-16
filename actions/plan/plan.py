@@ -2,7 +2,7 @@
 """Turn the caller's release inputs into one validated JSON plan (pattern: Facade over inputs).
 
 All values arrive as environment variables (see action.yml). Output: `plan` and
-`version` on $GITHUB_OUTPUT. Fails on a tag that is not `vMAJOR.MINOR.PATCH[-pre][+build]`. Empty `binaries` = library mode (`library: true`, no platform job; a binary plan has no `library` key, which counts as false).
+`version` on $GITHUB_OUTPUT. Fails on a tag that is not `vMAJOR.MINOR.PATCH[-pre][+build]`. `kind: library` (with empty `binaries`) = library mode (`library: true`, no platform job; a binary plan has no `library` key, which counts as false).
 """
 import json
 import os
@@ -70,10 +70,15 @@ def main():
     core = ".".join(version.split("-")[0].split("+")[0].split(".")[:3])
 
     kind = env("KIND", "cli")
-    if kind not in DEFAULT_FORMATS["linux"]:
-        fail("kind must be cli, daemon or app")
+    if kind != "library" and kind not in DEFAULT_FORMATS["linux"]:
+        fail("kind must be cli, daemon, app or library")
     binaries = csv(env("BINARIES"))
-    if not binaries:
+    if kind == "library" and binaries:
+        fail("kind 'library' with a non-empty 'binaries': a library has no binaries to package (remove one of the two)")
+    if kind != "library" and not binaries:
+        # A forgotten or empty `binaries` of an app repo must not turn into a release without packages: library mode is asked for explicitly.
+        fail("input 'binaries' is empty (a pure library must ask for it with `kind: library`)")
+    if kind == "library":
         # Library mode: nothing to build, package or sign; the plan only carries the tag and every platform job stays off.
         # (tag = Cargo version = non-empty CHANGELOG section is checked by actions/library-release/notes.py in the plan action.)
         name = env("NAME") or env("GITHUB_REPOSITORY").rsplit("/", 1)[-1] or "library"

@@ -1,5 +1,5 @@
 # Reusable release pipeline: plan -> platform jobs -> signed, attested draft -> Pre-release (fs-catalog pulls it from there). Usage: docs/usage.md
-# LIBRARY MODE: with an empty `binaries` (pure library, no packages) the plan carries `library: true`, every platform job, `finalize` (SBOM,
+# LIBRARY MODE: with `kind: library` and an empty `binaries` (pure library, no packages; an empty `binaries` WITHOUT `kind: library` is still an error) the plan carries `library: true`, every platform job, `finalize` (SBOM,
 # signatures, checksums, provenance) and `publish` are skipped, and the job `library` creates the Pre-release whose notes are the CHANGELOG section
 # of the tag version. The plan fails unless tag = Cargo workspace version = non-empty CHANGELOG section. No artefacts, so no binary packages and no
 # signature; the job `library` sees no secret (only its own GITHUB_TOKEN with contents: write). The actions used here exist only from the pin
@@ -8,11 +8,11 @@ name: release
 on:
   workflow_call:
     inputs:
-      binaries: { type: string, default: "", description: "Comma separated binary names; empty = library mode (no packages, notes from CHANGELOG.md)" }
+      binaries: { type: string, default: "", description: "Comma separated binary names; empty only together with kind library" }
       app-id: { type: string, default: "", description: "Reverse-DNS id, e.g. net.freesynergy.CapnpCompiler (AppImage, Flatpak, macOS bundle)" }
       app-name: { type: string, default: "", description: "Human readable name (default - project name)" }
       description: { type: string, default: "", description: "One line (default - Cargo description)" }
-      kind: { type: string, default: cli, description: "cli, daemon or app - selects the default formats" }
+      kind: { type: string, default: cli, description: "cli, daemon or app - selects the default formats; library = pure library (library mode, binaries must be empty)" }
       name: { type: string, default: "", description: "Artefact base name (default - Cargo package)" }
       ignore-binaries: { type: string, default: "", description: "Binaries under crates/ that are deliberately not packaged (* = all)" }
       cargo-package: { type: string, default: "", description: "Cargo package (-p) in a workspace" }
@@ -158,6 +158,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the tag commit must be an ancestor of origin/main (release.sh)
       - uses: FreeSynergy/fs-release/actions/library-release@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54
         with:
           tag: ${{ fromJSON(needs.plan.outputs.plan).tag }}
