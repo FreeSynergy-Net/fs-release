@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.10 (candidate, no tag)
+
+- `stil-neu` (flow, Glass plan section 5, strategy 16 Nov): new style in fs-components-styles - dossier with dossier gate, style contract (`stil-vollstaendigkeit`), tokens light/dark, blocks one by one, gates contrast, distance r >= 0.25, theme guard, picture gate, Opus review, picture OK of the user, release through the strategy. Test `tests/workflows_stil_neu.rs`. TODO: the scripts `stil-vollstaendigkeit` and `zwei-stile` do not exist (the steps run the Rust tests `block_tokens.rs` and `blocks_styles.rs` of fs-components); `contrast-gate`, `theme-guard`, `picture-gate` are specifications.
+
 ## 0.0.9
 
 - Version 0.0.9 in all crates, all flows (38), `chains/release.chain.yaml` and all `@fs` calls (crate version = tag). `@main` refs in `ci.yml`, `check.yml`, `release.yml` and the `_release-*.yml` files are pinned to the v0.0.8 commit (a fast-forward commit, not a merge commit).

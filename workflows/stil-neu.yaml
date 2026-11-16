@@ -1,0 +1,329 @@
+# New style in fs-components-styles (Glass plan .scratch/theme-glass/PLAN.md, section 5 and appendix; strategy 16.11.): dossier of the model, style contract,
+# tokens light/dark, every block on its own, then the gates (completeness, contrast, distance to every other style, theme guard, pictures), Opus review,
+# the picture OK of the user, release by the strategy. Agents never push, tag or merge; the tag is set by the strategy only.
+# Input: repo (fs-components), branch, tag, stil (name of the new style), vorbild (the model, name), dossier (folder of the model dossier), contract (contracts/THEME-CONTRACT.md),
+# blocks (folder blocks/*.toml), bilder (folder of the picture run), delta, docs, docs_base, old, new, allow (docs inputs for release-flow, empty lists unless names changed).
+# Loops: a red check jumps back at most twice (red rounds 1 and 2); the third red round goes to `eskalation` (the person). The script carries `runde`;
+# `runde` is NOT reset by a green result inside one loop, only when the flow leaves the phase.
+# Order: `Workflow stil-neu, step <id>, parameters repo, branch, tag, stil, vorbild, dossier, contract, blocks, bilder, delta` (docs/prompt-template.md). FS profile: see README.md.
+# TODO (not invented): the scripts `stil-vollstaendigkeit` and `zwei-stile` do NOT exist in fs-release (O12 report: only the wiring). The steps `vollstaendigkeit`
+# and `abstand` therefore run the Rust tests of fs-components (`block_tokens.rs`: one entry per style for ALL blocks, 16 block_tokens; `blocks_styles.rs`: distance r >= 0.25 to
+# every other style) through /srv/FreeSynergy/.scratch/build-slot.sh; the scripts follow as their own work, then the call names `stil-vollstaendigkeit` and `zwei-stile` replace the test run.
+# The names `contrast-gate`, `theme-guard` and `picture-gate` are specifications, not runnable (see the status table in README.md).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: stil-neu
+  version: 0.0.9
+  title: Create a new style in fs-components-styles - dossier, contract, tokens, blocks, gates, pictures, review, user OK, release
+do:
+  - dossier:
+      call: dossier-ai:0.0.9@fs
+      with:
+        stil: ${ .input.stil }
+        vorbild: ${ .input.vorbild }
+        dossier: ${ .input.dossier }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet writes the dossier of the model (pictures, colours, edges, depth, motion, states of the blocks) in the dossier folder; every row of the table `Zustand | belegt | Quelle` carries a source or is `[offen]` marked `ohne Vorbild` (own version). No model at all is allowed, but then the whole style is `ohne Vorbild`."
+  - dossier-gate:
+      call: dossier-gate:0.0.9@fs
+      with:
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { gate: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Dossier gate (decision of the strategy, 16.11.): scripts/dossier-gate (python3 -I, read only, no AI; self test scripts/test_dossier_gate.sh, the flow name dossier-gate@fs is not runnable yet). Every row is `belegt` with a source (`ja`) or `[offen]` marked `ohne Vorbild`; any other row is red, and so is a belegt row without a source. rc 2 (no table, bad input) is NOT green. The script keeps no state: the flow counts `runde`. Carries red and runde."
+  - dossier-again:
+      switch:
+        - runden:
+            when: '${ $context.gate.red == true and ($context.gate.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.gate.red == true }'
+            then: dossier
+        - green:
+            when: '${ $context.gate.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `dossier`, from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`."
+  - vertrag:
+      call: style-contract-read:0.0.9@fs
+      with:
+        contract: ${ .input.contract }
+        blocks: ${ .input.blocks }
+      export:
+        as: '${ $context + { vertrag: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent reads contracts/THEME-CONTRACT.md and blocks/*.toml and writes down the list of ALL blocks of the contract (result field `bausteine`). Rule `stil-vollstaendigkeit`: a new style has one entry for EVERY block and the 16 block_tokens, otherwise fs-components does not compile; a block missing in the list is a defect of this step."
+  - tokens:
+      call: style-tokens-ai:0.0.9@fs
+      with:
+        stil: ${ .input.stil }
+        dossier: ${ .input.dossier }
+        branch: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent writes the colour and shape tokens of the style for light AND dark in fs-components-styles on the branch (own worktree, local commit, no push). The OLD styles are not touched; their pictures must stay byte-identical (step `bilder`)."
+  - bausteine:
+      for:
+        each: baustein
+        in: ${ $context.vertrag.bausteine }
+        do:
+          - baustein:
+              call: style-block-ai:0.0.9@fs
+              with:
+                stil: ${ .input.stil }
+                baustein: ${ $baustein }
+                branch: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Every block of the contract list on its own: one entry per block in blocks/*.toml with the 16 block_tokens, light and dark; no block is left out or copied from another style without a look (the distance gate below catches a copy)."
+  - vollstaendigkeit:
+      call: stil-vollstaendigkeit:0.0.9@fs
+      with:
+        repo: ${ .input.repo }
+        stil: ${ .input.stil }
+        blocks: ${ .input.blocks }
+      export:
+        as: '${ $context + { voll: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Rule `stil-vollstaendigkeit` (script follows, TODO - not invented, see the header): until then `/srv/FreeSynergy/.scratch/build-slot.sh cargo test -p fs-components --test block_tokens --locked` (one entry per style for ALL blocks, 16 block_tokens, a missing entry does not compile). Carries red and runde."
+  - kontrast:
+      call: contrast-gate:0.0.9@fs
+      with:
+        repo: ${ .input.repo }
+        stil: ${ .input.stil }
+      export:
+        as: '${ $context + { kontrast: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Contrast gate on the DRAWN colours (not on the tokens alone): text 4.5:1, edges and controls 3:1, light and dark. An exception is allowed only when it is written down with a reason in the contract exception list; an undocumented miss is red. Specification, no script yet. Carries red and runde."
+  - abstand:
+      call: zwei-stile:0.0.9@fs
+      with:
+        repo: ${ .input.repo }
+        stil: ${ .input.stil }
+        r: 0.25
+      export:
+        as: '${ $context + { abstand: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Two-styles distance: r >= 0.25 against EVERY other style (a new style that is only a recolour of another is red). Script `zwei-stile` follows (TODO, not invented); until then `/srv/FreeSynergy/.scratch/build-slot.sh cargo test -p fs-components --test blocks_styles --locked`. Carries red and runde."
+  - waechter:
+      call: theme-guard:0.0.9@fs
+      with:
+        repo: ${ .input.repo }
+      export:
+        as: '${ $context + { waechter: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Rule [THEME-WAECHTER]: the picture tests share no global theme state; every picture result carries the theme it was drawn with, and a test that sets the theme restores it. Carries red and runde."
+  - checks-again:
+      switch:
+        - runden:
+            when: '${ ($context.voll.red == true or $context.kontrast.red == true or $context.abstand.red == true or $context.waechter.red == true) and (($context.voll.runde // 0) >= 3 or ($context.kontrast.runde // 0) >= 3 or ($context.abstand.runde // 0) >= 3 or ($context.waechter.runde // 0) >= 3) }'
+            then: eskalation
+        - red:
+            when: '${ $context.voll.red == true or $context.kontrast.red == true or $context.abstand.red == true or $context.waechter.red == true }'
+            then: tokens
+        - green:
+            when: '${ $context.voll.red == false and $context.kontrast.red == false and $context.abstand.red == false and $context.waechter.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `tokens`, from the third red round to `eskalation`; only all four `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - bilder:
+      call: picture-gate:0.0.9@fs
+      with:
+        repo: ${ .input.repo }
+        stil: ${ .input.stil }
+        bilder: ${ .input.bilder }
+      export:
+        as: '${ $context + { bild: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Picture gate: pictures of ALL blocks in light and dark in the new style, and the pictures of the OLD styles before and after the change are byte-identical (the new style must not move any other style). Specification, no script yet. Carries red and runde."
+  - bilder-again:
+      switch:
+        - runden:
+            when: '${ $context.bild.red == true and ($context.bild.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.bild.red == true }'
+            then: tokens
+        - green:
+            when: '${ $context.bild.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `tokens` (and through `checks-again` again), from the third red round to `eskalation`; a missing result goes to `eskalation`."
+  - head:
+      call: resolve-head:0.0.9@fs
+      with:
+        branch: ${ .input.branch }
+      export:
+        as: '${ $context + { kopf: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: Resolves the branch to the commit hash of its tip (git rev-parse, read only) after all gates; review, picture OK and release are bound to exactly this hash.
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.9
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          head: ${ $context.kopf.head }
+          delta: ${ .input.delta }
+      export:
+        as: '${ $context + { review: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Sub-workflow review.yaml for exactly the head hash of step `head` - the JA is bound to this hash, a new head makes it void.
+  - review-again:
+      switch:
+        - rounds:
+            when: '${ $context.review.verdict == "NEIN" and ($context.review.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.review.verdict != "JA" }'
+            then: tokens
+        - ja:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO goes back to `tokens` (the gates run again, the head changes), from the third NO to `eskalation`; only a JA goes on."
+  - bild-ok:
+      call: user-acceptance:0.0.9@fs
+      with:
+        stil: ${ .input.stil }
+        bilder: ${ .input.bilder }
+        head: ${ $context.kopf.head }
+      export:
+        as: '${ $context + { abnahme: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The user looks at the pictures of all blocks in light and dark (side by side with the model; picture-acceptance helps) and says OK or what is wrong; result `befunde` (empty = accepted). Pictures first, then the strategy approval and the release."
+  - bild-ok-again:
+      switch:
+        - offen:
+            when: '${ $context.abnahme.befunde != null and ($context.abnahme.befunde | length) > 0 }'
+            then: tokens
+        - angenommen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - findings of the user go back to `tokens` (new head, gates again); an empty list goes on."
+  - freigabe:
+      listen:
+        to:
+          one:
+            with:
+              type: net.freesynergy.approval
+              subject: ${ $context.kopf.head }
+      export:
+        as: '${ $context + { freigabe: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: The strategy approves the release for exactly this head hash (event net.freesynergy.approval with the subject = head); an approval for another head does not open the gate.
+  - release:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: release-flow
+          version: 0.0.9
+        input:
+          repo: ${ .input.repo }
+          tag: ${ .input.tag }
+          delta: ${ .input.delta }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          old: ${ .input.old }
+          new: ${ .input.new }
+          allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The tag is set through the strategy only (agents never push, tag or merge); release-flow.yaml holds CI, merge and release. The documentation moves along inside release-flow (step `doku`, rule doku-mitziehen)."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check step was red for the third time (`runde` >= 3), a NO came for the third time, or a result is missing: the loop stops and the person decides. The report names the step and the last red result."
