@@ -15,6 +15,7 @@ pub const FILES: [&str; 37] = [
     "cleanup-targets",
     "coordination-round",
     "cost-reconcile",
+    "doku-aufraeumen",
     "doku-mitziehen",
     "dossier",
     "download-readonly",

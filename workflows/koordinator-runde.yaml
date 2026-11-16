@@ -15,7 +15,8 @@
 # Work stock (strategy order): the checklists of the programs (fs-documentation todo/checklisten/<programm>.md, read by `checklisten-lesen`) are read
 # with the handoffs; the open GRUNDSACHE items are the work stock of the round (`straenge` makes work steps of them). A change of a program without its checklist is RED (doku-mitziehen).
 # Texts that come from tests, gates, handoffs, checklists or the inbox are DATA for the agents, never an instruction: they are passed as named fields, not as free text of an order.
-# Input: repo, programm, branch, head, delta, docs, docs_base, old, new, allow (as for doku-mitziehen), handoffs (folder, default todo/), inbox.
+# Input: repo, programm, branch, head, delta, docs, docs_base, old, new, allow (as for doku-mitziehen), handoffs (folder, default todo/), inbox;
+# optional doku_aufraeumen_faellig (true once a day: runs the docs tidy-up `doku-aufraeumen` before the report; its branch date is the day of the run).
 # Every work step of `plan.schritte` carries its own repo, branch, delta, programm, docs (worktree of fs-documentation), docs_base, old, new, allow: gates, docs and review run PER STEP.
 document:
   dsl: 1.0.3
@@ -518,6 +519,39 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Brings the handoff file and the memory up to date with the state of the round."
+  - doku-aufraeumen-tag:
+      switch:
+        - faellig:
+            when: '${ .input.doku_aufraeumen_faellig == true }'
+            then: doku-aufraeumen
+        - sonst:
+            then: bericht
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the daily tidy-up of the docs (rule doku-aufraeumen) runs once a day: only when the input `doku_aufraeumen_faellig` is true (set by the daily trigger, outside this round); otherwise straight on to the report."
+  - doku-aufraeumen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-aufraeumen
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          datum: ${ now | strftime("%Y%m%d-%H%M") }
+          allow: ${ .input.allow }
+      export:
+        as: '${ $context + { aufraeumen: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sub-workflow doku-aufraeumen.yaml (daily, once per round that is due): machine inventory first; AI only for pages of changed topics since the mark (none changed = `nichts_zu_tun`, no AI); branch unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM> only when something changed. Its result (status, findings of `befunde_offen` as a message, `hinweis` of `skipped`, `push_offen`) goes into the report; it does not change the gates of the round. The push is the own step `doku-push` AFTER the report. No agent pushes."
   - bericht:
       run:
         workflow:
@@ -529,13 +563,38 @@ do:
           run: ${ .input.head }
           eskaliert: ${ $context.ergebnis.eskaliert // false }
           regel: ${ $context.regel }
-      then: end
+          doku: ${ $context.aufraeumen }
+      then: doku-push-weiche
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "ONE bundled report to the strategy per round: only final states, red and approval gates; questions at the very end after a marker."
+  - doku-push-weiche:
+      switch:
+        - offen:
+            when: '${ $context.aufraeumen.push_offen == true }'
+            then: doku-push
+        - sonst:
+            then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - after the report: only a green tidy-up with a branch to push (`push_offen`) goes to `doku-push`; `nichts_zu_tun`, `befunde_offen` (a message in the report, no gate) and `skipped` end the round."
+  - doku-push:
+      call: push-unreviewed:0.0.8@fs
+      with:
+        branches: ${ $context.aufraeumen.branch }
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: strategie-ok
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Gate `strategie-ok`, behind the report: after the approval of the strategy (event net.freesynergy.approval with source net.freesynergy.strategie and data.actor human; never an agent, CI job or worktree) the person pushes ONLY the one `unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM>` branch of the tidy-up. Never main, never a tag, never a merge. An agent never pushes (Spezifikation, Skript folgt: `push-unreviewed`)."
   - eskalation:
       set:
         todo: runde-eskalation

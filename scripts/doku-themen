@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Thema-Lauf der Doku (inkrementell, NUR LESEN, ohne KI): welche Doku-Seiten zu den Aenderungen seit der Marke gehoeren.
+
+  python3 -I scripts/doku-themen --docs <fs-documentation-Klon> --repo <Coderepo> [--state FILE] [--themen docs/topics.toml] [--json FILE]
+  python3 -I scripts/doku-themen --schreibe-marke <sha> [--repo <Coderepo>] [--state FILE] [--bekannt-aus BESTAND.json]
+  python3 -I scripts/doku-themen --selbsttest
+
+Format der Zuordnung (docs/topics.toml) und der Front-Matter: siehe doku_bestand_lib/themen.py.
+Marke: --state (Vorgabe $XDG_STATE_HOME/freesynergy/doku-aufraeumen/<repo>.marke, nie im Checkout) mit {"marke": sha, "bekannt": [...]}. Die Marke wird NUR nach einem
+gruenen Lauf gesetzt (Schritt `marke` des Ablaufs); --bekannt-aus schreibt die Schluessel eines doku-bestand-Inventars
+(JSON-Ausgabe) als entschieden dazu, wenn der Opus-Schritt gelaufen ist.
+
+Ausgabe (JSON): status (ok | nichts_zu_tun | skipped), marke, kopf, geaendert {repo, crates, namen, adr}, themen,
+seiten (Doku-Seiten fuer den Haiku-Lauf `aktualisieren`), ohne_seite (geaenderte Crates/Namen ohne Themenzuordnung).
+rc 0 = gelaufen; rc 2 = skipped (keine Marke, keine Tabelle, kein SHA, kein Git-Klon). Selbsttest rc 1 bei Rot.
+Spezifikation, nicht gebaut: die Pflege der Zuordnung in fs-documentation (docs/topics.toml) ist ein eigener Auftrag dort.
+"""
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "doku_bestand_lib"))
+
+from themen import GitFehler, lauf, schreibe_marke, standard_bestand, standard_marke  # noqa: E402
+
+
+def skipped(msg):
+    print(json.dumps({"status": "skipped", "fehler": msg}, ensure_ascii=False))
+    return 2
+
+
+def main(argv):
+    if "--selbsttest" in argv:
+        from themen_selbsttest import selbsttest
+        return selbsttest()
+    ap = argparse.ArgumentParser(description="Thema-Lauf der Doku (see module docstring).")
+    ap.add_argument("--docs")
+    ap.add_argument("--repo")
+    ap.add_argument("--state")
+    ap.add_argument("--themen")
+    ap.add_argument("--json")
+    ap.add_argument("--schreibe-marke")
+    ap.add_argument("--bekannt-aus")
+    a = ap.parse_args(argv[1:])
+    if a.schreibe_marke:
+        state = a.state or (standard_marke(a.repo) if a.repo else None)
+        if not state:
+            return skipped("--state oder --repo fehlt")
+        bekannt_aus = a.bekannt_aus
+        if bekannt_aus == "-" and a.repo:
+            bekannt_aus = standard_bestand(a.repo)
+        try:
+            schreibe_marke(state, a.schreibe_marke, bekannt_aus)
+        except ValueError as e:
+            return skipped(str(e))
+        print(json.dumps({"status": "ok", "marke": a.schreibe_marke}, ensure_ascii=False))
+        return 0
+    if not (a.docs and a.repo):
+        return skipped("--docs und --repo sind Pflicht")
+    state = a.state or standard_marke(a.repo)
+    themen = a.themen or os.path.join(a.docs, "docs", "topics.toml")
+    if not os.path.isfile(state):
+        return skipped(f"{state}: keine Marke (einmal doku-bestand als Vollpruefung, danach --schreibe-marke)")
+    if not os.path.isfile(themen):
+        return skipped(f"{themen}: keine Zuordnungstabelle")
+    try:
+        res = lauf(a.docs, a.repo, state, themen)
+    except (ValueError, GitFehler, OSError) as e:
+        return skipped(str(e))
+    text = json.dumps(res, ensure_ascii=False, indent=2)
+    print(text)
+    if a.json:
+        with open(a.json, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
