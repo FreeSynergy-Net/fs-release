@@ -161,9 +161,17 @@ fn umbenennen_lessons_l1_l2_l5_are_wired() {
 #[test]
 fn counter_a_lock_check_that_does_not_go_back_or_a_docs_step_before_the_rename_is_caught() {
     let t = read("umbenennen");
-    assert!(!lessons_are_wired(&t.replace("then: umbau\n        - gruen", "then: continue\n        - gruen")));
-    assert!(!lessons_are_wired(&t.replace("cargo metadata --locked", "cargo check")));
-    assert!(!lessons_are_wired(&t.replace("NACH der GitHub-Umbenennung", "vor der GitHub-Umbenennung")));
+    assert!(!lessons_are_wired(&t.replace(
+        "then: umbau\n        - gruen",
+        "then: continue\n        - gruen"
+    )));
+    assert!(!lessons_are_wired(
+        &t.replace("cargo metadata --locked", "cargo check")
+    ));
+    assert!(!lessons_are_wired(&t.replace(
+        "NACH der GitHub-Umbenennung",
+        "vor der GitHub-Umbenennung"
+    )));
     assert!(!lessons_are_wired(&t.replace("keep: ${ .input.keep }", "")));
     let swapped = t
         .replacen("  - doku-veroeffentlichen:", "  - zz:", 1)
@@ -176,7 +184,10 @@ fn counter_a_lock_check_that_does_not_go_back_or_a_docs_step_before_the_rename_i
 fn counter_order_rounds_json_and_spec_marks_of_the_corrected_lessons_are_caught() {
     let t = read("umbenennen");
     // the catalog before the GitHub rename (back in `merge`), the catalog step missing, the catalog before the remotes
-    assert!(!lessons_are_wired(&t.replace("the own last step `katalog`)", "of fs-catalog)").replace("(NOT fs-catalog, that is", "(of fs-catalog, that is")));
+    assert!(!lessons_are_wired(
+        &t.replace("the own last step `katalog`)", "of fs-catalog)")
+            .replace("(NOT fs-catalog, that is", "(of fs-catalog, that is")
+    ));
     let swapped = t
         .replacen("  - katalog:", "  - zz:", 1)
         .replacen("  - remotes:", "  - katalog:", 1)
@@ -185,9 +196,20 @@ fn counter_order_rounds_json_and_spec_marks_of_the_corrected_lessons_are_caught(
     // the lock loop without the round counter or the escalation
     assert!(!lessons_are_wired(&t.replace("lock.runde", "lock.rounds")));
     let no_esc = step_body(&t, "lock-weiter").replace("then: eskalation", "then: umbau");
-    assert!(!lessons_are_wired(&t.replacen(&step_body(&t, "lock-weiter"), &no_esc, 1)));
+    assert!(!lessons_are_wired(&t.replacen(
+        &step_body(&t, "lock-weiter"),
+        &no_esc,
+        1
+    )));
     // the keep example with single quotes (no valid JSON), the lock step without the spec mark, the name lock text
-    assert!(!lessons_are_wired(&t.replace("\\\"pattern\\\"", "'pattern'")));
-    assert!(!lessons_are_wired(&t.replace("(Spezifikation, Skript folgt - the script step", "(the script step")));
-    assert!(!lessons_are_wired(&t.replace("wirksam am Schluss", "sofort")));
+    assert!(!lessons_are_wired(
+        &t.replace("\\\"pattern\\\"", "'pattern'")
+    ));
+    assert!(!lessons_are_wired(&t.replace(
+        "(Spezifikation, Skript folgt - the script step",
+        "(the script step"
+    )));
+    assert!(!lessons_are_wired(
+        &t.replace("wirksam am Schluss", "sofort")
+    ));
 }
