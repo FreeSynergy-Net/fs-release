@@ -2,6 +2,7 @@
 # clone (it is often behind origin/main and lacks scripts and pages; the script marks such a clone `skipped`, never green). `mkdocs build --strict` runs WITHOUT the quiet flag; red = rc != 0
 # or any output line starting with WARNING or ERROR (script check `scripts/check-mkdocs-quiet` finds a quiet call). mkdocs missing (PATH, $FS_MKDOCS, .venv of fs-documentation) = `skipped`, never green.
 # A broken link is RED in docs/, conventions/ and README.md and for a missing target file (counter-checks in `scripts/test_doku_mitziehen.sh`).
+# This flow is the gate of ONE change. The sweep of the whole docs repo (orphans, dead links, doubles, old names, stale branches) is `doku-aufraeumen` (daily in koordinator-runde, closing step of release-flow).
 # Rule: every change of code, names, interfaces or behaviour pulls the documentation in fs-documentation along in the SAME run
 # (official docs are always current, DE and EN together). A change without a matching docs change turns the gate RED.
 # Used as a sub-workflow (`run: workflow`) by programm-neu, release-flow (so also by lift, frontend-round, frontend-umbau), upstream-update

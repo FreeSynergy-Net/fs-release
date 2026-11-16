@@ -2,7 +2,8 @@
 # A step marked with a gate halts until somebody else has acted; run again to go on. Nothing is published without the
 # approval of exactly this head. Between `lift` and `gates` the documentation moves along (`doku`, rule doku-mitziehen; inputs docs, docs_base,
 # old, new, allow besides repo and delta; an escalation of `doku` ends this flow before the review: `doku-weiter`); the docs main branch is pushed only after
-# the review, the approval and the merge of the code (`doku-veroeffentlichen`, human, after `main-ff`). FS profile: see README.md.
+# the review, the approval and the merge of the code (`doku-veroeffentlichen`, human, after `main-ff`). The flow closes with the tidy-up of the whole docs repo
+# (`doku-aufraeumen`, rule doku-aufraeumen; its push waits for the strategy). FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -189,6 +190,39 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Waits for the sign and test runs of the catalog (see catalog-bump.yaml); the flow only describes this wait, it does not poll yet.
+  - doku-aufraeumen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: doku-aufraeumen
+          version: 0.0.8
+        input:
+          repo: ${ .input.repo }
+          docs: ${ .input.docs }
+          docs_base: ${ .input.docs_base }
+          datum: ${ now | strftime("%Y-%m-%d") }
+          allow: ${ .input.allow }
+      export:
+        as: '${ $context + { aufraeumen: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mandatory closing step (rule doku-aufraeumen): sub-workflow doku-aufraeumen.yaml sweeps the whole docs repo (orphans, dead links, doubles, old names, stale branches) and prepares the branch unreviewed/doku-aufraeumen-<datum>; the push waits for the strategy's approval (gate strategie-ok, the person). A red or escalated tidy-up ends this flow with `eskaliert: true` (step aufraeumen-weiter)."
+  - aufraeumen-weiter:
+      switch:
+        - eskaliert:
+            when: '${ $context.aufraeumen.eskaliert == true or $context.aufraeumen.status != "green" }'
+            then: eskalation
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the closing tidy-up ended with `eskaliert` or without `status == green`: the person decides (eskalation). Only green lets this flow end as released."
   - fertig:
       set:
         status: released

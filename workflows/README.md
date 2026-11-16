@@ -35,7 +35,7 @@ als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `sc
 - Server: `server-einrichtung` (Weg A: unsere Schicht auf ein vorhandenes System mit SSH; Bestand, Trockenlauf, Gate, Schicht,
   Absicherung, Dienste, Prüfung; der Mensch führt `fs-server-run` lokal aus, ohne KI; B kexec, D Plattenumbau sind eigene Workflows),
   `anbieter-neuinstallation` (Weg C: Hetzner-Rescue und `installimage` mit Konfig aus Variablen durch `scripts/installimage-config`; Gate "Daten werden gelöscht" mit Hostname-Wiederholung; der Mensch führt Rescue und Install aus; danach Übergabe an `server-einrichtung`; Montagsablauf in `docs/anbieter-neuinstallation.md`).
-- Umbenennen und Doku: `umbenennen` (Repo, Crates `fs-<x>-*`, Katalog mit `replaces`, Doku, Pins; der alte Name wird nie wieder vergeben, ADR 0080; Trockenlauf ohne KI, GitHub-Umbenennung nur nach dem Freigabe-Gate `strategie-ok`), `doku-mitziehen` (Pflichtschritt, s. u.).
+- Umbenennen und Doku: `umbenennen` (Repo, Crates `fs-<x>-*`, Katalog mit `replaces`, Doku, Pins; der alte Name wird nie wieder vergeben, ADR 0080; Trockenlauf ohne KI, GitHub-Umbenennung nur nach dem Freigabe-Gate `strategie-ok`), `doku-mitziehen` (Pflichtschritt, s. u.), `doku-aufraeumen` (Gesamt-Aufräumlauf der Doku: täglich in `koordinator-runde`, Pflicht-Abschluss jedes `release-flow`; Push nur durch die Strategie).
 - Koordinator: `koordinator-runde`, `testlauf`, `coordination-round`, `cost-reconcile`, `report-to-strategy`, `slot-check`, `wip-continue`, `download-readonly`,
   `publish-doc`, `workflow-pflege`.
 - Strategie: `entscheidung` (erst ADR-Suche, dann Auswertung, Nutzerfrage nur bei Abweichung oder Lücke), `adr-write`,
