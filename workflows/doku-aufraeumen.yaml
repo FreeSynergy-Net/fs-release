@@ -35,6 +35,7 @@ do:
         repo: ${ .input.repo }
         allow: ${ .input.allow }
         bekannt: ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") }
+        json: ${ .input.repo + "/.fs/doku-bestand.json" }
       export:
         as: '${ $context + { bestand: . } }'
       metadata:
@@ -194,7 +195,7 @@ do:
             then: ausfuehren
         - gruen:
             when: '${ $context.pruefung.status == "green" }'
-            then: marke
+            then: marke-weiche
         - sonst:
             then: eskalation
       metadata:
@@ -203,6 +204,29 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `ausfuehren` (red lines as data); from the third red round `eskalation`; only `status == \"green\"` goes on to the mark and the push; skipped or any other result is NOT green and goes to `eskalation`."
+  - marke-weiche:
+      switch:
+        - opus_gelaufen:
+            when: '${ $context.urteil != null }'
+            then: marke-opus
+        - sonst:
+            then: marke
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the mark moves with the findings Opus has decided (`--bekannt-aus`) only when Opus ran; otherwise a plain mark. Without this, the same folders would go to Opus on every run."
+  - marke-opus:
+      run:
+        script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --state ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") } --bekannt-aus ${ .input.repo + "/.fs/doku-bestand.json" }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "After the green check, Opus ran: moves the mark to `themen.kopf` and adds the keys of the inventory file `.fs/doku-bestand.json` (written by `bestand` with `json:`) to `bekannt`. Writes the state file only."
+      then: push
   - marke:
       run:
         script: 'python3 -I scripts/doku-themen --schreibe-marke ${ $context.themen.kopf } --state ${ .input.state // (.input.repo + "/.fs/doku-aufraeumen.state") }'
@@ -211,7 +235,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "After the green check only: moves the mark to the head the topic run read (`themen.kopf`). With `--bekannt-aus <bestand.json>` added when Opus ran (its findings count as decided). Writes the state file only."
+        freesynergy.net:summary: "After the green check, no Opus run: moves the mark to the head the topic run read (`themen.kopf`). Writes the state file only."
       then: push
   - push:
       call: push-unreviewed:0.0.8@fs
