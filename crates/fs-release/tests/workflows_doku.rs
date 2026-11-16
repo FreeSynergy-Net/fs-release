@@ -462,7 +462,7 @@ fn theme_guard_is_wired(testlauf: &str, belt: &str, accept: &str) -> bool {
         .zip(pos("theme-waechter"))
         .zip(pos("gezielt-again"))
         .is_some_and(|((a, b), c)| a < b && b < c)
-        && again.contains("waechter.red != false")
+        && again.contains("waechter.red != false }'\n            then: fix")
         && again
             .find("waechter.red")
             .zip(again.find("gezielt.red == false"))

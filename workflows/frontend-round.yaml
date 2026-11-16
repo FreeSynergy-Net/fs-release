@@ -144,6 +144,18 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Renders the images of the gap list (old and new state) and shows them; whatever they look like, the state changes to shown.
+  - images-waechter:
+      call: theme-waechter-check:0.0.8@fs
+      with:
+        images: ${ $context.images }
+      export:
+        as: '${ $context + { waechter: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "SPECIFICATION, NOT RUNNABLE (no script yet). Theme guard of the pictures (rule [THEME-WAECHTER] in testlauf): the result `waechter` goes to the picture acceptance; pictures without a green guard (`red == false`) do not count as evidence there, whatever they look like."
   - picture-verdict:
       run:
         workflow:
@@ -153,6 +165,7 @@ do:
         input:
           model: ${ .input.model }
           ours: ${ $context.images }
+          waechter: ${ $context.waechter }
       export:
         as: '${ $context + { verdict: . } }'
       metadata:
