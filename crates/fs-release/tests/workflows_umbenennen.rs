@@ -128,7 +128,7 @@ fn lessons_are_wired(text: &str) -> bool {
         && step_body(text, "trockenlauf").contains("keep: ${ .input.keep }")
         && step_body(text, "nachher").contains("keep: ${ .input.keep }")
         && in_order(text, &["github-umbenennen", "doku-veroeffentlichen"])
-        && step_body(text, "doku-veroeffentlichen").contains("L5")
+        && step_body(text, "doku-veroeffentlichen").contains("NACH der GitHub-Umbenennung")
 }
 
 #[test]
@@ -141,6 +141,7 @@ fn counter_a_lock_check_that_does_not_go_back_or_a_docs_step_before_the_rename_i
     let t = read("umbenennen");
     assert!(!lessons_are_wired(&t.replace("then: umbau\n        - gruen", "then: continue\n        - gruen")));
     assert!(!lessons_are_wired(&t.replace("cargo metadata --locked", "cargo check")));
+    assert!(!lessons_are_wired(&t.replace("NACH der GitHub-Umbenennung", "vor der GitHub-Umbenennung")));
     assert!(!lessons_are_wired(&t.replace("keep: ${ .input.keep }", "")));
     let swapped = t
         .replacen("  - doku-veroeffentlichen:", "  - zz:", 1)
