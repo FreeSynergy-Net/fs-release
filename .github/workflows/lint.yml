@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - name: no composite action calls another fs-release action by a moving ref
         run: |
-          # actions/ must not say `uses: FreeSynergy/fs-release/...@ref` (a pinned action would pull later main states of the
+          # actions/ must not say `uses: FreeSynergy/fs-release/...@b7ffe9f4030c6384b2ee28f4b35336dd6b135f54` (a pinned action would pull later main states of the
           # other one): call the shared script by path from $GITHUB_ACTION_PATH instead. Reusable workflows cannot use `./`
           # (it means the caller's repo) and are pinned by scripts/pin-refs.sh at release time.
           if grep -rnE 'uses:[[:space:]]*FreeSynergy/fs-release/' actions; then echo "::error::composite action refers to fs-release by @ref"; exit 1; fi
