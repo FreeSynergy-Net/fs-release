@@ -17,7 +17,7 @@ on:
       repository: { type: string, required: true, description: "owner/name of the repository that holds the approved folder state" }
       ref: { type: string, required: true, description: "40-hex commit of the approved folder state" }
       folder: { type: string, default: ".", description: "folder inside that repository" }
-      name: { type: string, required: true, description: "artefact name, e.g. helfa.org" }
+      name: { type: string, required: true, description: "artefact name, e.g. example.org" }
       version: { type: string, required: true, description: "version, e.g. 0.0.1" }
       mode: { type: choice, options: [static, passthrough], default: static, description: "passthrough = the person's own HTML with JavaScript (explicit, logged)" }
       build-run: { type: string, default: "", description: "run 2 only: run id <id>-<attempt> of run 1" }
@@ -53,6 +53,9 @@ jobs:
           [[ $REF =~ ^[0-9a-f]{40}$ ]] || { echo "ref must be a 40-hex commit"; exit 1; }
           [[ $FOLDER =~ ^[A-Za-z0-9._/-]+$ && $FOLDER != *..* && $FOLDER != /* ]] || { echo "folder is not a plain relative path"; exit 1; }
           opt=(); [ "$MODE" != passthrough ] || opt=(--passthrough)
+          # release time = commit time of the approved source: every tar entry gets it (ETag = size + mtime changes with each release)
+          SITE_MTIME=$(git -C src show -s --format=%ct "$REF")
+          export SITE_MTIME
           scripts/site-bauen.sh "${opt[@]}" build "src/$FOLDER" dist "$NAME" "$VERSION" | tee build.log
           {
             echo "### site build"; echo '```'; cat build.log

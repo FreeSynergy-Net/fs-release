@@ -19,9 +19,10 @@ dist=$1 appr=$2 sig=$3 ring=$4 allowed=$5 run=$6 pub=$7 src=$8
 nokey=(env -u GPG_PRIVATE_KEY -u GPG_PASSPHRASE)
 "${nokey[@]}" "$here/site-freigabe-pruefen.sh" "$dist" "$appr" "$sig" "$ring" "$allowed" "$run" || red "approval check failed"
 name=$(sed -n -E 's/^name: (.*)$/\1/p' "$appr"); version=$(sed -n -E 's/^version: (.*)$/\1/p' "$appr"); mode=$(sed -n -E 's/^mode: (.*)$/\1/p' "$appr")
+mtime=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["mtime"])' "$dist/$name-$version-manifest.json") || red "no release time in the manifest"
 popt=(); [ "$mode" != passthrough ] || popt=(--passthrough)
 hold=$(mktemp -d); trap 'rm -rf "$hold"' EXIT
-"${nokey[@]}" "$here/site-bauen.sh" "${popt[@]}" build "$src" "$hold/again" "$name" "$version" >/dev/null || red "rebuild from the approved source failed"
+"${nokey[@]}" SITE_MTIME="$mtime" "$here/site-bauen.sh" "${popt[@]}" build "$src" "$hold/again" "$name" "$version" >/dev/null || red "rebuild from the approved source failed"
 diff -r "$dist" "$hold/again" >/dev/null || red "the delivered files differ from a rebuild of the approved source (not the approved state)"
 (cd "$dist" && sha256sum --check --strict --quiet SHA256SUMS.txt) || red "artefacts differ from SHA256SUMS.txt"
 cp -- "$appr" "$dist/approval.txt"; cp -- "$sig" "$dist/approval.txt.asc"

@@ -8,6 +8,7 @@
 #   (the pinned 26.11_2) instead of the maker's image. Verify the .deb first (fs-zentinel scripts/verify-mirror.sh); this script does not.
 # The pages are TEST pages written here (a marker per site); real pages only come through site-bauen/site-signieren. The layout is the delivered one:
 # <webroot>/<domain>/releases/1 and the link `current` -> releases/1.
+# After a swap of `current` the delivery step must run `zentinel reload` (SIGHUP): shown here (stale content before, new content after).
 # 1. `zentinel test -c` on the production rendering (ACME staging) and the first-start rendering: valid.   2. serves (test variant) and checks over HTTP:
 # pages, 404, traversal, headers (CSP, nosniff: NOTE, see below), port 80 = real 301.
 set -euo pipefail
@@ -25,16 +26,18 @@ if [ -n "${ZENTINEL_DEB:-}" ]; then
 fi
 cleanup() { "$tool" rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$t"; }; trap cleanup EXIT
 chmod 755 "$t"
-export SITE1=freesynergy.net SITE2=helfa.org SITE3=freeplanetearth.org ACME_EMAIL=admin@helfa.org WEBROOT=/www
-mkdir -p "$t/www" "$t/conf"
-for d in freesynergy.net helfa.org freeplanetearth.org; do
+export ACME_EMAIL=admin@example.org
+DOMAINS=(one.example.org two.example.org three.example.org)
+mkdir -p "$t/www" "$t/conf"; sites=()
+for d in "${DOMAINS[@]}"; do
+  printf 'schema = 1\npurpose = "website"\n[names]\nprimary = "%s"\naliases = ["www.%s"]\n[acme]\nmethod = "http-01"\n' "$d" "$d" > "$t/$d.toml"; sites+=(--site "$t/$d.toml")
   mkdir -p "$t/www/$d/releases/1/de" "$t/www/$d/releases/1/en"
   for l in "" de/ en/; do printf '<!doctype html>\n<html lang="%s"><head><meta charset="utf-8"><title>test %s</title></head><body><p>MARKER-%s</p><a href="/de/">de</a> <a href="/en/">en</a></body></html>\n' "${l%/}" "$d" "$d" > "$t/www/$d/releases/1/${l}index.html"; done
   ln -s releases/1 "$t/www/$d/current"
 done
-WEBROOT=/www "$here/render.sh" --staging "$t/conf/prod.kdl" >/dev/null
-WEBROOT=/www "$here/render.sh" --http-only "$t/conf/first.kdl" >/dev/null
-WEBROOT=/www HTTP_ADDR=0.0.0.0:8080 HTTPS_ADDR=0.0.0.0:8081 "$here/render.sh" --test "$t/conf/test.kdl" >/dev/null
+WEBROOT=/www "$here/render.sh" --staging "${sites[@]}" "$t/conf/prod.kdl" >/dev/null
+WEBROOT=/www "$here/render.sh" --http-only "${sites[@]}" "$t/conf/first.kdl" >/dev/null
+WEBROOT=/www HTTP_ADDR=0.0.0.0:8080 HTTPS_ADDR=0.0.0.0:8081 "$here/render.sh" --test "${sites[@]}" "$t/conf/test.kdl" >/dev/null
 chmod -R a+rX "$t"
 mount=(-v "$t/www:/www:ro,z" -v "$t/conf:/conf:ro,z")
 echo "== 1. production rendering passes zentinel test"
@@ -42,7 +45,7 @@ echo "== 1. production rendering passes zentinel test"
 "$tool" run --rm --network none "${bin[@]}" "${mount[@]}" "$image" test -c /conf/first.kdl
 echo "== 2. serve the pages and check them"
 "$tool" run -d --name "$name" -p "127.0.0.1:$port:8080" -p "127.0.0.1:$((port+1)):8081" "${bin[@]}" "${mount[@]}" "$image" -c /conf/test.kdl >/dev/null
-python3 -I - "$port" "$name" "$tool" <<'PY'
+python3 -I - "$port" "$name" "$tool" "$t" <<'PY'
 import sys, time, http.client, subprocess
 port, name, tool = int(sys.argv[1]), sys.argv[2], sys.argv[3]
 def get(host, path="/", p=None, **h):
@@ -50,14 +53,14 @@ def get(host, path="/", p=None, **h):
     c.request("GET", path, headers={"Host": host, **h}); r = c.getresponse()
     return r.status, r.read(), {k.lower(): v for k, v in r.getheaders()}
 for _ in range(60):
-    try: get("helfa.org"); break
+    try: get("one.example.org"); break
     except OSError: time.sleep(0.25)
 else:
     print(subprocess.run([tool, "logs", name], capture_output=True, text=True).stdout[-2000:]); sys.exit("proxy did not come up")
 ok = True
 def check(n, c):
     global ok; print(("ok   " if c else "FAIL ") + n); ok = ok and bool(c)
-D = ["freesynergy.net", "helfa.org", "freeplanetearth.org"]
+D = ["one.example.org", "two.example.org", "three.example.org"]
 for d in D:
     mark = f"MARKER-{d}".encode()
     s, b, h = get(d); check(f"{d} / -> 200, its own page", s == 200 and mark in b and b'href="/de/"' in b)
@@ -89,6 +92,13 @@ for d in D:
     s, b, h = get(d, "/a?x=1", port); print(f"NOTE {d} port 80 query string in Location: {h.get('location')} (measured: it is dropped)")
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=5); c.request("HEAD", "/", headers={"Host": d}); r = c.getresponse(); print(f"NOTE {d} port 80 HEAD -> {r.status} {r.getheader('location')}")
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=5); c.request("POST", "/", body=b"x", headers={"Host": d}); r = c.getresponse(); print(f"NOTE {d} port 80 POST -> {r.status} {r.getheader('location')}")
+# After a swap of `current` the proxy serves OLD content from its cache (measured 26.11_2, cache-control/ETag from size+mtime, same-size file = same ETag)
+# until `zentinel reload` (SIGHUP): the delivery step must reload after every swap. Here: same-size new content, swap, check stale NOTE, HUP, check new.
+d0 = D[0]
+subprocess.run(["bash", "-c", f"cd {sys.argv[4]}/www/{d0} && mkdir -p releases/2 && sed 's/MARKER-/MARKEX-/' releases/1/index.html > releases/2/index.html && ln -sfn releases/2 current.new && mv -T current.new current"], check=True)
+s, b, h = get(d0); print(f"NOTE {d0} right after the swap, before reload: {'OLD content (cache)' if b'MARKER-' in b else 'new content'}")
+subprocess.run([tool, "kill", "--signal", "HUP", name], check=True, capture_output=True); time.sleep(2)
+s, b, h = get(d0); check(f"{d0} after reload (SIGHUP) the swapped release is served", b"MARKEX-" in b)
 s, b, h = get("evil.example"); check("unknown host gets no page", b"MARKER-" not in b)
 sys.exit(0 if ok else 1)
 PY

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Pattern: none. Allowlist check of a site tarball BEFORE anything is unpacked (ADR 0078: the build job is the less trusted part).
 
-usage: python3 -I site-tar-pruefen.py <tarball.tar.gz>     exit 0 only for a tarball that holds nothing but plain files and folders.
+usage: python3 -I site-tar-pruefen.py <tarball.tar.gz>     exit 0 only for a tarball that holds nothing but plain files and folders; prints `mtime=<epoch>`.
 
-Allowed: regular files (mode 0644 or 0755) and folders (mode 0755), owner 0:0 without names, mtime 0, relative safe names
+Allowed: regular files (mode 0644 or 0755) and folders (mode 0755), owner 0:0 without names, ONE common mtime (the release time, 2020-01-01 .. now+1 day), relative safe names
 without `..`, without a dot file, no name twice. Everything else is red and named: symlinks, hard links, devices, fifos, sparse files, set-uid/
 set-gid/sticky bits, a folder 0777, absolute or `..` paths, other owners. This is exactly what scripts/site-bauen.sh writes.
 """
 import re
 import sys
 import tarfile
+import time
 
 MAX_MEMBERS, MAX_BYTES = 20000, 500 * 1024 * 1024
 COMP = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]*$")  # no leading dot: no dot files, no "." or ".."
@@ -19,6 +20,7 @@ def main(path: str) -> int:
     bad: list[str] = []
     seen: set[str] = set()
     total = 0
+    mtimes: set[int] = set()
     try:
         tf = tarfile.open(path, "r:gz")
     except (OSError, tarfile.TarError) as e:
@@ -54,16 +56,21 @@ def main(path: str) -> int:
                     bad.append(f"{label}: mode {perm:04o} (allowed: {', '.join(f'{w:04o}' for w in want)})")
                 if m.uid != 0 or m.gid != 0 or m.uname or m.gname:
                     bad.append(f"{label}: owner {m.uid}:{m.gid} {m.uname!r}/{m.gname!r} (must be 0:0 without names)")
-                if m.mtime != 0:
-                    bad.append(f"{label}: mtime {m.mtime} (must be 0)")
+                mtimes.add(int(m.mtime))
                 total += m.size
                 if total > MAX_BYTES:
                     bad.append("content too large")
                     break
         except (OSError, tarfile.TarError, EOFError) as e:
             bad.append(f"tarball broken ({e})")
+    if len(mtimes) != 1:
+        bad.append(f"entries have {len(mtimes)} different mtimes (must be exactly one: the release time)")
+    elif not 1577836800 <= next(iter(mtimes)) <= time.time() + 86400:
+        bad.append(f"mtime {next(iter(mtimes))} is not a release time (2020-01-01 .. now+1 day)")
     for b in bad:
         print(f"{path}: {b}", file=sys.stderr)
+    if not bad:
+        print(f"mtime={next(iter(mtimes))}")
     return 1 if bad else 0
 
 

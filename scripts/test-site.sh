@@ -6,7 +6,7 @@
 set -uo pipefail
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/.." && pwd)
 t=$(mktemp -d); export GNUPGHOME="$t/gh"; mkdir -m 700 "$GNUPGHOME"; trap 'gpgconf --kill gpg-agent >/dev/null 2>&1; rm -rf "$t"' EXIT
-unset GITHUB_ACTIONS GITHUB_RUN_ID GITHUB_RUN_ATTEMPT
+unset GITHUB_ACTIONS GITHUB_RUN_ID GITHUB_RUN_ATTEMPT; export SITE_MTIME=1700000000
 fail=0; ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; fail=1; }
 red() { local n=$1; shift; if "$@" >"$t/o" 2>&1; then bad "$n (was green)"; else ok "$n"; [ -z "${VERBOSE:-}" ] || sed "s/^/       /" "$t/o" | grep -E "RED|error|:" | head -2; fi; }
 grn() { local n=$1; shift; if "$@" >"$t/o" 2>&1; then ok "$n"; else bad "$n"; sed 's/^/     /' "$t/o"; fi; }
@@ -26,8 +26,12 @@ printf '%s\n' "# allowed signing keys" "$appr" > "$t/allowed"
 
 # --- the folder (written here: no placeholder pages are kept in git; the input of site-bauen is a folder a person approved)
 mkdir -p "$t/src/de"
-printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>t</title><style>p{color:#111}</style></head><body><p>hello</p><a href="https://example.org/x">out</a> <a href="/de/">de</a></body></html>\n' > "$t/src/index.html"
+printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>t</title><meta http-equiv="Content-Security-Policy" content="img-src data:"><style>p{color:#111}</style></head><body><p>hello</p><a href="https://example.org/x">out</a> <a href="/de/">de</a></body></html>\n' > "$t/src/index.html"
 printf '<!doctype html>\n<html lang="de"><head><meta charset="utf-8"><title>t</title></head><body><p>hallo</p></body></html>\n' > "$t/src/de/index.html"
+# the one place of the host names: site.toml (fixture values only; no template, script or test other than fixtures names a host)
+mktoml() { # file primary mode [alias]
+  printf 'schema = 1\npurpose = "website"\n[names]\nprimary = "%s"\naliases = [%s]\n[dns]\nrecords = ["A", "AAAA", "CAA"]\n[acme]\nmethod = "http-01"\n[csp]\nmode = "%s"\n' "$2" "${4:+\"$4\"}" "$3" > "$1"; }
+mktoml "$t/src/site.toml" helfa.org static www.helfa.org
 B="$here/site-bauen.sh"
 grn "build: good folder" "$B" build "$t/src" "$t/dist" helfa.org 0.0.1
 tree=$(grep '^tree-sha256=' "$t/o" | cut -d= -f2); tarh=$(grep '^tar-sha256=' "$t/o" | cut -d= -f2)
@@ -36,6 +40,20 @@ tree=$(grep '^tree-sha256=' "$t/o" | cut -d= -f2); tarh=$(grep '^tar-sha256=' "$
 grn "build: second build into another folder is byte-identical (same hash)" bash -c "'$B' build '$t/src' '$t/dist2' helfa.org 0.0.1 && cmp '$t/dist/helfa.org-0.0.1-site.tar.gz' '$t/dist2/helfa.org-0.0.1-site.tar.gz'"
 red "build: non-empty outdir refused" "$B" build "$t/src" "$t/dist" helfa.org 0.0.1
 red "build: bad version refused" "$B" build "$t/src" "$t/o-v" helfa.org "1;rm"
+red "build: without SITE_MTIME is refused (a fixed time would keep the ETag of a same-size file)" env -u SITE_MTIME "$B" build "$t/src" "$t/o-nm" helfa.org 0.0.1
+grn "build: another release time gives other tarball bytes (so another ETag)" bash -c "SITE_MTIME=1700001000 '$B' build '$t/src' '$t/dist-mt' helfa.org 0.0.1 && ! cmp -s '$t/dist/helfa.org-0.0.1-site.tar.gz' '$t/dist-mt/helfa.org-0.0.1-site.tar.gz'"
+grep -q '"mtime": 1700000000' "$t/dist/helfa.org-0.0.1-manifest.json" && ok "manifest records the release time" || bad "manifest records the release time"
+# site.toml, the only place of the host names
+tm() { rm -rf "$t/f-$1"; cp -r "$t/src" "$t/f-$1"; printf '%s\n' "$2" > "$t/f-$1/site.toml"; red "site.toml: $1 is refused" "$B" check "$t/f-$1"; }
+rm -rf "$t/f-nom"; cp -r "$t/src" "$t/f-nom"; rm "$t/f-nom/site.toml"; red "site.toml: missing is refused" "$B" check "$t/f-nom"
+tm junk 'not = [toml'
+tm dns01 $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\n[acme]\nmethod = "dns-01"'
+tm badname $'schema = 1\npurpose = "website"\n[names]\nprimary = "A b.example.org"\n[acme]\nmethod = "http-01"'
+tm aliastwice $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\naliases = ["a.example.org"]\n[acme]\nmethod = "http-01"'
+tm recordtype $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\n[dns]\nrecords = ["MX"]\n[acme]\nmethod = "http-01"'
+tm extrakey $'schema = 1\npurpose = "website"\ntoken = "x"\n[names]\nprimary = "a.example.org"\n[acme]\nmethod = "http-01"'
+tm cspquote $'schema = 1\npurpose = "website"\n[names]\nprimary = "a.example.org"\n[acme]\nmethod = "http-01"\n[csp]\npolicy = "a\\"b"'
+rm -rf "$t/f-cspm"; cp -r "$t/src" "$t/f-cspm"; mktoml "$t/f-cspm/site.toml" helfa.org passthrough; red "site.toml: csp.mode passthrough in a static check is refused" "$B" check "$t/f-cspm"
 
 # --- folder check: allowlist (mode static). Each case: name | file | content appended (or the whole file for new files)
 fc() { # name file content
@@ -79,7 +97,7 @@ cp -r "$t/src" "$t/bad-suid"; chmod 4755 "$t/bad-suid/index.html"; red "folder: 
 mkdir "$t/noindex"; echo x > "$t/noindex/a.html"; red "folder: no index.html refused" "$B" check "$t/noindex"
 grn "folder: ordinary link, style and image types pass" bash -c "cp -r '$t/src' '$t/f-ok' && printf 'p{color:red}' > '$t/f-ok/s.css' && printf 'PNG' > '$t/f-ok/a.png' && printf '<a href=\"mailto:x@example.org\">m</a><img src=\"a.png\">' >> '$t/f-ok/index.html' && '$B' check '$t/f-ok'"
 # mode passthrough: a person's own HTML with JavaScript, explicitly; allowlist and log stay
-rm -rf "$t/pt"; cp -r "$t/src" "$t/pt"; printf '<script src="https://cdn.example/x.js"></script><script>1</script>\n' >> "$t/pt/index.html"; echo 'document.title="x"' > "$t/pt/app.js"
+rm -rf "$t/pt"; cp -r "$t/src" "$t/pt"; printf '<script src="https://cdn.example/x.js"></script><script>1</script>\n' >> "$t/pt/index.html"; echo 'document.title="x"' > "$t/pt/app.js"; mktoml "$t/pt/site.toml" helfa.org passthrough
 grn "passthrough: own HTML with scripts passes" "$B" --passthrough check "$t/pt"
 grep -q '^log: index.html sha256=[0-9a-f]\{64\} size=[0-9]* script external' "$t/o" && grep -q '^log: app.js .* script' "$t/o" && ok "passthrough: every file is logged (hash, size, script/external)" || bad "passthrough log"
 red "passthrough: the same folder is refused in static mode" "$B" check "$t/pt"
@@ -89,7 +107,7 @@ done
 grn "passthrough: build records the mode" bash -c "'$B' --passthrough build '$t/pt' '$t/dpt' helfa.org 0.0.1 | grep -q '^mode=passthrough' && grep -q '\"mode\": \"passthrough\"' '$t/dpt/helfa.org-0.0.1-manifest.json'"
 
 # --- mutation of the build script: the byte comparison of the double build must bite (nothing else makes it red here)
-mkdir -p "$t/mut"; cp "$here"/site-bauen.sh "$here"/site-lib.sh "$here"/site-pruefen.py "$here"/site-tar-pruefen.py "$t/mut/"
+mkdir -p "$t/mut"; cp "$here"/site-bauen.sh "$here"/site-lib.sh "$here"/site_manifest.py "$here"/site-pruefen.py "$here"/site-tar-pruefen.py "$t/mut/"
 sed -i 's/"tools": {"tar": tarv, "gzip": gzv}, "files": files}/"tools": {"tar": tarv, "gzip": gzv}, "nonce": os.urandom(8).hex(), "files": files}/' "$t/mut/site-bauen.sh"
 grep -q 'os.urandom' "$t/mut/site-bauen.sh" && ok "mutation: nondeterminism injected into a copy" || bad "mutation: injection did not apply (the script changed: adjust the test)"
 red "mutation: a non-reproducible build is refused (the byte comparison is alive)" "$t/mut/site-bauen.sh" build "$t/src" "$t/m1" helfa.org 0.0.1
@@ -103,7 +121,7 @@ mktar() { python3 -I - "$1" "$2" <<'PY'
 import io, sys, tarfile
 kind, out = sys.argv[1:3]
 tf = tarfile.open(out, "w:gz", format=tarfile.GNU_FORMAT)
-def add(name, typ=tarfile.REGTYPE, mode=0o644, data=b"x", link="", uid=0, mtime=0):
+def add(name, typ=tarfile.REGTYPE, mode=0o644, data=b"x", link="", uid=0, mtime=1700000000):
     i = tarfile.TarInfo(name); i.type = typ; i.mode = mode; i.uid = i.gid = uid; i.mtime = mtime; i.linkname = link
     i.size = len(data) if typ == tarfile.REGTYPE else 0
     tf.addfile(i, io.BytesIO(data) if typ == tarfile.REGTYPE else None)
@@ -119,7 +137,8 @@ add("./", tarfile.DIRTYPE, 0o755); add("./index.html", data=b"<p>x</p>")
  "dotdot": lambda: add("./../x.html"),
  "dotfile": lambda: add("./.env"),
  "owner": lambda: add("./x.html", uid=1000),
- "mtime": lambda: add("./x.html", mtime=1700000000),
+ "mtime": lambda: add("./x.html", mtime=1700000999),
+ "mtime0": lambda: (add("./x.html", mtime=0)),
  "twice": lambda: add("./index.html"),
  "emptydir-ok": lambda: add("./empty/", tarfile.DIRTYPE, 0o755)}[kind]()
 tf.close()
@@ -127,7 +146,7 @@ PY
 }
 mktar good "$t/tar-good.tgz"; grn "tarball check: a tarball like site-bauen writes passes" python3 -I "$here/site-tar-pruefen.py" "$t/tar-good.tgz"
 grn "tarball check: the real built tarball passes" python3 -I "$here/site-tar-pruefen.py" "$t/dist/helfa.org-0.0.1-site.tar.gz"
-for k in symlink hardlink device dir777 setuid exec0700 absolute dotdot dotfile owner mtime twice; do mktar "$k" "$t/tar-$k.tgz"; red "tarball check: $k is refused" python3 -I "$here/site-tar-pruefen.py" "$t/tar-$k.tgz"; done
+for k in symlink hardlink device dir777 setuid exec0700 absolute dotdot dotfile owner mtime mtime0 twice; do mktar "$k" "$t/tar-$k.tgz"; red "tarball check: $k is refused" python3 -I "$here/site-tar-pruefen.py" "$t/tar-$k.tgz"; done
 echo "not a tar" > "$t/tar-junk.tgz"; red "tarball check: junk is refused" python3 -I "$here/site-tar-pruefen.py" "$t/tar-junk.tgz"
 
 # --- the approval
@@ -182,6 +201,9 @@ cp -r "$t/dist" "$t/dist-t"; echo tamper >> "$t/dist-t/helfa.org-0.0.1-site.tar.
 cp -r "$t/dist" "$t/dist-m"; sed -i 's/"tree_sha256": "[0-9a-f]*"/"tree_sha256": "'"$zero"'"/' "$t/dist-m/helfa.org-0.0.1-manifest.json"
 (cd "$t/dist-m" && sha256sum helfa.org-0.0.1-site.tar.gz helfa.org-0.0.1-manifest.json helfa.org-0.0.1.spdx.json > SHA256SUMS.txt)
 red "approval: manifest lying about the hash is red" check "$t/a.txt" "" "" "" "" "$t/dist-m"
+cp -r "$t/dist" "$t/dist-mm"; sed -i 's/"mtime": 1700000000/"mtime": 1700000001/' "$t/dist-mm/helfa.org-0.0.1-manifest.json"
+(cd "$t/dist-mm" && sha256sum helfa.org-0.0.1-site.tar.gz helfa.org-0.0.1-manifest.json helfa.org-0.0.1.spdx.json > SHA256SUMS.txt)
+red "approval: manifest lying about the release time is red" check "$t/a.txt" "" "" "" "" "$t/dist-mm"
 # repack helper: a new tarball in a copy of dist, sums and manifest rewritten to match (what a hostile build job would do)
 repack() { # distcopy kind: unpack, add something, pack again like site-bauen does not (plain tar), fix sums and manifest
   local d=$1 kind=$2 w="$t/rp-$2"; rm -rf "$w"; mkdir -p "$w"; tar -xzf "$d/helfa.org-0.0.1-site.tar.gz" -C "$w"
@@ -190,7 +212,7 @@ repack() { # distcopy kind: unpack, add something, pack again like site-bauen do
     emptydir) mkdir "$w/empty" ;;
     exec) chmod 755 "$w/index.html" ;;
   esac
-  (cd "$w" && tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu -cf - .) | gzip -n -9 > "$d/helfa.org-0.0.1-site.tar.gz"
+  (cd "$w" && tar --sort=name --mtime=@"$SITE_MTIME" --owner=0 --group=0 --numeric-owner --format=gnu -cf - .) | gzip -n -9 > "$d/helfa.org-0.0.1-site.tar.gz"
   new=$(sha256sum "$d/helfa.org-0.0.1-site.tar.gz" | cut -d' ' -f1)
   sed -i 's/"tar_sha256": "[0-9a-f]*"/"tar_sha256": "'"$new"'"/' "$d/helfa.org-0.0.1-manifest.json"
   (cd "$d" && sha256sum helfa.org-0.0.1-site.tar.gz helfa.org-0.0.1-manifest.json helfa.org-0.0.1.spdx.json > SHA256SUMS.txt)
@@ -232,24 +254,25 @@ red "sign: wrong public key for the check is red" env "GPG_PRIVATE_KEY=$(cat "$t
 # --- templates
 T="$root/templates/site"
 [ ! -e "$T/sites" ] && [ ! -e "$T/port80" ] && [ ! -e "$T/gen-pages.sh" ] && ok "templates: no placeholder pages are kept in git" || bad "templates: placeholder pages are back"
-export SITE1=freesynergy.net SITE2=helfa.org SITE3=freeplanetearth.org ACME_EMAIL=admin@helfa.org
+export ACME_EMAIL=admin@example.org
 R="$T/render.sh"
-grn "render: staging is the default" bash -c "'$R' '$t/s.kdl' >/dev/null && grep -q 'staging #true' '$t/s.kdl' && ! grep -q '@[A-Z0-9_]*@' '$t/s.kdl'"
-grn "render: production" bash -c "'$R' --production '$t/p.kdl' >/dev/null && grep -q 'staging #false' '$t/p.kdl'"
+mktoml "$t/s1.toml" one.example.org static www.one.example.org; mktoml "$t/s2.toml" two.example.org static; mktoml "$t/s3.toml" three.example.org passthrough
+SITES=(--site "$t/s1.toml" --site "$t/s2.toml" --site "$t/s3.toml")
+grn "render: staging is the default" bash -c "'$R' '${SITES[*]}' '$t/s.kdl' >/dev/null 2>&1 || '$R' ${SITES[*]} '$t/s.kdl' >/dev/null 2>&1; grep -q 'staging #true' '$t/s.kdl' && ! grep -q '@[A-Z0-9_]*@' '$t/s.kdl'"
+grn "render: production" bash -c "'$R' --production ${SITES[*]} '$t/p.kdl' >/dev/null 2>&1 && grep -q 'staging #false' '$t/p.kdl'"
+grn "render: names come from the site.toml files: aliases get a route and are in the certificate" bash -c "grep -q 'host \"www.one.example.org\"' '$t/s.kdl' && grep -q 'domains \"one.example.org\" \"www.one.example.org\"' '$t/s.kdl' && [ \$(grep -c 'acme {' '$t/s.kdl') = 3 ]"
+grn "templates and scripts name no host of the three real domains (fixtures only)" bash -c "! grep -rn -E 'freesynergy\.net|helfa\.org|freeplanetearth\.org' '$T/render.py' '$T/render.sh' '$T'/*.in '$here/site_manifest.py' '$here/site-bauen.sh' '$here/site-pruefen.py' '$here/site-signieren.sh' '$here/site-freigabe-pruefen.sh' '$root/.github/workflows/site.yml'"
 grn "render: port 80 is a real 301 redirect (namespace + redirect filter), no page served" bash -c "grep -q 'type \"redirect\"' '$t/s.kdl' && grep -q 'status-code 301' '$t/s.kdl' && grep -q 'namespace \"redirect\"' '$t/s.kdl' && ! grep -q '_port80' '$t/s.kdl'"
-grn "render: roots end in /current (what the delivery step swaps)" bash -c "grep -c 'root \"/srv/www/[a-z.]*/current\"' '$t/s.kdl' | grep -qx 3"
-grn "render: strict CSP default on every site" bash -c "[ \$(grep -c \"default-src 'none'\" '$t/s.kdl') = 3 ] && ! grep -q 'script-src' '$t/s.kdl'"
-grn "render: CSP_MODE2=passthrough changes only that site (and warns)" bash -c "CSP_MODE2=passthrough '$R' '$t/c.kdl' 2>'$t/w' >/dev/null && [ \$(grep -c \"script-src 'self'\" '$t/c.kdl') = 1 ] && [ \$(grep -c \"default-src 'none'\" '$t/c.kdl') = 2 ] && grep -q WARNING '$t/w'"
-grn "render: CSP3 replaces the policy of site 3" bash -c "CSP3=\"default-src 'self'; script-src 'self' https://cdn.example\" '$R' '$t/c3.kdl' >/dev/null && grep -q 'https://cdn.example' '$t/c3.kdl'"
-red "render: a quote in a CSP is refused" env CSP1='default-src "x"' "$R" "$t/x.kdl"
-red "render: a line break in a CSP is refused" env CSP1=$'a\nb' "$R" "$t/x.kdl"
-red "render: a marker in a CSP is refused" env CSP1='@WEBROOT@' "$R" "$t/x.kdl"
-red "render: unknown CSP mode is refused" env CSP_MODE1=wild "$R" "$t/x.kdl"
-grn "render: writes <file>.sha256 that checks, and renders the same bytes twice" bash -c "'$R' '$t/r1.kdl' >/dev/null && '$R' '$t/r2.kdl' >/dev/null && (cd '$t' && sha256sum --check --quiet r1.kdl.sha256) && cmp '$t/r1.kdl' '$t/r2.kdl'"
-grn "render: --http-only (first start) has no ACME and no TLS" bash -c "'$R' --http-only '$t/h.kdl' >/dev/null && ! grep -q 'acme' '$t/h.kdl' && ! grep -q 'protocol \"https\"' '$t/h.kdl' && grep -q '/current\"' '$t/h.kdl'"
-red "render: --install-pages is gone (no unchecked copy from git)" "$R" --install-pages "$t/x.kdl"
-red "render: quote in a domain refused" env SITE2='evil".org' "$R" "$t/x.kdl"
-red "render: two equal domains refused" env SITE2=helfa.org SITE3=helfa.org "$R" "$t/x.kdl"
-red "render: path in WEBROOT refused" env WEBROOT='/srv/../etc' "$R" "$t/x.kdl"
+grn "render: roots end in /current of the primary name (what the delivery step swaps)" bash -c "grep -q 'root \"/srv/www/one.example.org/current\"' '$t/s.kdl' && ! grep -q 'root \"/srv/www/www' '$t/s.kdl'"
+grn "render: CSP strict by default, passthrough only for the site that says so (and warns)" bash -c "'$R' ${SITES[*]} '$t/c.kdl' 2>'$t/w' >/dev/null; [ \$(grep -c \"script-src 'self'\" '$t/c.kdl') = 1 ] && [ \$(grep -c \"default-src 'none'\" '$t/c.kdl') = 3 ] && grep -q WARNING '$t/w'"
+grn "render: csp.policy of site.toml replaces the preset" bash -c "printf 'schema = 1\npurpose = \"website\"\n[names]\nprimary = \"four.example.org\"\n[acme]\nmethod = \"http-01\"\n[csp]\npolicy = \"default-src self; img-src https://cdn.example.org\"\n' > '$t/s4.toml' && '$R' --site '$t/s4.toml' '$t/c4.kdl' >/dev/null && grep -q 'img-src https://cdn.example.org' '$t/c4.kdl'"
+red "render: the same name in two sites is refused" "$R" --site "$t/s1.toml" --site "$t/s1.toml" "$t/x.kdl"
+red "render: no --site is refused" "$R" "$t/x.kdl"
+red "render: a bad site.toml is refused" "$R" --site "$t/f-dns01/site.toml" "$t/x.kdl"
+grn "render: writes <file>.sha256 that checks, and renders the same bytes twice" bash -c "'$R' ${SITES[*]} '$t/r1.kdl' >/dev/null 2>&1 && '$R' ${SITES[*]} '$t/r2.kdl' >/dev/null 2>&1 && (cd '$t' && sha256sum --check --quiet r1.kdl.sha256) && cmp '$t/r1.kdl' '$t/r2.kdl'"
+grn "render: --http-only (first start) has no ACME and no TLS" bash -c "'$R' --http-only ${SITES[*]} '$t/h.kdl' >/dev/null 2>&1 && ! grep -q 'acme' '$t/h.kdl' && ! grep -q 'protocol \"https\"' '$t/h.kdl' && grep -q '/current\"' '$t/h.kdl'"
+red "render: --install-pages is gone (no unchecked copy from git)" "$R" --install-pages --site "$t/s1.toml" "$t/x.kdl"
+red "render: path in WEBROOT refused" env WEBROOT='/srv/../etc' "$R" --site "$t/s1.toml" "$t/x.kdl"
+red "render: ACME needs an e-mail address" env -u ACME_EMAIL "$R" --site "$t/s1.toml" "$t/x.kdl"
 if [ -n "${ZENTINEL_BIN:-}" ]; then for f in s p h; do grn "zentinel test -c on the rendering $f" "$ZENTINEL_BIN" test -c "$t/$f.kdl"; done; fi
 exit "$fail"

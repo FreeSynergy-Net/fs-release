@@ -94,7 +94,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The person fetches the signed files, runs scripts/site-signaturen-pruefen.sh and `sha256sum --check SHA256SUMS.txt`, unpacks the tarball with `tar -xzf --no-same-owner --no-same-permissions` into /srv/www/<domain>/releases/<version> (the folder the Zentinel roots point to is /srv/www/<domain>/current), then swaps the link atomically (`ln -sfn releases/<version> current.new && mv -T current.new current`; way back = the old link). The Zentinel configuration is a separate file the person has read: it is rendered by templates/site/render.sh from the pinned main and compared with its .sha256. No AI, no SSH by an agent."
+        freesynergy.net:summary: "The person fetches the signed files, runs scripts/site-signaturen-pruefen.sh and `sha256sum --check SHA256SUMS.txt`, unpacks the tarball with `tar -xzf --no-same-owner --no-same-permissions` into /srv/www/<domain>/releases/<version> (the folder the Zentinel roots point to is /srv/www/<domain>/current), then swaps the link atomically (`ln -sfn releases/<version> current.new && mv -T current.new current`; way back = the old link) and runs `zentinel reload` (SIGHUP) AFTER EVERY SWAP: without it Zentinel serves the old content from its cache (measured with 26.11_2: a same-size file keeps its ETag, size + mtime). The Zentinel configuration is a separate file the person has read: it is rendered by templates/site/render.sh from the pinned main and compared with its .sha256. No AI, no SSH by an agent."
   - record:
       call: append-log:0.0.6@fs
       metadata:

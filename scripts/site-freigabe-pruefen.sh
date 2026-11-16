@@ -73,10 +73,11 @@ tar="$dist/$base-site.tar.gz"
 grep -q -F "  $base-site.tar.gz" "$dist/SHA256SUMS.txt" || red "tarball not listed in SHA256SUMS.txt"
 realtar=$(sha256sum "$tar" | cut -d' ' -f1)
 [ "$realtar" = "$a_tar" ] || red "tarball bytes $realtar differ from the approved tar-sha256 $a_tar"
-tar_check "$tar" || red "tarball is not made of plain files and folders only"
+tarinfo=$(tar_check "$tar") || red "tarball is not made of plain files and folders only"
+tarmtime=${tarinfo#mtime=}
 real=$(tar_tree_hash "$tar") || red "tarball cannot be read"
 [ "$real" = "$a_tree" ] || red "tarball content hash $real differs from the approved $a_tree"
-python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); sys.exit(0 if (m["tree_sha256"],m["tar_sha256"],m["mode"],m["name"],m["version"])==tuple(sys.argv[2:7]) else 1)' \
-  "$dist/$base-manifest.json" "$real" "$realtar" "$a_mode" "$a_name" "$a_version" || red "manifest names another hash, mode, name or version"
+python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); sys.exit(0 if (m["tree_sha256"],m["tar_sha256"],m["mode"],m["name"],m["version"],str(m["mtime"]))==tuple(sys.argv[2:8]) else 1)' \
+  "$dist/$base-manifest.json" "$real" "$realtar" "$a_mode" "$a_name" "$a_version" "$tarmtime" || red "manifest names another hash, mode, name, version or release time"
 echo "approver key $fpr, $a_name $a_version ($a_mode), tarball $realtar, tree $real, run $run"
 echo "freigabe ok"

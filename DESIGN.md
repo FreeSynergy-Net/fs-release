@@ -198,3 +198,7 @@ path of `gates-files.sh` is not run there.
 
 ### Changes
 - 0.2.0: `yaml-check` in lift and gates; `bump` in the flow; `workflows/` with the schema check. (Later changes: see `CHANGELOG.md`.)
+
+## Website stage 0: host names only in `site.toml`
+
+The host names of a site stand only in its `site.toml` (root of the signed package; schema `templates/site/site-toml-schema.md`). `templates/site/render.py` generates the Zentinel configuration from it; a later DnsProvider adapter (fs-server, ADR 0088) reads the same files for names and wanted record types and manages the records, with no change to stage 0. No DNS code, no provider access and no token exist in this repo for that.

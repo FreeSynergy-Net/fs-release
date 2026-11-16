@@ -17,75 +17,7 @@ listeners {
 }
 
 routes {
-    route "site1" {
-        matches {
-            host "@SITE1@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
-            root "@WEBROOT@/@SITE1@/current"
-            index "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-        policies {
-            response-headers {
-                set {
-                    "Content-Security-Policy" "@CSP1@"
-                    "X-Content-Type-Options" "nosniff"
-                    "Referrer-Policy" "no-referrer"
-                }
-            }
-        }
-    }
-    route "site2" {
-        matches {
-            host "@SITE2@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
-            root "@WEBROOT@/@SITE2@/current"
-            index "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-        policies {
-            response-headers {
-                set {
-                    "Content-Security-Policy" "@CSP2@"
-                    "X-Content-Type-Options" "nosniff"
-                    "Referrer-Policy" "no-referrer"
-                }
-            }
-        }
-    }
-    route "site3" {
-        matches {
-            host "@SITE3@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
-            root "@WEBROOT@/@SITE3@/current"
-            index "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-        policies {
-            response-headers {
-                set {
-                    "Content-Security-Policy" "@CSP3@"
-                    "X-Content-Type-Options" "nosniff"
-                    "Referrer-Policy" "no-referrer"
-                }
-            }
-        }
-    }
+@ROUTES@
 }
 
 limits {

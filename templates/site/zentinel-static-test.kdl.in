@@ -21,9 +21,10 @@ listeners {
 }
 
 // A listener that belongs to a namespace serves only that namespace's routes (upstream: crates/config/src/scopes.rs). Port 80 therefore answers
-// every request with a real 301 to https (same host and path; the query string is NOT carried over). Measured with 26.11_2 on a high port (GET):
-// messung-zentinel-redirect.md and fs-zentinel examples/test_serve.sh. NOT measured: ACME HTTP-01 on this listener (upstream answers the challenge
-// before the routing, acme.md / http_trait.rs), HEAD, POST, IPv6. The staging run checks these; until then they are "not proven".
+// every request with a real 301 to https (same host and path; the query string is NOT carried over). Measured with 26.11_2 (messung-zentinel-redirect.md,
+// messung-zentinel-stufe1.md, test-podman.sh): GET, HEAD, POST, PUT all give 301 (no 307/308), IPv6 [::1] the same, unknown hosts get a 301 too; the ACME
+// HTTP-01 challenge on this listener is answered BEFORE the redirect (Pebble, 3 of 3; an unknown token gets the 301); the log shows a harmless ERROR
+// "ACME challenge served, status: 500" next to the answer 200. Not measured against the real Let's Encrypt: the staging run is that proof.
 namespace "redirect" {
     filters {
         filter "to-https" {
@@ -44,75 +45,7 @@ namespace "redirect" {
 }
 
 routes {
-    route "site1" {
-        matches {
-            host "@SITE1@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
-            root "@WEBROOT@/@SITE1@/current"
-            index "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-        policies {
-            response-headers {
-                set {
-                    "Content-Security-Policy" "@CSP1@"
-                    "X-Content-Type-Options" "nosniff"
-                    "Referrer-Policy" "no-referrer"
-                }
-            }
-        }
-    }
-    route "site2" {
-        matches {
-            host "@SITE2@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
-            root "@WEBROOT@/@SITE2@/current"
-            index "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-        policies {
-            response-headers {
-                set {
-                    "Content-Security-Policy" "@CSP2@"
-                    "X-Content-Type-Options" "nosniff"
-                    "Referrer-Policy" "no-referrer"
-                }
-            }
-        }
-    }
-    route "site3" {
-        matches {
-            host "@SITE3@"
-            path-prefix "/"
-        }
-        service-type "static"
-        static-files {
-            // the folder `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
-            root "@WEBROOT@/@SITE3@/current"
-            index "index.html"
-            cache-control "public, max-age=300"
-            compress #true
-        }
-        policies {
-            response-headers {
-                set {
-                    "Content-Security-Policy" "@CSP3@"
-                    "X-Content-Type-Options" "nosniff"
-                    "Referrer-Policy" "no-referrer"
-                }
-            }
-        }
-    }
+@ROUTES@
 }
 
 limits {

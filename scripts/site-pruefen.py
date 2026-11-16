@@ -3,14 +3,14 @@
 
 usage: python3 -I site-pruefen.py [--passthrough] <folder>     exit 0 = folder ok, 1 = every problem named on stderr (`path: reason`)
 
-Mode static (default): only these file types (by ending): html css txt xml json svg png jpg jpeg gif webp avif ico woff2 webmanifest.
+Mode static (default): only these file types (by ending): html css txt xml json svg png jpg jpeg gif webp avif ico woff2 webmanifest toml.
   html, svg, xml and css are parsed (not grepped): no script, no on* attribute, no frame/object/embed/base, no meta refresh, no javascript:/data:
   URL, every URL attribute (href src srcset action poster data xlink:href ...) relative, except `<a href>` with http, https, mailto or tel;
   css: no @import, every url() relative, no expression().
 Mode --passthrough (a person's own HTML, possibly with JavaScript, is passed through): the same file types plus js and mjs, no content rules for
   html/css/js/svg, but a log line per file (stdout, `log: <path> sha256 size [script] [external]`) so the passing is on record; the Content-Security-
   Policy of the web server (templates/site, CSP_MODE) is the second wall.
-Both modes: index.html at the root; only regular files and folders; names of `A-Za-z0-9._-` and `/`; NO dot file or dot folder (.git, .env, ...);
+Both modes: index.html and a valid site.toml at the root (the ONE place of the host names, scripts/site_manifest.py; its csp.mode must equal the mode of this check); only regular files and folders; names of `A-Za-z0-9._-` and `/`; NO dot file or dot folder (.git, .env, ...);
   no set-uid/set-gid/sticky bit; limits on count and size; nothing that looks like a secret in any file.
 """
 import hashlib
@@ -20,7 +20,10 @@ import stat
 import sys
 from html.parser import HTMLParser
 
-STATIC_EXT = {"html", "css", "txt", "xml", "json", "svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "ico", "woff2", "webmanifest"}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import site_manifest  # noqa: E402
+
+STATIC_EXT = {"html", "css", "txt", "xml", "json", "svg", "png", "jpg", "jpeg", "gif", "webp", "avif", "ico", "woff2", "webmanifest", "toml"}
 PASS_EXT = STATIC_EXT | {"js", "mjs"}
 PARSED = {"html", "svg", "xml"}
 MAX_FILES, MAX_BYTES = 5000, 200 * 1024 * 1024
@@ -140,6 +143,15 @@ def main(argv: list[str]) -> int:
                 total += st.st_size
     if not os.path.isfile(os.path.join(src, "index.html")):
         bad.append("no index.html at the root")
+    if not os.path.isfile(os.path.join(src, "site.toml")):
+        bad.append("no site.toml at the root")
+    else:
+        try:
+            man = site_manifest.load(os.path.join(src, "site.toml"))
+            if man["csp_mode"] != ("passthrough" if passthrough else "static"):
+                bad.append(f"site.toml: csp.mode is {man['csp_mode']} but this check runs in mode {'passthrough' if passthrough else 'static'}")
+        except (ValueError, OSError) as e:
+            bad.append(f"site.toml: {e}")
     if len(files) > MAX_FILES or total > MAX_BYTES:
         bad.append(f"too large ({len(files)} files, {total} bytes)")
     files.sort(key=lambda f: f.encode())
