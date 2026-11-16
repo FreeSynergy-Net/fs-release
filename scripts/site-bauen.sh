@@ -7,6 +7,8 @@
 #       <name>-<version>-manifest.json    name, version, mode, tree_sha256, tar_sha256, file list with sha256 and size, tar and gzip version
 #       <name>-<version>.spdx.json        SPDX 2.3 file list (the site has no packages; the project's cargo-sbom action does not apply)
 #       SHA256SUMS.txt                    the three files above
+#   (the manifest also records the site: schema, id, directory, path_prefix and names of its site.toml, schema 1 or 2)
+#   (the manifest also records the site: schema, id, directory, path_prefix and names of its site.toml, schema 1 or 2)
 #   and prints `tree-sha256=<hash>` and `tar-sha256=<hash>` (the approval names both; the tarball hash is the bytes). A second build into a
 #   temp folder must be byte-identical (the comparison is mutation-tested in test-site.sh).
 # SITE_MTIME (epoch, required) is the release time: every entry of the tarball gets it as mtime, so the web server's ETag (size + mtime) changes with each
@@ -30,9 +32,12 @@ build_into() { # src out name version
   (cd "$src" && tar --sort=name --mtime=@"$SITE_MTIME" --owner=0 --group=0 --numeric-owner --mode='u=rwX,go=rX' --format=gnu -cf - .) | gzip -n -9 > "$tar"
   tar_check "$tar" >/dev/null || die "the tarball just built does not pass the tarball check"
   python3 -I - "$src" "$out" "$name" "$version" "$mode" "$SITE_MTIME" "$(tar_tree_hash "$tar")" "$(sha256sum "$tar" | cut -d' ' -f1)" \
-    "$(tar --version | head -1)" "$(gzip --version 2>&1 | head -1)" <<'PY'
+    "$(tar --version | head -1)" "$(gzip --version 2>&1 | head -1)" "$here" <<'PY'
 import hashlib, json, os, sys
-src, out, name, version, mode, mtime, tree, tarsum, tarv, gzv = sys.argv[1:11]
+src, out, name, version, mode, mtime, tree, tarsum, tarv, gzv, here = sys.argv[1:12]
+sys.path.insert(0, here)
+import site_manifest
+sm = site_manifest.load(os.path.join(src, "site.toml"))  # the folder check has passed: the file is valid (schema 1 reads as id main, prefix /)
 files = []
 for root, _, names in os.walk(src):
     for n in names:
@@ -41,7 +46,8 @@ for root, _, names in os.walk(src):
         files.append({"path": rel, "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)})
 files.sort(key=lambda f: f["path"].encode())
 man = {"name": name, "version": version, "mode": mode, "mtime": int(mtime), "tree_sha256": tree, "tar": f"{name}-{version}-site.tar.gz", "tar_sha256": tarsum,
-       "tools": {"tar": tarv, "gzip": gzv}, "files": files}
+       "tools": {"tar": tarv, "gzip": gzv}, "files": files,
+       "site": {"schema": sm["schema"], "id": sm["id"], "dir": sm["dir"], "path_prefix": sm["path_prefix"], "names": sm["names"]}}
 open(f"{out}/{name}-{version}-manifest.json", "w").write(json.dumps(man, indent=2, sort_keys=True) + "\n")
 spdx = {"spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT", "name": f"{name}-{version}",
         "documentNamespace": f"urn:fs-release:site-spdx:{name}:{version}:{tree}",

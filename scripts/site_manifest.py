@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Pattern: none. Reader and validator of `site.toml`, the ONE declarative place of the host names of a site (schema 1 and 2: templates/site/site-toml-schema.md
-and site-toml-schema-v2.md). Used by site-pruefen.py (the folder check) and templates/site/render.py (the Zentinel configuration is generated from it). A later
+"""Pattern: none. Reader and validator of `site.toml`, the ONE declarative place of the host names of a site (schema 1 and 2: templates/site/site-toml-schema.md). Used by site-pruefen.py (the folder check) and templates/site/render.py (the Zentinel configuration is generated from it). A later
 DnsProvider reads the same file (names, wanted record types); nothing here touches DNS.
 
 Schema 1 (unchanged, stays valid): schema, purpose, names, dns, acme, csp; one site per file, at the root of its host, directory `<webroot>/<primary>`.

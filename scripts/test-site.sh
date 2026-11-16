@@ -43,6 +43,7 @@ red "build: bad version refused" "$B" build "$t/src" "$t/o-v" helfa.org "1;rm"
 red "build: without SITE_MTIME is refused (a fixed time would keep the ETag of a same-size file)" env -u SITE_MTIME "$B" build "$t/src" "$t/o-nm" helfa.org 0.0.1
 grn "build: another release time gives other tarball bytes (so another ETag)" bash -c "SITE_MTIME=1700001000 '$B' build '$t/src' '$t/dist-mt' helfa.org 0.0.1 && ! cmp -s '$t/dist/helfa.org-0.0.1-site.tar.gz' '$t/dist-mt/helfa.org-0.0.1-site.tar.gz'"
 grep -q '"mtime": 1700000000' "$t/dist/helfa.org-0.0.1-manifest.json" && ok "manifest records the release time" || bad "manifest records the release time"
+grep -q '"site": {' "$t/dist/helfa.org-0.0.1-manifest.json" && python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1]))["site"]; sys.exit(0 if (m["schema"], m["id"], m["path_prefix"], m["dir"]) == (1, "main", "/", "helfa.org") else 1)' "$t/dist/helfa.org-0.0.1-manifest.json" && ok "manifest records the site (schema 1 reads as id main, prefix /)" || bad "manifest records the site"
 # site.toml, the only place of the host names
 tm() { rm -rf "$t/f-$1"; cp -r "$t/src" "$t/f-$1"; printf '%s\n' "$2" > "$t/f-$1/site.toml"; red "site.toml: $1 is refused" "$B" check "$t/f-$1"; }
 rm -rf "$t/f-nom"; cp -r "$t/src" "$t/f-nom"; rm "$t/f-nom/site.toml"; red "site.toml: missing is refused" "$B" check "$t/f-nom"
@@ -296,7 +297,7 @@ grn "passthrough: build records the mode" bash -c "'$B' --passthrough build '$t/
 
 # --- mutation of the build script: the byte comparison of the double build must bite (nothing else makes it red here)
 mkdir -p "$t/mut"; cp "$here"/site-bauen.sh "$here"/site-lib.sh "$here"/site_manifest.py "$here"/site-pruefen.py "$here"/site-tar-pruefen.py "$t/mut/"
-sed -i 's/"tools": {"tar": tarv, "gzip": gzv}, "files": files}/"tools": {"tar": tarv, "gzip": gzv}, "nonce": os.urandom(8).hex(), "files": files}/' "$t/mut/site-bauen.sh"
+sed -i 's/"tools": {"tar": tarv, "gzip": gzv}, "files": files,/"tools": {"tar": tarv, "gzip": gzv}, "nonce": os.urandom(8).hex(), "files": files,/' "$t/mut/site-bauen.sh"
 grep -q 'os.urandom' "$t/mut/site-bauen.sh" && ok "mutation: nondeterminism injected into a copy" || bad "mutation: injection did not apply (the script changed: adjust the test)"
 red "mutation: a non-reproducible build is refused (the byte comparison is alive)" "$t/mut/site-bauen.sh" build "$t/src" "$t/m1" helfa.org 0.0.1
 # shellcheck disable=SC2016  # the pattern is meant literally
@@ -498,5 +499,95 @@ grn "render: --http-only (first start) has no ACME and no TLS" bash -c "'$R' --h
 red "render: --install-pages is gone (no unchecked copy from git)" "$R" --install-pages --site "$t/s1.toml" "$t/x.kdl"
 red "render: path in WEBROOT refused" env WEBROOT='/srv/../etc' "$R" --site "$t/s1.toml" "$t/x.kdl"
 red "render: ACME needs an e-mail address" env -u ACME_EMAIL "$R" --site "$t/s1.toml" "$t/x.kdl"
+# --- site.toml schema 2: several sites on one domain (site.id, path_prefix, languages, [[csp.area]]); schema 1 stays valid
+mk2() { # file id primary prefix [site-extra-lines] [tail tables]
+  printf 'schema = 2\npurpose = "website"\n[site]\nid = "%s"\npath_prefix = "%s"\nlanguages = ["en", "de"]\n%s\n[names]\nprimary = "%s"\n[acme]\nmethod = "http-01"\n%s\n' "$2" "$4" "${5:-}" "$3" "${6:-}" > "$1"; }
+f2() { rm -rf "$t/g-$1"; cp -r "$t/src" "$t/g-$1"; mk2 "$t/g-$1/site.toml" "${@:2}"; }
+f2 ok wiki wiki.example.org /wiki; grn "schema 2: a site with id, path_prefix and languages passes the folder check" "$B" check "$t/g-ok"
+f2 root landing example.org /; grn "schema 2: a site at the root of its host passes" "$B" check "$t/g-root"
+grn "schema 1: the old file stays valid unchanged (control of the schema 2 refusals)" "$B" check "$t/src"
+f2 xn wiki xn--bcher-kva.example.org /wiki; grn "schema 2: an A-label host name (xn--...) passes" "$B" check "$t/g-xn"
+f2 xn-tld wiki example.xn--p1ai /wiki; grn "schema 2: an A-label as the last label passes" "$B" check "$t/g-xn-tld"
+f2 xn-bad wiki 'xn--@@.example.org' /wiki; red "schema 2: a broken A-label is refused" "$B" check "$t/g-xn-bad"
+f2 xn-punycode wiki 'xn--a-.example.org' /wiki; red "schema 2: an A-label that is not Punycode is refused" "$B" check "$t/g-xn-punycode"
+f2 idn wiki 'bücher.example.org' /wiki; red "schema 2: a Unicode name must be given as A-label (refused)" "$B" check "$t/g-idn"
+f2 upper wiki 'Wiki.example.org' /wiki; red "schema 2: an upper-case name is refused" "$B" check "$t/g-upper"
+f2 onelabel wiki 'localhost' /wiki; red "schema 2: one label is refused" "$B" check "$t/g-onelabel"
+f2 nl-host wiki 'wiki.example.org\n' /wiki; red "schema 2: a host name with a line break is refused (fullmatch)" "$B" check "$t/g-nl-host"
+f2 long wiki "$long" /wiki; red "schema 2: a name over 253 characters is refused" "$B" check "$t/g-long"
+for c in 'dotdot|/..' 'dotdot-mid|/a/../b' 'dot|/.' 'dotfile|/.hidden' 'backslash|/a\\b' 'backslash-lead|\\wiki' 'pct|/%2e%2e' 'upper|/Wiki' 'empty-seg|/a//b' 'trailing|/wiki/' 'five|/a/b/c/d/e' 'fs|/_fs' 'fs-in|/_fs/x' 'noslash|wiki' 'quote|/a\"b' 'brace|/a{b}' 'semi|/a;b' 'colon|/a:b' 'query|/a?b' 'hash|/a#b' 'space|/a b' 'nl|/a\nb' 'nul|/a\u0000b' 'long|/'"$(printf 'a%.0s' $(seq 101))"; do
+  IFS='|' read -r n pfx <<<"$c"; f2 "pfx-$n" wiki wiki.example.org "$pfx"; red "schema 2: path_prefix '$n' is refused" "$B" check "$t/g-pfx-$n"
+done
+f2 pfx-four wiki wiki.example.org /a/b/c/d; grn "schema 2: a prefix of four segments passes (the limit is four)" "$B" check "$t/g-pfx-four"
+for c in 'upper|Wiki' 'lead-dash|-wiki' 'trail-dash|wiki-' 'under|wi_ki' 'dot|wi.ki' 'empty|' 'long|'"$(printf 'a%.0s' $(seq 33))" 'space|a b' 'nl|a\nb'; do
+  IFS='|' read -r n id <<<"$c"; f2 "id-$n" "$id" wiki.example.org /wiki; red "schema 2: site.id '$n' is refused" "$B" check "$t/g-id-$n"
+done
+f2 id-short a wiki.example.org /wiki; grn "schema 2: a one-character id passes" "$B" check "$t/g-id-short"
+f2 id-32 "$(printf 'a%.0s' $(seq 32))" wiki.example.org /wiki; grn "schema 2: an id of 32 characters passes" "$B" check "$t/g-id-32"
+f2 host-key wiki wiki.example.org /wiki 'host = "x.example.org"'; red "schema 2: a \`host\` key is refused (the host is names.primary)" "$B" check "$t/g-host-key"
+f2 name-ok wiki wiki.example.org /wiki 'name = "Example Wiki"'; grn "schema 2: site.name passes" "$B" check "$t/g-name-ok"
+f2 name-ctl wiki wiki.example.org /wiki 'name = "a\u0007b"'; red "schema 2: site.name with a control character is refused" "$B" check "$t/g-name-ctl"
+f2 name-long wiki wiki.example.org /wiki "name = \"$(printf 'a%.0s' $(seq 81))\""; red "schema 2: site.name over 80 characters is refused" "$B" check "$t/g-name-long"
+f2 lang-default wiki wiki.example.org /wiki 'default_language = "fr"'; red "schema 2: default_language not in languages is refused" "$B" check "$t/g-lang-default"
+f2 lang-dup wiki wiki.example.org /wiki 'languages = ["en", "en"]'; red "schema 2: a language twice is refused" "$B" check "$t/g-lang-dup"
+f2 lang-bad wiki wiki.example.org /wiki 'languages = ["EN"]'; red "schema 2: an upper-case language tag is refused" "$B" check "$t/g-lang-bad"
+f2 lang-slash wiki wiki.example.org /wiki 'languages = ["../x"]'; red "schema 2: a language tag that is a path is refused" "$B" check "$t/g-lang-slash"
+f2 lang-nine wiki wiki.example.org /wiki 'languages = ["aa","bb","cc","dd","ee","ff","gg","hh","ii"]'; red "schema 2: nine languages are refused" "$B" check "$t/g-lang-nine"
+f2 lang-nofolder wiki wiki.example.org /wiki 'languages = ["en", "fr"]'; red "schema 2: a listed language without its folder is refused" "$B" check "$t/g-lang-nofolder"
+f2 lang-more wiki wiki.example.org /wiki 'default_language = "de"'; mkdir "$t/g-lang-more/en"; cp "$t/src/de/index.html" "$t/g-lang-more/en/index.html"; grn "schema 2: default language at the root, the other as a folder, passes" "$B" check "$t/g-lang-more"
+f2 site-extra wiki wiki.example.org /wiki 'colour = "red"'; red "schema 2: an unknown key in [site] is refused" "$B" check "$t/g-site-extra"
+rm -rf "$t/g-nosite"; cp -r "$t/src" "$t/g-nosite"; printf 'schema = 2\npurpose = "website"\n[names]\nprimary = "wiki.example.org"\n[acme]\nmethod = "http-01"\n' > "$t/g-nosite/site.toml"; red "schema 2: [site] is required" "$B" check "$t/g-nosite"
+rm -rf "$t/g-v1site"; cp -r "$t/src" "$t/g-v1site"; printf '[site]\nid = "x"\n' >> "$t/g-v1site/site.toml"; red "schema 1: a [site] table is refused (needs schema 2)" "$B" check "$t/g-v1site"
+rm -rf "$t/g-v1area"; cp -r "$t/src" "$t/g-v1area"; printf '[[csp.area]]\npath = "/apps"\nmode = "static"\n' >> "$t/g-v1area/site.toml"; red "schema 1: [[csp.area]] is refused (needs schema 2)" "$B" check "$t/g-v1area"
+rm -rf "$t/g-v3"; cp -r "$t/src" "$t/g-v3"; sed -i 's/schema = 1/schema = 3/' "$t/g-v3/site.toml"; red "schema 3 is refused" "$B" check "$t/g-v3"
+# [[csp.area]]: a policy per folder
+f2 area wiki wiki.example.org /wiki '' $'[csp]\nmode = "static"\n[[csp.area]]\npath = "/apps"\nmode = "static"'; mkdir -p "$t/g-area/apps"; grn "schema 2: a csp.area with its folder passes" "$B" check "$t/g-area"
+f2 area-nofolder wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/apps"\nmode = "static"'; red "schema 2: a csp.area whose folder does not exist is refused" "$B" check "$t/g-area-nofolder"
+f2 area-root wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/"\nmode = "static"'; red "schema 2: a csp.area at the root is refused" "$B" check "$t/g-area-root"
+f2 area-dotdot wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/../etc"\nmode = "static"'; red "schema 2: a csp.area path with .. is refused" "$B" check "$t/g-area-dotdot"
+f2 area-bs wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/a\\\\b"\nmode = "static"'; red "schema 2: a csp.area path with a backslash is refused" "$B" check "$t/g-area-bs"
+f2 area-dup wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/apps"\nmode = "static"\n[[csp.area]]\npath = "/apps"\nmode = "static"'; mkdir -p "$t/g-area-dup/apps"; red "schema 2: a csp.area path twice is refused" "$B" check "$t/g-area-dup"
+many=$'[csp]'; for i in 1 2 3 4 5 6 7 8 9; do many+=$'\n[[csp.area]]\npath = "/a'$i$'"\nmode = "static"'; done
+f2 area-nine wiki wiki.example.org /wiki '' "$many"; for i in 1 2 3 4 5 6 7 8 9; do mkdir -p "$t/g-area-nine/a$i"; done; red "schema 2: nine csp.area entries are refused (at most 8)" "$B" check "$t/g-area-nine"
+f2 area-key wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/apps"\nmode = "static"\nscript = "x"'; mkdir -p "$t/g-area-key/apps"; red "schema 2: an unknown key in csp.area is refused" "$B" check "$t/g-area-key"
+f2 area-nomode wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/apps"'; mkdir -p "$t/g-area-nomode/apps"; red "schema 2: a csp.area without mode is refused" "$B" check "$t/g-area-nomode"
+f2 area-quote wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/apps"\nmode = "static"\npolicy = "a\\"b"'; mkdir -p "$t/g-area-quote/apps"; red "schema 2: a csp.area policy with a quote is refused" "$B" check "$t/g-area-quote"
+f2 area-pass wiki wiki.example.org /wiki '' $'[csp]\n[[csp.area]]\npath = "/apps"\nmode = "passthrough"'; mkdir -p "$t/g-area-pass/apps"
+red "schema 2: an area in passthrough makes the site a passthrough site: a static check refuses it" "$B" check "$t/g-area-pass"
+grn "schema 2: the same folder passes the check with --passthrough" "$B" --passthrough check "$t/g-area-pass"
+grn "the example templates/site/site.example.toml is a valid schema 2 file (and in a folder with its area folder it passes the check)" bash -c "python3 -I '$here/site_manifest.py' '$T/site.example.toml' && rm -rf '$t/g-example' && cp -r '$t/src' '$t/g-example' && cp '$T/site.example.toml' '$t/g-example/site.toml' && mkdir '$t/g-example/apps' && '$B' check '$t/g-example'"
+# render: several sites; the same name under different prefixes
+mk2 "$t/v-land.toml" landing example.org / 'name = "Landing"'; mk2 "$t/v-wiki.toml" wiki example.org /wiki; mk2 "$t/v-help.toml" help help.example.org /
+grn "render schema 2: two sites on one host with different prefixes, one certificate for the name" bash -c "'$R' --site '$t/v-land.toml' --site '$t/v-wiki.toml' --site '$t/v-help.toml' '$t/v.kdl' >/dev/null 2>&1 && [ \$(grep -c 'acme {' '$t/v.kdl') = 2 ] && [ \$(grep -c 'domains \"example.org\"' '$t/v.kdl') = 1 ] && grep -q 'root \"/srv/www/wiki/current\"' '$t/v.kdl' && grep -q 'root \"/srv/www/landing/current\"' '$t/v.kdl' && grep -q 'path-prefix \"/wiki\"' '$t/v.kdl'"
+grn "render schema 2: the route of the longer prefix comes first (/wiki before /)" bash -c "[ \$(grep -n 'root \"/srv/www/wiki/current\"' '$t/v.kdl' | head -1 | cut -d: -f1) -lt \$(grep -n 'root \"/srv/www/landing/current\"' '$t/v.kdl' | head -1 | cut -d: -f1) ]"
+grn "render schema 2: same input, same bytes" bash -c "'$R' --site '$t/v-land.toml' --site '$t/v-wiki.toml' '$t/v1.kdl' >/dev/null 2>&1 && '$R' --site '$t/v-land.toml' --site '$t/v-wiki.toml' '$t/v2.kdl' >/dev/null 2>&1 && cmp '$t/v1.kdl' '$t/v2.kdl'"
+mk2 "$t/v-wiki2.toml" wiki2 example.org /wiki; red "render schema 2: the same name with the same prefix is refused" "$R" --site "$t/v-wiki.toml" --site "$t/v-wiki2.toml" "$t/x.kdl"
+mk2 "$t/v-wikib.toml" wiki other.example.org /; red "render schema 2: the same id (directory) twice is refused" "$R" --site "$t/v-wiki.toml" --site "$t/v-wikib.toml" "$t/x.kdl"
+mk2 "$t/v-wikip.toml" wikip example.org /wikipedia; grn "render schema 2: /wiki and /wikipedia are not nested (segment boundary)" "$R" --site "$t/v-wiki.toml" --site "$t/v-wikip.toml" "$t/x.kdl"
+mk2 "$t/v-de.toml" dede example.org /de; red "render schema 2: an inner site at /de is refused when the outer site generates a /de folder (its language)" "$R" --site "$t/v-land.toml" --site "$t/v-de.toml" "$t/x.kdl"
+mk2 "$t/v-sm.toml" smx example.org /sitemap.xml; red "render schema 2: an inner site taking sitemap.xml is refused" "$R" --site "$t/v-land.toml" --site "$t/v-sm.toml" "$t/x.kdl"
+mk2 "$t/v-deep.toml" deep example.org /wiki/en; red "render schema 2: a site below /wiki/en is refused when /wiki generates an en folder" "$R" --site "$t/v-wiki.toml" --site "$t/v-deep.toml" "$t/x.kdl"
+mk2 "$t/v-inj.toml" inj example.org '/a\"; }'; red "render schema 2: a prefix that tries to break out of the KDL string is refused" "$R" --site "$t/v-inj.toml" "$t/x.kdl"
+mk2 "$t/v-injid.toml" 'a\" {' example.org /x; red "render schema 2: an id that tries to break out of the KDL string is refused" "$R" --site "$t/v-injid.toml" "$t/x.kdl"
+mk2 "$t/v-dd.toml" up example.org '/../../etc'; red "render schema 2: a prefix with .. is refused" "$R" --site "$t/v-dd.toml" "$t/x.kdl"
+mk2 "$t/v-bs.toml" bs example.org '/a\\b'; red "render schema 2: a prefix with a backslash is refused" "$R" --site "$t/v-bs.toml" "$t/x.kdl"
+grn "render: a schema 1 and a schema 2 site together (directory by primary, by id)" bash -c "'$R' --site '$t/s1.toml' --site '$t/v-wiki.toml' '$t/m.kdl' >/dev/null 2>&1 && grep -q 'root \"/srv/www/one.example.org/current\"' '$t/m.kdl' && grep -q 'root \"/srv/www/wiki/current\"' '$t/m.kdl'"
+mk2 "$t/v-area.toml" apps apps.example.org /app '' $'[csp]\n[[csp.area]]\npath = "/own"\nmode = "passthrough"\npolicy = "default-src \'self\'; script-src \'self\'"'
+red "render schema 2: an area in passthrough is refused without --allow-passthrough" "$R" --site "$t/v-area.toml" "$t/x.kdl"
+grn "render schema 2: with --allow-passthrough the area gets its own route and CSP, the rest stays strict" bash -c "'$R' --allow-passthrough --site '$t/v-area.toml' '$t/a.kdl' 2>'$t/wa' >/dev/null && grep -q 'path-prefix \"/app/own\"' '$t/a.kdl' && grep -q \"script-src 'self'\" '$t/a.kdl' && [ \$(grep -c \"default-src 'none'\" '$t/a.kdl') = 1 ] && grep -q WARNING '$t/wa'"
+# mutations of the manifest reader (on a copy of scripts/ and templates/site/)
+mutset=$(mktemp -d); mkdir -p "$mutset/scripts" "$mutset/templates"; cp -r "$T" "$mutset/templates/site"
+mutm() { cp "$here/site_manifest.py" "$mutset/scripts/site_manifest.py"; sed -i "$1" "$mutset/scripts/site_manifest.py"; if cmp -s "$here/site_manifest.py" "$mutset/scripts/site_manifest.py"; then bad "mutation $2: the sed did not apply"; fi; }
+mutm 's/if pa == pb:/if False:/' sameprefix
+grn "mutation control: without the same-prefix rule the same name and prefix is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-wiki.toml" --site "$t/v-wiki2.toml" "$t/x.kdl"
+mutm 's/if a\["dir"\] == b\["dir"\]:/if False:/' samedir
+grn "mutation control: without the same-directory rule two sites in one directory are GREEN" "$mutset/templates/site/render.sh" --site "$t/v-wiki.toml" --site "$t/v-wikib.toml" "$t/x.kdl"
+mutm 's/if below in GENERATED | set(outer\["languages"\]):/if False:/' generated
+grn "mutation control: without the generated-names rule /de over a /de language folder is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-land.toml" --site "$t/v-de.toml" "$t/x.kdl"
+mutm 's/^SEGMENT = .*/SEGMENT = re.compile(r"[a-z0-9._-]+")/; s/ or any(x in (".", "..") for x in segs)//' dotdot
+grn "mutation control: without the segment and .. rules the prefix /../../etc is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-dd.toml" "$t/x.kdl"
+mutm 's/^SEGMENT = .*/SEGMENT = re.compile(r"[a-z0-9._\\\\-]+")/' backslash
+grn "mutation control: with a backslash allowed in a segment the backslash prefix is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-bs.toml" "$t/x.kdl"
+rm -rf "$mutset"
 if [ -n "${ZENTINEL_BIN:-}" ]; then for f in s p h; do grn "zentinel test -c on the rendering $f" "$ZENTINEL_BIN" test -c "$t/$f.kdl"; done; fi
 exit "$fail"

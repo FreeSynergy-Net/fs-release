@@ -1,0 +1,30 @@
+# Example site.toml, schema 2 (copy it to the root of a site folder, next to index.html; adapt every value; the host names here are the reserved example.org).
+# Schema 1 files stay valid unchanged (see site-toml-schema.md); this is the form for several sites on one domain.
+schema = 2
+purpose = "website"
+
+[site]
+id = "wiki"                      # a-z 0-9 -, 1..32, not starting or ending with -; unique over all sites; names the directory <webroot>/<id>/current
+name = "Example Wiki"            # optional; shown in the page frame; default = id
+path_prefix = "/wiki"            # optional; default "/" (the site sits at the root of its host); the same host may serve another site under another prefix
+languages = ["en", "de"]         # optional; default ["en"]; the default language is at the root, every other one is a folder (de/index.html)
+default_language = "en"          # optional; default = first of languages
+
+[names]
+primary = "example.org"          # the host of the site (there is no `host` key); international names as A-label (xn--...)
+aliases = ["www.example.org"]
+
+[dns]                            # wanted record types; read by the later DnsProvider only
+records = ["A", "AAAA", "CAA"]
+
+[acme]
+method = "http-01"
+
+[csp]
+mode = "static"                  # static (default) | passthrough; the policy of the whole site
+# policy = "default-src 'self'"  # optional complete policy for the whole site
+
+[[csp.area]]                     # optional, up to 8: a folder of the site with its own mode and policy (longest matching folder wins)
+path = "/apps"                   # relative to the site's own root; same rules as path_prefix; must exist as a folder; not "/"
+mode = "static"                  # an area in passthrough makes the whole site a passthrough site (build with --passthrough, render with --allow-passthrough)
+# policy = "default-src 'self'; script-src 'self'"
