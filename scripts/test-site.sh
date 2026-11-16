@@ -253,6 +253,18 @@ PY
 red "folder: the CSP meta before <meta charset> is refused (charset first, then the CSP)" "$B" check "$t/f-head-csp-first"
 hc head-ws-newline "$CH" "<meta charset=\"utf-8\">
 <meta http-equiv"; grn "folder: line break between <meta charset> and the CSP meta passes (the exporter writes one)" "$B" check "$t/f-head-ws-newline"
+# A1 (round 4): a browser takes only ONE leading U+FEFF as the byte order mark; a second one is a character and closes <head> (measured in Firefox)
+bomf() { rm -rf "$t/f-$1"; cp -r "$t/src" "$t/f-$1"; python3 -I - "$t/f-$1/index.html" "$2" <<'PY'
+import sys
+p, n = sys.argv[1], int(sys.argv[2]); s = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write("\ufeff" * n + s)
+PY
+}
+bomf bom-one 1; grn "folder: one leading byte order mark passes (control)" "$B" check "$t/f-bom-one"
+bomf bom-two 2; red "folder: two leading byte order marks are refused (the second closes <head>, the CSP meta would be ignored)" "$B" check "$t/f-bom-two"
+bomf bom-three 3; red "folder: three leading byte order marks are refused" "$B" check "$t/f-bom-three"
+mutate bomtwo 's/return text\[1:\] if text.startswith("\\ufeff") else text/return text.lstrip("\\ufeff")/'
+grn "mutation control: with every leading U+FEFF cut the double-BOM page is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-bom-two"
 mutate headoff 's/^    want = ("html", "head", "meta", "meta")$/    return None/'
 grn "mutation control: with the head check switched off the nbsp page is GREEN" "$t/mut2/site-bauen.sh" check "$t/f-head-nbsp-between"
 mutate headws 's/pos = re.compile(f"{WS}\*").match(t, pos).end()/pos = re.compile("[^<]*").match(t, pos).end()/'
@@ -558,8 +570,16 @@ grn "schema 2: the same folder passes the check with --passthrough" "$B" --passt
 grn "the example templates/site/site.example.toml is a valid schema 2 file (and in a folder with its area folder it passes the check)" bash -c "python3 -I '$here/site_manifest.py' '$T/site.example.toml' && rm -rf '$t/g-example' && cp -r '$t/src' '$t/g-example' && cp '$T/site.example.toml' '$t/g-example/site.toml' && mkdir '$t/g-example/apps' && '$B' check '$t/g-example'"
 # render: several sites; the same name under different prefixes
 mk2 "$t/v-land.toml" landing example.org / 'name = "Landing"'; mk2 "$t/v-wiki.toml" wiki example.org /wiki; mk2 "$t/v-help.toml" help help.example.org /
-grn "render schema 2: two sites on one host with different prefixes, one certificate for the name" bash -c "'$R' --site '$t/v-land.toml' --site '$t/v-wiki.toml' --site '$t/v-help.toml' '$t/v.kdl' >/dev/null 2>&1 && [ \$(grep -c 'acme {' '$t/v.kdl') = 2 ] && [ \$(grep -c 'domains \"example.org\"' '$t/v.kdl') = 1 ] && grep -q 'root \"/srv/www/wiki/current\"' '$t/v.kdl' && grep -q 'root \"/srv/www/landing/current\"' '$t/v.kdl' && grep -q 'path-prefix \"/wiki\"' '$t/v.kdl'"
-grn "render schema 2: the route of the longer prefix comes first (/wiki before /)" bash -c "[ \$(grep -n 'root \"/srv/www/wiki/current\"' '$t/v.kdl' | head -1 | cut -d: -f1) -lt \$(grep -n 'root \"/srv/www/landing/current\"' '$t/v.kdl' | head -1 | cut -d: -f1) ]"
+grn "render schema 2: two sites on one host with different prefixes, one certificate for the name" bash -c "'$R' --site '$t/v-land.toml' --site '$t/v-wiki.toml' --site '$t/v-help.toml' '$t/v.kdl' >/dev/null 2>&1 && [ \$(grep -c 'acme {' '$t/v.kdl') = 2 ] && [ \$(grep -c 'domains \"example.org\"' '$t/v.kdl') = 1 ] && grep -q 'root \"/srv/www/wiki/mount\"' '$t/v.kdl' && grep -q 'root \"/srv/www/landing/current\"' '$t/v.kdl' && grep -q 'path-prefix \"/wiki\"' '$t/v.kdl'"
+grn "render schema 2: the route of the longer prefix comes first (/wiki before /)" bash -c "[ \$(grep -n 'root \"/srv/www/wiki/mount\"' '$t/v.kdl' | head -1 | cut -d: -f1) -lt \$(grep -n 'root \"/srv/www/landing/current\"' '$t/v.kdl' | head -1 | cut -d: -f1) ]"
+# Zentinel 26.11_2 does not cut the path-prefix before the file lookup (measured: /wiki/ gives <root>/wiki/index.html): a site with a prefix gets the root `mount` (the delivery step links mount/<prefix> to ../current), a site at / gets `current`
+grn "render schema 2: the route of /wiki has the root <id>/mount (the prefix is not cut), the site at / keeps current" bash -c "grep -A8 'path-prefix \"/wiki\"' '$t/v.kdl' | grep -q 'root \"/srv/www/wiki/mount\"' && ! grep -q 'wiki/current' '$t/v.kdl' && grep -A8 'path-prefix \"/\"' '$t/v.kdl' | grep -q 'root \"/srv/www/landing/current\"'"
+mk2 "$t/v-deep2.toml" deep2 example.org /a/b; grn "render schema 2: a two-segment prefix gets the root mount too" bash -c "'$R' --site '$t/v-deep2.toml' '$t/d2.kdl' >/dev/null 2>&1 && grep -q 'root \"/srv/www/deep2/mount\"' '$t/d2.kdl'"
+mk2 "$t/v-ar-out.toml" outer example.org / '' $'[csp]\n[[csp.area]]\npath = "/apps"\nmode = "static"'
+mk2 "$t/v-ar-in.toml" inner example.org /apps; mk2 "$t/v-ar-in2.toml" inner2 example.org /apps2
+red "render schema 2: an inner site exactly on a csp.area of the outer site (two equal routes) is refused" "$R" --site "$t/v-ar-out.toml" --site "$t/v-ar-in.toml" "$t/x.kdl"
+red "render schema 2: the same, the other way round in the list, is refused" "$R" --site "$t/v-ar-in.toml" --site "$t/v-ar-out.toml" "$t/x.kdl"
+grn "render schema 2: an inner site next to the area (/apps2) passes (control)" "$R" --site "$t/v-ar-out.toml" --site "$t/v-ar-in2.toml" "$t/x.kdl"
 grn "render schema 2: same input, same bytes" bash -c "'$R' --site '$t/v-land.toml' --site '$t/v-wiki.toml' '$t/v1.kdl' >/dev/null 2>&1 && '$R' --site '$t/v-land.toml' --site '$t/v-wiki.toml' '$t/v2.kdl' >/dev/null 2>&1 && cmp '$t/v1.kdl' '$t/v2.kdl'"
 mk2 "$t/v-wiki2.toml" wiki2 example.org /wiki; red "render schema 2: the same name with the same prefix is refused" "$R" --site "$t/v-wiki.toml" --site "$t/v-wiki2.toml" "$t/x.kdl"
 mk2 "$t/v-wikib.toml" wiki other.example.org /; red "render schema 2: the same id (directory) twice is refused" "$R" --site "$t/v-wiki.toml" --site "$t/v-wikib.toml" "$t/x.kdl"
@@ -571,7 +591,7 @@ mk2 "$t/v-inj.toml" inj example.org '/a\"; }'; red "render schema 2: a prefix th
 mk2 "$t/v-injid.toml" 'a\" {' example.org /x; red "render schema 2: an id that tries to break out of the KDL string is refused" "$R" --site "$t/v-injid.toml" "$t/x.kdl"
 mk2 "$t/v-dd.toml" up example.org '/../../etc'; red "render schema 2: a prefix with .. is refused" "$R" --site "$t/v-dd.toml" "$t/x.kdl"
 mk2 "$t/v-bs.toml" bs example.org '/a\\b'; red "render schema 2: a prefix with a backslash is refused" "$R" --site "$t/v-bs.toml" "$t/x.kdl"
-grn "render: a schema 1 and a schema 2 site together (directory by primary, by id)" bash -c "'$R' --site '$t/s1.toml' --site '$t/v-wiki.toml' '$t/m.kdl' >/dev/null 2>&1 && grep -q 'root \"/srv/www/one.example.org/current\"' '$t/m.kdl' && grep -q 'root \"/srv/www/wiki/current\"' '$t/m.kdl'"
+grn "render: a schema 1 and a schema 2 site together (directory by primary, by id)" bash -c "'$R' --site '$t/s1.toml' --site '$t/v-wiki.toml' '$t/m.kdl' >/dev/null 2>&1 && grep -q 'root \"/srv/www/one.example.org/current\"' '$t/m.kdl' && grep -q 'root \"/srv/www/wiki/mount\"' '$t/m.kdl'"
 mk2 "$t/v-area.toml" apps apps.example.org /app '' $'[csp]\n[[csp.area]]\npath = "/own"\nmode = "passthrough"\npolicy = "default-src \'self\'; script-src \'self\'"'
 red "render schema 2: an area in passthrough is refused without --allow-passthrough" "$R" --site "$t/v-area.toml" "$t/x.kdl"
 grn "render schema 2: with --allow-passthrough the area gets its own route and CSP, the rest stays strict" bash -c "'$R' --allow-passthrough --site '$t/v-area.toml' '$t/a.kdl' 2>'$t/wa' >/dev/null && grep -q 'path-prefix \"/app/own\"' '$t/a.kdl' && grep -q \"script-src 'self'\" '$t/a.kdl' && [ \$(grep -c \"default-src 'none'\" '$t/a.kdl') = 1 ] && grep -q WARNING '$t/wa'"
@@ -588,6 +608,11 @@ mutm 's/^SEGMENT = .*/SEGMENT = re.compile(r"[a-z0-9._-]+")/; s/ or any(x in (".
 grn "mutation control: without the segment and .. rules the prefix /../../etc is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-dd.toml" "$t/x.kdl"
 mutm 's/^SEGMENT = .*/SEGMENT = re.compile(r"[a-z0-9._\\\\-]+")/' backslash
 grn "mutation control: with a backslash allowed in a segment the backslash prefix is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-bs.toml" "$t/x.kdl"
+mutm 's/^                if pa != pb and same:$/                if False:/' areaplace
+grn "mutation control: without the equal-place rule an inner site on a csp.area is GREEN" "$mutset/templates/site/render.sh" --site "$t/v-ar-out.toml" --site "$t/v-ar-in.toml" "$t/x.kdl"
+cp "$T/render.py" "$mutset/templates/site/render.py"; sed -i 's/("current" if s\["path_prefix"\] == "\/" else "mount")/"current"/' "$mutset/templates/site/render.py"
+cmp -s "$T/render.py" "$mutset/templates/site/render.py" && bad "mutation rootmount: the sed did not apply"
+red "mutation: with the root always current the /wiki mount test is found" bash -c "'$mutset/templates/site/render.sh' --site '$t/v-wiki.toml' '$t/mm.kdl' >/dev/null 2>&1 && grep -q 'root \"/srv/www/wiki/mount\"' '$t/mm.kdl'"
 rm -rf "$mutset"
 # H4: the hash of the Zentinel configuration in the sign job (scripts/site-kdl-hash.sh) depends on site.toml AND on ACME_EMAIL, WEBROOT, HTTP_ADDR, HTTPS_ADDR; fixed values, same hash twice
 K="$here/site-kdl-hash.sh"; TB="$t/dist/helfa.org-0.0.1-site.tar.gz"

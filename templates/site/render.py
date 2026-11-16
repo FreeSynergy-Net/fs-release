@@ -3,7 +3,7 @@
 usage: render.py [--staging|--production|--http-only|--test] [--allow-passthrough] --site <site.toml> [--site <site.toml> ...] <output.kdl>
 Environment: ACME_EMAIL (not needed with --http-only/--test), WEBROOT (default /srv/www), HTTP_ADDR (default 0.0.0.0:80), HTTPS_ADDR (default 0.0.0.0:443).
 Per site: certificate for primary name plus aliases (acme.method http-01), one route per name AND per place (path_prefix of schema 2; a `[[csp.area]]` folder gets its own
-route with its own CSP), root <WEBROOT>/<dir>/current (dir = primary for schema 1, site.id for schema 2), CSP from csp.mode/csp.policy. Two sites may share a name when their
+route with its own CSP), root <WEBROOT>/<dir>/current (dir = primary for schema 1, site.id for schema 2; for a schema 2 site with a path_prefix: <WEBROOT>/<dir>/mount, see the comment at `root =`: Zentinel does not cut the prefix), CSP from csp.mode/csp.policy. Two sites may share a name when their
 path_prefix differs (one certificate per name, the routes differ by path-prefix, longest first); the same name with the same prefix, or the same directory, is refused.
 Everything written into the configuration is validated by scripts/site_manifest.py before (names, prefixes, ids: no quote, backslash, brace or line break can get in).
 A site with csp.mode "passthrough" (its own scripts run) is REFUSED unless --allow-passthrough says so explicitly: Zentinel 26.11_2 does not send the CSP on static routes.
@@ -100,6 +100,9 @@ def main(argv: list[str]) -> None:
             else:
                 print(f"NOTE: {where}: the CSP header of this configuration is NOT delivered by Zentinel 26.11_2 on static routes (measured). The wall for mode static "
                       "is the folder check (scripts/site-pruefen.py: allowlist, and a page-own <meta> CSP in every page).", file=sys.stderr)
+            # Zentinel 26.11_2 does NOT cut the route's path-prefix before it looks for the file (measured: /wiki/ gives <root>/wiki/index.html).
+            # Prefix "/": the root is the package (`current`). Prefix /p: the root is `mount`, and `mount/p` is a link to `../current` (made by the delivery step), so /p/x is <root>/p/x = package/x.
+            root = f"{webroot}/{s['dir']}/" + ("current" if s["path_prefix"] == "/" else "mount")
             for j, n in enumerate(s["names"]):
                 routes.append((-len(pp), i, k, j, f'''    route "site{i + 1}-{j + 1}-{k + 1}" {{
         matches {{
@@ -109,7 +112,7 @@ def main(argv: list[str]) -> None:
         service-type "static"
         static-files {{
             // `current` is a link to releases/<version>, swapped atomically by the person (site-signieren, step deliver)
-            root "{webroot}/{s["dir"]}/current"
+            root "{root}"
             index "index.html"
             cache-control "public, max-age=300"
             compress #true

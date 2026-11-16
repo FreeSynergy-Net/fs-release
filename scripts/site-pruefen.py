@@ -61,6 +61,11 @@ CSP_DIRECTIVES = {"default-src", "script-src", "style-src", "img-src", "font-src
 CSP_NONE = ("script-src", "object-src", "base-uri", "form-action")
 SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 WS = "[ \t\n\r\f]"
+
+
+def one_bom(text: str) -> str:
+    """A browser takes ONE leading U+FEFF as the byte order mark; a second one is a character that ends <head> early (measured). Cut at most one."""
+    return text[1:] if text.startswith("\ufeff") else text
 TAG = re.compile(rf"<(/?)([A-Za-z][A-Za-z0-9:_-]*)((?:{WS}+[A-Za-z][A-Za-z0-9:_-]*(?:{WS}*={WS}*\"[^\"<>]*\")?)*){WS}*(/?)>")
 ATTR = re.compile(rf"({WS}+)([A-Za-z][A-Za-z0-9:_-]*)(?:{WS}*={WS}*\"([^\"<>]*)\")?")
 CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -147,11 +152,11 @@ def check_html(text: str) -> list[str]:
     bad: list[str] = []
     if CTRL.search(text):
         return ["control character in the text"]
-    if not DOCTYPE.match(text.lstrip("\ufeff")):
+    if not DOCTYPE.match(one_bom(text)):
         bad.append("does not start with <!DOCTYPE html>")
     starts: list[tuple[str, dict]] = []
     try:
-        for name, attrs, closing, selfclose in tokens(text.lstrip("\ufeff"), False):
+        for name, attrs, closing, selfclose in tokens(one_bom(text), False):
             if name not in HTML_TAGS:
                 bad.append(f"<{'/' if closing else ''}{name}> is not on the allowlist")
                 continue
@@ -180,7 +185,7 @@ def check_html(text: str) -> list[str]:
             bad += check_tag(name, attrs)
     except ValueError as e:
         bad.append(str(e))
-    bad += check_head(text.lstrip("\ufeff"), starts)
+    bad += check_head(one_bom(text), starts)
     return bad
 
 
@@ -229,7 +234,7 @@ def check_tag(name: str, a: dict) -> list[str]:
 def head_prefix(text: str) -> str | None:
     """The page must open EXACTLY as the exporter writes it: DOCTYPE, <html>, <head>, <meta charset="utf-8">, then the Content-Security-Policy <meta>; only white space between.
     Any text or character reference before the CSP meta (`<meta charset>&nbsp;<meta CSP>`) makes a browser close <head>, move the meta into <body> and ignore it."""
-    t = text.lstrip("\ufeff")
+    t = one_bom(text)
     m = DOCTYPE.match(t)
     pos = m.end() if m else 0
     want = ("html", "head", "meta", "meta")
@@ -262,11 +267,11 @@ def check_xml(text: str) -> list[str]:
     bad: list[str] = []
     if CTRL.search(text):
         return ["control character in the text"]
-    if not XML_DECL.match(text.lstrip("\ufeff")):
+    if not XML_DECL.match(one_bom(text)):
         bad.append('must start with <?xml version="1.0" encoding="UTF-8"?>')
     first = True
     try:
-        for name, attrs, closing, _ in tokens(text.lstrip("\ufeff"), True):
+        for name, attrs, closing, _ in tokens(one_bom(text), True):
             if name not in XML_TAGS:
                 bad.append(f"<{name}> is not allowed in xml (sitemaps only)")
                 continue

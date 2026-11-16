@@ -8,7 +8,6 @@
 #       <name>-<version>.spdx.json        SPDX 2.3 file list (the site has no packages; the project's cargo-sbom action does not apply)
 #       SHA256SUMS.txt                    the three files above
 #   (the manifest also records the site: schema, id, directory, path_prefix and names of its site.toml, schema 1 or 2)
-#   (the manifest also records the site: schema, id, directory, path_prefix and names of its site.toml, schema 1 or 2)
 #   and prints `tree-sha256=<hash>` and `tar-sha256=<hash>` (the approval names both; the tarball hash is the bytes). A second build into a
 #   temp folder must be byte-identical (the comparison is mutation-tested in test-site.sh).
 # SITE_MTIME (epoch, required) is the release time: every entry of the tarball gets it as mtime, so the web server's ETag (size + mtime) changes with each
