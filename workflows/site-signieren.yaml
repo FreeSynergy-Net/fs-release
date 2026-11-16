@@ -8,7 +8,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: site-signieren
-  version: 0.0.6
+  version: 0.0.8
   title: Sign the artefacts of a site after an approval that is bound to the hash (job sign)
 do:
   - build:
@@ -16,7 +16,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: site-bauen
-          version: 0.0.6
+          version: 0.0.8
       export:
         as: '${ $context + { tree: . } }'
       metadata:
@@ -26,7 +26,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sub-workflow site-bauen without a key (CI run 1, job build); its tree hash, tarball hash, mode and the id of THIS CI run go into the approval request."
   - request:
-      call: site-approval-request:0.0.6@fs
+      call: site-approval-request:0.0.8@fs
       with:
         tree: ${ $context.tree }
       export:
@@ -53,7 +53,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The person signs the approval text with a signing subkey that is not usable under the agents' UID (token with touch policy or another device; its fingerprint is pinned in the allowed list, a software subkey under the same primary key does not count); the event only wakes the flow, the signature is what counts, not source or actor. Proof that the key is unusable for agents is written down once before the first real run (TODO person)."
   - approval-check:
-      call: site-freigabe-pruefen:0.0.6@fs
+      call: site-freigabe-pruefen:0.0.8@fs
       with:
         approval: ${ $context.approval }
         run: ${ $context.run }
@@ -64,7 +64,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/site-freigabe-pruefen.sh from the pinned main, never from an agent worktree, WITHOUT the key in its environment: signing subkey on the fixed list (read-only keyring), dist holds exactly the four files, the tarball bytes equal tar-sha256 and pass the allowlist (plain files and folders only, no link, special mode or odd owner), tree hash recomputed from the tarball, name, version, mode, run id, not expired and at most 72 h after the SIGNATURE time; anything missing is red."
   - rebuild:
-      call: site-rebuild-compare:0.0.6@fs
+      call: site-rebuild-compare:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -72,7 +72,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "CI step `site-signieren.sh --check-only` (the approval check above and this rebuild run in it), no key anywhere on the runner: builds again from the git checkout of the approved folder state and compares every file byte for byte with the delivered folder; the delivered tarball is only what the approved source produces; a difference is red and nothing is signed."
   - kdl-hash:
-      call: site-kdl-hash:0.0.6@fs
+      call: site-kdl-hash:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -80,7 +80,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/site-kdl-hash.sh on the checked tarball (no key): takes ONLY ./site.toml out of it and renders staging, production and http-only with templates/site/render.py; prints `kdl-inputs` (webroot, http-addr, https-addr, acme-email: the defaults /srv/www, 0.0.0.0:80, 0.0.0.0:443 when unset, the e-mail from the repository variable SITE_ACME_EMAIL, missing = red) and `kdl-sha256 <variant> <hash>` into the job summary. The person renders the same way from the pinned main with the SAME four values and compares: the hash depends on them too."
   - key-file:
-      call: site-key-file:0.0.6@fs
+      call: site-key-file:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -88,7 +88,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "CI environment `site-signing`: first a step without secrets makes the 0700 folder in the runner temp; then the ONLY step with GPG_PRIVATE_KEY and GPG_PASSPHRASE writes them as two 0600 files with shell builtins only (set, umask, printf and redirection: no child process inherits the secrets, checked in scripts/test-site.sh against site.yml). The signing step gets only the two file paths."
   - sign:
-      call: site-signieren:0.0.6@fs
+      call: site-signieren:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -96,7 +96,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/site-signieren.sh with GPG_PRIVATE_KEY_FILE and GPG_PASSPHRASE_FILE (missing = red, not 'not signed'; an empty file is red too): repeats the approval check and the rebuild comparison first (so the key file is on the runner's disk while this own code runs, with -I and no content executed: not 'without a key'), only then detached .asc for the five files (the four artefacts of dist plus approval.txt; the approver keeps his own approval.txt.approver.asc) with sign-files/sign.sh (the Release path with the key in the environment still works). The key files exist only in this job (CI environment `site-signing`) and are removed in a last step that always runs (`if: always()`)."
   - signatures-check:
-      call: site-signaturen-pruefen:0.0.6@fs
+      call: site-signaturen-pruefen:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -104,15 +104,15 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/site-signaturen-pruefen.sh <folder> <release-pubkey.asc> <name-version>: the folder holds exactly the five files, each with an .asc that verifies against the public release key and is made by exactly its fingerprint, plus the approver's own signature of approval.txt; a missing file, a foreign file or a missing signature is red. The same script is what the person runs before delivering."
   - deliver:
-      call: deliver-by-hand:0.0.6@fs
+      call: deliver-by-hand:0.0.8@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The person fetches the signed files, runs scripts/site-signaturen-pruefen.sh and `sha256sum --check SHA256SUMS.txt`, unpacks the tarball with `tar -xzf --no-same-owner --no-same-permissions` into /srv/www/<domain>/releases/<version> (the folder the Zentinel roots point to is /srv/www/<domain>/current), then swaps the link atomically (`ln -sfn releases/<version> current.new && mv -T current.new current`; way back = the old link) and runs `zentinel reload` (SIGHUP) AFTER EVERY SWAP: without it Zentinel serves the old content from its cache (measured with 26.11_2: a same-size file keeps its ETag, size + mtime). The Zentinel configuration is a separate file the person has read: it is rendered by templates/site/render.sh from the pinned main and compared with its .sha256. No AI, no SSH by an agent."
+        freesynergy.net:summary: "The person fetches the signed files, runs scripts/site-signaturen-pruefen.sh and `sha256sum --check SHA256SUMS.txt`, unpacks the tarball with `tar -xzf --no-same-owner --no-same-permissions` into /srv/www/<domain>/releases/<version> (`<webroot>/<id>/releases/<version>`; the Zentinel root is `<webroot>/<id>/current` for a site at `/` and `<webroot>/<id>/mount` for a site with a path prefix), then swaps the link atomically (`ln -sfn releases/<version> current.new && mv -T current.new current`; way back = the old link) and, for a schema-2 site with a prefix other than `/`, makes ONCE the link `mount/<prefix>` -> the relative way back to `current` (idempotent: `mkdir -p` the parent, `ln -sfn ../current mount/wiki`, `ln -sfn ../../current mount/a/b`; check with `readlink`), then runs `zentinel reload` (SIGHUP) AFTER EVERY SWAP: without it Zentinel serves the old content from its cache (measured with 26.11_2: a same-size file keeps its ETag, size + mtime). The Zentinel configuration is a separate file the person has read: it is rendered by templates/site/render.sh from the pinned main and compared with its .sha256. Security check before the delivery (Zentinel follows symlinks without a limit to the root, measured with 26.11_2 and 26.11_3): no link in the tarball (scripts/site-tar-pruefen.py ran before unpacking), `find <release> -type l` is empty, `mount/` holds only the own prefix link, and `releases/`, `current` and `mount/` belong to root and are not writable for the user `zentinel`. No AI, no SSH by an agent."
   - record:
-      call: append-log:0.0.6@fs
+      call: append-log:0.0.8@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

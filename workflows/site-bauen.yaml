@@ -5,11 +5,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: site-bauen
-  version: 0.0.6
+  version: 0.0.8
   title: Build the artefacts of a site from an approved folder state (job build, no key)
 do:
   - source-check:
-      call: site-source-check:0.0.6@fs
+      call: site-source-check:0.0.8@fs
       with:
         folder: ${ .input.folder }
       metadata:
@@ -19,7 +19,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/site-bauen.sh [--passthrough] check <folder>: allowlist of file types (static: html css txt xml json svg images woff2; passthrough adds js), no dot files, safe names, only regular files, index.html; static mode parses html/svg/css (no script, no on* attribute, no frame, no meta refresh, every URL relative except a-links); nothing key-like; red names every file; passthrough logs every file."
   - build:
-      call: site-build:0.0.6@fs
+      call: site-build:0.0.8@fs
       with:
         folder: ${ .input.folder }
         mode: ${ .input.mode }
@@ -34,7 +34,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/site-bauen.sh [--passthrough] build <folder> <outdir> <name> <version>: a tar with sorted names, owner 0, mtime 0, modes 0644/0755, gzip -n; manifest.json (with mode and tool versions), SPDX 2.3 file list, SHA256SUMS.txt; the build runs twice and the two results are compared byte for byte INSIDE this step (red on a difference; the comparison is mutation-tested in scripts/test-site.sh); the job holds no key."
   - hash-out:
-      call: site-tree-hash:0.0.6@fs
+      call: site-tree-hash:0.0.8@fs
       with:
         tree: ${ $context.tree }
       metadata:
@@ -44,7 +44,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Prints tree-sha256=<hash> (the content of the folder state), tar-sha256=<hash> (the bytes of the tarball) and mode=; the approval in `site-signieren` must name all three. Same folder, same bytes; any other change, other hash."
   - pass-on:
-      call: upload-artefact:0.0.6@fs
+      call: upload-artefact:0.0.8@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service

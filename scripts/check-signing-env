@@ -4,7 +4,7 @@
   python3 -I scripts/check-signing-env [<workflow file or folder>...]     (default: .github/workflows and examples, relative to the repo root)
 
 For every job of every workflow file (also the mirror / site templates of other repos, pass them as arguments):
-  1. a job with a step `uses: .../actions/sign-files@...` (the signer) must have `environment:`;
+  1. a job with a step `uses: .../actions/sign-files@...` or a `run:` of `scripts/site-signieren.sh` (the signer) must have `environment:`;
   2. a job that mentions `GPG_` (secrets `GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`) must be a signer or a call of the reusable `release.yml` / `_release-finalize.yml` of fs-release
      (a job with `uses:` cannot have an `environment:` itself; the environment sits in the called job);
 rc 0 = ok, rc 1 = red (one line `file: job: reason`), rc 2 = bad input or no PyYAML (nothing was checked, never green).
@@ -45,7 +45,8 @@ def check(path):
             continue
         text = yaml.dump(job)
         steps = job.get("steps") or []
-        signer = any(isinstance(s, dict) and "/actions/sign-files@" in str(s.get("uses", "")) for s in steps)
+        # signer = a step `uses: .../actions/sign-files@` or a step that runs the site signing script (scripts/site-signieren.sh)
+        signer = any(isinstance(s, dict) and ("/actions/sign-files@" in str(s.get("uses", "")) or "scripts/site-signieren.sh" in str(s.get("run", ""))) for s in steps)
         # a job with `uses:` cannot have an `environment:`; it only hands the secrets to the reusable workflow whose signing job has one
         calls_final = any(f"fs-release/.github/workflows/{w}.yml@" in str(job.get("uses", "")) for w in ("release", "_release-finalize")) or str(job.get("uses", "")).startswith("./.github/workflows/_release-finalize.yml")
         if signer and not job.get("environment"):

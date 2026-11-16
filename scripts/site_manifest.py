@@ -178,7 +178,7 @@ def check_set(sites: list[dict]) -> list[str]:
                     continue
                 same = ({join(pa, x["path"]) for x in a["areas"]} | {pa}) & ({join(pb, x["path"]) for x in b["areas"]} | {pb})
                 if pa != pb and same:
-                    err.append(f"the name {n}: sites {a['dir']} and {b['dir']} both own the place {sorted(same)[0]} (a site lies exactly on a csp.area of the other: two equal routes)")
+                    err.append(f"the name {n}: sites {a['dir']} and {b['dir']} both own the place {sorted(same)[0]} (two equal routes: a site prefix lies exactly on a csp.area of the other site, or both sites have an area at the same place)")
                     continue
                 outer, inner = (a, b) if len(pa) < len(pb) else (b, a)
                 if not nested(inner["path_prefix"], outer["path_prefix"]):

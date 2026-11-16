@@ -16,6 +16,17 @@ python3 -c "import yaml" 2>/dev/null || { echo "skipped: no PyYAML (nothing was 
 python3 -I "$tool" >/dev/null 2>&1 && ok "the real workflows are green" || bad "the real workflows are red"
 grep -q '^    environment: release-signing' "$repo/.github/workflows/_release-finalize.yml" && ok "the signing job names the environment release-signing" || bad "no environment in _release-finalize.yml"
 
+# site.yml: the job `sign` signs through scripts/site-signieren.sh (not actions/sign-files) and has `environment: site-signing`
+if [ -f "$repo/.github/workflows/site.yml" ]; then
+  python3 -I "$tool" "$repo/.github/workflows/site.yml" >/dev/null 2>&1 && ok "site.yml (signing script, environment site-signing) is green" || bad "site.yml is red"
+  mkdir -p "$tmp/site"; sed '/^    environment: site-signing$/d' "$repo/.github/workflows/site.yml" >"$tmp/site/site.yml"
+  python3 -I "$tool" "$tmp/site" >"$tmp/o" 2>&1; r=$?
+  if [ "$r" -eq 1 ] && grep -q 'sign: the signing job has no `environment:`' "$tmp/o"; then ok "site.yml: signing step without environment is red"; else bad "site.yml without environment rc=$r"; fi
+  cp "$tool" "$tmp/mutsite"; sed -i 's| or "scripts/site-signieren.sh" in str(s.get("run", ""))||' "$tmp/mutsite"
+  cmp -s "$tmp/mutsite" "$tool" && bad "site mutation changed nothing"
+  python3 -I "$tmp/mutsite" "$repo/.github/workflows/site.yml" >/dev/null 2>&1 && bad "mutation (script not a signer) stayed green" || ok "mutation (script not a signer) turns site.yml red"
+fi
+
 # case <tool> <label>: the three counter-cases must all be red with the given tool
 cases() {
   local t="$1" l="$2" d r

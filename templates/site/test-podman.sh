@@ -35,6 +35,17 @@ for d in "${DOMAINS[@]}"; do
   for l in "" de/ en/; do printf '<!doctype html>\n<html lang="%s"><head><meta charset="utf-8"><title>test %s</title></head><body><p>MARKER-%s</p><a href="/de/">de</a> <a href="/en/">en</a></body></html>\n' "${l%/}" "$d" "$d" > "$t/www/$d/releases/1/${l}index.html"; done
   ln -s releases/1 "$t/www/$d/current"
 done
+# prefixed sites (schema 2): Zentinel does not cut the route prefix, so the root of such a site is `mount` and `mount/<prefix>` is a link to `../current`
+# (made by the delivery step). `wiki` shares the host one.example.org with the site at /, `deep` (two segments) sits on its own host.
+mkprefixed() { # <id> <host> <prefix> <relative link target> <marker>
+  printf 'schema = 2\npurpose = "website"\n[site]\nid = "%s"\npath_prefix = "%s"\n[names]\nprimary = "%s"\n[acme]\nmethod = "http-01"\n' "$1" "$3" "$2" > "$t/$1.toml"; sites+=(--site "$t/$1.toml")
+  mkdir -p "$t/www/$1/releases/1" "$t/www/$1/mount/$(dirname "${3#/}")"
+  printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>%s</title></head><body><p>%s</p></body></html>\n' "$1" "$5" > "$t/www/$1/releases/1/index.html"
+  ln -s releases/1 "$t/www/$1/current"; ln -s "$4" "$t/www/$1/mount/${3#/}"
+}
+mkprefixed wiki one.example.org /wiki ../current PREFIX-WIKI
+mkprefixed deep four.example.org /a/b ../../current PREFIX-DEEP
+printf 'SECRET-OUTSIDE\n' > "$t/www/outside.txt"; ln -s ../../../outside.txt "$t/www/wiki/releases/1/esc.txt"
 WEBROOT=/www "$here/render.sh" --staging "${sites[@]}" "$t/conf/prod.kdl" >/dev/null
 WEBROOT=/www "$here/render.sh" --http-only "${sites[@]}" "$t/conf/first.kdl" >/dev/null
 WEBROOT=/www HTTP_ADDR=0.0.0.0:8080 HTTPS_ADDR=0.0.0.0:8081 "$here/render.sh" --test "${sites[@]}" "$t/conf/test.kdl" >/dev/null
@@ -99,6 +110,17 @@ subprocess.run(["bash", "-c", f"cd {sys.argv[4]}/www/{d0} && mkdir -p releases/2
 s, b, h = get(d0); print(f"NOTE {d0} right after the swap, before reload: {'OLD content (cache)' if b'MARKER-' in b else 'new content'}")
 subprocess.run([tool, "kill", "--signal", "HUP", name], check=True, capture_output=True); time.sleep(2)
 s, b, h = get(d0); check(f"{d0} after reload (SIGHUP) the swapped release is served", b"MARKEX-" in b)
+# Prefixed sites (measured 26.11_2 and 26.11_3): the prefix is not cut, the root `mount` with the link `mount/<prefix> -> ../current` serves, `..` is blocked.
+for host, pre, mark in (("one.example.org", "/wiki", b"PREFIX-WIKI"), ("four.example.org", "/a/b", b"PREFIX-DEEP")):
+    for path in (pre + "/", pre, pre + "/index.html"):
+        s, b, h = get(host, path); check(f"{host}{path} -> 200, the prefixed site", s == 200 and mark in b)
+    s, b, h = get(host, pre + "x/"); check(f"{host}{pre}x (not a segment border) is not the prefixed site", mark not in b)
+    for path in (pre + "/../outside.txt", pre + "/%2e%2e/outside.txt", pre + "/..%2foutside.txt", pre + "/%2e%2e/%2e%2e/outside.txt"):
+        s, b, h = get(host, path); check(f"{host}{path} blocked", mark not in b and b"SECRET-OUTSIDE" not in b)
+s, b, h = get("one.example.org"); check("one.example.org / still the site at the root (after the swap above)", b"MARKEX-one.example.org" in b)
+# NOT a wall (measured): Zentinel follows a symlink out of the root. The walls are: no links in the tarball (checked before unpacking), the folder check refuses
+# links, and the webroot is not writable for the service user. This line only documents the measurement; a version that refuses it shows up as a NOTE.
+s, b, h = get("one.example.org", "/wiki/esc.txt"); print(f"NOTE a link out of the root is {'FOLLOWED (as measured; the walls above are load-bearing)' if b'SECRET-OUTSIDE' in b else 'NOT followed (new behaviour)'}")
 s, b, h = get("evil.example"); check("unknown host gets no page", b"MARKER-" not in b)
 sys.exit(0 if ok else 1)
 PY
