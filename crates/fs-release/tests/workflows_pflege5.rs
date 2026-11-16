@@ -25,6 +25,7 @@ fn flows_that_release_have_no_second_review() {
         "wrapper-einbindung",
         "bugfix",
         "frontend-round",
+        "grundfassung",
     ] {
         assert!(single_review(&read(f)), "{f}");
     }
