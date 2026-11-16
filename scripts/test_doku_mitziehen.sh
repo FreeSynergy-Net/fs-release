@@ -226,6 +226,16 @@ DH="$(base "$d/docs")"
 expect 1 "broken link" "red: working-tree-encoding=UTF-16 does not hide a broken link (B1)" "$d" -- --docs-head "$DH" --old fs-old
 expect 1 "old name 'fs-old' still in docs/de/a.md" "red: working-tree-encoding does not hide the old name (B1)" "$d" -- --docs-head "$DH" --old fs-old
 
+# C1: git older than 2.40 (no `--attr-source`) is `skipped: git too old`, rc 2, status skipped, never green and no vague error (a fake git answers --version)
+realgit="$(command -v git)"
+mkdir -p "$tmp/oldgit"
+printf '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "git version 2.39.5"; exit 0; fi\nexec %s "$@"\n' "$realgit" >"$tmp/oldgit/git"
+chmod +x "$tmp/oldgit/git"
+out="$(PATH="$tmp/oldgit:$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --docs-head "$DH" --json "$d/old.json" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && grep -q 'skipped: git too old' <<<"$out" && grep -q '"status": "skipped"' "$d/old.json" && ! grep -q 'unknown option' <<<"$out"; then echo "ok   git 2.39 is skipped (git too old), rc 2"; else echo "FAIL old git: rc=$rc $out"; fails=$((fails + 1)); fi
+out="$(PATH="$tmp/oldgit:$tmp/bin:$PATH" "${tool[@]}" --docs "$d/docs" --docs-base "$DB" --code "$d/code" --code-base "$CB" --state "$d/state" --json "$d/old2.json" 2>&1)"; rc=$?
+if [ "$rc" -ne 2 ] || ! grep -q 'git too old' <<<"$out"; then echo "ok   without --docs-head the old git does not matter"; else echo "FAIL old git without --docs-head: rc=$rc $out"; fails=$((fails + 1)); fi
+
 # A3: a symlink of the author's branch is written as a plain text file, never followed
 fresh symb; code_change; docs_both
 (cd "$d/docs" && ln -s "$tmp/victim" docs/de/leak.md && ln -s "$tmp/victim" docs/en/leak.md && g add . && g commit -q -am sym)
