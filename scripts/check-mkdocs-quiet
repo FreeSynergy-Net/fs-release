@@ -3,14 +3,16 @@
 
   python3 -I scripts/check-mkdocs-quiet [<folder or file>...]     (default: workflows scripts actions .github crates)
 
-Red = a line where `mkdocs` is followed (in the same command, no `|`, `;`, `&` between) by `-q` or `--quiet`, also in a Python argument list
+Red = a line where `mkdocs` is followed (in the same command, no `|`, `;`, `&` between) by `-q`, `--quiet` or a combined short flag (`-vq`, `-sq`), also behind `$MKDOCS` / `$FS_MKDOCS` and on a continuation line (`\\`), also in a Python argument list
 (`"mkdocs", "build", "-q"`). rc 0 clean, rc 1 red (`red: file:line: text`), rc 2 bad input.
 """
 import os
 import re
 import sys
 
-QUIET = re.compile(r"mkdocs\b[^|;&\n]*?(?:^|[\s\"',(\[])(?:-q|--quiet)(?=[\s\"',)\]]|$)")
+MKDOCS = r"(?:mkdocs\b|\$\{?MKDOCS\b|\$\{?FS_MKDOCS\b)"  # the program name or a variable that holds it
+FLAG = r"(?:--quiet|-[cdfstv]*q[cdfstv]*)"  # `-q`, `--quiet`, and combined short flags (`-vq`, `-sq`, `-qs`); letters = the short flags of mkdocs
+QUIET = re.compile(rf"{MKDOCS}[^|;&\n]*?(?:^|[\s\"',(\[]){FLAG}(?=[\s\"',)\]]|$)")
 SELF = {"check-mkdocs-quiet", "test_check_mkdocs_quiet.sh"}
 SKIP_DIRS = {".git", "target", "node_modules", "wt"}
 DEFAULT = ["workflows", "scripts", "actions", ".github", "crates"]
@@ -41,7 +43,14 @@ def main(argv):
             lines = open(f, encoding="utf-8").read().splitlines()
         except (OSError, UnicodeDecodeError):
             continue
+        # a line that ends in `\` goes on in the next one: the call is checked as ONE line (reported at its first line)
+        joined = []
         for i, line in enumerate(lines, 1):
+            if joined and joined[-1][1].endswith("\\"):
+                joined[-1] = (joined[-1][0], joined[-1][1][:-1] + " " + line.strip())
+            else:
+                joined.append((i, line.rstrip()))
+        for i, line in joined:
             if QUIET.search(line):
                 print(f"red: {f}:{i}: {line.strip()}")
                 red += 1

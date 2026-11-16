@@ -26,12 +26,22 @@ mkdocs build --strict $q -f mkdocs.yml
 ["mkdocs", "build", "--strict", "$q", "-f", x]
 mkdocs build --quiet --strict
 /x/.venv/bin/mkdocs build --strict $q
+mkdocs build --strict -vq
+mkdocs build -sq --strict
+mkdocs build -qs
+\$MKDOCS build $q --strict
+\${FS_MKDOCS} build --strict --quiet
 EOF
 }
 out="$(cases "$tool" real)"; grep '^ok' <<<"$out"; grep -q '^FAIL' <<<"$out" && { grep '^FAIL' <<<"$out"; fails=$((fails + 1)); }
 
+# a quiet flag on a continuation line is the same call
+mkdir -p "$tmp/m"
+printf '%s\n' 'mkdocs build \' '  --strict \' "  $q" >"$tmp/m/x.sh"
+python3 -I "$tool" "$tmp/m" >/dev/null 2>&1; [ $? -eq 1 ] && ok "a quiet flag on a continuation line is red" || bad "continuation line not red"
+
 mkdir -p "$tmp/h"
-printf '%s\n' 'mkdocs build --strict -f mkdocs.yml' "mkdocs --version | grep $q x" "grep $q WARNING build.log; mkdocs build" "echo $q mkdocs" >"$tmp/h/ok.sh"
+printf '%s\n' 'mkdocs build --strict -f mkdocs.yml' "mkdocs --version | grep $q x" "grep $q WARNING build.log; mkdocs build" "echo $q mkdocs" 'mkdocs build -f queue.yml --strict -v' 'mkdocs build --strict \' '  -f mkdocs.yml' '$MKDOCS build --strict' >"$tmp/h/ok.sh"
 python3 -I "$tool" "$tmp/h" >/dev/null 2>&1 && ok "harmless lines are not red" || bad "a harmless line was red"
 python3 -I "$tool" "$tmp/none" >/dev/null 2>&1; [ $? -eq 2 ] && ok "a missing path is rc 2" || bad "missing path not rc 2"
 

@@ -29,6 +29,22 @@ scripts/x.sh|ps aux | grep cargo; $a -9 rustc
 scripts/x.sh|echo hi && $b -9 rustc
 scripts/x.sh|kill \$(pgrep -f cargo)
 scripts/x.sh|pgrep -f cargo | xargs kill
+scripts/x.sh|kill \$(pgrep -f cargo)
+scripts/x.sh|kill -9 \`pgrep -f cargo\`
+scripts/x.sh|if true; then $a cargo; fi
+scripts/x.sh|for i in 1 2; do $a cargo; done
+scripts/x.sh|  /usr/bin/$a cargo
+scripts/x.sh|  command $a cargo
+scripts/x.sh|  \\$a cargo
+scripts/x.sh|kill \$(pidof cargo)
+scripts/x.sh|pidof cargo | xargs kill
+scripts/x.sh|pidof cargo | xargs -r kill -9
+scripts/x.sh|ps aux | grep cargo | awk '{print \$2}' | xargs kill
+scripts/x.sh|fuser -k 8080/tcp
+scripts/x.sh|sudo fuser -km /srv
+scripts/x.sh|$b -9 cargo
+scripts/x.sh|for p in \$(pgrep cargo); do kill \$p; done
+scripts/x.sh|pgrep cargo; kill 1
 workflows/x.yaml|        run: $a -f build-slot
 workflows/x.yaml|      - run: cd x && $b cargo
 EOF
@@ -41,6 +57,34 @@ if echo "$cases" | grep -q '^FAIL'; then echo "$cases" | grep '^FAIL'; fails=$((
 mkdir -p "$tmp/c/scripts"
 printf '%s\n' "# never $a here" "echo \"no $a, no $b with patterns\"" "summary: \"no \`$a\` / \`$b\`\"" 'kill "$pid"' >"$tmp/c/scripts/ok.sh"
 python3 -I "$tool" "$tmp/c" >/dev/null 2>&1 && ok "prose, comment and kill of an own PID are not red" || bad "a clean file was red"
+
+# false alarms that must stay green: own PID (also from $!), a lookup that only asks (no kill), a kill of a variable that is NOT a lookup, markdown quotes
+mkdir -p "$tmp/f/scripts"
+cat >"$tmp/f/scripts/ok.sh" <<EOF
+scripts/build-slot.sh cargo test & PID=\$!
+kill \$PID
+kill -TERM "\$PID"
+if pgrep -f cargo >/dev/null; then echo busy; fi
+n=\$(pgrep -c cargo)
+echo "see \`$a\` and \`kill \\\`pgrep\\\`\` in the rule"
+pid=\$(cat slot.pid); kill "\$pid"
+fuser /srv/x
+EOF
+python3 -I "$tool" "$tmp/f" >"$tmp/o" 2>&1 && ok "own PID, a pure lookup, fuser without -k are not red" || { cat "$tmp/o"; bad "a false alarm"; }
+
+# a variable that holds a lookup and is killed on a LATER line (x=\$(pgrep ..); kill \$x), also a for loop over the lookup
+mkdir -p "$tmp/v/scripts"
+for body in 'x=$(pgrep -f cargo)
+echo "$x"
+kill $x' 'p=`pidof cargo`
+kill -9 "$p"' 'for q in $(pgrep cargo)
+do
+  kill ${q}
+done'; do
+  printf '%s\n' "$body" >"$tmp/v/scripts/x.sh"
+  python3 -I "$tool" "$tmp/v" >"$tmp/o" 2>&1; r=$?
+  if [ "$r" -eq 1 ]; then ok "lookup variable killed on a later line is red"; else bad "variable kill not red (rc=$r): $body"; fi
+done
 
 python3 -I "$tool" "$tmp/nothing" >/dev/null 2>&1; [ $? -eq 2 ] && ok "a missing path is rc 2" || bad "missing path not rc 2"
 
