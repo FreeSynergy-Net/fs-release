@@ -1,0 +1,250 @@
+# ff-und-tag: the push of a reviewed head to main and the annotated tag - what the push helper of the strategy does by hand today. The
+# order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (docs/prompt-template.md). Specification (the @fs calls
+# have no script yet, like the other specification steps). It is the procedure behind the steps `tag`, `push`, `ci` and `main-ff` of
+# `release-flow` (those stay, they follow the code of `fs-release flow`); the checklist here is the hands-on side with the proofs.
+# Order of the end: branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, fresh
+# clone, checklist, approval for exactly this head, push without force, annotated tag, ls-remote proof, watch the release, tidy up.
+# Agents never push or tag. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: ff-und-tag
+  version: 0.0.10
+  title: Fast-forward a reviewed head to main and tag it - checklist, proofs, release watch
+do:
+  - zweig-ci:
+      call: branch-ci:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+      export:
+        as: '${ $context + { ci: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Reads the branch CI of ALL workflows for exactly this head (also the Windows jobs, not only the one that is quick); `scripts/check_job_status.py`, read only. Result `ci` with `status` green | red | hung (no progress for more than 30 minutes) and `neustarts`. Green for an older head does not count (new head, new CI)."
+  - ci-weiter:
+      switch:
+        - rot:
+            when: '${ $context.ci.status == "red" }'
+            then: eskalation
+        - haengt-erstmals:
+            when: '${ $context.ci.status == "hung" and ($context.ci.neustarts // 0) == 0 }'
+            then: ci-neustart
+        - haengt-wieder:
+            when: '${ $context.ci.status == "hung" }'
+            then: eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes to the person (the cause comes from the log, `bugfix` or `agent-run` for exactly that run; lesson fs-packages typing-test: a hanging job is not a green one); a hang goes to ONE restart, a second hang escalates; only green goes on."
+  - ci-neustart:
+      call: ci-restart:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+      then: ci-weiter
+      export:
+        as: '${ $context + { ci: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "A run without progress for more than 30 minutes is cancelled and started ONCE again (counted in `neustarts`), then the CI is read again; never a second restart, never a rerun that hides a red job."
+  - secrets-pruefen:
+      call: secret-names:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        names: GPG_PRIVATE_KEY,GPG_PASSPHRASE
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Before the push: the repository holds the signing entries GPG_PRIVATE_KEY and GPG_PASSPHRASE (read only: the NAMES from the list of repository entries, never a value, nothing is printed or copied). A missing name stops the flow before any push - an unsigned release cannot be repaired afterwards."
+  - klon:
+      call: fresh-clone:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        dir: ${ .input.workdir }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Fresh blobless clone in the own work folder (input workdir; no wildcard path, the folder is new and empty), so that no old state of an agent worktree flows into the check."
+  - kopf-und-ff:
+      call: head-ff-check:0.0.10@fs
+      with:
+        head: ${ .input.head }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The head of the clone equals the head of the order and of the approval; main of the remote (`git ls-remote`) is an ancestor of this head (`git merge-base --is-ancestor`), so the push is a pure fast-forward without a merge commit."
+  - identitaet:
+      call: identity-check:0.0.10@fs
+      with:
+        range: main..HEAD
+        allowed_identity_key: FS_ALLOWED_IDENTITY
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step `adresse-pruefen` of release-flow on the fresh clone: only the identity in FS_ALLOWED_IDENTITY is author and committer in the range (`git log --format='%ae %ce' main..HEAD | sort -u` shows exactly one line); every other address is a hit, the check names the commit and never an address; red goes to `branch-neu-schreiben`."
+  - version:
+      call: version-check:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Version = crate version in Cargo.toml = Cargo.lock entry of the own crates = first heading of CHANGELOG.md (lesson fs-people v0.0.11: the lock check is mandatory, a lock with the old version is red); the tag is `v<version>`; `lock-pruefung` of release-flow runs on the clone too."
+  - tag-frei:
+      call: tag-free:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git ls-remote --tags` shows no tag of this name (also no tag with another case), and the local clone has none; an existing tag is never moved."
+  - diff-pfade:
+      call: diff-paths:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        allow: ${ .input.allow }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git diff --name-only main..HEAD` lists only the paths of the order (input allow); an unexpected path is red (the head is not the one that was reviewed)."
+  - ja-fuer-kopf:
+      call: approval-check:0.0.10@fs
+      with:
+        head: ${ .input.head }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The Opus approval names exactly this head. A JA is void for every other head: new head, new JA (rule of `review`); no JA, no push."
+  - push-ff:
+      call: push-ff:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        into: main
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The person or the coordinator (the strategy's push helper) pushes the head to main as a pure fast-forward, WITHOUT force and without a merge commit; agents never push. A rejected push is never forced: it goes back to `kopf-und-ff`."
+  - tag:
+      call: tag-annotated:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+        head: ${ .input.head }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "ANNOTATED tag v<version> on the pushed head (`git tag -a`), written with the project identity (author and committer = FS_ALLOWED_IDENTITY), message = the first CHANGELOG heading; then the tag is pushed alone, never forced."
+  - ls-remote-beleg:
+      call: ls-remote-proof:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+        head: ${ .input.head }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Proof by `git ls-remote`: refs/heads/main equals the head, refs/tags/<tag> exists and its peeled commit (`^{}`) equals the head; both lines go into the report."
+  - release-beobachten:
+      call: release-watch:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      export:
+        as: '${ $context + { release: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The release run of the tag is watched until its end (`scripts/check_job_status.py`): ALL jobs green; the release is published (not a draft; a draft is never counted as released); the signature says `signed` with the fingerprint of the project key; the attestation is there. Red goes to `bugfix` with the failing job, never a silent rerun."
+  - release-weiter:
+      switch:
+        - rot:
+            when: '${ $context.release.status != "green" }'
+            then: eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a release that is not completely green (job red, draft, signature or attestation missing) escalates to the person; the catalog follows only after a green release (`katalog`)."
+  - aufraeumen:
+      call: clean-workdir:0.0.10@fs
+      with:
+        dir: ${ .input.workdir }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Removes the own work folder of the clone (exactly the named folder, never a pattern) and the temp files of this run; the report keeps the proof lines."
+  - fertig:
+      set:
+        status: done
+        head: ${ .input.head }
+        tag: ${ .input.tag }
+      then: end
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The flow reached its end: head on main, annotated tag, ls-remote proof, release green and published. Sets `status: done`."
+  - eskalation:
+      set:
+        status: escalated
+        eskaliert: true
+      then: end
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The CI is red or hangs twice, a check is red or the release is not green: the flow ends with `eskaliert: true`; the person decides. Nothing was forced."
+output:
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), head: ($context.ergebnis.head // null), tag: ($context.ergebnis.tag // null) } }'

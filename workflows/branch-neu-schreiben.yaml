@@ -1,0 +1,261 @@
+# branch-neu-schreiben: correct the history of an own unreviewed branch (identity, WIP) or rebase several branches in a chain onto the new main.
+# Order: `Workflow branch-neu-schreiben, parameters repo, branch, kette, allow, scope, tests` (docs/prompt-template.md). Specification (the @fs calls have
+# no script yet). Rule: a forced push only with `--force-with-lease` on an own `unreviewed/*` branch (lease SHA = the old head); a new head
+# is a NEW head and needs a new JA. Mode chain: branches one after the other, each onto the main that holds the earlier one. FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: branch-neu-schreiben
+  version: 0.0.10
+  title: Rewrite an own branch (identity, WIP) or rebase a chain of branches - lease, equal content, new head, new JA
+do:
+  - alter-kopf:
+      call: ls-remote-head:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+      export:
+        as: '${ $context + { alt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git ls-remote` of the branch: the old head is written down (it becomes the lease SHA later); the branch must be an own `unreviewed/*` branch, anything else (main, release-*, tags, a foreign branch) stops the flow here."
+  - ketten-plan:
+      call: chain-plan:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branches: ${ .input.kette }
+        base: main
+      export:
+        as: '${ $context + { kette: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mode chain (input kette, a list; empty = a single branch): the ORDER of the branches is fixed here (the one that others build on first; CHANGELOG, usage and README conflict in the same lines, so never in parallel), the base is the CURRENT remote main (`git ls-remote`), not the one of the order's day. Result `kette` with `aktuell`, `rest` and `modus` (einzel | kette)."
+  - modus:
+      switch:
+        - kette:
+            when: '${ $context.kette.modus == "kette" }'
+            then: rebase
+        - einzel:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a chain rebases onto the new main (`rebase`), a single branch is rewritten in place (`neu-schreiben`)."
+  - neu-schreiben:
+      call: rewrite:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        base: main
+        allowed_identity_key: FS_ALLOWED_IDENTITY
+      then: identitaet-nach
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "In an own worktree: author AND committer of every commit become the identity FS_ALLOWED_IDENTITY (`git rebase --exec` with `git commit --amend --no-edit --reset-author`, with the identity set by `-c user.name -c user.email`), WIP commits are removed (squashed into the commit they belong to, no commit with WIP in the subject), the messages keep the footer of the order. The content stays the same - only history changes."
+  - rebase:
+      call: chain-rebase:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.kette }
+        base: main
+        allowed_identity_key: FS_ALLOWED_IDENTITY
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "One branch of the chain onto the current main. Conflicts: CHANGELOG - first ALL entries of main, then the entries of the branch under ONE `## Unreleased`; usage.md and README (de and en) - both sides kept, no sentence lost; the file counter (FILES in tests/support/workflows.rs and every number in the texts) is COUNTED again on the result, never added up by hand. A rebase can write the LOCAL agent name as committer: therefore `--reset-author` and `--exec` with the explicit identity (`git -c user.name -c user.email`); the identity check of the next step decides, not the belief. After the rebase the gates run once (step `gates`)."
+  - identitaet-nach:
+      call: identity-check:0.0.10@fs
+      with:
+        range: main..HEAD
+        allowed_identity_key: FS_ALLOWED_IDENTITY
+      export:
+        as: '${ $context + { identitaet: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git log --format='%ae %ce' main..HEAD | sort -u` is exactly ONE line, the identity FS_ALLOWED_IDENTITY (author and committer, also after a rebase); the check names the commit, never an address."
+  - wip-weg:
+      call: wip-check:0.0.10@fs
+      with:
+        range: main..HEAD
+      export:
+        as: '${ $context + { wip: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "No commit of the range has WIP, fixup or squash in its subject; no unfinished marker (conflict marks) in the files."
+  - inhaltsgleich:
+      call: content-check:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        old: ${ $context.alt.head }
+        allow: ${ .input.allow }
+      export:
+        as: '${ $context + { inhalt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Diff old head against new head (`git diff --name-only old..new`, then the content): for a pure identity rewrite the trees are EQUAL (`git diff --exit-code`); for a rebase only the allowed files differ (input allow: CHANGELOG, usage, README, the file counter); every other file is red."
+  - pruefen-rot:
+      switch:
+        - rot:
+            when: '${ $context.identitaet.red == true or $context.wip.red == true or $context.inhalt.red == true }'
+            then: eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red check is not repaired by hand in the branch: the person decides (the third round at the latest); only green goes on."
+  - gates:
+      call: gates:0.0.10@fs
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "scripts/gates.sh on the NEW head (after a rebase the gates of the old head are worth nothing); a result for exactly this head is reused by the review."
+  - lease-pruefen:
+      call: lease-check:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        lease: ${ $context.alt.head }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The push may be a forced one ONLY on an own `unreviewed/*` branch and ONLY with the lease: `--force-with-lease=<branch>:<old head>` with the old head of `alter-kopf` as the SHA; `--force` alone is refused; main, `release-*`, tags and foreign branches are refused (red)."
+  - push-lease:
+      call: push-lease:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        lease: ${ $context.alt.head }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The person or the coordinator pushes with `--force-with-lease` and the lease SHA; if the remote head is not the old head (somebody pushed in between) the push fails and nothing is overwritten. Agents never push."
+  - ls-remote-beleg:
+      call: ls-remote-proof:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+      export:
+        as: '${ $context + { neu: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git ls-remote` shows the new head on the branch; the old and the new head go into the report."
+  - neues-ja:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.10
+        input:
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+          head: ${ $context.neu.head }
+          delta: ${ $context.alt.head }..${ $context.neu.head }
+          scope: ${ .input.scope }
+          tests: ${ .input.tests }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A new head is a NEW head: the earlier JA is void and a new review (mode delta of `review`: only the diff old head to new head, the CI of the branch attached) decides; the new head is reported with its hash."
+  - kette-weiter:
+      switch:
+        - weiter:
+            when: '${ $context.kette.rest > 0 }'
+            then: vorgaenger-ff
+        - ende:
+            then: fertig
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a chain goes on with the next branch only after the earlier one is on main; a single branch ends here."
+  - vorgaenger-ff:
+      call: merge-ff:0.0.10@fs
+      with:
+        into: main
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The earlier branch of the chain is fast-forwarded into main (flow `ff-und-tag`, the person or the coordinator); only then the next branch is rebased onto this NEW main."
+  - ketten-naechster:
+      call: chain-next:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branches: ${ .input.kette }
+      then: rebase
+      export:
+        as: '${ $context + { kette: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Takes the next branch of the chain (`aktuell`, `rest` counted down) and reads the new remote main; the old head of this branch becomes the new lease SHA."
+  - fertig:
+      set:
+        status: done
+        head: ${ $context.neu.head }
+      then: end
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The branch (or the whole chain) is rewritten, checked, pushed and reported with its new head. Sets `status: done`."
+  - eskalation:
+      set:
+        status: escalated
+        eskaliert: true
+      then: end
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check of the rewrite is red (identity, WIP, content): the flow ends with `eskaliert: true`; the person decides. Nothing was pushed after a red check."
+output:
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), head: ($context.ergebnis.head // null) } }'

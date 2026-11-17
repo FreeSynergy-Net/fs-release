@@ -6,10 +6,11 @@ use std::process::Command;
 
 use super::{have_yaml, python};
 
-pub const FILES: [&str; 44] = [
+pub const FILES: [&str; 47] = [
     "adr-write",
     "agent-run",
     "anbieter-neuinstallation",
+    "branch-neu-schreiben",
     "bugfix",
     "catalog-bump",
     "cleanup-targets",
@@ -21,11 +22,13 @@ pub const FILES: [&str; 44] = [
     "download-readonly",
     "entscheidung",
     "feature-liste",
+    "ff-und-tag",
     "frontend-round",
     "frontend-umbau",
     "grundfassung",
     "handoff-update",
     "icon-round",
+    "katalog",
     "koordinator-runde",
     "lift",
     "lift-v1plus",
