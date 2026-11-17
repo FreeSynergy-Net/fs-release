@@ -116,3 +116,82 @@ fn lessons_are_a_mandatory_step_before_the_gates() {
     let weak = t.replace("ETXTBSY", "x");
     assert!(!has(&weak, "lehren-pruefen", &phrases));
 }
+
+const SPERRE_WHEN: &str =
+    "when: ${ .input.art != \"grundfassung\" and $context.vertrag.sperre != true }\n            then: end";
+const WEICHE_WHEN: &str = "when: ${ $context.vor_tag.red != false }\n            then: end";
+const PFLICHT: &str = "is MANDATORY before the first FEATURE release";
+
+/// The release lock, the pre-tag switch, the mandatory sentence in the head and the green exit of `gates-again`, word for word.
+fn lock_lines(text: &str) -> bool {
+    step_body(text, "release-sperre").contains(SPERRE_WHEN)
+        && step_body(text, "vor-tag-weiche").contains(WEICHE_WHEN)
+        && text.contains(PFLICHT)
+        && step_body(text, "gates-again").contains("- green:\n            then: continue")
+}
+
+#[test]
+fn lock_and_pre_tag_lines_are_word_for_word() {
+    let t = read("grundfassung");
+    assert!(lock_lines(&t));
+    for (from, to) in [
+        (
+            "when: ${ .input.art != \"grundfassung\" and $context.vertrag.sperre != true }",
+            "when: ${ $context.vertrag.sperre != true }",
+        ),
+        (SPERRE_WHEN, "when: ${ false }\n            then: end"),
+        (PFLICHT, "is optional"),
+        (WEICHE_WHEN, "when: ${ false }\n            then: end"),
+        (
+            "- green:\n            then: continue",
+            "- green:\n            then: release",
+        ),
+    ] {
+        assert!(!lock_lines(&t.replacen(from, to, 1)), "{to}");
+    }
+}
+
+/// A loop with a counter: from the third round it goes to `grundfassung-eskalation`, which ends.
+fn loops_count(text: &str) -> bool {
+    let ends = step_body(text, "grundfassung-eskalation").contains("then: end");
+    let gates = step_body(text, "gates-again");
+    let bild = step_body(text, "bild-weiche");
+    ends && gates.contains("- runden:")
+        && gates.contains("(($context.gates.runde // 0) >= 3")
+        && gates.contains("then: grundfassung-eskalation")
+        && bild
+            .contains("$context.verdict.accepted == false and ($context.verdict.runde // 0) >= 3")
+        && bild.contains("then: grundfassung-eskalation")
+}
+
+#[test]
+fn loops_have_a_round_counter_and_escalate() {
+    let t = read("grundfassung");
+    assert!(loops_count(&t));
+    assert!(!loops_count(
+        &t.replace("($context.verdict.runde // 0) >= 3", "false")
+    ));
+    assert!(!loops_count(
+        &t.replace("(($context.gates.runde // 0) >= 3", "((false")
+    ));
+    let (head, tail) = t.split_once("  - grundfassung-eskalation:\n").unwrap();
+    let open = format!(
+        "{head}  - grundfassung-eskalation:\n{}",
+        tail.replace("then: end", "then: gates")
+    );
+    assert!(!loops_count(&open));
+}
+
+#[test]
+fn no_stale_texts() {
+    let t = read("grundfassung");
+    assert!(!t.contains("not yet in main"));
+    assert!(!t.contains("v0.0.1 WITHOUT"));
+    assert!(!t.contains("Same release package"));
+    assert!(has(
+        &t,
+        "frontend-crate",
+        &["Own package `fs-<programm>-<frontend>` in the same release"]
+    ));
+    assert!(step_body(&t, "release-sperre").contains("v0.0.x"));
+}
