@@ -50,7 +50,7 @@ impl Preapproved {
         if !fetched.ok() {
             if ctx.reach == Reach::Public {
                 return Err(Stop::red(format!(
-                    "public reach needs the fresh list: git fetch origin {LIST_BRANCH} of {} failed ({}); no local ref is trusted",
+                    "public reach needs the fresh list (no local ref is trusted): git fetch origin {LIST_BRANCH} of {} failed ({})",
                     dir.display(),
                     fetched.first_error()
                 )));
