@@ -142,10 +142,10 @@ do:
             when: '${ ($context.plan.offen | length) == 0 }'
             then: lock-ende
         - schleife:
-            when: '${ ($context.plan.offen | length) > 0 and ($context.plan.offen | length) >= ($context.offenvorher // 1000000) }'
+            when: '${ ($context.plan.offen | length) > 0 and ($context.plan.offen | length) >= ($context.plan.offen_vorher // 1000000) }'
             then: eskalation
         - weiter:
-            when: '${ ($context.plan.offen | length) > 0 and ($context.plan.offen | length) < ($context.offenvorher // 1000000) }'
+            when: '${ ($context.plan.offen | length) > 0 and ($context.plan.offen | length) < ($context.plan.offen_vorher // 1000000) }'
             then: glied-start
         - ohne-ergebnis:
             then: eskalation
@@ -154,14 +154,14 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow of the loop over the Glieder - an empty `plan.offen` goes to the final lock check; if the length of `plan.offen` is NOT smaller than at the last `glied-start` (`offenvorher`: `naechstes` did not shorten the list, the same Glied would be `offen[0]` again) it is a loop and goes to `eskalation`; otherwise the next Glied; a missing plan goes to `eskalation`."
+        freesynergy.net:summary: "Control flow of the loop over the Glieder - an empty `plan.offen` goes to the final lock check; if the length of `plan.offen` is NOT smaller than before the last `naechstes` (`plan.offen_vorher`, written by the script `kaskade-glied-fertig`: it did not shorten the list, the same Glied would be `offen[0]` again) it is a loop and goes to `eskalation`; otherwise the next Glied; a missing plan goes to `eskalation`."
   - glied-start:
       call: kaskade-glied:0.0.10@fs
       with:
         plan: ${ $context.plan }
         ausloeser: ${ .input["ausloeser-tag"] }
       export:
-        as: '${ $context + { glied: ., offenvorher: ($context.plan.offen | length) } }'
+        as: '${ $context + { glied: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -389,7 +389,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - moves the Glied from `plan.offen` to `plan.erledigt` with its tag and the ls-remote proof, adds a note to the board card, and returns to the loop: the NEXT Glied starts only now."
+        freesynergy.net:summary: "Script - moves the Glied from `plan.offen` to `plan.erledigt` with its tag and the ls-remote proof, writes the old length of `offen` as `plan.offen_vorher` (loop guard of `glied-weiche`), adds a note to the board card, and returns to the loop: the NEXT Glied starts only now."
   - lock-ende:
       call: lock-gleich:0.0.10@fs
       with:

@@ -84,7 +84,8 @@ fn ok(t: &str) -> bool {
         .iter()
         .all(|r| step_body(t, "gates").contains(r))
         && step_body(t, "eskalation").contains("ab: ${ if $context.lockende != null then null")
-        && step_body(t, "glied-start").contains("offenvorher")
+        && step_body(t, "glied-weiche").contains("plan.offen_vorher")
+        && step_body(t, "naechstes").contains("plan.offen_vorher")
         && step_body(t, "lage").contains("erledigt")
         && t.contains(".input[\"ausloeser-tag\"]")
         && t.contains(".input.glieder")
@@ -169,7 +170,7 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
         "        ab: ${ if $context.lockende != null then null else",
         "        ab: ${ if false then null else"
     )));
-    assert!(bad(t.replace("offenvorher: (", "x: (")));
+    assert!(bad(t.replace("plan.offen_vorher", "plan.x")));
 }
 
 #[test]
