@@ -1,10 +1,10 @@
 # bahnen: the lanes round of the coordinator - lead the lanes (projects) and the board in fs-tasks, spread the build slots, report to the strategy bundled per lane.
-# Order: `Workflow bahnen, parameters bahnen, ids, slots, nacht, docs` (docs/prompt-template.md). Specification: the `@fs` calls have no script yet, a real run is not proven. It does not replace `koordinator-runde` (the work round with agents, gates and review, a draft); `bahnen` is the book-keeping and slot part of every round. FS profile: see README.md.
+# Order: `Workflow bahnen, parameters bahnen, ids, reihenfolge, slots, nacht, docs` (docs/prompt-template.md). Specification: the `@fs` calls have no script yet, a real run is not proven. It does not replace `koordinator-runde` (the work round with agents, gates and review, a draft); `bahnen` is the book-keeping and slot part of every round. FS profile: see README.md.
 # Rule [ARBEIT-IN-FS-TASKS] (b7, 17 Nov.): ALL agents lead their work in fs-tasks (account `agents`, CLI `timeout 15 fs-tasks ...`, NEVER without `timeout`: start-hang risk 0.0.8). Projects = lanes (`bahn1-komponenten` ... `bahn5-crates`), one card per run, the status is kept current
 # (`claim`, `status ... in-progress|done|failed --report <path>`, `note` of at most 500 bytes). Names: `koordinator`, `bahnN-bauer`, `opus-review`, `haiku-text`, `haiku-push`, `claude-strategie`. Agents NEVER change the ORDER of the cards (the order is the wish of the user), only status and notes.
 # If the CLI hangs (`timeout 15` fires): NEVER start a server yourself, report it to the strategy (the server runs at the user's). Remote states (heads, branches, tags) are PROVEN by `git ls-remote`, never taken from memory or from a report.
 # Slots: at most 2 builds at the same time (`pgrep -af 'build-slot.sh cargo'` without the timeout / bash -c lines: fewer than 2, else wait); slot rule: WRITE code without a slot, BUILD only after the release of a slot. Loops are counted: from the third round (`runde >= 3`) `eskalation`.
-# Input: bahnen (the lane names), ids (the id list of the strategy: card ids per lane), slots (maximum, default 2), nacht (true: night order, see `slots-verteilen`), docs (worktree of fs-documentation for the handoff note).
+# Input: bahnen (the lane names), ids (the id list of the strategy: card ids per lane), reihenfolge (ordered lane list of the strategy; without it the order of the cards), slots (maximum, default 2), nacht (true: night order, see `slots-verteilen`), docs (worktree of fs-documentation for the handoff note).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -41,7 +41,7 @@ do:
   - haenger-weiche:
       switch:
         - haenger:
-            when: '${ $context.board.haenger == true }'
+            when: '${ $context.board.haenger != false }'
             then: haenger-melden
         - ok:
             then: continue
@@ -114,6 +114,7 @@ do:
         karten: ${ $context.karten }
         maximum: ${ .input.slots }
         nacht: ${ .input.nacht }
+        reihenfolge: ${ .input.reihenfolge }
       export:
         as: '${ $context + { verteilung: . } }'
       metadata:
@@ -121,7 +122,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Coordinator (Sonnet) - at most 2 builds at the same time (`maximum`): the free slots (`slots.frei`) go to the cards that wait for a build, in the order of the cards; night order (`nacht == true`): all five lanes keep running, the lane order given by the strategy for the night, without one the order of the cards. SLOT RULE: an agent WRITES code (and tests, documentation, picture sketches) without a slot and BUILDS only after the release of a slot; waiting for a slot is no idle time. Result `verteilung` has `ueberbucht` (more than `maximum` planned = true) and carries runde (+1 for each jump back from `slots-weiche`)."
+        freesynergy.net:summary: "Coordinator (Sonnet) - at most 2 builds at the same time (`maximum`): the free slots (`slots.frei`) go to the cards that wait for a build, in the order of the cards; night order (`nacht == true`): all five lanes keep running; the ORDER of the work kind is: 1. finished states (ff / tag), 2. Opus reviews, 3. gates, then the lanes in the order of the input `reihenfolge` (the lane order from the reports of the strategy; today as the default: finished states, reviews, gates, lane 3 (people), lane 1 (components), lane 4, lane 5, lane 2), without it the order of the cards. SLOT RULE: an agent WRITES code (and tests, documentation, picture sketches) without a slot and BUILDS only after the release of a slot; waiting for a slot is no idle time. Result `verteilung` has `ueberbucht` (more than `maximum` planned = true) and carries runde (+1 for each jump back from `slots-weiche`)."
   - slots-weiche:
       switch:
         - runden:

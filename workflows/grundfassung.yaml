@@ -41,7 +41,6 @@ do:
       call: research-haiku:0.0.10@fs
       with:
         programm: ${ .input.programm }
-        vorbild: ${ .input.vorbild }
         dossier: ${ .input.dossier }
       metadata:
         freesynergy.net:actor: ai
@@ -304,7 +303,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: bilder-gate
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Picture gate of the main view (specification, no script yet): for `main` and `main-empty` (de and en) BOTH pictures exist - the model picture and ours - with the SAME filter and the SAME state (same active filter, language and theme); model pictures come from the model round (podman, local, no terms of service agreed; documentation pictures only from public pages), never from a run that agreed to a licence dialog. A missing model picture, a missing main view picture or a pair with a different state is RED (`red`), never green. The picture OK of the strategy (b7) on these pairs is MANDATORY: no tag without it (`vor-tag`)."
+        freesynergy.net:summary: "Picture gate of the main view (specification, no script yet): for `main` and `main-empty` (de and en) BOTH pictures exist - the model picture and ours - with the SAME filter and the SAME state (same active filter, language and theme); model pictures come from the model round (podman, local, no terms of service agreed; documentation pictures only from public pages), never from a run that agreed to a licence dialog. A missing model picture, a missing main view picture or a pair with a different state is RED (`red`), never green. HINT for the later script: the model comes from ONE source, `$context.features.vorbild` (`hauptansicht`, `bildpaar`, `picture-ok`); there is no own input `vorbild`. The picture OK of the strategy (b7) on these pairs is MANDATORY: no tag without it (`vor-tag`)."
   - bildpaar-weiche:
       switch:
         - rot:
@@ -326,7 +325,7 @@ do:
           version: 0.0.10
         input:
           dossier: ${ .input.dossier }
-          model: ${ .input.vorbild }
+          model: ${ $context.features.vorbild }
           ours: ${ $context.images }
           waechter: ${ $context.waechter }
           paare: ${ $context.bildpaar }
@@ -414,6 +413,8 @@ do:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
         head: ${ .input.head }
+        verdict: ${ $context.verdict }
+        bildpaar: ${ $context.bildpaar }
       export:
         as: '${ $context + { vor_tag: . } }'
       metadata:
@@ -421,7 +422,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Before ANY tag: (1) the branch CI of ALL workflows (also Windows where it exists) is green on exactly this head - checked, not assumed; (2) every condition of the Opus review (also of the Nachblick, delta look) is resolved: NO tag with an open condition (lesson messages v0.0.3); (3) for `art: feature` the lock `release_frei` is there; (4) the picture OK of the strategy (b7) on the picture pairs of the main view is there (`bildpaar`, `picture-ok`): no tag without it. The result is `red` or not; a missing result is never green."
+        freesynergy.net:summary: "Before ANY tag: (1) the branch CI of ALL workflows (also Windows where it exists) is green on exactly this head - checked, not assumed; (2) every condition of the Opus review (also of the Nachblick, delta look) is resolved: NO tag with an open condition (lesson messages v0.0.3); (3) for `art: feature` the lock `release_frei` is there; (4) the picture OK of the strategy (b7) on the picture pairs of the main view is there (`bildpaar`, `picture-ok`): no tag without it: this step is RED when `verdict.accepted != true` or `bildpaar.red != false` (both are handed over in `with`, not only named here). The result is `red` or not; a missing result is never green."
   - vor-tag-weiche:
       switch:
         - rot:

@@ -409,3 +409,57 @@ fn chain_rebase_hint_names_the_result_fields() {
         &t.replace("HINT for the later script `chain-rebase`", "note")
     ));
 }
+
+#[test]
+fn opus_conditions_hang_pretag_and_order() {
+    let b = read("bahnen");
+    let hang = |t: &str| has(t, "haenger-weiche", &["$context.board.haenger != false"]);
+    assert!(hang(&b));
+    assert!(!hang(&b.replace(
+        "$context.board.haenger != false",
+        "$context.board.haenger == true"
+    )));
+    let g = read("grundfassung");
+    let pre = |t: &str| {
+        has(
+            t,
+            "vor-tag",
+            &[
+                "verdict: ${ $context.verdict }",
+                "bildpaar: ${ $context.bildpaar }",
+                "verdict.accepted != true",
+                "bildpaar.red != false",
+            ],
+        )
+    };
+    assert!(pre(&g));
+    assert!(!pre(
+        &g.replace("verdict: ${ $context.verdict }", "verdict: x")
+    ));
+    assert!(!pre(
+        &g.replace("bildpaar: ${ $context.bildpaar }", "bildpaar: x")
+    ));
+    assert!(!pre(&g.replace("verdict.accepted != true", "x")));
+    let ord = |t: &str| {
+        has(
+            t,
+            "slots-verteilen",
+            &[
+                "reihenfolge: ${ .input.reihenfolge }",
+                "1. finished states (ff / tag), 2. Opus reviews, 3. gates",
+            ],
+        ) && t.contains("reihenfolge (ordered lane list")
+    };
+    assert!(ord(&b));
+    assert!(!ord(&b.replace("reihenfolge: ${ .input.reihenfolge }", "x")));
+    assert!(!ord(&b.replace("2. Opus reviews", "2. x")));
+    assert!(
+        !g.contains(".input.vorbild")
+            && has(&g, "picture-ok", &["model: ${ $context.features.vorbild }"])
+    );
+    assert!(g
+        .replace("$context.features.vorbild", ".input.vorbild")
+        .contains(".input.vorbild"));
+    assert!(b.contains("lane 3 (people), lane 1 (components), lane 4, lane 5, lane 2"));
+    assert!(has(&g, "bildpaar", &["ONE source"]));
+}
