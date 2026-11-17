@@ -23,6 +23,27 @@ pub struct Out {
     pub stderr: String,
 }
 
+/// The text without ANSI escape sequences (`ESC [ ... final byte`, e.g. colours): a caller that forces colour
+/// (`CARGO_TERM_COLOR=always`, as the CI does) must not change what is compared or shown.
+#[must_use]
+pub fn strip_ansi(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut it = text.chars().peekable();
+    while let Some(c) = it.next() {
+        if c == '\u{1b}' && it.peek() == Some(&'[') {
+            it.next();
+            for d in it.by_ref() {
+                if ('@'..='~').contains(&d) {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 impl Out {
     /// True when the program exited with 0.
     #[must_use]
@@ -33,7 +54,7 @@ impl Out {
     /// First line that carries an error, else the first non-empty line of stderr, else of stdout.
     #[must_use]
     pub fn first_error(&self) -> String {
-        let all = format!("{}\n{}", self.stderr, self.stdout);
+        let all = strip_ansi(&format!("{}\n{}", self.stderr, self.stdout));
         let lines = || all.lines().map(str::trim).filter(|l| !l.is_empty());
         let pick = lines().find(|l| {
             let low = l.to_lowercase();

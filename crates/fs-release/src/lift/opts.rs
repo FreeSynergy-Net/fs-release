@@ -189,7 +189,8 @@ impl LiftEnv<'_> {
         words.push("cargo".into());
         words.extend(args.iter().map(|a| (*a).to_string()));
         let program = words.remove(0);
-        let mut env = Vec::new();
+        // no colour codes in what the lift reads, whatever the caller (or the CI) forces
+        let mut env = vec![("CARGO_TERM_COLOR".to_string(), "never".to_string())];
         if let Some(t) = toolchain {
             env.push(("RUSTUP_TOOLCHAIN".to_string(), t.to_string()));
         } else if let Ok(v) = std::fs::read_to_string(self.opts.release_dir.join("RUST_VERSION")) {
