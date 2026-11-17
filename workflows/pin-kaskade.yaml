@@ -168,14 +168,15 @@ do:
       with:
         plan: ${ $context.plan }
         ausloeser: ${ .input["ausloeser-tag"] }
+        dir: ${ .input.worktrees // "/srv/FreeSynergy/.scratch/api-runner/wt" }/pk-${ $context.plan.offen[0].repo }
       export:
-        as: '${ $context + { glied: . } }'
+        as: '${ $context + { glied: .glied, lockdatei: .lock_datei } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script `scripts/kaskade-glied` - takes `plan.offen[0]` as the current Glied (`glied` = { repo, art, tag, allow, besonderes, libs, tags }, `libs` = the trigger tag of fs-types plus the tags of the Glieder already done that this one depends on, as `NAME=vX.Y.Z` for the lift; `tags` = the same for every done Glied it depends on, as {repo: tag}; a dependency that is not done is red). One Glied at a time; BUILD_PRIORITY of every build step of a Glied is 0 (scaffold core, `build-slot.sh`)."
+        freesynergy.net:summary: "Script `scripts/kaskade-glied` - ensures the tool file `.fs-lock-sources.toml` (`strict = true`, `only_from_enabled = true`) in the Glied worktree (missing: created; `strict = false` raised to true and shown in `hinweise`, so the commit of the Glied branch carries it), takes `plan.offen[0]` as the current Glied (`glied` = { repo, art, tag, allow, besonderes, libs, tags }, `libs` = the trigger tag of fs-types plus the tags of the Glieder already done that this one depends on, as `NAME=vX.Y.Z` for the lift; `tags` = the same for every done Glied it depends on, as {repo: tag}; a dependency that is not done is red). One Glied at a time; BUILD_PRIORITY of every build step of a Glied is 0 (scaffold core, `build-slot.sh`)."
   - rev-pins:
       call: kaskade-fremde-pins:0.0.10@fs
       with:
