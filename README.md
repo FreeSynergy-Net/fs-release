@@ -11,6 +11,7 @@ What is different here: everything is free of charge for you and for us. A relea
 No release tag yet. The workflows are used by the repos through a caller file.
 
 - CI: formatting, lints, tests, our own code-rules checker and a licence policy check.
+- Windows gate: one reusable workflow (`_windows-check.yml`: fmt, clippy pedantic, tests on `windows-2022`) with a small caller file.
 - Packages: Linux (tar.gz, deb, rpm, AppImage, Arch, optional Flatpak), Windows (zip, msi, exe), macOS (tar.gz, dmg), optional container image.
 - A software bill of materials (SPDX), build provenance, checksums and OpenPGP signatures.
 - A draft GitHub release, never published automatically.
