@@ -1,0 +1,383 @@
+# Create a module (plan baukasten section b2): only when nothing exists and enough programs need it; no module without a standard or an open specification of its own.
+# Order: `Workflow modul-neu, step <id>, parameters name, kategorie, art, nutzer, standard` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
+# DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main, tag or merge; output only on `unreviewed/<workflow>-<ziel>` branches; no `gh` call; reports per [BERICHT]; one board card per run (fs-tasks).
+# Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
+# Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
+# Inputs: `name`, `kategorie` (plan section b2.7), `art` (konfiguration | agent | fachmodul), `nutzer` (list of programs), `standard`, `programmseite` (program page in fs-documentation en + de, for the help part), `hilfe_marker` (optional).
+# Rules. (1) Existing first (N10): catalog, module repos, `unreviewed/` branches and `.scratch` are searched before anything new. (2) A shared module needs at least 2 users, a specialist module at least 1 (plan section b2.3 e). (3) Data of others only through a contract; own data with export, import, share, delete, media type, version. (4) No `[[exception]]` without `talk` (use `ausnahme-gespraech`).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: modul-neu
+  version: 0.0.10
+  title: Create a shared module or specialist module - existing first, users, standard, place, way, description, trait review, create, catalog proposal
+do:
+  - karte:
+      call: board-card:0.0.10@fs
+      with:
+        workflow: modul-neu
+        name: ${ .input.name }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
+  - vorhandenes-zuerst:
+      call: vorhandenes-zuerst-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+        kategorie: ${ .input.kategorie }
+      export:
+        as: '${ $context + { vorhanden: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Search the catalog, the module repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`) and `.scratch` for existing work (N10, rule [VORHANDENES-ZUERST]). Result `treffer` (list with source and head); a hit means: no new module."
+  - vorhanden-weiche:
+      switch:
+        - treffer:
+            when: '${ $context.vorhanden.treffer != null and ($context.vorhanden.treffer | length) > 0 }'
+            then: abbruch
+        - keine:
+            when: '${ $context.vorhanden.treffer != null and ($context.vorhanden.treffer | length) == 0 }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a hit ends the run with a reference to it (no new module); an empty hit list goes on; a missing result goes to `eskalation`."
+  - nutzer-pruefen:
+      call: nutzer-zaehlen:0.0.10@fs
+      with:
+        art: ${ .input.art }
+        nutzer: ${ .input.nutzer }
+      export:
+        as: '${ $context + { nutzer: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - a shared module needs at least 2 users (`art` konfiguration or agent), a specialist module at least 1 (plan section b2.3 e); otherwise abort. Result `{ zahl, genug }`."
+  - nutzer-weiche:
+      switch:
+        - genug:
+            when: '${ $context.nutzer.genug == true }'
+            then: continue
+        - zu-wenige:
+            when: '${ $context.nutzer.genug == false }'
+            then: abbruch
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - too few users abort the run (the feature stays a feature of the program); a missing result goes to `eskalation`."
+  - standard-pruefen:
+      call: standard-belegen-ai:0.0.10@fs
+      with:
+        standard: ${ .input.standard }
+        name: ${ .input.name }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Prove the standard per method or field (URI and section) or write an own open specification; nothing is invented."
+  - standard-pruefen-check:
+      call: standard-belege:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      export:
+        as: '${ $context + { standardcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every method or field has a standard URI with a section or an own open specification; a missing proof is red."
+  - standard-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.standardcheck.red == true and ($context.standardcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.standardcheck.red == true }'
+            then: standard-pruefen
+        - green:
+            when: '${ $context.standardcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `standard-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - ort:
+      call: modul-ort:0.0.10@fs
+      with:
+        name: ${ .input.name }
+        kategorie: ${ .input.kategorie }
+      export:
+        as: '${ $context + { ort: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the place: test \"general enough for crates.io?\" (no fs dependency, own docs, MIT OR Apache-2.0, Claude named) gives a candidate (publication later, without \"freesynergy\" in the name); otherwise the group repo of the category (plan section b2.5). The result stands in the report."
+  - kommunikation:
+      call: kommunikation-ai:0.0.10@fs
+      with:
+        nutzer: ${ .input.nutzer }
+        ort: ${ $context.ort }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The way by closeness (plan section b2.0): near = WebAssembly, without a program = Cap'n Proto, far away = Cap'n Proto, JSON or gRPC. Way and reason go into the manifest."
+  - beschreibung:
+      call: modul-beschreibung-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+        art: ${ .input.art }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Module description: contract part, kits, `accepts`, duties (plan section b2.3: data of others only through a contract, own data with export, import, share, delete, media type, version)."
+  - beschreibung-check:
+      call: modul-pflichten:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      export:
+        as: '${ $context + { pflichten: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every duty of plan section b2.3 is proven in the description (export, import, share, delete, media type, version; contract for foreign data)."
+  - beschreibung-again:
+      switch:
+        - runden:
+            when: '${ $context.pflichten.red == true and ($context.pflichten.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.pflichten.red == true }'
+            then: beschreibung
+        - green:
+            when: '${ $context.pflichten.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `beschreibung` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - trait-pruefung:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: trait-delta
+          version: 0.0.10
+        input:
+          name: ${ .input.name }
+          teil: review
+      export:
+        as: '${ $context + { urteil: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Opus look through the flow `trait-delta`: verdict YES or NO for the description."
+  - trait-pruefung-again:
+      switch:
+        - runden:
+            when: '${ $context.urteil.verdict == "NEIN" and ($context.urteil.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.urteil.verdict == "NEIN" }'
+            then: beschreibung
+        - ja:
+            when: '${ $context.urteil.verdict == "JA" }'
+            then: continue
+        - ohne-urteil:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO goes back to `beschreibung` (at most two repeats), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
+  - anlegen:
+      call: modul-anlegen-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+        ort: ${ $context.ort }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Create the crate in the target repo and the manifest (AppStream `addon`, `extends`, `fs:requires`) on a branch `unreviewed/modul-neu-<name>`; local commit, no push."
+  - anlegen-check:
+      call: manifest-pruefen:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      export:
+        as: '${ $context + { manifest: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: the manifest is valid (AppStream addon, extends, fs:requires)."
+  - anlegen-again:
+      switch:
+        - runden:
+            when: '${ $context.manifest.red == true and ($context.manifest.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.manifest.red == true }'
+            then: anlegen
+        - green:
+            when: '${ $context.manifest.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `anlegen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - katalog-vorschlag:
+      call: katalog-vorschlag-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Catalog proposal: an entry `kind = module` (ADR 0077) as a diff, not pushed."
+  - katalog-vorschlag-check:
+      call: gen-catalog-check:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      export:
+        as: '${ $context + { katalog: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: `gen_catalog --check` is green on the proposal."
+  - katalog-vorschlag-again:
+      switch:
+        - runden:
+            when: '${ $context.katalog.red == true and ($context.katalog.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.katalog.red == true }'
+            then: katalog-vorschlag
+        - green:
+            when: '${ $context.katalog.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `katalog-vorschlag` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - doku-hilfe:
+      call: doku-hilfe-ai:0.0.10@fs
+      with:
+        programmseite: ${ .input.programmseite }
+        hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Help = docs (step G2b): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`) has a MARKED help part (marker `hilfe_marker`, default `<!-- fs:help -->` ... `<!-- /fs:help -->`); if not, a placeholder part is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
+  - doku-hilfe-check:
+      call: doku-hilfe-regel:0.0.10@fs
+      with:
+        programmseite: ${ .input.programmseite }
+      export:
+        as: '${ $context + { hilfecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: the marker is there in BOTH languages (en and de) and encloses a part; no help text in the program repo (a second source is red)."
+  - doku-hilfe-again:
+      switch:
+        - runden:
+            when: '${ $context.hilfecheck.red == true and ($context.hilfecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.hilfecheck.red == true }'
+            then: doku-hilfe
+        - green:
+            when: '${ $context.hilfecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `doku-hilfe` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never to green."
+  - bericht:
+      call: report-write:0.0.10@fs
+      with:
+        lauf: ${ $context }
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report: place (crates.io candidate or group repo), way, users, standard, the branch and the catalog diff; what is not proven is named."
+  - abbruch:
+      set:
+        todo: abbruch
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Abort with a reference (hit of `vorhandenes-zuerst` or too few users): no new module; the report names the reference. The run ends here."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a NO came for the third time, a decision is open, or a result is missing: the loop stops and the person decides. The report names the step and the last red result; nothing goes on by itself."
