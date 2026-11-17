@@ -4,6 +4,7 @@
 # One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters contract, tag, repo,
 # branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
 # Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
+# Review template frontend: step `frontend-nur-komponenten` (input `frontend_crate`) before the picture acceptance: only component calls; logic or a widget is a finding (conversation `frontend-befund-talk`).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -233,6 +234,49 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - fixed values left, red gates or a changed picture go back to convert, otherwise on to the release.
+  - frontend-nur-komponenten:
+      call: frontend-nur-komponenten:0.0.10@fs
+      with:
+        frontend_crate: ${ .input.frontend_crate }
+      export:
+        as: '${ $context + { komponenten: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Review template frontend (rule of the user, lane 3): the frontend crate (input `frontend_crate`) contains ONLY the plugging together of components from fs-components plus theme, style, menu tree and texts: no logic, no own widgets, no data conversion. A new widget or logic is a FINDING (result `befunde`, each with file and line): a missing component is built in fs-components (or the nearest existing component stands in, marked \"vorläufig\"), logic belongs into the program or the modules through the contract. Until the frontend is a description (manifest / forms kit, read at run time) the plug-together code is a transition. Opus reads only the crate and writes the findings; it changes nothing."
+  - frontend-nur-komponenten-weiche:
+      switch:
+        - runden:
+            when: '${ $context.komponenten.befunde != null and ($context.komponenten.befunde | length) > 0 and ($context.komponenten.runde // 0) >= 3 }'
+            then: umbau-eskalation
+        - befund:
+            when: '${ $context.komponenten.befunde != null and ($context.komponenten.befunde | length) > 0 }'
+            then: frontend-befund-talk
+        - sauber:
+            when: '${ $context.komponenten.befunde != null and ($context.komponenten.befunde | length) == 0 }'
+            then: release
+        - ohne-ergebnis:
+            then: umbau-eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a finding goes to the conversation `frontend-befund-talk` (at most two repeats, then the escalation); only an empty list (not a missing result) goes on; a missing result goes to the escalation, never on."
+  - frontend-befund-talk:
+      call: talk:0.0.10@fs
+      with:
+        frontend_crate: ${ .input.frontend_crate }
+        befunde: ${ $context.komponenten.befunde }
+      then: frontend-nur-komponenten
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Conversation of the user and Opus about every finding (logic or widget in the frontend crate): move it into fs-components or into the program, or decide otherwise; the protocol `talk-<programm>-frontend-<datum>.md` holds the decision. No agent decides it alone. Then the check runs again."
   - release:
       then: end
       run:
