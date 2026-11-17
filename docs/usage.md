@@ -295,6 +295,10 @@ branch is the human step `veroeffentlichen`. The list is German only, not publis
 documentation stays short with a picture and takes its "today" and "what comes" from the stages of the list. `grundfassung` calls the
 flow as step 1b; it also runs alone. The `@fs` calls have no script yet (specification, a real run is not proven).
 
+## Identity check before ff (`adresse-pruefen`)
+
+Before a branch goes to `main` by fast-forward, the steps `adresse-pruefen` of `release-flow` (after `lock-pruefung`, before `review-request`) and `agent-run` (after `fmt`, before `review`) check the range `main..HEAD`: `git log --format='%ae %ce' main..HEAD` lists author and committer address of every commit, and only the identity in the key `FS_ALLOWED_IDENTITY` (value `support@freesynergy.net`) is allowed. Every other address, as author or as committer, is a hit without exception (also machine and bot addresses): the step is red, the branch is rewritten first (author and committer = the allowed identity) and the check runs again. The step names the commit, never an address. The check sits before the review because a rewrite makes a new head and a JA is bound to exactly one head (a new head makes a JA invalid); after the tag a rewrite would leave a public tag on the old commits. Agents and bots must commit with the allowed identity (FS_ALLOWED_IDENTITY); any other author or committer address in `main..HEAD` counts as a finding and the branch is rewritten before the review. Specification: the `@fs` call `identity-check` has no script yet.
+
 ## Required package metadata
 
 The plan step fails early unless every package that owns binaries declares `authors`, `description`,

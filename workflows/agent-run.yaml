@@ -73,6 +73,17 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: cargo fmt by the coordinator's machine step, not by the agent ([EFFIZIENZ] - mechanics is a script, not an agent).
+  - adresse-pruefen:
+      call: identity-check:0.0.10@fs
+      with:
+        range: main..${ .input.head }
+        allowed_identity_key: FS_ALLOWED_IDENTITY
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Identity check before the review (b7), specification, no script yet: `git log --format='%ae %ce' main..HEAD` lists author and committer address of every commit of the range; only the identity in the key/config `FS_ALLOWED_IDENTITY` is allowed. Every other address as author or as committer is a hit (no exception, also no machine or bot address): red, the branch is rewritten first (author and committer = the allowed identity) and the check runs again. The check names the commit, never an address. It sits BEFORE the review because a rewrite makes a new head, and a JA is bound to exactly one head; after the review or after the tag a rewrite would void the JA or leave a public tag on the old commits."
   - review:
       call: review-ai:0.0.10@fs
       with:
