@@ -41,7 +41,7 @@ pub const EDGES: &[(&str, &[&str])] = &[
     ),
 ];
 
-/// The `rev` pins to FreeSynergy repos the header names (`# REV-PIN: <Glied> -> <owner repo> rev <rev> ...`), read from the Cargo.toml of main 17.11.2026.
+/// The `rev` pins to `FreeSynergy` repos the header names (`# REV-PIN: <Glied> -> <owner repo> rev <rev> ...`), read from the Cargo.toml of main 17.11.2026.
 pub const REV_PINS: &[&str] = &[
     "fs-rpc -> fs-types rev 339aa24f",
     "fs-components -> fs-types rev 339aa24f",
