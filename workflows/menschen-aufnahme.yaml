@@ -1,0 +1,263 @@
+# menschen-aufnahme: taking a new person into the project (invitation and first steps). People first: only data the person gave THEMSELVES, never without their consent, no labelling of a person.
+# Order: `Workflow menschen-aufnahme, parameters person, rolle, zugang, gruppe, kanal` (docs/prompt-template.md). Specification: the `@fs` calls have no script yet, a real run is not proven. FS profile: see README.md.
+# Rule [KEINE-ZUSTIMMUNG-IM-NAMEN-DES-NUTZERS]: an agent NEVER agrees to anything in the name of a person (terms, privacy, licence, invitation, vote, role); every consent is given EXPLICITLY by the person themselves in a `human` step.
+# The way in follows the self-administration of the group: gatekeeper bot (no AI), vote, admin or open, with the min/max of the group; an AI takes part only by invitation and with the consent of all (STOP-AI), never as an account of a person.
+# The agent only prepares texts (invitation, welcome material, privacy note) and writes the report; it sends nothing, stores nothing about the person beyond the self-given data and starts no account. Missing data are asked for, never filled in or dropped without asking.
+# Loops are counted: from the third round (`runde` >= 3) `eskalation`. Input: person (the reference to the person in people), rolle (the wished role), zugang (gatekeeper | vote | admin | open), gruppe, kanal (how the invitation reaches the person, chosen by them).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: menschen-aufnahme
+  version: 0.0.10
+  title: "Take a new person into the project - self-given data, consent only by the person, way in by the rules of the group"
+do:
+  - angaben-aufnehmen:
+      call: take-details:0.0.10@fs
+      with:
+        person: ${ .input.person }
+        rolle: ${ .input.rolle }
+        kanal: ${ .input.kanal }
+      export:
+        as: '${ $context + { angaben: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The person (or the inviting person on their word) gives the data themselves: the name they want to be called, the way they want to be reached, the wished role. Only what is given; nothing is looked up about the person elsewhere, nothing is guessed, no field about other people. Result `angaben` carrying `runde` (+1 for each jump back from `angaben-weiche`)."
+  - einwilligung-daten:
+      call: data-consent:0.0.10@fs
+      with:
+        angaben: ${ $context.angaben }
+      export:
+        as: '${ $context + { einwilligung: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The PERSON agrees to the storage of exactly these data and nothing else, or says no (the consent is the person's own, never given by an agent or in their name). Result `einwilligung` with `gegeben` (true only after the explicit answer of the person)."
+  - einwilligung-weiche:
+      switch:
+        - keine:
+            when: '${ $context.einwilligung.gegeben != true }'
+            then: ohne-einwilligung
+        - gegeben:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Control flow - without the explicit consent of the person (or a missing result) nothing is stored and no account is made: `ohne-einwilligung`; only `gegeben == true` goes on."
+  - daten-pruefen:
+      call: check-details:0.0.10@fs
+      with:
+        angaben: ${ $context.angaben }
+      export:
+        as: '${ $context + { daten: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - checks the data: only the self-given fields (name, way of contact, role), no data about other people, no labelling of the person, nothing the person did not give. A field that does not belong is NOT dropped silently: it is named and goes back to the person. Result `daten` with `red` (true = a field does not belong or is missing) and the named fields."
+  - angaben-weiche:
+      switch:
+        - runden:
+            when: '${ $context.daten.red != false and ($context.angaben.runde // 0) >= 3 }'
+            then: eskalation
+        - nochmal:
+            when: '${ $context.daten.red != false }'
+            then: angaben-aufnehmen
+        - sauber:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red or missing `daten` result goes back to `angaben-aufnehmen` (the person is asked about the named fields), from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the role."
+  - rolle-klaeren:
+      call: settle-role:0.0.10@fs
+      with:
+        gruppe: ${ .input.gruppe }
+        rolle: ${ .input.rolle }
+      export:
+        as: '${ $context + { rolle: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The role is settled by the rule of the group (self-administration): the person names the wish, the group or its admin decides by its own rule; the agent decides nothing. Result `rolle`."
+  - zugang-lesen:
+      call: read-access-rules:0.0.10@fs
+      with:
+        gruppe: ${ .input.gruppe }
+        zugang: ${ .input.zugang }
+      export:
+        as: '${ $context + { zugang: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - reads the way in from the rules of the group: `gatekeeper` (the gatekeeper bot, no AI, checks the invitation link and the min/max), `vote` (the members vote), `admin` (an admin of the group frees the entry) or `open`. Result `zugang` with `art` and `red`; an unknown way is `red`, never guessed."
+  - zugang-weiche:
+      switch:
+        - unbekannt:
+            when: '${ $context.zugang.red != false }'
+            then: eskalation
+        - bekannt:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - an unknown way in (or a missing result) goes to `eskalation`; only `red == false` goes on to the way of the group."
+  - tuersteher:
+      call: gatekeeper-bot:0.0.10@fs
+      with:
+        gruppe: ${ .input.gruppe }
+      if: '${ $context.zugang.art == "gatekeeper" }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the gatekeeper bot (no AI, never an account of a person) checks the invitation link, the min/max of the group and the valid time; it decides nothing about the person beyond the rule and writes the entry to the log of the group."
+  - abstimmung:
+      call: group-vote:0.0.10@fs
+      with:
+        gruppe: ${ .input.gruppe }
+      if: '${ $context.zugang.art == "vote" }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The members of the group vote by their own rule; the result of the vote is the vote of the people, never of an agent. Only for the way `vote`."
+  - admin-freigabe:
+      call: admin-release:0.0.10@fs
+      with:
+        gruppe: ${ .input.gruppe }
+      if: '${ $context.zugang.art == "admin" }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "An admin of the group frees the entry, by their own decision. Only for the way `admin`."
+  - willkommen-vorbereiten:
+      call: welcome-ai:0.0.10@fs
+      with:
+        angaben: ${ $context.angaben }
+        rolle: ${ $context.rolle }
+      export:
+        as: '${ $context + { willkommen: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The agent PREPARES the invitation text, the welcome material (what the project is, how to reach help, how to leave, who sees what) and the privacy note, from the self-given data only; it sends nothing, stores nothing, starts no account and never agrees to anything in the name of the person ([KEINE-ZUSTIMMUNG-IM-NAMEN-DES-NUTZERS]). An AI of the project is named only as invitation with STOP-AI, never as given. Result `willkommen`."
+  - zustimmung-pruefen:
+      call: check-consents:0.0.10@fs
+      with:
+        willkommen: ${ $context.willkommen }
+      export:
+        as: '${ $context + { zustimmung: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - checks all records of this run: every consent (data, privacy, invitation, vote) has the PERSON themselves as the giver and `human` as the actor; a consent written by an agent or a machine, a pre-ticked box or a consent without a time is red. Result `zustimmung` with `red` and `runde` (+1 for each jump back from `zustimmung-weiche`)."
+  - zustimmung-weiche:
+      switch:
+        - runden:
+            when: '${ $context.zustimmung.red != false and ($context.zustimmung.runde // 0) >= 3 }'
+            then: eskalation
+        - nochmal:
+            when: '${ $context.zustimmung.red != false }'
+            then: willkommen-vorbereiten
+        - sauber:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red or missing consent check goes back to `willkommen-vorbereiten`, from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the privacy note."
+  - datenschutz-hinweis:
+      call: privacy-note:0.0.10@fs
+      with:
+        willkommen: ${ $context.willkommen }
+      export:
+        as: '${ $context + { hinweis: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The PERSON reads the privacy note (what is stored, who sees it, how to leave and have everything removed, an AI only by invitation with STOP-AI) and confirms it themselves, or says no. Without their own confirmation the run goes no further. Result `hinweis` with `gesehen`."
+  - hinweis-weiche:
+      switch:
+        - nein:
+            when: '${ $context.hinweis.gesehen != true }'
+            then: ohne-einwilligung
+        - gesehen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Control flow - a privacy note that the person did not confirm themselves (or a missing result) ends the run at `ohne-einwilligung`; only `gesehen == true` goes on to the invitation."
+  - einladung-senden:
+      call: send-invitation:0.0.10@fs
+      with:
+        willkommen: ${ $context.willkommen }
+        kanal: ${ .input.kanal }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A human (the inviting person, an admin, or the gatekeeper bot by the rule of the group) sends the invitation to the way the person chose; the agent sends nothing."
+  - aufnahme-beleg:
+      call: record-ai:0.0.10@fs
+      with:
+        angaben: ${ $context.angaben }
+        rolle: ${ $context.rolle }
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The agent writes the report: who (the reference to the person, no more data than given), role, way in, date, which consents the person gave themselves and when. No address, no data beyond the self-given ones. This flow ends."
+  - ohne-einwilligung:
+      set:
+        todo: ohne-einwilligung
+        status: stopped
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The person did not consent (or did not confirm the note): nothing is stored, no account is made, no invitation goes out; the person may come back any time. The agent does not ask again and does not agree for them. This flow ends."
+  - eskalation:
+      set:
+        todo: eskalation
+        status: escalated
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Escalation after the third round (`runde` >= 3) of the data check or the consent check: the person (or the admin of the group) decides how to go on; nothing is stored in the meantime. This flow ends."

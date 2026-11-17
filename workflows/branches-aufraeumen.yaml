@@ -1,0 +1,165 @@
+# branches-aufraeumen: the clean-up LIST of branches, clones and build folders - the agents DELETE NOTHING (rule of the user: mass deletion is run by the user with a script; a refusal is never worked around through own agents).
+# The flow only READS and WRITES a list and a user script: an entry in `fuer-nutzer.md` plus a script whose default is `--dry-run`, with single names (no placeholder, no glob) and no `rm -rf` on a variable without a check.
+# The delete commands exist ONLY as text inside the user script; no step of an agent or a machine runs one. The flow ends with `nutzer-fuehrt-aus` (the user runs the script). `cleanup-targets` stays the flow for the build targets of finished runs.
+# Order: `Workflow branches-aufraeumen, parameters repos, wurzeln, datum` (docs/prompt-template.md). Specification: the `@fs` calls have no script yet, a real run is not proven. FS profile: see README.md.
+# Proof of every remote statement: `git ls-remote <repo> <ref>` (never an old fetch) and `git merge-base --is-ancestor <head> origin/main`; podman: images and volumes are LISTED; anonymous volumes of other runs are never touched.
+# Loops are counted: from the third round (`runde` >= 3) `eskalation`. Input: repos (the repos to look at), wurzeln (the local roots: .scratch/review-*, wt/*, target folders), datum (the date in the file name of the script).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: branches-aufraeumen
+  version: 0.0.10
+  title: "Branch, clone and target clean-up list with a user script - agents delete nothing, the user runs it"
+do:
+  - remote-lage:
+      call: remote-heads:0.0.10@fs
+      with:
+        repos: ${ .input.repos }
+      export:
+        as: '${ $context + { heads: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (read only) - per repo `git ls-remote --heads <url>` gives the heads of all branches; main and the newest tag are named. Nothing is fetched into a working tree, nothing is changed. Result `heads` (repo, branch, head)."
+  - merged-belegen:
+      call: merged-proof:0.0.10@fs
+      with:
+        heads: ${ $context.heads }
+      export:
+        as: '${ $context + { branches: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (read only) - for every branch `git merge-base --is-ancestor <head> origin/main` (merged = the head is part of main) and `git cherry` as the second view; `unreviewed/*` branches are listed apart. Result `branches` with the proof per branch (head, result of the check, date of the last commit); a branch without a proof is `unklar`, never `merged`."
+  - lokal-listen:
+      call: local-list:0.0.10@fs
+      with:
+        wurzeln: ${ .input.wurzeln }
+      export:
+        as: '${ $context + { lokal: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (read only) - lists the local clones under `.scratch/review-*`, the work trees under `wt/*`, the `target` folders (size per folder, last change, which run owns them according to the board) and the temporary folders of finished runs. Result `lokal`; nothing is touched."
+  - podman-listen:
+      call: podman-list:0.0.10@fs
+      export:
+        as: '${ $context + { podman: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (read only) - lists the podman images and volumes (name, size, age, used by which run). Anonymous volumes and everything of other runs are marked BLEIBT and are never put on a list for removal. Result `podman`."
+  - bleibt-liste:
+      call: sort-lists-ai:0.0.10@fs
+      with:
+        branches: ${ $context.branches }
+        lokal: ${ $context.lokal }
+        podman: ${ $context.podman }
+      export:
+        as: '${ $context + { listen: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent sorts everything found into two lists: `weg` (a branch that is merged with proof, a clone or work tree of a finished run, a target folder without an owner, an image of a finished run) and `bleibt` (a branch that is not merged, an open review, a lane that still runs, anonymous volumes and everything of other runs, everything without a proof). Every entry has its proof and the reason; when in doubt it goes to `bleibt`. The agent changes and runs nothing here. Result `listen` carrying `runde` (+1 for each jump back from `listen-weiche`)."
+  - listen-pruefen:
+      call: check-list:0.0.10@fs
+      with:
+        listen: ${ $context.listen }
+      export:
+        as: '${ $context + { liste: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (read only) - checks the list `weg`: every entry has a proof (head by `ls-remote`, result of `--is-ancestor`), is no entry of `bleibt`, has ONE complete name (no `*`, no `?`, no `$` variable, no placeholder), lies under an allowed root and belongs to no run that still goes. Result `liste` with `red` (true = one entry fails) and the failing entries; a missing proof is red, never green."
+  - listen-weiche:
+      switch:
+        - runden:
+            when: '${ $context.liste.red != false and ($context.listen.runde // 0) >= 3 }'
+            then: eskalation
+        - nochmal:
+            when: '${ $context.liste.red != false }'
+            then: bleibt-liste
+        - sauber:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red or missing check result goes back to `bleibt-liste` (the failing entries go to `bleibt`), from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the user script."
+  - skript-erzeugen:
+      call: user-script-ai:0.0.10@fs
+      with:
+        listen: ${ $context.listen }
+        datum: ${ .input.datum }
+      export:
+        as: '${ $context + { skript: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The agent WRITES (does not run) the user script `aufraeumen-<datum>.sh` and an entry in `fuer-nutzer.md`: default `--dry-run` (it only prints; the removal needs the explicit `--apply`), a header check (the script is in the right folder, the repos match), a question j/N per group, a backup list BEFORE the removal, every name of the list `weg` as ONE single name (no placeholder, no glob), a `rm -rf` only after a check of the exact absolute path (not empty, under the allowed root), `git push --delete` per single branch; the delete commands are TEXT inside this script and are NEVER run by the agent. The entry says what the script does, what stays (`bleibt`) and how to check afterwards."
+  - skript-pruefen:
+      call: check-user-script:0.0.10@fs
+      with:
+        skript: ${ $context.skript }
+        listen: ${ $context.listen }
+      export:
+        as: '${ $context + { skriptcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - checks the user script: shellcheck, the default is the dry run, no glob and no placeholder in a name, no `rm -rf` on an unchecked variable, every name is on the list `weg` and on no list `bleibt`; then it runs the script ONLY with `--dry-run` (NEVER with the apply flag) and compares the printed names with the list. Result `skriptcheck` with `red` and `runde` (+1 for each jump back from `skript-weiche`)."
+  - skript-weiche:
+      switch:
+        - runden:
+            when: '${ $context.skriptcheck.red != false and ($context.skriptcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - nochmal:
+            when: '${ $context.skriptcheck.red != false }'
+            then: skript-erzeugen
+        - sauber:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red or missing script check goes back to `skript-erzeugen`, from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the user."
+  - nutzer-fuehrt-aus:
+      call: user-runs:0.0.10@fs
+      with:
+        skript: ${ $context.skript }
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The USER runs the script (first `--dry-run`, then with the apply flag) - the agents delete nothing and never work around a refusal of the user. Afterwards the user (or a new read-only run) can compare the lists. This flow ends here."
+  - eskalation:
+      set:
+        todo: eskalation
+        status: escalated
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Escalation after the third round (`runde` >= 3): the person decides which entries stay and which are named; nothing is removed by the agents. This flow ends."

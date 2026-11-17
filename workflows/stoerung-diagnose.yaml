@@ -1,0 +1,215 @@
+# stoerung-diagnose: find the CAUSE of a fault (hang, crash, a program that does not start) - READ ONLY, in the agent's own directory, never on a real server and never in the user's session.
+# Order: `Workflow stoerung-diagnose, parameters symptom, repo, version, logs, bereich` (docs/prompt-template.md). Specification: the `@fs` calls have no script yet, a real run is not proven. FS profile: see README.md.
+# Rules: [KEIN-ZUGRIFF-AUF-NUTZERSITZUNG] (no Wayland/X11 socket, D-Bus, compositor, window or process of the user account; measure only in the own environment, headless, temporary HOME and XDG folders) and
+# [KEIN-AGENT-AUF-SERVERN] (no SSH or root on a real server, no AI on servers; a human runs a script). If the fault cannot be reproduced in the own environment the run stops and the human gets a safe instruction.
+# NO FIX in the same run: the fix is its own run through `bugfix` (the strategy starts it from the report). Loops are counted: from the third round (`runde` >= 3) `eskalation`.
+# Lesson of the single-instance hang (BEFUND-einzelinstanz.md): symptom 'the second start of a program hangs or ends without a word'; the first hypothesis 'handed over to the running instance and ended' was REFUTED by the code
+# (there is no hand-over logic, the window waits for the server without a time limit); the cause was PROVEN by starting a second instance in the own directory with a temporary HOME and a dead server (the start hangs) and by the lines
+# of the code that wait without a deadline. The report named cause, proof and a proposal (a bounded wait plus a handshake test) - and changed no code.
+# Input: symptom (what the person saw: what was done, expected, happened), repo, version (tag or head), logs (paths of COPIES of logs that the person or the push helper gave; never a live log of a server), bereich (the part: program, crate or flow).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: stoerung-diagnose
+  version: 0.0.10
+  title: "Diagnose a fault read-only in the own directory - cause, proof, proposal, no fix in the same run"
+do:
+  - symptom-aufnehmen:
+      call: take-symptom:0.0.10@fs
+      with:
+        symptom: ${ .input.symptom }
+        bereich: ${ .input.bereich }
+      export:
+        as: '${ $context + { symptom: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The symptom is taken as the person tells it (what was done, what was expected, what happened, since when, how often, which version); nothing is corrected, nothing guessed. Missing facts are asked for, never invented. Result `symptom`."
+  - ort-pruefen:
+      call: diagnose-place:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        logs: ${ .input.logs }
+      export:
+        as: '${ $context + { ort: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - checks WHERE the diagnosis would run: only the own directory of the agent (own worktree, temporary HOME and XDG, headless, no socket of the user session); an input that points at a real server, an SSH target, a root path, the session of the user account (Wayland, X11, D-Bus, compositor, windows) or live processes of other runs is red. Result `ort` with `red` (true = the place is not allowed) and the reason."
+  - ort-weiche:
+      switch:
+        - verboten:
+            when: '${ $context.ort.red != false }'
+            then: nutzeranleitung
+        - erlaubt:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red or missing `ort` result goes to `nutzeranleitung` (the run measures nothing and ends there); only `red == false` goes on to the logs."
+  - logs-lesen:
+      call: read-logs-ai:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        version: ${ .input.version }
+        logs: ${ .input.logs }
+        symptom: ${ $context.symptom }
+      export:
+        as: '${ $context + { logs: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent READS the copies of logs and protocols (program log, journal extract, crash report, `tasks.log` style files) and the code paths named by them; it only reads: it starts nothing, changes no file outside its own report folder, calls no tool on a real server. Facts are quoted with file and line. Result `logs` (list of facts: where, what, since when, which version)."
+  - hypothesen:
+      call: hypotheses-ai:0.0.10@fs
+      with:
+        logs: ${ $context.logs }
+        symptom: ${ $context.symptom }
+      export:
+        as: '${ $context + { hypothesen: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent writes the hypotheses, each with what would PROVE it and what would REFUTE it (the lesson of the single-instance hang: 'handed over and ended' was refuted by the code, not by feeling); in a later round it takes the result of the last reproduction into account. Result `hypothesen`, the most likely first, carrying `runde` (+1 for each jump back)."
+  - reproduktion:
+      call: reproduce-ai:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        version: ${ .input.version }
+        hypothesen: ${ $context.hypothesen }
+      export:
+        as: '${ $context + { repro: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent reproduces the fault in its OWN directory (own worktree, temporary HOME and XDG, headless, own sockets; never a real server, never the session of the user account): it starts the program or a test exactly as the symptom says and measures (exit code, time to the hang, output). A bounded wait for every start. Commands one at a time ([BASH]), local commits only ([COMMIT]), no push. Result `repro` with `red` (true = NOT reproduced as described, or the run left leftovers) and `runde`."
+  - repro-weiche:
+      switch:
+        - runden:
+            when: '${ $context.repro.red != false and ($context.repro.runde // 0) >= 3 }'
+            then: eskalation
+        - nochmal:
+            when: '${ $context.repro.red != false }'
+            then: hypothesen
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - not reproduced goes back to `hypothesen`, from the third round (`runde` >= 3) to `eskalation` (the person decides, a safe instruction for a measurement on the person's side may follow); only `red == false` goes on."
+  - ursache-belegen:
+      call: prove-cause-ai:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        repro: ${ $context.repro }
+        hypothesen: ${ $context.hypothesen }
+      export:
+        as: '${ $context + { ursache: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent PROVES the cause: the same reproduction with and without the suspected cause (switch, patched copy in the own worktree that is NOT committed as a fix, or the code lines that wait without a deadline) gives different results. Fact, source (file and line, log line) and measured number are named. A cause without proof is `belegt: false`, never a guess in the report. Result `ursache` with `belegt`, `beleg` and `runde`."
+  - beleg-weiche:
+      switch:
+        - runden:
+            when: '${ $context.ursache.belegt != true and ($context.ursache.runde // 0) >= 3 }'
+            then: eskalation
+        - nochmal:
+            when: '${ $context.ursache.belegt != true }'
+            then: hypothesen
+        - belegt:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a cause that is not proven (or a missing result) goes back to `hypothesen`, from the third round (`runde` >= 3) to `eskalation`; only `belegt == true` goes on to the check that nothing was fixed."
+  - kein-fix:
+      call: no-fix-check:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        version: ${ .input.version }
+      export:
+        as: '${ $context + { fix: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - NO FIX in the diagnosis run: the diff of the own worktree against the version under test must contain no change in the product code (only reproduction files and the report folder). Result `fix` with `red` (true = product code was changed: the run is not a diagnosis)."
+  - kein-fix-weiche:
+      switch:
+        - geaendert:
+            when: '${ $context.fix.red != false }'
+            then: eskalation
+        - sauber:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a changed product code (or a missing result) goes to `eskalation` (the change is dropped, a fix is its own run through `bugfix`); only `red == false` goes on to the report."
+  - bericht:
+      call: report-ai:0.0.10@fs
+      with:
+        symptom: ${ $context.symptom }
+        ursache: ${ $context.ursache }
+      export:
+        as: '${ $context + { bericht: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The agent writes the report ([BERICHT], at most 20 lines) with cause, proof (facts with source and measured numbers), the reproduction (how to repeat it in the own directory) and a PROPOSAL for the fix; it also says what is NOT proven. The report names no real server, no user data and no address."
+  - uebergabe:
+      call: hand-over:0.0.10@fs
+      with:
+        bericht: ${ $context.bericht }
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The strategy reads the report and decides: a fix is wanted - then a NEW run `Workflow bugfix, parameters tag, repo, branch, head, delta, finding` starts with the finding of the report (this flow never fixes); or no action. This flow ends here."
+  - nutzeranleitung:
+      set:
+        todo: nutzeranleitung
+        status: waiting
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The place is not allowed or the fault cannot be reproduced in the own environment: the agent writes a SAFE instruction for the person (read-only commands, where the logs are, what to copy, nothing with root, nothing that touches other programs) into `fuer-nutzer.md`; the person runs it and gives the result back as copies of logs. Nothing is measured on the real server or in the session by the agent. This flow ends."
+  - eskalation:
+      set:
+        todo: eskalation
+        status: escalated
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Escalation after the third round (`runde` >= 3) of the reproduction or the proof, or a changed product code: the person decides how to go on (more logs, a measurement on the person's side by instruction, or a `bugfix` run on the best hypothesis); nothing is fixed in this run. This flow ends."
