@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""The current Glied of the pin cascade (call `kaskade-glied` of the workflow `pin-kaskade`, step `glied-start`). No network, writes nothing.
+
+  python3 -I scripts/kaskade-glied --plan JSON|FILE|- --ausloeser vX.Y.Z
+
+Takes `plan.offen[0]`. `libs` = the trigger tag of fs-types plus the tags of the Glieder already done that this one depends on, as `NAME=vX.Y.Z` strings for the
+lift (`fs-release lift --repo NAME=vX.Y.Z`; only the libraries the lift knows: fs-components, fs-interfaces, fs-types, fs-objects, fs-rpc, fs-jscalendar).
+`tags` = the same for EVERY done Glied it depends on, as {repo: tag} (the step `rev-pins` needs fs-people, which the lift does not know). A dependency that is neither the trigger nor
+done is red (the order was broken: no Glied is started before the ones it depends on). BUILD_PRIORITY of every build step of the Glied is 0 (`prioritaet`).
+Result JSON: {status, red, glied:{repo, art, tag, allow, besonderes, abhaengig, rev_pins, libs, tags, prioritaet}, befunde}. rc 0 / 1 red / 2 bad input.
+"""
+import argparse
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "kaskade_lib"))
+import kio  # noqa: E402
+
+LIFT_LIBS = ("fs-components", "fs-interfaces", "fs-types", "fs-objects", "fs-rpc", "fs-jscalendar")
+TRIGGER_REPO = "fs-types"
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--plan", required=True)
+    p.add_argument("--ausloeser", required=True)
+    a = p.parse_args(argv)
+    try:
+        plan = kio.load_json(a.plan)
+        offen = plan["offen"]
+    except (ValueError, KeyError, TypeError) as e:
+        return kio.skipped(f"plan: {e}")
+    if not kio.TAG.match(a.ausloeser):
+        return kio.skipped("ausloeser: must be vX.Y.Z")
+    if not offen:
+        return kio.skipped("plan.offen is empty: there is no Glied to start (the end check is next)")
+    g = offen[0]
+    done = {e["repo"]: e["tag"] for e in plan.get("erledigt", [])}
+    tags, befunde = {TRIGGER_REPO: a.ausloeser}, []
+    for dep in g.get("abhaengig", []):
+        if dep == TRIGGER_REPO:
+            continue
+        if dep in done:
+            tags[dep] = done[dep]
+        else:
+            befunde.append(f"{g['repo']} depends on {dep}, which is not done: the order is broken, nothing is started")
+    libs = [f"{r}={t}" for r, t in sorted(tags.items()) if r in LIFT_LIBS]
+    glied = {k: g.get(k) for k in ("repo", "art", "tag", "allow", "besonderes", "abhaengig", "rev_pins")}
+    glied.update({"libs": libs, "tags": tags, "prioritaet": 0})
+    kio.emit({"status": "ok", "red": bool(befunde), "glied": glied, "befunde": befunde})
+    return 1 if befunde else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

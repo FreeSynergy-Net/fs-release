@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""Closes one Glied of the pin cascade (call `kaskade-glied-fertig` of the workflow `pin-kaskade`, step `naechstes`).
+
+  python3 -I scripts/kaskade-glied-fertig --plan JSON|FILE|- --glied JSON|FILE --beleg TEXT [--karte ID] [--als NAME]
+
+The remote must show the tag of the Glied (`git ls-remote --tags`, never the `beleg` text alone): else red, the plan stays as it was. Then the Glied moves from `plan.offen` to
+`plan.erledigt` with its tag and the ls-remote proof, the OLD length of `offen` is written as `plan.offen_vorher` (loop guard of `glied-weiche`: the list must get shorter), and a note
+text for the board card is returned (`karte_notiz`); with `--karte ID` the note is also written with `timeout 15 fs-tasks note ID TEXT --as NAME` (a failing CLI is reported in `karte`, it never
+makes the Glied red and the CLI is never restarted). Result: the NEW plan JSON {status, red, offen, erledigt, offen_vorher, ..., karte_notiz, karte, befunde}. rc 0 / 1 red / 2 bad input.
+"""
+import argparse
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "kaskade_lib"))
+import kgit  # noqa: E402
+import kio  # noqa: E402
+
+
+def note(karte, text, als):
+    try:
+        p = subprocess.run(["timeout", "15", os.environ.get("FS_TASKS", "fs-tasks"), "note", karte, text, "--as", als], capture_output=True, text=True, check=False)
+    except OSError as e:
+        return f"not written: {e}"
+    return "written" if p.returncode == 0 else f"not written (rc {p.returncode}): {(p.stdout + p.stderr).strip()[:200]}"
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--plan", required=True)
+    p.add_argument("--glied", required=True)
+    p.add_argument("--beleg", default="")
+    p.add_argument("--karte")
+    p.add_argument("--als", default="bahn5-bauer")
+    a = p.parse_args(argv)
+    try:
+        plan = kio.load_json(a.plan)
+        glied = kio.load_json(a.glied)
+        offen = plan["offen"]
+        repo, tag = glied["repo"], glied["tag"]
+    except (ValueError, KeyError, TypeError) as e:
+        return kio.skipped(f"input: {e}")
+    if not offen or offen[0]["repo"] != repo:
+        return kio.skipped(f"{repo} is not plan.offen[0]: only the first open Glied can be closed")
+    try:
+        sha = kgit.tags(repo).get(tag)
+    except (RuntimeError, ValueError) as e:
+        return kio.skipped(str(e))
+    if not sha:
+        kio.emit({"status": "ok", "red": True, "befunde": [f"{repo}: tag {tag} is NOT on the remote (ls-remote): the Glied is not done"], "offen": offen,
+                  "erledigt": plan.get("erledigt", [])})
+        return 1
+    proof = f"ls-remote {repo} refs/tags/{tag} = {sha}" + (f"; {a.beleg}" if a.beleg else "")
+    new = dict(plan)
+    new["offen_vorher"] = len(offen)
+    new["offen"] = offen[1:]
+    new["erledigt"] = [*plan.get("erledigt", []), {"repo": repo, "tag": tag, "beleg": proof}]
+    new["karte_notiz"] = f"pin-kaskade: {repo} {tag} done ({sha[:8]}); {len(new['offen'])} Glied(er) open"
+    new["karte"] = note(a.karte, new["karte_notiz"], a.als) if a.karte else "no card id given"
+    new.update({"status": "ok", "red": False, "befunde": []})
+    kio.emit(new)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

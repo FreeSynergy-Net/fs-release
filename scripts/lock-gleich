@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""End check of the pin cascade (call `lock-gleich` of the workflow `pin-kaskade`, step `lock-ende`). READ ONLY: a blobless clone of every done Glied at its TAG into an own temp folder.
+
+  python3 -I scripts/lock-gleich --plan JSON|FILE|- --ausloeser vX.Y.Z [--env "FS_LOCK_STRICT=1 FS_LOCK_ONLY_FROM=1"]
+
+Per done Glied (`plan.erledigt`, at its tag, not at main): (1) `scripts/gates-lock.sh` (= `check_lock_sources.py` with the switches of `--env`): ONE source per library of scripts/lock-sources.toml, and with
+FS_LOCK_ONLY_FROM=1 fs-types ONLY from FreeSynergy/fs-types; (2) EVERY crate of the repo fs-types in the Cargo.lock (fs-types, fs-conformance, ...) stands on the trigger tag from the repo
+FreeSynergy/fs-types: the same version in every lock; (3) no `rev` pin to a FreeSynergy repo is left in any Cargo.toml (also `fs-people-directory`); known foreign sources
+(workflows/kaskade-fremdquellen.txt) are skipped. One differing version, a second source or a left `rev` pin is red. Both switches are REQUIRED in `--env` (a call without them is bad input: the strict check
+must not be weakened by the caller). Result JSON: {status, red, ausloeser, glieder:[{repo, tag, fs_types_tags, lock_rc, lock_text, rev_pins}], befunde}. rc 0 / 1 red / 2 bad input or no remote.
+"""
+import argparse
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import tomllib
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "kaskade_lib"))
+import kcargo  # noqa: E402
+import kgit  # noqa: E402
+import kio  # noqa: E402
+
+TYPES_URL = "github.com/freesynergy/fs-types"
+REQUIRED = ("FS_LOCK_STRICT=1", "FS_LOCK_ONLY_FROM=1")
+
+
+def fetch(repo, tag, dest, fremd):
+    """Cargo.lock, Cargo.toml and .fs-lock-sources.toml of the tag into `dest`; returns the rev pins left (FreeSynergy, not foreign)."""
+    clone = dest + ".git"
+    kgit.clone(repo, clone, ref=tag)
+    pins = []
+    for f in kgit.tree(clone, "HEAD"):
+        base = os.path.basename(f)
+        if base not in ("Cargo.lock", "Cargo.toml", ".fs-lock-sources.toml"):
+            continue
+        text = kgit.show(clone, "HEAD", f)
+        if text is None:
+            continue
+        os.makedirs(os.path.dirname(os.path.join(dest, f)), exist_ok=True)
+        with open(os.path.join(dest, f), "w", encoding="utf-8") as fh:
+            fh.write(text)
+        if base == "Cargo.toml":
+            pins += [{"crate": d["crate"], "repo": d["repo"], "rev": d["rev"], "datei": f} for d in kcargo.git_deps(text)
+                     if d["rev"] and d["owner"].lower() == kcargo.ORG.lower() and not kcargo.is_fremd(d, fremd)]
+    return pins
+
+
+def types_tags(dest):
+    """The tags of every package in the Cargo.lock files that comes from the repo fs-types (set), and the ones with no tag."""
+    found, bad = set(), []
+    for d, _, files in os.walk(dest):
+        if "Cargo.lock" not in files:
+            continue
+        for pkg in tomllib.loads(open(os.path.join(d, "Cargo.lock"), encoding="utf-8").read()).get("package", []):
+            src = pkg.get("source", "")
+            if src.startswith("git+") and TYPES_URL in src.lower():
+                m = re.search(r"[?&]tag=([^&#]+)", src)
+                (found.add(m.group(1)) if m else bad.append(f"{pkg['name']} {pkg['version']}: {src}"))
+    return found, bad
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--plan", required=True)
+    p.add_argument("--ausloeser", required=True)
+    p.add_argument("--env", default=" ".join(REQUIRED))
+    p.add_argument("--fremdquellen", default=os.path.join(HERE, "..", "workflows", "kaskade-fremdquellen.txt"))
+    a = p.parse_args(argv)
+    try:
+        plan = kio.load_json(a.plan)
+        erledigt = plan["erledigt"]
+        fremd = kcargo.fremdquellen(a.fremdquellen)
+    except (ValueError, OSError, KeyError, TypeError) as e:
+        return kio.skipped(f"plan: {e}")
+    env_pairs = a.env.split()
+    if not kio.TAG.match(a.ausloeser) or not all(r in env_pairs for r in REQUIRED) or not all(re.match(r"^[A-Z_]+=[01]$", x) for x in env_pairs):
+        return kio.skipped("ausloeser must be vX.Y.Z and --env must contain FS_LOCK_STRICT=1 and FS_LOCK_ONLY_FROM=1 (KEY=0|1 only)")
+    if not erledigt:
+        return kio.skipped("plan.erledigt is empty: nothing to check (an end check over no Glied is never green)")
+    env = {**os.environ, **dict(x.split("=", 1) for x in env_pairs)}
+    out, befunde = [], []
+    try:
+        with tempfile.TemporaryDirectory(prefix="lock-gleich-") as tmp:
+            for e in erledigt:
+                dest = os.path.join(tmp, e["repo"])
+                pins = fetch(e["repo"], e["tag"], dest, fremd)
+                r = subprocess.run(["bash", os.path.join(HERE, "gates-lock.sh"), dest], env=env, capture_output=True, text=True, check=False)
+                found, bad = types_tags(dest)
+                g = {"repo": e["repo"], "tag": e["tag"], "fs_types_tags": sorted(found), "lock_rc": r.returncode, "lock_text": (r.stdout + r.stderr).strip(), "rev_pins": pins}
+                out.append(g)
+                if r.returncode != 0:
+                    befunde.append(f"{e['repo']} {e['tag']}: lock check red (rc {r.returncode}): {g['lock_text'][:300]}")
+                if found - {a.ausloeser} or bad:
+                    befunde.append(f"{e['repo']} {e['tag']}: crates of the repo fs-types on {sorted(found)} (wanted only {a.ausloeser}) {bad}")
+                if pins:
+                    befunde.append(f"{e['repo']} {e['tag']}: rev pin(s) to a FreeSynergy repo left: " + ", ".join(f"{x['crate']}@{x['rev']} ({x['datei']})" for x in pins))
+    except (RuntimeError, ValueError, OSError, tomllib.TOMLDecodeError) as e:
+        return kio.skipped(str(e))
+    kio.emit({"status": "ok", "red": bool(befunde), "ausloeser": a.ausloeser, "glieder": out, "befunde": befunde})
+    return 1 if befunde else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

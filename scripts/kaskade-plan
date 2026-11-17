@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Plan of the pin cascade (call `kaskade-plan` of the workflow `pin-kaskade`, step `plan`): the order of the Glieder DERIVED from the REAL Cargo.toml pins (ADR 0092/0093). READ ONLY.
+
+  python3 -I scripts/kaskade-plan --lage JSON|FILE|- [--fremdquellen FILE]
+
+Input is the result of `kaskade-lage` (`glieder`, `erledigt`, `ausloeser`). For every Glied that is not done: a blobless clone of main (own temp folder), every Cargo.toml,
+every git dependency on a FreeSynergy repo (`tag` AND `rev`): the owner repo is the repo of the git URL. Edges = owner repos that are Glieder (a dependency on a repo of the same
+Glied is none); the trigger repo fs-types is a known owner. Sorted topologically with the stable tie order of the `glieder` list (the first Glied of the list whose dependencies are all done).
+A dependency on a FreeSynergy repo that is neither a Glied, fs-types nor a KNOWN FOREIGN SOURCE (workflows/kaskade-fremdquellen.txt, e.g. the Blinc patch repos), a crate that comes from a repo
+that is not its owner and cannot be moved by the lift (only the crate `fs-types` is moved from the repo fs-interfaces) and a cycle are `befunde` (the cascade stops, nothing is guessed).
+Result JSON: {status, red, ausloeser, offen:[{repo, art, tag, allow, besonderes, abhaengig, rev_pins, falsche_quellen, fremdquellen}], erledigt, kanten, befunde}.
+rc 0 = plan, 1 = befunde, 2 = bad input or no remote.
+"""
+import argparse
+import os
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "kaskade_lib"))
+import kcargo  # noqa: E402
+import kgit  # noqa: E402
+import kio  # noqa: E402
+
+TRIGGER_REPO = "fs-types"
+MOVABLE = ("fs-types",)  # the lift moves fs-types from the repo fs-interfaces to the repo fs-types
+
+
+def scan(repo, fremd):
+    """(deps, fremd_deps) of the Cargo.toml files of main of one Glied repo: FreeSynergy deps with the file name; foreign sources apart."""
+    deps, fdeps = [], []
+    with tempfile.TemporaryDirectory(prefix="kaskade-plan-") as tmp:
+        d = os.path.join(tmp, repo)
+        kgit.clone(repo, d)
+        for f in kgit.tree(d):
+            if f != "Cargo.toml" and not f.endswith("/Cargo.toml"):
+                continue
+            for dep in kcargo.git_deps(kgit.show(d, "HEAD", f) or ""):
+                dep["datei"] = f
+                if kcargo.is_fremd(dep, fremd):
+                    fdeps.append(dep)
+                elif dep["owner"].lower() == kcargo.ORG.lower():
+                    deps.append(dep)
+    return deps, fdeps
+
+
+def order(offen, kanten, done):
+    """Topological order, tie = list order; (order, rest): `rest` is not empty only with a cycle."""
+    left, out, have = list(offen), [], set(done)
+    while left:
+        nxt = next((g for g in left if all(d in have or d not in offen for d in kanten[g])), None)
+        if nxt is None:
+            return out, left
+        out.append(nxt)
+        have.add(nxt)
+        left.remove(nxt)
+    return out, []
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--lage", required=True)
+    p.add_argument("--fremdquellen", default=os.path.join(HERE, "..", "workflows", "kaskade-fremdquellen.txt"))
+    a = p.parse_args(argv)
+    try:
+        lage = kio.load_json(a.lage)
+        fremd = kcargo.fremdquellen(a.fremdquellen)
+        glieder = lage["glieder"]
+    except (ValueError, OSError, KeyError, TypeError) as e:
+        return kio.skipped(f"lage: {e}")
+    err = kio.check_glieder(glieder)
+    if err:
+        return kio.skipped("; ".join(err))
+    done = [e["repo"] for e in lage.get("erledigt", [])]
+    names = [g["repo"] for g in glieder]
+    offen = [g for g in glieder if g["repo"] not in done]
+    befunde, info, kanten = [], {}, {}
+    try:
+        for g in offen:
+            deps, fdeps = scan(g["repo"], fremd)
+            edges, wrong, pins = [], [], []
+            for d in deps:
+                if d["repo"] == g["repo"]:
+                    continue
+                owner = kcargo.owner_of_crate(d["crate"])
+                if owner and owner != d["repo"]:
+                    wrong.append({"crate": d["crate"], "repo": d["repo"], "gehoert_zu": owner, "datei": d["datei"], "verschiebbar": d["crate"] in MOVABLE})
+                    if d["crate"] not in MOVABLE:
+                        befunde.append(f"{g['repo']}: crate {d['crate']} comes from the repo {d['repo']}, its owner is {owner} and the lift cannot move it ({d['datei']})")
+                if d["repo"] not in names and d["repo"] != TRIGGER_REPO:
+                    befunde.append(f"{g['repo']}: dependency {d['crate']} on the repo {d['repo']} ({d['datei']}): not a Glied, not fs-types, not a known foreign source")
+                elif d["repo"] not in edges:
+                    edges.append(d["repo"])
+                if d["rev"]:
+                    pins.append({"crate": d["crate"], "key": d["key"], "repo": d["repo"], "rev": d["rev"], "datei": d["datei"]})
+            kanten[g["repo"]] = sorted(edges, key=lambda x: (x != TRIGGER_REPO, names.index(x) if x in names else 0))
+            info[g["repo"]] = {"rev_pins": pins, "falsche_quellen": wrong,
+                               "fremdquellen": sorted({f"{d['owner']}/{d['repo']}" for d in fdeps})}
+    except (RuntimeError, ValueError) as e:
+        return kio.skipped(str(e))
+    reihe, rest = order([g["repo"] for g in offen], kanten, done)
+    if rest:
+        befunde.append("cycle between: " + ", ".join(rest))
+    by = {g["repo"]: g for g in offen}
+    plan = [{"repo": r, "art": by[r]["art"], "tag": by[r]["tag"], "allow": by[r]["allow"], "besonderes": by[r].get("besonderes", ""),
+             "abhaengig": kanten[r], **info[r]} for r in reihe + rest]
+    kio.emit({"status": "ok", "red": bool(befunde), "ausloeser": lage.get("ausloeser"), "offen": plan,
+              "erledigt": lage.get("erledigt", []), "kanten": kanten, "befunde": befunde})
+    return 1 if befunde else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
