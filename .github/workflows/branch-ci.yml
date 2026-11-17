@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # full history AND tags: released_changelog_sections_equal_their_tags (scripts/test_changelog_released.sh) reads every tag
       - uses: FreeSynergy/fs-release/actions/setup-rust@ceddb45ce0d3ddc97e85c60bb24427806868c81c
         with:
           toolchain: pinned

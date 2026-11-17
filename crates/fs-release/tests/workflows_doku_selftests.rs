@@ -116,3 +116,13 @@ fn the_changelog_test_runs_in_the_own_ci_and_not_in_the_reusable_ci() {
         &format!("{ci}\n          fetch-tags: true\n")
     ));
 }
+
+/// The own branch CI runs `cargo test`, which includes the CHANGELOG test: its checkout needs the full history with tags (a flat clone is red).
+#[test]
+fn the_branch_ci_checks_out_the_full_history_with_tags() {
+    let ci = std::fs::read_to_string(root().join(".github/workflows/branch-ci.yml")).unwrap();
+    assert!(
+        ci.contains("fetch-depth: 0"),
+        "branch-ci.yml needs fetch-depth: 0 (tags + history for the CHANGELOG test)"
+    );
+}
