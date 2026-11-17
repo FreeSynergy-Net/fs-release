@@ -1,0 +1,432 @@
+# Sort existing code of the programs into the scaffold crates (plan baukasten section e, start S1 to S3): traits first, then the crate scaffold, then the code goes behind the traits, WITHOUT a build.
+# Order: `Workflow geruest-heben, step <id>, parameters crate, quellen, trait_datei, schicht` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
+# DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main, tag or merge; output only on `unreviewed/<workflow>-<ziel>` branches; no `gh` call; reports per [BERICHT]; one board card per run (fs-tasks).
+# Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
+# Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
+# Inputs: `crate` (name from plan section b1, binding order), `quellen` (list repo@head), `trait_datei` (`TRAIT-ENTWUERFE-geruest.md` or `traits.md` of the crate), `schicht` (layer repo of plan section b0), `programmseite` (program page in fs-documentation en + de, for the help part), `hilfe_marker` (optional).
+# Rules. (1) Traits first: no crate without a trait draft the review has passed. (2) NO build in the sort-in steps (user, conversation 2: "noch nicht kompilieren"); the gates run only in the bundled step `bau-buendel`. (3) Origin: every copied file starts with `//! Herkunft: <repo>@<kopf>:<pfad>` (line 2, after the pattern line); the programs stay unchanged until their lift. (4) Only sort in, never rewrite (N10); what does not fit goes to the unclear list, never silently dropped. (5) An exception is a conversation (answer 128): no `[[exception]]` without a protocol (`talk`).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: geruest-heben
+  version: 0.0.10
+  title: Lift code from the programs into scaffold crates - trait draft, trait review, crate scaffold, sort in WITHOUT build, unclear list, talk, bundled build
+do:
+  - karte:
+      call: board-card:0.0.10@fs
+      with:
+        workflow: geruest-heben
+        crate: ${ .input.crate }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
+  - lage:
+      call: geruest-lage:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        quellen: ${ .input.quellen }
+      export:
+        as: '${ $context + { lage: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, read only - the heads of all sources are proven by `git ls-remote` (never from an old clone), and the inventory lines of the sources are fetched (`INVENTUR-programme.md`, key of the target crate). Result `lage.md` with `{ quellen, ziel }`."
+  - lage-check:
+      call: geruest-lage-regeln:0.0.10@fs
+      with:
+        lage: ${ $context.lage }
+      export:
+        as: '${ $context + { lagecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every source has a head, and the target crate stands in plan section b1 (binding order); a missing head or an unknown crate is red."
+  - lage-again:
+      switch:
+        - runden:
+            when: '${ $context.lagecheck.red == true and ($context.lagecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.lagecheck.red == true }'
+            then: lage
+        - green:
+            when: '${ $context.lagecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `lage` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - trait-entwurf:
+      call: trait-draft-ai:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        trait_datei: ${ .input.trait_datei }
+        lage: ${ $context.lage }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Opus reads the trait draft of the crate and completes it: traits, types, errors, standard per method. Output `traits.md`. Only an own rule or a standard may stand behind a method; no dependency upward (plan section b0)."
+  - trait-entwurf-check:
+      call: trait-regeln:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+      export:
+        as: '${ $context + { traitcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every public method has a default or the words \"eigene Regel\"; the crate depends only on crates of lower layers; the draft names the standard per method."
+  - trait-entwurf-again:
+      switch:
+        - runden:
+            when: '${ $context.traitcheck.red == true and ($context.traitcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.traitcheck.red == true }'
+            then: trait-entwurf
+        - green:
+            when: '${ $context.traitcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `trait-entwurf` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - trait-pruefung:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: trait-delta
+          version: 0.0.10
+        input:
+          teil: review
+          crate: ${ .input.crate }
+          trait_datei: ${ .input.trait_datei }
+      export:
+        as: '${ $context + { urteil: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Opus look at `traits.md` through the flow `trait-delta` (part `review`): verdict YES or NO for exactly this draft."
+  - trait-pruefung-again:
+      switch:
+        - runden:
+            when: '${ $context.urteil.verdict == "NEIN" and ($context.urteil.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.urteil.verdict == "NEIN" }'
+            then: trait-entwurf
+        - ja:
+            when: '${ $context.urteil.verdict == "JA" }'
+            then: continue
+        - ohne-urteil:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO goes back to `trait-entwurf` (at most two repeats), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
+  - crate-geruest:
+      call: crate-geruest-ai:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        schicht: ${ .input.schicht }
+        traits: ${ $context.urteil }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet creates the crate in the layer repo (plan section b0) on the branch `unreviewed/geruest-<crate>`: `Cargo.toml` (licence MIT OR Apache-2.0, Claude named), `lib.rs` with the traits of `traits.md`, README, CHANGELOG. Local commit, no push."
+  - crate-geruest-check:
+      call: geruest-regeln:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+      export:
+        as: '${ $context + { geruestcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: the crate hangs only on crates of lower layers; every file has at most 300 lines and the `//! Pattern:` line; licence and the Claude mention are there."
+  - crate-geruest-again:
+      switch:
+        - runden:
+            when: '${ $context.geruestcheck.red == true and ($context.geruestcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.geruestcheck.red == true }'
+            then: crate-geruest
+        - green:
+            when: '${ $context.geruestcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `crate-geruest` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - doku-hilfe:
+      call: doku-hilfe-ai:0.0.10@fs
+      with:
+        programmseite: ${ .input.programmseite }
+        hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Help = docs (step G2b): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`) has a MARKED help part (marker `hilfe_marker`, default `<!-- fs:help -->` ... `<!-- /fs:help -->`); if not, a placeholder part is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
+  - doku-hilfe-check:
+      call: doku-hilfe-regel:0.0.10@fs
+      with:
+        programmseite: ${ .input.programmseite }
+      export:
+        as: '${ $context + { hilfecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: the marker is there in BOTH languages (en and de) and encloses a part; no help text in the program repo (a second source is red)."
+  - doku-hilfe-again:
+      switch:
+        - runden:
+            when: '${ $context.hilfecheck.red == true and ($context.hilfecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.hilfecheck.red == true }'
+            then: doku-hilfe
+        - green:
+            when: '${ $context.hilfecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `doku-hilfe` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never to green."
+  - einsortieren:
+      call: einsortieren-ai:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        lage: ${ $context.lage }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet copies the modules of the sources named by the inventory key and sorts them behind the traits. Zunächst NICHT kompilieren (spart Slots): no compile, no test, no build call in this step; the build comes only in `bau-buendel`. Every copied file starts with `//! Herkunft: <repo>@<kopf>:<pfad>`; the source repos stay unchanged."
+  - einsortieren-check:
+      call: herkunft-regel:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        quellen: ${ .input.quellen }
+      export:
+        as: '${ $context + { herkunft: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every copied file has the origin line (line 2); no source repo was changed (`git status` of the sources is clean)."
+  - einsortieren-again:
+      switch:
+        - runden:
+            when: '${ $context.herkunft.red == true and ($context.herkunft.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.herkunft.red == true }'
+            then: einsortieren
+        - green:
+            when: '${ $context.herkunft.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `einsortieren` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - unklar-liste:
+      call: unklar-ai:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        lage: ${ $context.lage }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet writes `UNKLAR-<crate>.md`: every part that does not fit behind a trait, with reason and proposal (module / specialist module / delete / \"Schrott?\"). Nothing is dropped silently."
+  - unklar-liste-check:
+      call: unklar-regel:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+      export:
+        as: '${ $context + { unklarcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every source file that was not taken over stands in `UNKLAR-<crate>.md` or in `lage.md` as \"passt\"."
+  - unklar-liste-again:
+      switch:
+        - runden:
+            when: '${ $context.unklarcheck.red == true and ($context.unklarcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.unklarcheck.red == true }'
+            then: unklar-liste
+        - green:
+            when: '${ $context.unklarcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `unklar-liste` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - talk:
+      call: talk:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        liste: UNKLAR-${ .input.crate }.md
+      export:
+        as: '${ $context + { gespraech: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: user
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Conversation of the user and Opus about the unclear cases (user, conversation 2: \"dann wird er aussortiert ... ggf. schrott, dann kann das weg\"). Protocol `talk-<crate>-<datum>.md`; no agent decides a case alone."
+  - talk-again:
+      switch:
+        - runden:
+            when: '${ $context.gespraech.offen != null and ($context.gespraech.offen | length) > 0 and ($context.gespraech.runde // 0) >= 3 }'
+            then: eskalation
+        - offen:
+            when: '${ $context.gespraech.offen != null and ($context.gespraech.offen | length) > 0 }'
+            then: talk
+        - entschieden:
+            when: '${ $context.gespraech.offen != null and ($context.gespraech.offen | length) == 0 }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - an open case goes back to `talk` (at most two repeats); every case decided (insert / module / specialist module with `[[exception]]` and `talk` / delete) goes on; a missing result goes to `eskalation`."
+  - schicht-weiche:
+      switch:
+        - fertig:
+            when: '${ $context.gespraech.schicht_fertig == true }'
+            then: bau-buendel
+        - offen:
+            when: '${ $context.gespraech.schicht_fertig == false }'
+            then: bericht
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the bundled build runs only when ALL crates of the layer are sorted in; otherwise the run reports without a build."
+  - bau-buendel:
+      call: gates-buendel:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        schicht: ${ .input.schicht }
+      export:
+        as: '${ $context + { bau: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the bundled build: [GATES] one after the other through `build-slot.sh` (test, clippy pedantic, rules check, shellcheck); `set -o pipefail`, rc per gate, no output cut with `tail`/`head` ([GATE-PIPEFAIL]); at most one build of this run."
+  - bau-again:
+      switch:
+        - runden:
+            when: '${ $context.bau.red == true and ($context.bau.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.bau.red == true }'
+            then: bau-fix
+        - green:
+            when: '${ $context.bau.red == false }'
+            then: bericht
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes to `bau-fix` and back to the build (at most two repeats), from the third red round to `eskalation`; only `red == false` goes to the report; a missing result goes to `eskalation`."
+  - bau-fix:
+      call: bau-fix-ai:0.0.10@fs
+      with:
+        bau: ${ $context.bau }
+      then: bau-buendel
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet fixes ALL errors of the bundled build in one pass (local commit, no push), then the bundle runs again."
+  - bericht:
+      call: report-write:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        zahlen: inventur-classify.py
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report: lines before and after per program (script `inventur-classify.py`), state of the unclear list; the numbers come from the script, not from an estimate."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a NO came for the third time, a decision is open, or a result is missing: the loop stops and the person decides. The report names the step and the last red result; nothing goes on by itself."

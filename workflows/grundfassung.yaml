@@ -2,6 +2,7 @@
 # Replaces nothing: `programm-grundgeruest` (draft, not runnable) stays for the feature work; `programm-neu` stays the entry for NEW programs with an interface decision.
 # The USER creates the repository; this flow prepares the scaffold in an own worktree and creates no repository. Agents never push, tag or merge; the tag goes through the strategy's helper after the review YES.
 # Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, icon, frontend, art, repo, branch, head, delta, tag, vorbild, dossier, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
+# Help = docs (pflege 9, G2b): input `programmseite` (program page in fs-documentation en + de) and `hilfe_marker`; step `doku-hilfe` after `nutzer-doku`.
 # Inputs: programm (name after the naming rule, ADR 0087), beschreibung (one sentence), icon (path; missing: the nearest existing icon of the catalog, marked "vorläufig" and in the gap list - no PNG placeholder), frontend (frontend id, ASCII lower case, e.g. `simple`; the display name e.g. Einfach is translated; not core, server, client, app, bin, cli, engine, testserver - ADR 0094 draft, item 6), repo (name; the user creates it), art (`grundfassung` or `feature`; decides at `release-sperre` whether the trait lock is needed).
 # Rules of 17 Nov. (b7): (a) NO PNG placeholder: a missing component is replaced by the nearest EXISTING component, honestly marked "vorläufig" (tooltip or hint) and listed in the gap list ("Lücken") of the program's DESIGN; the real component is built in the background (lane 1) and replaces it. (b) Versions may currently JUMP (e.g. the basics directly v0.0.2, even with gaps); later no longer (the user announces it); version = tag. (c) No picture OK of the user is needed: the STRATEGY looks at the pictures (step `picture-ok`); only `accepted == true` goes on to `katalog-vorschlag`, otherwise gap list or escalation, never on.
 # (d) SLOT RULE (hint): WRITE code, tests, documentation and picture sketches without a build slot; BUILD only after the release of a slot (`build-slot.sh`, at most 2 builds at the same time); waiting for a slot is no idle time.
@@ -163,6 +164,48 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the user documentation stub in fs-documentation, docs/de and docs/en `programs/apps/<x>/index.md`: what it is, what it can do today, what comes, picture. The picture is the real window (no PNG placeholder: what is missing in the window is a stand-in component marked \"vorläufig\" and listed under \"Lücken\" in DESIGN); own work only, no foreign logos."
+  - doku-hilfe:
+      call: doku-hilfe-ai:0.0.10@fs
+      with:
+        programmseite: ${ .input.programmseite }
+        hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Help = docs (step G2b): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`) has a MARKED help part (marker `hilfe_marker`, default `<!-- fs:help -->` ... `<!-- /fs:help -->`); if not, a placeholder part is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
+  - doku-hilfe-check:
+      call: doku-hilfe-regel:0.0.10@fs
+      with:
+        programmseite: ${ .input.programmseite }
+      export:
+        as: '${ $context + { hilfecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: the marker is there in BOTH languages (en and de) and encloses a part; no help text in the program repo (a second source is red)."
+  - doku-hilfe-again:
+      switch:
+        - runden:
+            when: '${ $context.hilfecheck.red == true and ($context.hilfecheck.runde // 0) >= 3 }'
+            then: grundfassung-eskalation
+        - red:
+            when: '${ $context.hilfecheck.red == true }'
+            then: doku-hilfe
+        - green:
+            when: '${ $context.hilfecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: grundfassung-eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `doku-hilfe` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never to green."
   - aufrufer:
       call: callers-ai:0.0.10@fs
       with:

@@ -1,0 +1,190 @@
+# Own code in a program is an exception and becomes a conversation (answer 128): the number of lines does not decide, the conversation does. This flow replaces `ausnahme-beleg`.
+# Order: `Workflow ausnahme-gespraech, step <id>, parameters programm, was, warum, kandidaten` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
+# DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main, tag or merge; output only on `unreviewed/<workflow>-<ziel>` branches; no `gh` call; reports per [BERICHT]; one board card per run (fs-tasks).
+# Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
+# Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
+# Inputs: `programm`, `was` (the part), `warum` (draft of the reason), `kandidaten` (checked building blocks: modules, kits, rule sets, workflows, components).
+# Rules. (1) No agent decides an exception alone: the step `gespraech` is the user with Opus (gate user). (2) `[[exception]]` carries `what`, `why`, `checked`, `alternatives`, `talk`; without `talk` it is red. (3) The protocol `talk-<programm>-<thema>-<datum>.md` (place: ADR 0097 open 8) holds the decision.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: ausnahme-gespraech
+  version: 0.0.10
+  title: Exception only after a conversation - prepare candidates and alternatives, conversation of the user and Opus, protocol, then enter
+do:
+  - karte:
+      call: board-card:0.0.10@fs
+      with:
+        workflow: ausnahme-gespraech
+        programm: ${ .input.programm }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
+  - vorbereiten:
+      call: gespraech-vorbereiten-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        was: ${ .input.was }
+        warum: ${ .input.warum }
+        kandidaten: ${ .input.kandidaten }
+      export:
+        as: '${ $context + { vorlage: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Opus checks the candidates (modules, kits, rule sets, workflows, components), formulates ALTERNATIVES and \"to what does it fit?\"; output `talk-vorlage.md`."
+  - vorbereiten-check:
+      call: vorlage-regel:0.0.10@fs
+      with:
+        vorlage: ${ $context.vorlage }
+      export:
+        as: '${ $context + { vorlagecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: at least 2 alternatives, or the template says why there is none; a missing reason is red."
+  - vorbereiten-again:
+      switch:
+        - runden:
+            when: '${ $context.vorlagecheck.red == true and ($context.vorlagecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.vorlagecheck.red == true }'
+            then: vorbereiten
+        - green:
+            when: '${ $context.vorlagecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorbereiten` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - gespraech:
+      call: talk:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        vorlage: talk-vorlage.md
+      export:
+        as: '${ $context + { protokoll: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: user
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Conversation of the user and Opus: learn, compromise, another view; not the line count. Output the protocol `talk-<programm>-<thema>-<datum>.md`; the decision stands in the protocol."
+  - gespraech-weiche:
+      switch:
+        - offen:
+            when: '${ $context.protokoll.entscheidung == null }'
+            then: eskalation
+        - baustein:
+            when: '${ $context.protokoll.entscheidung == "baustein" }'
+            then: eintragen
+        - modul:
+            when: '${ $context.protokoll.entscheidung == "modul" }'
+            then: modul-anlegen
+        - ausnahme:
+            when: '${ $context.protokoll.entscheidung == "ausnahme" }'
+            then: eintragen
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - no decision in the protocol goes to `eskalation` (nothing is entered); use a block goes to `eintragen`; a new module goes to `modul-anlegen`; an exception goes to `eintragen` with the protocol."
+  - modul-anlegen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: modul-neu
+          version: 0.0.10
+        input:
+          name: ${ $context.protokoll.modul }
+          kategorie: ${ $context.protokoll.kategorie }
+          art: ${ $context.protokoll.art }
+          nutzer: ${ $context.protokoll.nutzer }
+          standard: ${ $context.protokoll.standard }
+      export:
+        as: '${ $context + { modul: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sub-workflow `modul-neu` for the module the conversation decided on (existing first, users, standard)."
+  - eintragen:
+      call: ausnahme-eintragen-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        talk: ${ $context.protokoll.pfad }
+        entscheidung: ${ $context.protokoll.entscheidung }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "By the decision of the protocol: use the block, or the module from `modul-anlegen`, or `[[exception]]` with `what`, `why`, `checked`, `alternatives` and `talk` (path of the protocol). Output a diff of the plan (blueprint); local commit on `unreviewed/ausnahme-<programm>`, no push."
+  - eintragen-check:
+      call: ausnahme-regel:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { ausnahmecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: an `[[exception]]` without `talk` is red; `talk` points to an existing protocol; `what`, `why`, `checked` and `alternatives` are there."
+  - eintragen-again:
+      switch:
+        - runden:
+            when: '${ $context.ausnahmecheck.red == true and ($context.ausnahmecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.ausnahmecheck.red == true }'
+            then: eintragen
+        - green:
+            when: '${ $context.ausnahmecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `eintragen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - bericht:
+      call: report-write:0.0.10@fs
+      with:
+        lauf: ${ $context }
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report: the decision, the protocol path, the diff of the plan; what is not proven is named."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a NO came for the third time, a decision is open, or a result is missing: the loop stops and the person decides. The report names the step and the last red result; nothing goes on by itself."

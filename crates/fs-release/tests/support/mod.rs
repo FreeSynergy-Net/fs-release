@@ -11,6 +11,7 @@ use fs_release::lift::LiftOpts;
 use tempfile::TempDir;
 
 pub mod flow;
+pub mod flowcheck;
 pub mod gh;
 pub mod workflows;
 

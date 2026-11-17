@@ -1,0 +1,316 @@
+# Create a data kit in fs-types (ADR 0098): described ONCE, storage and component are generated from it later (`fs-blueprint`).
+# Order: `Workflow bausatz-neu, step <id>, parameters name, felder, nutzer, medientyp` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
+# DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main, tag or merge; output only on `unreviewed/<workflow>-<ziel>` branches; no `gh` call; reports per [BERICHT]; one board card per run (fs-tasks).
+# Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
+# Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
+# Inputs: `name`, `felder` (name, base type, standard URI), `nutzer` (at least 2 programs), `medientyp`.
+# Rules. (1) Existing first: kits in fs-types and base types (`types.capnp`). (2) At least 2 programs need it, otherwise the field stays a field of the program. (3) A standard URI with a section per field. (4) Append only; no JSON or blob column; no duty beyond the form (a duty only in contracts). (5) Personal data need a release per kit group (ADR 0098 point 4.6).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: bausatz-neu
+  version: 0.0.10
+  title: Create a data kit (ADR 0098) - existing first, 2 users, standard per field, description, storage plan, release, trait review
+do:
+  - karte:
+      call: board-card:0.0.10@fs
+      with:
+        workflow: bausatz-neu
+        name: ${ .input.name }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
+  - vorhandenes-zuerst:
+      call: vorhandenes-zuerst-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+        felder: ${ .input.felder }
+      export:
+        as: '${ $context + { vorhanden: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Look at the kits in fs-types and the base types (`types.capnp`) and at the `unreviewed/` branches and `.scratch` (N10). Result `treffer`; a hit means: no new kit."
+  - vorhanden-weiche:
+      switch:
+        - treffer:
+            when: '${ $context.vorhanden.treffer != null and ($context.vorhanden.treffer | length) > 0 }'
+            then: abbruch
+        - keine:
+            when: '${ $context.vorhanden.treffer != null and ($context.vorhanden.treffer | length) == 0 }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a hit ends the run with a reference; an empty list goes on; a missing result goes to `eskalation`."
+  - nutzer-pruefen:
+      call: nutzer-zaehlen:0.0.10@fs
+      with:
+        art: bausatz
+        nutzer: ${ .input.nutzer }
+      export:
+        as: '${ $context + { nutzer: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - at least 2 programs need the kit; otherwise abort (the field stays a field of the program). Result `{ zahl, genug }`."
+  - nutzer-weiche:
+      switch:
+        - genug:
+            when: '${ $context.nutzer.genug == true }'
+            then: continue
+        - zu-wenige:
+            when: '${ $context.nutzer.genug == false }'
+            then: abbruch
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - fewer than 2 users abort the run; a missing result goes to `eskalation`."
+  - standard-pruefen:
+      call: standard-belegen-ai:0.0.10@fs
+      with:
+        felder: ${ .input.felder }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Prove a standard URI with a section for every field."
+  - standard-pruefen-check:
+      call: standard-belege:0.0.10@fs
+      with:
+        felder: ${ .input.felder }
+      export:
+        as: '${ $context + { standardcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every field has a standard URI and a section; a missing proof is red."
+  - standard-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.standardcheck.red == true and ($context.standardcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.standardcheck.red == true }'
+            then: standard-pruefen
+        - green:
+            when: '${ $context.standardcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `standard-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - beschreibung:
+      call: bausatz-beschreibung-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+        medientyp: ${ .input.medientyp }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Description of the kit in fs-types: fields, form duty, media type; no duty beyond the form (a duty only in contracts)."
+  - beschreibung-check:
+      call: bausatz-form-regel:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      export:
+        as: '${ $context + { formcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: description complete (fields, media type); no duty beyond the form."
+  - beschreibung-again:
+      switch:
+        - runden:
+            when: '${ $context.formcheck.red == true and ($context.formcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.formcheck.red == true }'
+            then: beschreibung
+        - green:
+            when: '${ $context.formcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `beschreibung` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - erzeugen-plan:
+      call: erzeugen-plan-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Describe the storage form (1:1 column group, 1:n sub table), `accepts` and the `TypeCatalog` entry; the generation itself comes with `fs-blueprint`. Only append; no JSON or blob column."
+  - erzeugen-plan-check:
+      call: bausatz-speicher-regel:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      export:
+        as: '${ $context + { plancheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: only appended; no JSON or blob column; every field has a typed column."
+  - erzeugen-plan-again:
+      switch:
+        - runden:
+            when: '${ $context.plancheck.red == true and ($context.plancheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.plancheck.red == true }'
+            then: erzeugen-plan
+        - green:
+            when: '${ $context.plancheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `erzeugen-plan` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - freigabe-pruefen:
+      call: freigabe-pruefen-ai:0.0.10@fs
+      with:
+        name: ${ .input.name }
+        felder: ${ .input.felder }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Personal data? Then a release per kit group is foreseen (ADR 0098 point 4.6); no personal data: say so."
+  - freigabe-pruefen-check:
+      call: bausatz-freigabe-regel:0.0.10@fs
+      with:
+        name: ${ .input.name }
+      export:
+        as: '${ $context + { freigabecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: a kit with personal data names its release per kit group; otherwise red."
+  - freigabe-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.freigabecheck.red == true and ($context.freigabecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.freigabecheck.red == true }'
+            then: freigabe-pruefen
+        - green:
+            when: '${ $context.freigabecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `freigabe-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - trait-pruefung:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: trait-delta
+          version: 0.0.10
+        input:
+          name: ${ .input.name }
+          teil: review
+      export:
+        as: '${ $context + { urteil: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Opus look through the flow `trait-delta`: verdict YES or NO for the kit."
+  - trait-pruefung-again:
+      switch:
+        - runden:
+            when: '${ $context.urteil.verdict == "NEIN" and ($context.urteil.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.urteil.verdict == "NEIN" }'
+            then: beschreibung
+        - ja:
+            when: '${ $context.urteil.verdict == "JA" }'
+            then: continue
+        - ohne-urteil:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO goes back to `beschreibung` (at most two repeats), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
+  - bericht:
+      call: report-write:0.0.10@fs
+      with:
+        lauf: ${ $context }
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report: kit, fields with standard, users, storage form, release, verdict; what is not proven is named."
+  - abbruch:
+      set:
+        todo: abbruch
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Abort with a reference (hit of `vorhandenes-zuerst` or fewer than 2 users): no new kit; the report names the reference. The run ends here."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a NO came for the third time, a decision is open, or a result is missing: the loop stops and the person decides. The report names the step and the last red result; nothing goes on by itself."
