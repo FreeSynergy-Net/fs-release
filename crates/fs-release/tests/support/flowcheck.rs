@@ -8,7 +8,8 @@ pub fn again_ok(text: &str, step: &str, back: &str, esc: &str) -> bool {
     let sw = b.split("metadata:").next().unwrap();
     let cases: Vec<&str> = sw.split("\n        - ").skip(1).collect();
     let open = |c: &&str| !c.contains("when:");
-    b.contains(">= 3")
+    // the exact expression: `>= 30` or `>= 2` must not pass
+    b.contains(">= 3 }")
         && b.contains(&format!("then: {esc}"))
         && b.contains(&format!("then: {back}"))
         && cases

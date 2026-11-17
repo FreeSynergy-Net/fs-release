@@ -72,13 +72,13 @@ fn counter_ausnahme_gespraech_agent_talk_missing_talk_and_decision_less_run_are_
 fn help_ok(t: &str) -> bool {
     let b = step_body(t, "doku-hilfe");
     in_order(t, &["doku-hilfe", "doku-hilfe-check", "doku-hilfe-again"])
-        && b.contains("programmseite: ${ .input.programmseite }")
+        && b.contains("programmseite: ${ .input.programmseite // (\"programs/apps/\"")
         && b.contains("hilfe_marker")
         && b.contains("docs/en")
         && b.contains("docs/de")
         && b.contains("one source")
         && step_body(t, "doku-hilfe-check").contains("BOTH languages")
-        && step_body(t, "doku-hilfe-again").contains(">= 3")
+        && step_body(t, "doku-hilfe-again").contains(">= 3 }")
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn counter_doku_hilfe_input_languages_and_single_source_are_caught() {
     let t = read("modul-neu");
     assert!(broken(
         help_ok,
-        &t.replace("programmseite: ${ .input.programmseite }", "seite: x")
+        &t.replace("programmseite: ${ .input.programmseite // ", "seite: ")
     ));
     assert!(broken(
         help_ok,

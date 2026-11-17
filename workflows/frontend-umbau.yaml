@@ -2,7 +2,7 @@
 # The ADR is conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md in fs-documentation.
 # Gate before replacing painted copies by Blinc blocks: bruecke, alle-stile-erweitern, stil-vollstaendigkeit, zwei-stile (plan-theme-bruecke.md).
 # One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters contract, tag, repo,
-# branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
+# branch, head, delta, group, frontend_crate` (docs/prompt-template.md). FS profile: see README.md.
 # Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 # Review template frontend: step `frontend-nur-komponenten` (input `frontend_crate`) before the picture acceptance: only component calls; logic or a widget is a finding (conversation `frontend-befund-talk`).
 # Mandatory first step `vorhanden-pruefen` (rule of the user): look whether it exists or is only extended; the result `befund` (with proof) is read by the following steps.

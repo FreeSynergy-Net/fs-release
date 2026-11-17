@@ -28,7 +28,7 @@ fn ok(text: &str, anchor: &str) -> bool {
         && check.contains("FINDING")
         && sw.contains("then: frontend-befund-talk")
         && sw.contains(&format!("then: {anchor}"))
-        && sw.contains(">= 3")
+        && sw.contains(">= 3 }")
         && talk.contains("freesynergy.net:actor: human")
         && talk.contains("freesynergy.net:gate: human")
         && talk.contains("then: frontend-nur-komponenten")

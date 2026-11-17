@@ -1,5 +1,5 @@
 # Sort existing code of the programs into the scaffold crates (plan baukasten section e, start S1 to S3): traits first, then the crate scaffold, then the code goes behind the traits, WITHOUT a build.
-# Order: `Workflow geruest-heben, step <id>, parameters crate, quellen, trait_datei, schicht` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
+# Order: `Workflow geruest-heben, step <id>, parameters crate, quellen, trait_datei, schicht, schicht_fertig, programmseite, hilfe_marker` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
 # DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main, tag or merge; output only on `unreviewed/<workflow>-<ziel>` branches; no `gh` call; reports per [BERICHT]; one board card per run (fs-tasks).
 # Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
 # Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
@@ -232,18 +232,18 @@ do:
   - doku-hilfe:
       call: doku-hilfe-ai:0.0.10@fs
       with:
-        programmseite: ${ .input.programmseite }
+        programmseite: ${ .input.programmseite // ("programs/apps/" + (.input.programm // .input.name) + "/index.md") }
         hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
+        freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`, default `programs/apps/<programm>/index.md`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
   - doku-hilfe-check:
       call: doku-hilfe-regel:0.0.10@fs
       with:
-        programmseite: ${ .input.programmseite }
+        programmseite: ${ .input.programmseite // ("programs/apps/" + (.input.programm // .input.name) + "/index.md") }
       export:
         as: '${ $context + { hilfecheck: . } }'
       metadata:
