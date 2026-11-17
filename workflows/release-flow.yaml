@@ -1,6 +1,6 @@
 # The release flow (`fs-release flow`, crates/fs-release/src/flow): lift, gates, review, tag, push, release, bump, sign.
 # A step marked with a gate halts until somebody else has acted; run again to go on. Nothing is published without the
-# approval of exactly this head. Between `lift` and `gates` the documentation moves along (`doku`, rule doku-mitziehen; inputs docs, docs_base,
+# approval of exactly this head. After `lift` the API switch `api-umstellung` (fs-interfaces feature `rpc` -> fs-rpc, V1+ lift) runs; between `lift` and `gates` the documentation moves along (`doku`, rule doku-mitziehen; inputs docs, docs_base,
 # old, new, allow besides repo and delta; an escalation of `doku` ends this flow before the review: `doku-weiter`); the docs main branch is pushed only after
 # the review, the approval and the merge of the code (`doku-veroeffentlichen`, human, after `main-ff`). The flow closes with the tidy-up of the whole docs repo
 # (`doku-aufraeumen`, rule doku-aufraeumen; its push waits for the strategy). FS profile: see README.md.
@@ -23,6 +23,32 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow lift.yaml with --commit; red here stops the flow before any review.
+  - api-umstellung:
+      call: api-umstellung:0.0.10@fs
+      input:
+        repo: ${ .input.repo }
+        delta: ${ .input.delta }
+      export:
+        as: '${ $context + { api_umstellung: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Specification step, no script (decision b7): only at the V1+ lift (fs-interfaces v0.0.27 or newer). From fs-interfaces v0.0.27 there is no Cargo feature `rpc` any more; the rpc helpers live in the library fs-rpc (git https://github.com/FreeSynergy/fs-rpc, tag v0.0.2; it was the module `rpc` of fs-interfaces up to v0.0.25, `fs_interfaces::rpc::X` is now `fs_rpc::X`; `fs_types::describe::CatalogServer` (feature `rpc`) is now `fs_rpc::catalog::CatalogServer`; source: README and CHANGELOG of fs-rpc v0.0.2). A program that uses `fs-interfaces` with feature `rpc` (server/client crates) changes (1) the dependency in Cargo.toml: `fs-interfaces` without feature `rpc`, plus `fs-rpc = { git = \"https://github.com/FreeSynergy/fs-rpc\", tag = \"v0.0.2\" }` with the same fs-types / fs-interfaces / fs-objects tags as fs-rpc pins (otherwise the lock holds two copies of the generated types), (2) the `use` paths `fs_interfaces::rpc::...` to `fs_rpc::...`, `fs_types::describe::CatalogServer` to `fs_rpc::catalog::CatalogServer`, `fs_types::types_capnp` stays where fs-types has it; nothing is guessed, a name that is not in fs-rpc is looked up in its README/CHANGELOG. Then `cargo check --workspace --all-targets --locked` WITHOUT feature `rpc` (via build-slot.sh). Result `api_umstellung`: `status` (green | red | skipped when the repo does not use the feature) and `crates` (list of the changed crates). Red stops the run (person or Sonnet fixes it, no go-on with a half-done switch): `api-umstellung-weiter`. Order of the libraries: fs-types -> {fs-interfaces, fs-objects, fs-jscalendar, fs-components} -> fs-rpc -> programs (ADR 0092/0093)."
+  - api-umstellung-weiter:
+      switch:
+        - rot:
+            when: '${ $context.api_umstellung.status == "red" }'
+            then: eskalation
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - `api_umstellung` is red: the flow ends in `eskalation` before `doku` and the gates; a half-done switch never goes on. `green` and `skipped` (repo without feature `rpc`) go on."
   - doku:
       run:
         workflow:
