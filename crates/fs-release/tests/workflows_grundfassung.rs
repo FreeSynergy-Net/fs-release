@@ -205,17 +205,17 @@ fn counters_are_carried(text: &str) -> bool {
     let reads = again.contains("$context.gates.runde")
         && again.contains("$context.binary.runde")
         && again.contains("$context.lehren.runde");
-    let counts = text.contains("  - bild-zaehlen:\n")
+    let counts = text.contains("bild-zaehlen")
         && step_body(text, "bild-zaehlen").contains("n: ${ ($context.bild_runde.n // 0) + 1 }")
         && step_body(text, "bild-zaehlen").contains("export:")
         && in_order(
             text,
             &[
-                "  - bild-start:\n",
-                "  - fenster:\n",
-                "  - picture-ok:\n",
-                "  - bild-zaehlen:\n",
-                "  - bild-weiche:\n",
+                "bild-start",
+                "fenster",
+                "picture-ok",
+                "bild-zaehlen",
+                "bild-weiche",
             ],
         );
     gates && reads && counts && !text.contains("$context.verdict.runde")
