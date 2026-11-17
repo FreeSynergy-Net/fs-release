@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Every `.github/workflows/*.yml|*.yaml` of a repo must parse as YAML (a step name like `Build (debug, the test: x)` is not
-YAML and GitHub answers "workflow file issue" only after the push). With `actionlint` installed it runs on top of that.
+"""Every YAML file of a repo must parse as YAML: `.github/workflows/*.yml|*.yaml`, `actions/*/action.yml|yaml` (composite
+actions) and `workflows/*.yaml` (the FreeSynergy flows). (Before run 7 only the first group was read, so an unquoted `: `
+in `actions/library-release/action.yml` stayed unseen.) A step name like `Build (debug, the test: x)` is not
+YAML and GitHub answers "workflow file issue" only after the push. With `actionlint` installed it runs on top of that.
 
 usage: python3 -I check_yaml.py <repo root> [--simulate-missing-yaml]
 exit 0 green, 1 red (first line `file:line: reason`), 2 skipped (no PyYAML: nothing was checked, never reported as green).
@@ -25,8 +27,17 @@ def main(argv):
     except ImportError:
         print("skipped: PyYAML (python3 yaml module) is not installed, the workflow files were NOT checked")
         return 2
-    wf = os.path.join(root, ".github", "workflows")
-    files = sorted(glob.glob(os.path.join(wf, "*.yml")) + glob.glob(os.path.join(wf, "*.yaml")))
+    files = []
+    for pattern in (
+        (".github", "workflows", "*.yml"),
+        (".github", "workflows", "*.yaml"),
+        ("actions", "*", "action.yml"),
+        ("actions", "*", "action.yaml"),
+        ("workflows", "*.yaml"),
+        ("workflows", "*.yml"),
+    ):
+        files += glob.glob(os.path.join(root, *pattern))
+    files = sorted(set(files))
     for path in files:
         rel = os.path.relpath(path, root)
         try:
@@ -38,10 +49,10 @@ def main(argv):
             why = getattr(e, "problem", None) or first_line(str(e))
             print(f"{rel}:{line}: {why}")
             return 1
-    note = f"{len(files)} workflow file(s) parse"
+    note = f"{len(files)} YAML file(s) parse"
     lint = shutil.which("actionlint")
     if lint and files:
-        r = subprocess.run([lint, "-no-color", *files], cwd=root, capture_output=True, text=True, check=False)
+        r = subprocess.run([lint, "-no-color", *[f for f in files if os.sep + ".github" + os.sep + "workflows" + os.sep in f]], cwd=root, capture_output=True, text=True, check=False)
         if r.returncode != 0:
             print(first_line(r.stdout + "\n" + r.stderr))
             return 1

@@ -121,3 +121,104 @@ fn a_step_that_returns_the_skipped_marker_is_recorded_skipped_and_does_not_stop_
     assert_eq!(records[0].detail, "no tool");
     assert!(!records[0].is_ok());
 }
+
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// All three groups the script must read: composite actions, FreeSynergy flows, GitHub workflows.
+fn yaml_files(root: &Path) -> Vec<PathBuf> {
+    let mut v = Vec::new();
+    let ext = |p: &Path| matches!(p.extension().and_then(|e| e.to_str()), Some("yml" | "yaml"));
+    for e in fs::read_dir(root.join("actions")).unwrap().flatten() {
+        let a = e.path().join("action.yml");
+        if a.is_file() {
+            v.push(a);
+        }
+    }
+    for dir in ["workflows", ".github/workflows"] {
+        for e in fs::read_dir(root.join(dir)).unwrap().flatten() {
+            if ext(&e.path()) {
+                v.push(e.path());
+            }
+        }
+    }
+    v
+}
+
+#[test]
+fn every_action_flow_and_github_workflow_file_of_this_repo_parses_and_the_script_reads_all_three_groups(
+) {
+    let root = repo_root();
+    let files = yaml_files(&root);
+    assert!(files.len() > 50, "{}", files.len());
+    let (code, out) = python(&script(), &[&root]);
+    if !have_yaml() {
+        assert_eq!(code, 2, "{out}");
+        return;
+    }
+    assert_eq!(code, 0, "{out}");
+    // the script counts exactly the files found here: none of the three groups is left out
+    assert_eq!(out, format!("{} YAML file(s) parse", files.len()), "{out}");
+}
+
+/// The finding of run 7: an unquoted `: ` in the description of a composite action (line 2).
+const BAD_ACTION: &str =
+    "name: x\ndescription: Release of a pure library: check the tag\ninputs: {}\n";
+
+#[test]
+fn a_broken_action_yml_and_a_broken_flow_yaml_are_red_with_file_and_line() {
+    if !have_yaml() {
+        return;
+    }
+    let tmp = tempfile::tempdir().unwrap();
+    let a = tmp.path().join("actions/library-release");
+    fs::create_dir_all(&a).unwrap();
+    fs::write(a.join("action.yml"), BAD_ACTION).unwrap();
+    let (code, out) = python(&script(), &[tmp.path()]);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.starts_with("actions/library-release/action.yml:2:"),
+        "{out}"
+    );
+    fs::write(
+        a.join("action.yml"),
+        "name: x\ndescription: \"ok: quoted\"\n",
+    )
+    .unwrap();
+    let (code, out) = python(&script(), &[tmp.path()]);
+    assert_eq!(code, 0, "{out}");
+    let w = tmp.path().join("workflows");
+    fs::create_dir_all(&w).unwrap();
+    fs::write(
+        w.join("flow.yaml"),
+        "name: f\nsteps:\n  - name: a\n    note: b: c\n",
+    )
+    .unwrap();
+    let (code, out) = python(&script(), &[tmp.path()]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.starts_with("workflows/flow.yaml:4:"), "{out}");
+}
+
+#[test]
+fn the_real_library_release_action_with_the_old_unquoted_line_is_red() {
+    if !have_yaml() {
+        return;
+    }
+    let real = fs::read_to_string(repo_root().join("actions/library-release/action.yml")).unwrap();
+    let (first, rest) = real.split_once('\n').unwrap();
+    let (desc, body) = rest.split_once('\n').unwrap();
+    let unquoted = desc.replacen("description: \"", "description: ", 1);
+    let unquoted = unquoted.strip_suffix('"').unwrap();
+    assert_ne!(unquoted, desc, "the description line must be quoted");
+    let tmp = tempfile::tempdir().unwrap();
+    let a = tmp.path().join("actions/library-release");
+    fs::create_dir_all(&a).unwrap();
+    fs::write(a.join("action.yml"), format!("{first}\n{unquoted}\n{body}")).unwrap();
+    let (code, out) = python(&script(), &[tmp.path()]);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.starts_with("actions/library-release/action.yml:2:"),
+        "{out}"
+    );
+}
