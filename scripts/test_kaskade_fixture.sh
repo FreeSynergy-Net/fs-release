@@ -37,6 +37,7 @@ commit_push fs-types one; tag_push fs-types v0.0.3
 newrepo fs-interfaces
 printf '[package]\nname = "fs-interfaces"\nversion = "0.0.2"\n[dependencies]\nfs-types = { git = "%s/fs-types", tag = "v0.0.3" }\n' "$GH" >"$tmp/work/fs-interfaces/Cargo.toml"
 lock fs-interfaces "git+$GH/fs-types?tag=v0.0.3#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" >"$tmp/work/fs-interfaces/Cargo.lock"
+printf "strict = true\nonly_from_enabled = true\n" >"$tmp/work/fs-interfaces/.fs-lock-sources.toml"
 mkdir -p "$tmp/work/fs-interfaces/.github/workflows"
 printf 'name: windows\njobs:\n  windows:\n    uses: FreeSynergy/fs-release/.github/workflows/_windows-check.yml@v0.0.11\n' >"$tmp/work/fs-interfaces/.github/workflows/windows.yml"
 commit_push fs-interfaces one; tag_push fs-interfaces v0.0.2
