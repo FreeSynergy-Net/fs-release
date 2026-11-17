@@ -3,6 +3,7 @@
 //! A red Glied aborts (no skipping, no repeat), resume with `ab`; the end checks one fs-types version in every lock. Counter-tests on changed copies.
 
 mod support;
+use support::kaskade::{cases, graph_ok, switches_ok, with_then, SWITCHES};
 use support::workflows::{in_order, read, step_body};
 
 fn ok(t: &str) -> bool {
@@ -19,6 +20,8 @@ fn ok(t: &str) -> bool {
             "plan",
             "glied-weiche",
             "glied-start",
+            "rev-pins",
+            "rev-pins-weiter",
             "pin-lift",
             "besonderes",
             "lock-strikt",
@@ -54,6 +57,35 @@ fn ok(t: &str) -> bool {
         && step_body(t, "eskalation").contains("actor: human")
         && step_body(t, "eskalation").contains("`ab`")
         && step_body(t, "lock-ende").contains("SAME fs-types version")
+        && step_body(t, "lock-ende").contains("`fs-conformance`")
+        && step_body(t, "rev-pins").contains("`rev` pins")
+        && step_body(t, "rev-pins").contains("fs-people-directory")
+        && step_body(t, "rev-pins").contains("fs-conformance")
+        && step_body(t, "rev-pins-weiter").contains("then: eskalation")
+        && !step_body(t, "rev-pins-weiter").contains("then: pin-lift")
+        && step_body(t, "plan").contains("REAL dependencies")
+        && graph_ok(t)
+        && switches_ok(t)
+        && step_body(t, "lock-strikt").contains("FS_LOCK_ONLY_FROM=1")
+        && step_body(t, "lock-strikt").contains("FS_LOCK_STRICT=1")
+        && step_body(t, "lock-ende").contains("FS_LOCK_ONLY_FROM=1")
+        && !t.contains("one source per fs crate")
+        && step_body(t, "review").contains("delta: ")
+        && step_body(t, "review").contains("tests: ")
+        && step_body(t, "push-zweig").contains("branch-prefix: ")
+        && !t.contains("shared target")
+        && [
+            "[EIGENES-TARGET]",
+            "[GATE-VOLLSTAENDIG-LAUFEN]",
+            "[GATE-CI-UMGEBUNG]",
+            "[GATE-FLACHER-KLON-OHNE-TAGS]",
+            "[GATE-AUSGABE-NIE-KUERZEN]",
+        ]
+        .iter()
+        .all(|r| step_body(t, "gates").contains(r))
+        && step_body(t, "eskalation").contains("ab: ${ if $context.lockende != null then null")
+        && step_body(t, "glied-start").contains("offenvorher")
+        && step_body(t, "lage").contains("erledigt")
         && t.contains(".input[\"ausloeser-tag\"]")
         && t.contains(".input.glieder")
         && t.contains(".input.ab")
@@ -76,6 +108,68 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     assert!(bad(t.replace("  - lock-strikt:", "  - lock-x:")));
     assert!(bad(t.replacen("gate: opus-ja", "gate: none", 1)));
     assert!(bad(format!("{t}\n# tag-annotated\n")));
+    // graph: jscalendar dropped, fs-rpc before fs-objects, fs-tasks before fs-people, a changed edge, the rev-pin step skipped
+    let order = "# GLIEDER-ORDER: fs-interfaces, fs-objects, fs-jscalendar, fs-rpc, fs-components, fs-people, fs-tasks, fs-calendars";
+    assert!(t.contains(order));
+    assert!(bad(t.replace(order, "# GLIEDER-ORDER: fs-interfaces, fs-objects, fs-rpc, fs-components, fs-people, fs-tasks, fs-calendars")));
+    assert!(bad(t.replace(order, "# GLIEDER-ORDER: fs-interfaces, fs-rpc, fs-objects, fs-jscalendar, fs-components, fs-people, fs-tasks, fs-calendars")));
+    assert!(bad(t.replace(order, "# GLIEDER-ORDER: fs-interfaces, fs-objects, fs-jscalendar, fs-rpc, fs-components, fs-tasks, fs-people, fs-calendars")));
+    assert!(bad(t.replace(
+        "# DAG: fs-tasks <- fs-interfaces, fs-objects, fs-components, fs-jscalendar, fs-people",
+        "# DAG: fs-tasks <- fs-interfaces, fs-objects, fs-components, fs-jscalendar"
+    )));
+    assert!(bad(t.replace(
+        "# DAG: fs-rpc <- fs-types, fs-interfaces, fs-objects, fs-conformance",
+        "# DAG: fs-rpc <- fs-types, fs-interfaces, fs-objects"
+    )));
+    assert!(bad(t.replace("  - rev-pins-weiter:", "  - rev-x:")));
+    assert!(bad(t.replace("  - rev-pins:", "  - rev-x:")));
+    // A2: every case of every switch, one by one (M4 gates-weiter red -> continue, M5 round case, M7 ff-weiter `sonst`)
+    for (step, want) in SWITCHES {
+        for (case, then) in *want {
+            let new = if *then == "eskalation" {
+                "naechstes"
+            } else {
+                "eskalation"
+            };
+            assert!(
+                bad(with_then(&t, step, case, new)),
+                "{step}/{case} -> {new} must be caught"
+            );
+        }
+        let first = cases(&t, step).remove(0).0;
+        let cut = t.replacen(
+            &format!("        - {first}:\n"),
+            "        - umbenannt:\n",
+            1,
+        );
+        assert!(
+            bad(cut),
+            "{step}: first case renamed/removed must be caught"
+        );
+    }
+    assert!(bad(t.replacen(">= 3", ">= 4", 1)));
+    assert!(bad(t.replace(
+        "lockcheck.red == false and",
+        "lockcheck.red != true and"
+    )));
+    assert!(bad(t.replace("\"JA\"", "\"NEIN\"")));
+    // A4-A8
+    assert!(bad(t.replace("FS_LOCK_ONLY_FROM=1", "")));
+    assert!(bad(t.replace(
+        "          delta: ${ $context.zweig.basis }..${ $context.zweig.head }\n",
+        ""
+    )));
+    assert!(bad(t.replace("branch-prefix: ", "branch: ")));
+    assert!(bad(t.replace(
+        "OWN target of the worktree",
+        "shared target of the worktree"
+    )));
+    assert!(bad(t.replace(
+        "        ab: ${ if $context.lockende != null then null else",
+        "        ab: ${ if false then null else"
+    )));
+    assert!(bad(t.replace("offenvorher: (", "x: (")));
 }
 
 #[test]

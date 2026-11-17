@@ -13,6 +13,7 @@ use tempfile::TempDir;
 pub mod flow;
 pub mod flowcheck;
 pub mod gh;
+pub mod kaskade;
 pub mod workflows;
 
 pub fn git(dir: &Path, args: &[&str]) -> String {

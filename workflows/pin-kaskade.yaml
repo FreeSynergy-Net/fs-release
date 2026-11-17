@@ -1,11 +1,21 @@
 # pin-kaskade: ONE cascade of the pins after a new tag of fs-types (trigger, here v0.0.3), in the order of the DAG (ADR 0092/0093; plan
 # `katalog-plan/PLAN-baukasten-architektur.md`, user priority "Grundsystem fertig"). Order: `Workflow pin-kaskade, parameters ausloeser-tag, glieder, ab, workdir` (docs/prompt-template.md). FS profile: see README.md.
 # Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
-# SPECIFICATION: the `@fs` calls without a script are specification, a real run is not proven. Agents never push to main, tag or merge; ordinary push only to `unreviewed/pin-kaskade-<repo>`; no `gh` call; reports per [BERICHT]; one board card (fs-tasks, project `bahn5-crates`).
-# Order of the Glieder: fs-interfaces (new tag, capnp regenerated, `catalog_roundtrip`) -> fs-objects -> fs-rpc (with fs-starter-L1 `coded_stub`) -> fs-components (with the fs-settings lift, F1 catalog, `WITHOUT_COMPONENT` extended) -> the programs, one lift each, fs-tasks (pilot) first.
-# Per Glied: pin in Cargo.toml and Cargo.lock by cargo (`lift`, never by hand), `strict` lock check (one source per fs crate), the gates complete in both environments (CARGO_BUILD_JOBS=4, BUILD_PRIORITY=0 = scaffold core, [GATE-*] rules), branch CI at the exact head, Opus review at the head, ff and tag ONLY through `ff-und-tag` - THEN the next Glied.
+# SPECIFICATION: the `@fs` calls without a script are specification, a real run is not proven. Agents never push to main, tag or merge; ordinary push only to `unreviewed/pin-kaskade-<repo>-<n>` (a NEW number after every rebase, never a force push, [REBASE-NEUER-BRANCH]); no `gh` call; reports per [BERICHT]; one board card (fs-tasks, project `bahn5-crates`).
+# Order of the Glieder (ADR 0093 rule 1: fs-types -> {fs-interfaces, fs-objects, fs-jscalendar, fs-components} -> fs-rpc -> programs), DERIVED from the real dependencies, not from a fixed list (step `plan`): the table below is the evidence (Cargo.toml of main of every Glied repo, `git clone --depth 1`, read 17.11.2026; `A <- B, C` = A depends on B and C); the test `workflows_pin_kaskade.rs` keeps the table, the order and its own copy of the edges in step.
+# GLIEDER-ORDER: fs-interfaces, fs-objects, fs-jscalendar, fs-rpc, fs-components, fs-people, fs-tasks, fs-calendars
+# DAG: fs-interfaces <- fs-types
+# DAG: fs-objects <- fs-types
+# DAG: fs-jscalendar <- fs-types
+# DAG: fs-rpc <- fs-types, fs-interfaces, fs-objects, fs-conformance
+# DAG: fs-components <- fs-types, fs-conformance
+# DAG: fs-people <- fs-interfaces, fs-objects, fs-components
+# DAG: fs-tasks <- fs-interfaces, fs-objects, fs-components, fs-jscalendar, fs-people
+# DAG: fs-calendars <- fs-types, fs-interfaces, fs-objects, fs-rpc, fs-jscalendar, fs-components, fs-tasks
+# Notes to the table: `fs-conformance` is a crate of the REPO fs-types (the trigger tag carries it), pinned by `rev 339aa24f` in fs-rpc (fs-starter) and fs-components (fs-settings); `fs-people-directory` is a crate of the REPO fs-people, pinned by `rev 358a8145` in fs-tasks (testdata), so fs-people is a Glied BEFORE fs-tasks (the pilot of the programs; fs-tasks stands before the other programs, fs-people only because the pilot needs its tag). fs-tasks, fs-people and fs-calendars still take `fs-types` from the repo fs-interfaces (v0.0.22, `fs-types-frontend` v0.0.2): the lift moves it to FreeSynergy/fs-types (`--types`, `--move`), the step `fremde-pins` proves afterwards that no other source is left. fs-components does not depend on fs-rpc (and the reverse), so their relative order is free; the order of the list is the stable tie order.
+# Per Glied: pin in Cargo.toml and Cargo.lock by cargo (`lift`, never by hand), `strict` lock check with `FS_LOCK_STRICT=1` and `FS_LOCK_ONLY_FROM=1` (one source per library of `scripts/lock-sources.toml`: fs-types, fs-objects, fs-interfaces, fs-rpc, fs-jscalendar; fs-types ONLY from FreeSynergy/fs-types), the gates complete in both environments (CARGO_BUILD_JOBS=4, BUILD_PRIORITY=0 = scaffold core, [GATE-*] rules), branch CI at the exact head, Opus review at the head, ff and tag ONLY through `ff-und-tag` - THEN the next Glied.
 # ABORT: a red Glied stops the cascade (`eskalation` to the strategy), no skipping, no parallel build of dependent Glieder. Resume after solving: input `ab` = the Glied that was red. End: the same fs-types version in every lock, one source in the graph.
-# Rule [KEINE-KALTEN-FLACHPROBEN-BIS-AUFRAEUMEN]: no cold flat trial builds in fresh targets until the clean-up is done; every build goes through `build-slot.sh` into the shared target. No AI on servers (not touched).
+# Rule [KEINE-KALTEN-FLACHPROBEN-BIS-AUFRAEUMEN]: no cold flat trial builds in fresh targets until the clean-up is done; every build goes through `build-slot.sh` into the OWN target of the worktree (`.scratch/target/<repo>/<worktree>`, [EIGENES-TARGET]); proof runs never in a target shared with other worktrees; an existing target of the same repo state is reused. Also [GATE-VOLLSTAENDIG-LAUFEN] (`cargo fmt --all` first, then `gates.sh` COMPLETE at the end head, both environments), [GATE-CI-UMGEBUNG] (also with `CARGO_TERM_COLOR=always CI=true`), [GATE-FLACHER-KLON-OHNE-TAGS] (a counter-run in a shallow clone WITHOUT tags, `git clone --depth 1 --no-tags`), [GATE-AUSGABE-NIE-KUERZEN] (no gate output cut with `tail`/`head`, rc of every gate visible). No AI on servers (not touched).
 # Inputs: `ausloeser-tag` (tag of fs-types, e.g. v0.0.3), `glieder` (list of { repo, art, tag, allow, besonderes } in DAG order), `ab` (optional resume: name of the Glied to start at), `workdir` (own folder for the fresh clones of `ff-und-tag`).
 # Loops: a red check step with repeats jumps back at most twice, the third red round goes to `eskalation`; the Glied steps do NOT repeat: red = abort.
 document:
@@ -82,7 +92,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script, read only - proves by `git ls-remote --tags` (never from an old clone) that the trigger tag of fs-types exists (here v0.0.3) and shows the head of every Glied; with `ab` (resume input = the Glied that was red) the list starts there, the earlier Glieder are read as done ONLY when their tag exists on the remote. Result `lage` = { ausloeser, glieder, ab }."
+        freesynergy.net:summary: "Script, read only - proves by `git ls-remote --tags` (never from an old clone) that the trigger tag of fs-types exists (here v0.0.3) and shows the head of every Glied; with `ab` (resume input = the Glied that was red) the list starts there, and the Glieder BEFORE `ab` are read as done ONLY when their tag exists on the remote (ls-remote): result `lage` = { ausloeser, glieder, ab, erledigt: [{ repo, tag, beleg }] } - the tags of the done Glieder are kept, so `libs` of the later Glieder are right after a resume."
   - plan:
       call: kaskade-plan:0.0.10@fs
       with:
@@ -94,7 +104,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - orders the Glieder by the DAG (ADR 0092/0093): fs-interfaces (new tag, capnp regenerated, `catalog_roundtrip`), fs-objects, fs-rpc (with the fs-starter-L1 `coded_stub`), fs-components (with the fs-settings lift, F1 catalog, `WITHOUT_COMPONENT` extended), then the programs, one lift each, fs-tasks (pilot) FIRST. Result `plan` = { offen: [Glied...], erledigt: [] } where a Glied = { repo, art: bibliothek | programm, tag, allow, besonderes }; `offen[0]` is the next one; a Glied is built only after ALL Glieder it depends on are done (no parallel build of dependent Glieder)."
+        freesynergy.net:summary: "Script - derives the order of the Glieder from the REAL dependencies (ADR 0092/0093), not from a fixed list: reads the Cargo.toml of main of every Glied repo (blobless clone, `git ls-remote` for the head), maps every FreeSynergy git dependency (`tag` AND `rev`) to its owner repo (crate -> repo: fs-conformance -> fs-types, fs-people-directory -> fs-people, fs-components-* -> fs-components, fs-tasks-core -> fs-tasks ...), builds the edges and sorts topologically with the stable tie order of the `glieder` input; fs-jscalendar is a Glied of the same level as fs-interfaces (before fs-rpc and the programs). A dependency whose owner repo is not in `glieder`, a dependency on a repo from the wrong source (fs-types from the repo fs-interfaces) and a cycle are reported as `befunde` (the cascade goes to `eskalation`, never silently on). Result `plan` = { offen: [Glied...], erledigt: `lage.erledigt` (EMPTY only without `ab`; with `ab` the Glieder before it with their ls-remote tag), befunde: [] } where a Glied = { repo, art: bibliothek | programm, tag, allow, besonderes, rev_pins }; `offen[0]` is the next one; a Glied is built only after ALL Glieder it depends on are done (no parallel build of dependent Glieder). The table in the header of this file is the evidence for today's graph."
   - plan-check:
       call: kaskade-plan-regeln:0.0.10@fs
       with:
@@ -106,7 +116,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Check: the order follows the DAG (no Glied before one it depends on), fs-tasks stands before the other programs, every Glied has `tag` and `allow`, `ab` names a Glied of the list."
+        freesynergy.net:summary: "Check: the order follows the DAG (no Glied before one it depends on; every edge of `plan` is checked against the Cargo.toml pins, also the `rev` ones), fs-jscalendar stands before fs-rpc and before every program, fs-tasks stands before the other programs (fs-people only before fs-tasks), every Glied has `tag` and `allow`, `befunde` is empty, `ab` names a Glied of the list."
   - plan-again:
       switch:
         - runden:
@@ -131,8 +141,11 @@ do:
         - fertig:
             when: '${ ($context.plan.offen | length) == 0 }'
             then: lock-ende
+        - schleife:
+            when: '${ ($context.plan.offen | length) > 0 and ($context.plan.offen | length) >= ($context.offenvorher // 1000000) }'
+            then: eskalation
         - weiter:
-            when: '${ ($context.plan.offen | length) > 0 }'
+            when: '${ ($context.plan.offen | length) > 0 and ($context.plan.offen | length) < ($context.offenvorher // 1000000) }'
             then: glied-start
         - ohne-ergebnis:
             then: eskalation
@@ -141,20 +154,48 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow of the loop over the Glieder - an empty `plan.offen` goes to the final lock check; otherwise the next Glied; a missing plan goes to `eskalation`."
+        freesynergy.net:summary: "Control flow of the loop over the Glieder - an empty `plan.offen` goes to the final lock check; if the length of `plan.offen` is NOT smaller than at the last `glied-start` (`offenvorher`: `naechstes` did not shorten the list, the same Glied would be `offen[0]` again) it is a loop and goes to `eskalation`; otherwise the next Glied; a missing plan goes to `eskalation`."
   - glied-start:
       call: kaskade-glied:0.0.10@fs
       with:
         plan: ${ $context.plan }
         ausloeser: ${ .input["ausloeser-tag"] }
       export:
-        as: '${ $context + { glied: . } }'
+        as: '${ $context + { glied: ., offenvorher: ($context.plan.offen | length) } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - takes `plan.offen[0]` as the current Glied (`glied` = { repo, art, tag, allow, besonderes, libs }, `libs` = the trigger tag of fs-types plus the tags of the Glieder already done that this one depends on). One Glied at a time; BUILD_PRIORITY of every build step of a Glied is 0 (scaffold core, `build-slot.sh`)."
+  - rev-pins:
+      call: kaskade-fremde-pins:0.0.10@fs
+      with:
+        glied: ${ $context.glied }
+      export:
+        as: '${ $context + { revpins: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, runs BEFORE the lift (the lift then makes Cargo.lock once, by cargo): lists every `rev` pin to a FreeSynergy repo in the Cargo.toml files of the Glied (today `fs-conformance` of the repo fs-types in fs-rpc and fs-components, rev 339aa24f; `fs-people-directory` of the repo fs-people in fs-tasks, rev 358a8145) and every crate that comes from a WRONG repo (fs-types from the repo fs-interfaces, `fs-types-frontend`); the `rev` pins are put on the TAG of the owner repo in the same Glied (fs-conformance -> the trigger tag of fs-types, which carries the crate; fs-people-directory -> the tag of the Glied fs-people, taken from `glied.libs`), only Cargo.toml is edited, never Cargo.lock. A rev whose commit is not contained in any tag of the owner repo (`git merge-base --is-ancestor` against the tag, read only) is NOT lifted by guess: it goes as a finding into `revpins.befunde` and the next step `rev-pins-weiter` stops the cascade. Specification, no script yet (`kaskade-fremde-pins`)."
+  - rev-pins-weiter:
+      switch:
+        - befund:
+            when: '${ ($context.revpins.befunde // [] | length) > 0 or ($context.revpins.red // false) == true }'
+            then: eskalation
+        - ohne-befund:
+            when: '${ ($context.revpins.befunde // [] | length) == 0 and ($context.revpins.red // false) == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a finding of `rev-pins` (a rev that is on no tag, a wrong source that cannot be moved) stops the cascade at once and goes to `eskalation` (the strategy decides: tag the owner repo first or add a Glied); without finding on to the lift; a missing result goes to `eskalation`."
   - pin-lift:
       run:
         workflow:
@@ -172,7 +213,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (no second pin way): sets the pin in Cargo.toml to the new tag (`--repo NAME=vX.Y.Z`; fs-interfaces never touches fs-types), regenerates Cargo.lock by `cargo update --workspace` (cargo metadata, NEVER by hand), runs fmt, clippy, rules, tests, `lock-sources` and commits with the identity FreeSynergy <support@freesynergy.net>."
+        freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (no second pin way): sets the pin in Cargo.toml to the new tag (`--repo NAME=vX.Y.Z`; fs-interfaces never touches fs-types; fs-types and fs-conformance come from the repo FreeSynergy/fs-types, the lift moves a crate that still comes from the repo fs-interfaces), regenerates Cargo.lock by `cargo update --workspace` (cargo metadata, NEVER by hand), runs fmt, clippy, rules, tests, `lock-sources` and commits with the identity FreeSynergy <support@freesynergy.net>."
   - besonderes:
       call: kaskade-besonderes-ai:0.0.10@fs
       with:
@@ -187,6 +228,7 @@ do:
       call: lock-sources-strict:0.0.10@fs
       with:
         repo: ${ $context.glied.repo }
+        env: FS_LOCK_STRICT=1 FS_LOCK_ONLY_FROM=1
       export:
         as: '${ $context + { lockcheck: . } }'
       metadata:
@@ -194,7 +236,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - `scripts/gates-lock.sh` / `scripts/check_lock_sources.py` with `strict = true`: EXACTLY ONE source per fs crate in Cargo.lock (also fs-types); a second source is red. The lock was made by cargo, a hand edit is red."
+        freesynergy.net:summary: "Script - `scripts/gates-lock.sh` / `scripts/check_lock_sources.py` with `strict = true` (env `FS_LOCK_STRICT=1`) AND `FS_LOCK_ONLY_FROM=1`: EXACTLY ONE source per library of `scripts/lock-sources.toml` (fs-types, fs-objects, fs-interfaces, fs-rpc, fs-jscalendar) in Cargo.lock, and fs-types ONLY from FreeSynergy/fs-types (a repo that still takes fs-types from the repo fs-interfaces, today fs-tasks v0.0.22, is red here); a second source is red. The lock was made by cargo, a hand edit is red."
   - gates:
       call: gates-komplett:0.0.10@fs
       with:
@@ -208,7 +250,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - `scripts/gates.sh` in BOTH environments (the strict CI one and the local one) through `/srv/FreeSynergy/.scratch/build-slot.sh` with CARGO_BUILD_JOBS=4 and BUILD_PRIORITY=0 (scaffold core); [GATES] fmt, clippy pedantic, tests, rules check; [GATE-PIPEFAIL] `set -o pipefail` and one visible rc per gate, no output cut with `tail`/`head`; [GATE-GLEICH-CI] check scripts from the tag the CI of the repo pins. Rule [KEINE-KALTEN-FLACHPROBEN-BIS-AUFRAEUMEN]: no cold flat trial build in a fresh target while the clean-up is open; the Glied builds in its own shared target (`build-slot.sh`)."
+        freesynergy.net:summary: "Script - `scripts/gates.sh` in BOTH environments (the strict CI one and the local one) through `/srv/FreeSynergy/.scratch/build-slot.sh` with CARGO_BUILD_JOBS=4 and BUILD_PRIORITY=0 (scaffold core); [GATES] fmt, clippy pedantic, tests, rules check; [GATE-PIPEFAIL] `set -o pipefail` and one visible rc per gate, no output cut with `tail`/`head`; [GATE-GLEICH-CI] check scripts from the tag the CI of the repo pins. Rule [KEINE-KALTEN-FLACHPROBEN-BIS-AUFRAEUMEN]: no cold flat trial build in a fresh target while the clean-up is open; the Glied builds in the OWN target of its worktree (`.scratch/target/<repo>/<worktree>`, [EIGENES-TARGET]); proof runs never in a target shared with other worktrees; an existing target of the same repo state is reused ([KEINE-KALTEN-FLACHPROBEN-BIS-AUFRAEUMEN]). [GATE-VOLLSTAENDIG-LAUFEN]: `cargo fmt --all` first, then `gates.sh` COMPLETE at the end head; [GATE-CI-UMGEBUNG]: both environments, the second with `CARGO_TERM_COLOR=always CI=true`; [GATE-FLACHER-KLON-OHNE-TAGS]: a counter-run in a shallow clone without tags (`git clone --depth 1 --no-tags`); [GATE-AUSGABE-NIE-KUERZEN]: no gate output cut with `tail`/`head`, the rc of every gate is visible."
   - gates-weiter:
       switch:
         - rot:
@@ -229,7 +271,7 @@ do:
       call: push-unreviewed:0.0.10@fs
       with:
         repo: ${ $context.glied.repo }
-        branch: unreviewed/pin-kaskade-${ $context.glied.repo }
+        branch-prefix: unreviewed/pin-kaskade-${ $context.glied.repo }-
       export:
         as: '${ $context + { zweig: . } }'
       metadata:
@@ -237,7 +279,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Ordinary push of the local commit to the branch `unreviewed/pin-kaskade-<repo>` ONLY (no force, never main, never a tag, no `gh`); result `zweig` = { branch, head } with the head from `git ls-remote`."
+        freesynergy.net:summary: "Ordinary push of the local commit to a NEW branch `unreviewed/pin-kaskade-<repo>-<n>` ONLY (`n` = the first number whose branch is not on the remote by `git ls-remote`, so a rebase gets a new name and never needs a force push, [REBASE-NEUER-BRANCH]; never main, never a tag, no `gh`); result `zweig` = { branch, head, basis } with the head from `git ls-remote` and `basis` = the head of main of the Glied repo (ls-remote) the review delta starts from."
   - zweig-ci:
       call: branch-ci:0.0.10@fs
       with:
@@ -275,7 +317,9 @@ do:
           repo: ${ $context.glied.repo }
           branch: ${ $context.zweig.branch }
           head: ${ $context.zweig.head }
+          delta: ${ $context.zweig.basis }..${ $context.zweig.head }
           scope: short
+          tests: ${ .input.tests // "targeted tests of the Glied (lift, lock, gates)" }
       export:
         as: '${ $context + { urteil: . } }'
       metadata:
@@ -283,7 +327,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The Opus review at exactly this head (sub-workflow `review`, read only): line 1 JA or NEIN. The one review of the Glied: `ff-und-tag` below only CHECKS the JA for this head, it asks for no second one."
+        freesynergy.net:summary: "The Opus review at exactly this head (sub-workflow `review`, read only) with the `delta` (`<main head of the Glied>..<branch head>`) and the `tests` of the Glied like every other caller: line 1 JA or NEIN. The one review of the Glied: `ff-und-tag` below only CHECKS the JA for this head, it asks for no second one."
   - review-weiter:
       switch:
         - ja:
@@ -351,6 +395,7 @@ do:
       with:
         plan: ${ $context.plan }
         ausloeser: ${ .input["ausloeser-tag"] }
+        env: FS_LOCK_STRICT=1 FS_LOCK_ONLY_FROM=1
       export:
         as: '${ $context + { lockende: . } }'
       metadata:
@@ -358,7 +403,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script, read only, end check - in every Cargo.lock of the done Glieder (fresh blobless clones of main at the tags) the SAME fs-types version (the trigger tag) and only ONE source per fs crate in the whole graph (`check_lock_sources.py` strict); one differing version or a second source is red."
+        freesynergy.net:summary: "Script, read only, end check - in every Cargo.lock of the done Glieder (fresh blobless clones of main at the tags) the SAME fs-types version (the trigger tag) and only ONE source per fs crate in the whole graph (`check_lock_sources.py` with `FS_LOCK_STRICT=1` and `FS_LOCK_ONLY_FROM=1`); EVERY crate of the repo fs-types stands on the trigger tag from the repo FreeSynergy/fs-types, also `fs-conformance` (everywhere the same source and version, no `rev` pin to a FreeSynergy repo is left in any Cargo.toml: also `fs-people-directory`); one differing version, a second source or a left `rev` pin is red."
   - lock-ende-weiter:
       switch:
         - gruen:
@@ -387,11 +432,12 @@ do:
   - eskalation:
       set:
         todo: eskalation
-        ab: ${ $context.glied.repo // null }
+        ab: ${ if $context.lockende != null then null else ($context.glied.repo // null) end }
+        endpruefung: ${ if $context.lockende != null then $context.lockende else null end }
       then: end
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "A check was red (three rounds for the steps with repeats), a Glied is red (lock, gates, CI, review NO, ff or tag not done) or a result is missing: the cascade STOPS, nothing is skipped and nothing runs in parallel. The strategy decides; the report names the Glied, the step and the last red result. After the Glied is solved the cascade resumes from exactly this Glied (input `ab`)."
+        freesynergy.net:summary: "A check was red (three rounds for the steps with repeats), a Glied is red (lock, gates, CI, review NO, ff or tag not done) or a result is missing: the cascade STOPS, nothing is skipped and nothing runs in parallel. The strategy decides; the report names the Glied, the step and the last red result. After the Glied is solved the cascade resumes from exactly this Glied (input `ab`). An escalation from the end check (`lock-ende`) sets `ab: null` (no Glied is to blame) and names the end check with its red result as `endpruefung`."
