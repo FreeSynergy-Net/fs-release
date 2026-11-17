@@ -41,6 +41,33 @@ pub const EDGES: &[(&str, &[&str])] = &[
     ),
 ];
 
+/// The `rev` pins to FreeSynergy repos the header names (`# REV-PIN: <Glied> -> <owner repo> rev <rev> ...`), read from the Cargo.toml of main 17.11.2026.
+pub const REV_PINS: &[&str] = &[
+    "fs-rpc -> fs-types rev 339aa24f",
+    "fs-components -> fs-types rev 339aa24f",
+    "fs-tasks -> fs-people rev 358a8145",
+    "fs-calendars -> fs-components rev 9950b51",
+];
+
+/// The `@fs` calls of `pin-kaskade` that are real scripts in `scripts/`.
+pub const SCRIPTS: &[&str] = &[
+    "kaskade-lage",
+    "kaskade-plan",
+    "kaskade-glied",
+    "kaskade-glied-fertig",
+    "kaskade-fremde-pins",
+    "lock-gleich",
+    "gates-komplett",
+];
+
+/// The text after `prefix` of every line of `text` that starts with it.
+pub fn list_lines(text: &str, prefix: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|l| l.strip_prefix(prefix))
+        .map(str::to_string)
+        .collect()
+}
+
 pub fn list(text: &str, prefix: &str) -> Vec<String> {
     let l = text
         .lines()
@@ -144,6 +171,14 @@ pub const SWITCHES: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     (
+        "windows-weiter",
+        &[
+            ("rot", "eskalation"),
+            ("gruen", "continue"),
+            ("ohne-ergebnis", "eskalation"),
+        ],
+    ),
+    (
         "gates-weiter",
         &[
             ("rot", "eskalation"),
@@ -182,6 +217,7 @@ pub fn switches_ok(t: &str) -> bool {
                     got[1].1.contains("lockcheck.red == false")
                         && got[1].1.contains("bau.red == false")
                 }
+                "windows-weiter" => got[1].1.contains("windows.red == false"),
                 "ci-weiter" => got[0].1.contains("== \"green\""),
                 "review-weiter" => got[0].1.contains("== \"JA\""),
                 "ff-weiter" => got[0].1.contains("== \"done\""),
