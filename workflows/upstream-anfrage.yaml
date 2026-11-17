@@ -1,5 +1,8 @@
 # One request to an upstream project (an issue). The text is drafted by the agent, the person approves and chooses the channel, a script
 # sends it or the person writes it themselves. Blinc: NO AI attribution in issue, PR or commit; no new Blinc PR without asking the user.
+# Rule of the Blinc permission (98): a request to Blinc goes through git-bug in OUR repo WITHOUT asking the user, but only when it is PROVEN (reproduction or source), the DUPLICATES are checked (the tracker of the upstream, read only), the
+# text is ENGLISH, has NO AI words and NO addresses or personal data, and carries the git-bug id. NEVER a pull request and NEVER a comment in a foreign issue or thread. Other upstreams keep the approval of the person (step `approval`).
+# The agent only prepares the text and the git-bug id; the helper of the strategy sends (agents never call gh or a browser login). Loops are counted: from the third round (`runde` >= 3) `eskalation`.
 # Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence`. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -8,11 +11,103 @@ document:
   version: 0.0.10
   title: Send one request to an upstream project by the channel the person chooses
 do:
+  - art-pruefen:
+      call: request-kind:0.0.10@fs
+      with:
+        upstream: ${ .input.upstream }
+        art: ${ .input.art }
+      export:
+        as: '${ $context + { art: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the kind of the request: only an `issue` (a question or a wish as a new issue). A pull request, a comment in a foreign issue or thread, a review or a reaction is red and is not sent by this flow. Result `art` with `red`."
+  - art-weiche:
+      switch:
+        - verboten:
+            when: '${ $context.art.red != false }'
+            then: abgelehnt
+        - issue:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a pull request, a comment or a missing result goes to `abgelehnt`; only `red == false` goes on to the proof."
+  - belegen:
+      call: prove-ai:0.0.10@fs
+      with:
+        upstream: ${ .input.upstream }
+        evidence: ${ .input.evidence }
+      export:
+        as: '${ $context + { belegt: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent PROVES what the request says: a reproduction (steps, version, measured numbers) or the source (file and line at the pinned version and at upstream main); read only, in its own directory. Nothing unproven is asked or claimed. Result `belegt` with `belegt` (true only with a reproduction or a source) and the evidence."
+  - belegt-weiche:
+      switch:
+        - unbelegt:
+            when: '${ $context.belegt.belegt != true }'
+            then: abgelehnt
+        - belegt:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - an unproven statement (or a missing result) is held back: `abgelehnt`; only `belegt == true` goes on to the duplicate search."
+  - dubletten:
+      call: search-duplicates-ai:0.0.10@fs
+      with:
+        upstream: ${ .input.upstream }
+        belegt: ${ $context.belegt }
+      export:
+        as: '${ $context + { dubletten: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The agent searches the tracker of the upstream (issues open and closed, by keywords of the request) READ ONLY: no login, no comment, no reaction, no new issue. A hit that says the same is a duplicate. Result `dubletten` with `treffer` (the list of hits with link) - the search and its keywords are named, never `none` without a search."
+  - dubletten-weiche:
+      switch:
+        - doppelt:
+            when: '${ ($context.dubletten.treffer | length) > 0 }'
+            then: abgelehnt
+        - neu:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a duplicate (the same request already stands in the tracker) goes to `abgelehnt` with the link, no comment is written there; only an empty hit list goes on."
+  - ticket:
+      call: git-bug-ticket:0.0.10@fs
+      with:
+        upstream: ${ .input.upstream }
+        belegt: ${ $context.belegt }
+      export:
+        as: '${ $context + { ticket: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the request is a git-bug ticket in OUR repo (`git-bug` entry with labels kind and area); the id is returned and stands in the text and in the report. Nothing is sent to the upstream yet. Result `ticket` with `id`."
   - draft:
       call: draft-issue:0.0.10@fs
       with:
         upstream: ${ .input.upstream }
-        evidence: ${ .input.evidence }
+        evidence: ${ $context.belegt }
+        ticket: ${ $context.ticket.id }
       export:
         as: '${ $context + { draft: . } }'
       metadata:
@@ -20,7 +115,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body.
+        freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body; it names the git-bug id of the ticket; NO AI words and NO address or personal data, no pull request, no comment in a foreign issue.
   - rules:
       call: upstream-rules:0.0.10@fs
       with:
@@ -34,10 +129,26 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - reads the CLAUDE.md of the upstream clone (Blinc - /srv/FreeSynergy/blinc) and checks the draft against it; for Blinc no Claude, Anthropic or AI mention, no Co-Authored-By, no session link, no robot footer; a new Blinc PR needs the user's question first. The result is `hits`, the list of broken rules.
+  - text-gate:
+      call: text-gate:0.0.10@fs
+      with:
+        draft: ${ $context.draft }
+        ticket: ${ $context.ticket }
+      export:
+        as: '${ $context + { textcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the text gate: the text is ENGLISH, has NO AI words (Claude, Anthropic, AI, LLM, model, agent, robot, bot footer), NO e-mail address, no phone number, no personal data and no private path, and names the git-bug id; no Co-Authored-By, no session link. Result `textcheck` with `hits` (the broken points) and `runde` (+1 for each jump back from `back-to-draft`)."
   - back-to-draft:
       switch:
+        - runden:
+            when: '${ (($context.rules.hits | length) > 0 or ($context.textcheck.hits | length) > 0) and ($context.textcheck.runde // 0) >= 3 }'
+            then: eskalation
         - hits:
-            when: '${ ($context.rules.hits | length) > 0 }'
+            when: '${ ($context.rules.hits | length) > 0 or ($context.textcheck.hits | length) > 0 }'
             then: draft
         - clean:
             then: continue
@@ -46,7 +157,20 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - a rules hit goes back to draft with the hits as the order, a clean draft goes on to the approval.
+        freesynergy.net:summary: Control flow - a hit of `rules` or `text-gate` goes back to draft with the hits as the order, from the third round (`runde` >= 3) to `eskalation`; a clean draft goes on to the approval.
+  - blinc-kanal:
+      call: blinc-channel:0.0.10@fs
+      with:
+        upstream: ${ .input.upstream }
+      export:
+        as: '${ $context + { channel: . } }'
+      if: '${ .input.upstream == "blinc" }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - for Blinc the channel is `git-bug` and nothing else, set by the rule of the Blinc permission (98): no approval of the user is asked for a proven, duplicate-free, English text without AI words (the gate above), no pull request, no comment. Result `channel`."
   - approval:
       call: approve:0.0.10@fs
       with:
@@ -57,6 +181,7 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's YES for exactly this text, given beforehand; without it nothing is sent, a changed text needs a new YES.
+      if: '${ .input.upstream != "blinc" }'
   - choose-channel:
       call: choose-channel:0.0.10@fs
       with:
@@ -69,6 +194,7 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The person chooses the channel for this upstream - `tracker` (the upstream's own issue tracker, e.g. a GitHub issue under the user's account, only after the user's release for exactly this channel), `git-bug` (only if we have write access to the upstream's repository; `git-bug push` over SSH fails otherwise) or `direct` (Discord or mail, the user writes it themselves with the approved text as the template). Without a choice nothing is sent.
+      if: '${ .input.upstream != "blinc" }'
   - send:
       call: send-issue:0.0.10@fs
       if: '${ $context.channel != "direct" }'
@@ -83,7 +209,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Script - sends by the chosen channel, only the approved text, only after the YES and the choice; `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id.
+        freesynergy.net:summary: Script - sends by the chosen channel, only the approved text, only after the YES and the choice; `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The helper of the strategy runs it; an agent never calls gh or a browser login and never sends itself.
   - hand-text:
       call: hand-text:0.0.10@fs
       if: '${ $context.channel == "direct" }'
@@ -95,8 +221,20 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Direct contact (Discord, mail) - the person writes and sends the message themselves, with the approved text as the template; the machine sends nothing and the agent does nothing in this step.
+  - link-ins-ticket:
+      call: ticket-link:0.0.10@fs
+      with:
+        ticket: ${ $context.ticket }
+        channel: ${ $context.channel }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - writes the link of the sent issue (or the note `direct`) into the git-bug ticket of our repo, so the ticket and the upstream issue point at each other."
   - record:
       call: note-history:0.0.10@fs
+      then: end
       with:
         id: ${ $context.send.id }
         channel: ${ $context.channel }
@@ -106,3 +244,25 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The agent notes the history - upstream, channel, issue id (none for `direct`), date, the approved text, later answers - in the report; no planning files in the upstream.
+  - abgelehnt:
+      set:
+        todo: abgelehnt
+        status: held-back
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Nothing is sent: a pull request or a comment was asked for, the statement is not proven, or a duplicate exists (the link goes into the report; no comment is written in the foreign issue). The strategy reads the reason and decides; a held-back request may come back with proof. This flow ends."
+  - eskalation:
+      set:
+        todo: eskalation
+        status: escalated
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Escalation after the third round (`runde` >= 3) of the rules or the text gate: the person decides how to go on; nothing is sent. This flow ends."
