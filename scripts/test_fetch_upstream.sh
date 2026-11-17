@@ -98,4 +98,18 @@ chk "mutant 3 changed something" differs "$tmp/m3" "$tool"
 chk "a forged endpoint is refused" forged "$tool"
 refused_not() { ! forged "$1"; }
 chk "mutant 3 (pattern check removed) is caught by the forged endpoint" refused_not "$tmp/m3"
+# parent segments in the repo name or in the endpoint are refused (mutant: the segment rule removed -> accepted)
+dots() { "$py" -I - "$1" <<'PY'
+import importlib.machinery, importlib.util, sys
+loader = importlib.machinery.SourceFileLoader("fu", sys.argv[1])
+m = importlib.util.module_from_spec(importlib.util.spec_from_loader("fu", loader))
+loader.exec_module(m)
+sys.exit(0 if not any(m.REPO.match(r) for r in ("../x", "a/..", "./b")) and not any(m.ENDPOINT.match(e) for e in ("repos/../x/issues/1/comments", "repos/a/../issues/1/comments")) else 1)
+PY
+}
+chk "repo and endpoint patterns refuse . and .. segments" dots "$tool"
+sed 's/(?!\\.{1,2}\/|\\.{1,2}\$)//' "$tool" >"$tmp/m4"
+chk "mutant 4 changed something" differs "$tmp/m4" "$tool"
+notdots() { ! dots "$1"; }
+chk "mutant 4 (segment rule removed) is caught by the dot case" notdots "$tmp/m4"
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

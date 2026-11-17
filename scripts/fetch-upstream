@@ -23,9 +23,10 @@ import re
 import subprocess
 import sys
 
-REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+SEG = r"(?!\.{1,2}/|\.{1,2}$)[A-Za-z0-9_.-]+"  # a segment `.` or `..` is refused
+REPO = re.compile(r"^" + SEG + "/" + SEG + "$")
 ENDPOINT = re.compile(
-    r"^repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(issues/[0-9]+/comments|pulls/[0-9]+(/comments|/reviews)?)$"
+    r"^repos/" + SEG + "/" + SEG + r"/(issues/[0-9]+/comments|pulls/[0-9]+(/comments|/reviews)?)$"
 )
 UNREACHABLE = "Upstream nicht erreichbar"
 

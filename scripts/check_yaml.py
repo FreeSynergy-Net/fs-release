@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Every YAML file of a repo must parse as YAML: `.github/workflows/*.yml|*.yaml`, `actions/*/action.yml|yaml` (composite
-actions) and `workflows/*.yaml` (the FreeSynergy flows). (Before run 7 only the first group was read, so an unquoted `: `
+actions) `workflows/*.yaml` (the FreeSynergy flows), `chains/*.yaml|yml` (chain definitions) and `examples/callers/*.yml|yaml` (caller examples). (Before run 7 only the first group was read, so an unquoted `: `
 in `actions/library-release/action.yml` stayed unseen.) A step name like `Build (debug, the test: x)` is not
 YAML and GitHub answers "workflow file issue" only after the push. With `actionlint` installed it runs on top of that.
 
@@ -35,6 +35,10 @@ def main(argv):
         ("actions", "*", "action.yaml"),
         ("workflows", "*.yaml"),
         ("workflows", "*.yml"),
+        ("chains", "*.yaml"),
+        ("chains", "*.yml"),
+        ("examples", "callers", "*.yml"),
+        ("examples", "callers", "*.yaml"),
     ):
         files += glob.glob(os.path.join(root, *pattern))
     files = sorted(set(files))

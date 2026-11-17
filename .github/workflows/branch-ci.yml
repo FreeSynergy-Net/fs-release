@@ -1,0 +1,29 @@
+# Branch CI of fs-release itself (CI before a tag, rule [ZWEIG-CI]): on a push to `unreviewed/**` the Rust gates of THIS branch run
+# (scripts/gates.sh: fmt, clippy pedantic, all tests incl. the workflows* tests, check_rust_rules, lock/yaml checks) next to the `lint` run.
+# Not a reusable workflow: the callable ci.yml / check.yml (the @v0.0.x contracts of other repos) are unchanged. No pull-request trigger (no double run).
+name: branch-ci
+on:
+  push:
+    branches: ['unreviewed/**']
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  gates:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@ceddb45ce0d3ddc97e85c60bb24427806868c81c
+        with:
+          toolchain: pinned
+          components: rustfmt,clippy
+          cache-key: branch-ci
+      - name: gates of this branch (scripts/gates.sh, one rc per gate)
+        run: scripts/gates.sh "$PWD"

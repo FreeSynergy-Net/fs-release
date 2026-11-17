@@ -6,6 +6,9 @@
 # Run it on a fresh clone. Do not rely on `set -e` in a tool call: the shell wrapper runs commands inside an
 # `&&` list, where bash ignores it. Inside this script it works.
 set -euo pipefail
+# Every gate prints its rc; a failing one prints its line and rc on stderr (the ERR trap). Never cut a gate output with `tail`/`head`
+# (a pipe into them hides the exit code of the gate): rule [GATE-PIPEFAIL], pinned by crates/fs-release/tests/workflows_pflege12.rs.
+trap 'echo "gates FAILED: line $LINENO: rc=$?" >&2' ERR
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$1" && pwd)"
 rules="$here/check_rust_rules.py"
@@ -22,12 +25,18 @@ if [ -z "${CI:-}" ]; then
 fi
 echo "gates: rustc $(rustc --version)"
 cargo fmt --check
+echo "gate fmt: rc=0"
 # --locked: the gate builds exactly the committed Cargo.lock (a repo without a current lock is red; `cargo update` is a visible commit)
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -W clippy::pedantic
+echo "gate clippy: rc=0"
 cargo test --workspace --all-features --locked
+echo "gate test: rc=0"
 python3 -I "$rules" "$root"
+echo "gate rust-rules: rc=0"
 # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
 bash "$here/gates-lock.sh" "$root"
+echo "gate lock: rc=0"
 # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
 bash "$here/gates-files.sh" "$root"
+echo "gate files: rc=0"
 echo "gates ok: $root at $(git rev-parse --short HEAD 2>/dev/null || echo '?')"

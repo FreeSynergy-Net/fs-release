@@ -126,7 +126,7 @@ fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// All three groups the script must read: composite actions, `FreeSynergy` flows, GitHub workflows.
+/// All five groups the script must read: composite actions, `FreeSynergy` flows, GitHub workflows, chains, caller examples.
 fn yaml_files(root: &Path) -> Vec<PathBuf> {
     let mut v = Vec::new();
     let ext = |p: &Path| matches!(p.extension().and_then(|e| e.to_str()), Some("yml" | "yaml"));
@@ -136,7 +136,12 @@ fn yaml_files(root: &Path) -> Vec<PathBuf> {
             v.push(a);
         }
     }
-    for dir in ["workflows", ".github/workflows"] {
+    for dir in [
+        "workflows",
+        ".github/workflows",
+        "chains",
+        "examples/callers",
+    ] {
         for e in fs::read_dir(root.join(dir)).unwrap().flatten() {
             if ext(&e.path()) {
                 v.push(e.path());
@@ -147,7 +152,7 @@ fn yaml_files(root: &Path) -> Vec<PathBuf> {
 }
 
 #[test]
-fn every_action_flow_and_github_workflow_file_of_this_repo_parses_and_the_script_reads_all_three_groups(
+fn every_action_flow_and_github_workflow_file_of_this_repo_parses_and_the_script_reads_all_five_groups(
 ) {
     let root = repo_root();
     let files = yaml_files(&root);
@@ -158,7 +163,7 @@ fn every_action_flow_and_github_workflow_file_of_this_repo_parses_and_the_script
         return;
     }
     assert_eq!(code, 0, "{out}");
-    // the script counts exactly the files found here: none of the three groups is left out
+    // the script counts exactly the files found here: none of the five groups is left out
     assert_eq!(out, format!("{} YAML file(s) parse", files.len()), "{out}");
 }
 
@@ -221,4 +226,44 @@ fn the_real_library_release_action_with_the_old_unquoted_line_is_red() {
         out.starts_with("actions/library-release/action.yml:2:"),
         "{out}"
     );
+}
+
+/// Mutant: the script with one group left out counts fewer files than the test finds (red), for each of the two new groups.
+#[test]
+fn a_script_that_leaves_out_the_chains_or_the_caller_examples_is_caught_by_the_count() {
+    if !have_yaml() {
+        return;
+    }
+    let root = repo_root();
+    let want = format!("{} YAML file(s) parse", yaml_files(&root).len());
+    let src = fs::read_to_string(script()).unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    for (name, drop) in [
+        ("no_chains", "(\"chains\", \"*.yaml\"),"),
+        ("no_callers", "(\"examples\", \"callers\", \"*.yml\"),"),
+    ] {
+        assert!(src.contains(drop), "{drop}");
+        let m = tmp.path().join(format!("{name}.py"));
+        fs::write(&m, src.replacen(drop, "", 1)).unwrap();
+        let (code, out) = python(&m, &[&root]);
+        assert_eq!(code, 0, "{out}");
+        assert_ne!(out, want, "{name}: the count must differ");
+    }
+}
+
+#[test]
+fn a_broken_chain_and_a_broken_caller_example_are_red_with_file_and_line() {
+    if !have_yaml() {
+        return;
+    }
+    let tmp = tempfile::tempdir().unwrap();
+    for (dir, file) in [("chains", "x.chain.yaml"), ("examples/callers", "ci.yml")] {
+        let d = tmp.path().join(dir);
+        fs::create_dir_all(&d).unwrap();
+        fs::write(d.join(file), "name: x\nnote: a: b\n").unwrap();
+        let (code, out) = python(&script(), &[tmp.path()]);
+        assert_eq!(code, 1, "{out}");
+        assert!(out.starts_with(&format!("{dir}/{file}:2:")), "{out}");
+        fs::remove_file(d.join(file)).unwrap();
+    }
 }

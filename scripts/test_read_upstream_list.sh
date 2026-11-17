@@ -31,6 +31,13 @@ chk "repo without owner is refused" bad 'Blinc#7 pull'
 chk "unknown kind is refused" bad 'project-blinc/Blinc#7 merge'
 chk "missing kind is refused" bad 'project-blinc/Blinc#7'
 chk "negative number is refused" bad 'project-blinc/Blinc#-7 pull'
+chk "parent segment ../x is refused" bad '../x#7 pull'
+chk "parent segment a/.. is refused" bad 'a/..#7 pull'
+chk "dot segment ./b is refused" bad './b#7 pull'
+chk "dot segment a/. is refused" bad 'a/.#7 pull'
+printf '.a/b..#7 pull\n' >"$tmp/dots"
+out="$(python3 -I "$tool" --datei "$tmp/dots")"; rc=$?
+chk "dots inside a name stay allowed (.a/b..)" [ "$rc" -eq 0 ]
 printf 'project-blinc/Blinc#1 pull\nbroken\n' >"$tmp/half"
 out="$(python3 -I "$tool" --datei "$tmp/half")"; rc=$?
 chk "one bad line makes the whole list skipped (no half list)" [ "$rc" -eq 2 ]
@@ -41,4 +48,10 @@ chk "mutation changed something" differs "$tmp/mutant" "$tool"
 printf '%s\n' 'project-blinc/Blinc#7a pull' >"$tmp/bad"
 out="$(python3 -I "$tmp/mutant" --datei "$tmp/bad" 2>/dev/null)"; rc=$?
 chk "mutation (digits check loosened) is caught by the bad-number case" [ "$rc" -ne 2 ]
+# mutation: the segment rule is dropped -> ../x is accepted again, caught by the parent-segment case
+sed 's/(?!\\.{1,2}(?:\/|#|\$))//' "$tool" >"$tmp/mutant2"
+chk "mutation 2 changed something" differs "$tmp/mutant2" "$tool"
+printf '%s\n' '../x#7 pull' >"$tmp/bad"
+out="$(python3 -I "$tmp/mutant2" --datei "$tmp/bad" 2>/dev/null)"; rc=$?
+chk "mutation 2 (segment rule removed) is caught by ../x" [ "$rc" -ne 2 ]
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

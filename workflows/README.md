@@ -21,7 +21,7 @@ Berichtsform und Prüfliste stehen im `summary` der Schritte und in `rules.md` (
 gehen über `export.as` und werden mit `$context.<name>` gelesen; ein Rücksprung ist ein `switch` mit `then`. **`rules.md`**
 liegt unter `/srv/FreeSynergy/.scratch/api-runner/rules.md`; diese Datei gilt, im Repo gibt es keine Kopie. Die Regeln
 `[EFFIZIENZ]` (ein Lauf = ein Gate-Zyklus, Gates einmal je Kopf, Reviews nur Delta, Mechanik als Skript, Abbruch-Schutz) stehen
-als Schritt-Regeln in `agent-run` und `review`. Vor jeder Entscheidung sucht `scripts/adr-search` die vorhandenen ADRs
+als Schritt-Regeln in `agent-run` und `review`. Regel [GATE-PIPEFAIL]: Gates immer mit `set -o pipefail` bzw. mit ausgegebenem rc; nie über `tail`/`head` kürzen; `check_rust_rules` nur mit `grep -E 'ERROR|errors'` UND sichtbarem rc; Prüfskripte aus dem von der CI gepinnten Tag (`scripts/gates.sh`, Test `tests/workflows_pflege12.rs`). Zweig-CI von fs-release = `lint` + `branch-ci` (Push auf `unreviewed/**`); vor einem Tag am genauen Kopf lesen. Vor jeder Entscheidung sucht `scripts/adr-search` die vorhandenen ADRs
 (`entscheidung`, `user-decision`).
 
 **Die Flows.**
