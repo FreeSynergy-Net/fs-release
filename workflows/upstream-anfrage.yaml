@@ -3,7 +3,7 @@
 # Rule of the Blinc permission (98): a request to Blinc goes through git-bug in OUR repo WITHOUT asking the user, but only when it is PROVEN (reproduction or source), the DUPLICATES are checked (the tracker of the upstream, read only), the
 # text is ENGLISH, has NO AI words and NO addresses or personal data, and carries the git-bug id. NEVER a pull request and NEVER a comment in a foreign issue or thread. Other upstreams keep the approval of the person (step `approval`).
 # The agent only prepares the text and the git-bug id; the helper of the strategy sends (agents never call gh or a browser login). Loops are counted: from the third round (`runde` >= 3) `eskalation`.
-# Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence`. FS profile: see README.md.
+# Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence, art`. FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -79,7 +79,7 @@ do:
   - dubletten-weiche:
       switch:
         - doppelt:
-            when: '${ ($context.dubletten.treffer | length) > 0 }'
+            when: '${ $context.dubletten.treffer == null or ($context.dubletten.treffer | length) > 0 }'
             then: abgelehnt
         - neu:
             then: continue
@@ -88,7 +88,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a duplicate (the same request already stands in the tracker) goes to `abgelehnt` with the link, no comment is written there; only an empty hit list goes on."
+        freesynergy.net:summary: "Control flow - a duplicate (the same request already stands in the tracker) or a missing result goes to `abgelehnt` with the link, no comment is written there; only an empty hit list (`treffer` present and empty) goes on."
   - ticket:
       call: git-bug-ticket:0.0.10@fs
       with:
@@ -145,10 +145,10 @@ do:
   - back-to-draft:
       switch:
         - runden:
-            when: '${ (($context.rules.hits | length) > 0 or ($context.textcheck.hits | length) > 0) and ($context.textcheck.runde // 0) >= 3 }'
+            when: '${ ($context.rules.hits == null or $context.textcheck.hits == null or ($context.rules.hits | length) > 0 or ($context.textcheck.hits | length) > 0) and ($context.textcheck.runde // 0) >= 3 }'
             then: eskalation
         - hits:
-            when: '${ ($context.rules.hits | length) > 0 or ($context.textcheck.hits | length) > 0 }'
+            when: '${ $context.rules.hits == null or $context.textcheck.hits == null or ($context.rules.hits | length) > 0 or ($context.textcheck.hits | length) > 0 }'
             then: draft
         - clean:
             then: continue
@@ -157,7 +157,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - a hit of `rules` or `text-gate` goes back to draft with the hits as the order, from the third round (`runde` >= 3) to `eskalation`; a clean draft goes on to the approval.
+        freesynergy.net:summary: Control flow - a hit of `rules` or `text-gate` (a missing `hits` result counts as a hit) goes back to draft with the hits as the order, from the third round (`runde` >= 3) to `eskalation`; a clean draft goes on to the approval.
   - blinc-kanal:
       call: blinc-channel:0.0.10@fs
       with:
@@ -209,7 +209,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Script - sends by the chosen channel, only the approved text, only after the YES and the choice; `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The helper of the strategy runs it; an agent never calls gh or a browser login and never sends itself.
+        freesynergy.net:summary: Script - sends by the chosen channel, only the approved text, only after the YES and the choice (for Blinc without a YES, by rule 98 and the gates above); `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The helper of the strategy runs it; an agent never calls gh or a browser login and never sends itself.
   - hand-text:
       call: hand-text:0.0.10@fs
       if: '${ $context.channel == "direct" }'

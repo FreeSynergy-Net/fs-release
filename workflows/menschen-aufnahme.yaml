@@ -121,35 +121,54 @@ do:
       call: gatekeeper-bot:0.0.10@fs
       with:
         gruppe: ${ .input.gruppe }
+      export:
+        as: '${ $context + { eintritt: . } }'
       if: '${ $context.zugang.art == "gatekeeper" }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - the gatekeeper bot (no AI, never an account of a person) checks the invitation link, the min/max of the group and the valid time; it decides nothing about the person beyond the rule and writes the entry to the log of the group."
+        freesynergy.net:summary: "Script - the gatekeeper bot (no AI, never an account of a person) checks the invitation link, the min/max of the group and the valid time; it decides nothing about the person beyond the rule and writes the entry to the log of the group. Result `eintritt` with `frei` (true only when the way lets the person in)."
   - abstimmung:
       call: group-vote:0.0.10@fs
       with:
         gruppe: ${ .input.gruppe }
+      export:
+        as: '${ $context + { eintritt: . } }'
       if: '${ $context.zugang.art == "vote" }'
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The members of the group vote by their own rule; the result of the vote is the vote of the people, never of an agent. Only for the way `vote`."
+        freesynergy.net:summary: "The members of the group vote by their own rule; the result of the vote is the vote of the people, never of an agent. Only for the way `vote`. Result `eintritt` with `frei` (true only when the way lets the person in)."
   - admin-freigabe:
       call: admin-release:0.0.10@fs
       with:
         gruppe: ${ .input.gruppe }
+      export:
+        as: '${ $context + { eintritt: . } }'
       if: '${ $context.zugang.art == "admin" }'
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "An admin of the group frees the entry, by their own decision. Only for the way `admin`."
+        freesynergy.net:summary: "An admin of the group frees the entry, by their own decision. Only for the way `admin`. Result `eintritt` with `frei` (true only when the way lets the person in)."
+  - eintritt-weiche:
+      switch:
+        - abgelehnt:
+            when: '${ $context.zugang.art != "open" and $context.eintritt.frei != true }'
+            then: ohne-zugang
+        - frei:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a refused entry (the gatekeeper bot says no, the vote says no, the admin refuses) or a missing result of the way goes to `ohne-zugang`; only `frei == true` (or the way `open`) goes on to the welcome material."
   - willkommen-vorbereiten:
       call: welcome-ai:0.0.10@fs
       with:
@@ -250,6 +269,17 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The person did not consent (or did not confirm the note): nothing is stored, no account is made, no invitation goes out; the person may come back any time. The agent does not ask again and does not agree for them. This flow ends."
+  - ohne-zugang:
+      set:
+        todo: ohne-zugang
+        status: stopped
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The way in (gatekeeper bot, vote or admin) did not let the person in: nothing is stored, no invitation goes out, no account is made; the person is told by a human, and may ask again by the rules of the group. This flow ends."
   - eskalation:
       set:
         todo: eskalation

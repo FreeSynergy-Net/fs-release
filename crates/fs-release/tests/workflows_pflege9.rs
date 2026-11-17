@@ -265,7 +265,18 @@ fn cleanup(t: &str) -> bool {
         && has(
             t,
             "skript-pruefen",
-            &["shellcheck", "ONLY with `--dry-run`", "NEVER"],
+            &[
+                "shellcheck",
+                "AFTER this static check is green",
+                "ONLY with `--dry-run`",
+                "NEVER",
+                "SANDBOX",
+                "temporary HOME",
+                "no SSH agent",
+                "GIT_TERMINAL_PROMPT=0",
+                "no push remote",
+                "does not run at all",
+            ],
         )
         && loop_ends(t, "skript-weiche", "skript-erzeugen")
         && actor(t, "nutzer-fuehrt-aus") == "human"
@@ -367,6 +378,7 @@ fn onboarding(t: &str) -> bool {
             "tuersteher",
             "abstimmung",
             "admin-freigabe",
+            "eintritt-weiche",
             "willkommen-vorbereiten",
             "zustimmung-pruefen",
             "zustimmung-weiche",
@@ -375,9 +387,24 @@ fn onboarding(t: &str) -> bool {
             "einladung-senden",
             "aufnahme-beleg",
             "ohne-einwilligung",
+            "ohne-zugang",
             "eskalation",
         ],
     ) && consents_by_people(t)
+        && ["tuersteher", "abstimmung", "admin-freigabe"]
+            .iter()
+            .all(|s| has(t, s, &["{ eintritt: . }", "`frei`"]))
+        && has(
+            t,
+            "eintritt-weiche",
+            &[
+                "$context.zugang.art != \"open\"",
+                "$context.eintritt.frei != true",
+                "then: ohne-zugang",
+            ],
+        )
+        && actor(t, "ohne-zugang") == "human"
+        && ends(t, "ohne-zugang")
         && has(
             t,
             "angaben-aufnehmen",
@@ -503,7 +530,11 @@ fn request(t: &str) -> bool {
         && has(
             t,
             "dubletten-weiche",
-            &["then: abgelehnt", "no comment is written"],
+            &[
+                "then: abgelehnt",
+                "no comment is written",
+                "$context.dubletten.treffer == null",
+            ],
         )
         && has(t, "ticket", &["git-bug", "OUR repo", "`id`"])
         && has(
@@ -521,6 +552,8 @@ fn request(t: &str) -> bool {
             "back-to-draft",
             &[
                 "textcheck.hits",
+                "$context.rules.hits == null",
+                "$context.textcheck.hits == null",
                 "- runden:",
                 ">= 3",
                 "then: eskalation",
@@ -541,6 +574,18 @@ fn request(t: &str) -> bool {
         && has(t, "approval", &["actor: human", "upstream != \"blinc\""])
         && has(t, "choose-channel", &["upstream != \"blinc\""])
         && has(t, "send", &["helper of the strategy", "never calls gh"])
+        && has(t, "send", &["without a YES, by rule 98"])
+        && t.contains("parameters upstream, evidence, art`")
+        && [
+            "art",
+            "belegt",
+            "dubletten",
+            "ticket",
+            "textcheck",
+            "channel",
+        ]
+        .iter()
+        .all(|k| t.contains(&format!("{{ {k}: . }}")))
         && actor(t, "send") == "machine"
         && ends(t, "record")
         && ends(t, "abgelehnt")
@@ -548,14 +593,33 @@ fn request(t: &str) -> bool {
         && no_pr_calls(t)
 }
 
-/// No step calls something that opens a pull request or writes a comment, a review or a reaction.
+/// The calls of the flow are a FIXED list (a new call, e.g. one that opens a pull request or writes a comment, is red until the list is changed on purpose).
+const CALLS: [&str; 14] = [
+    "request-kind",
+    "prove-ai",
+    "search-duplicates-ai",
+    "git-bug-ticket",
+    "draft-issue",
+    "upstream-rules",
+    "text-gate",
+    "blinc-channel",
+    "approve",
+    "choose-channel",
+    "send-issue",
+    "hand-text",
+    "ticket-link",
+    "note-history",
+];
+
 fn no_pr_calls(t: &str) -> bool {
-    t.lines()
+    let calls: Vec<&str> = t
+        .lines()
         .filter_map(|l| l.trim().strip_prefix("call: "))
-        .all(|c| {
-            ["pull", "comment", "review", "reply", "reaction", "-pr"]
-                .iter()
-                .all(|w| !c.contains(w))
+        .collect();
+    !calls.is_empty()
+        && calls.iter().all(|c| {
+            c.strip_suffix(":0.0.10@fs")
+                .is_some_and(|name| CALLS.contains(&name))
         })
 }
 
@@ -618,4 +682,58 @@ fn every_new_flow_keeps_the_escalation_after_three_rounds() {
             "{f}"
         );
     }
+}
+
+#[test]
+fn counter_cleanup_dry_run_only_after_the_static_check_in_a_sandbox() {
+    let t = read("branches-aufraeumen");
+    assert!(cleanup(&t));
+    for (a, b) in [
+        ("SANDBOX", "folder"),
+        ("GIT_TERMINAL_PROMPT=0", "nothing"),
+        ("AFTER this static check is green", "at once"),
+        ("no SSH agent", "an SSH agent"),
+        ("does not run at all", "runs anyway"),
+    ] {
+        assert!(!cleanup(&t.replace(a, b)), "{a}");
+    }
+}
+
+#[test]
+fn counter_onboarding_the_way_in_must_let_the_person_in() {
+    let t = read("menschen-aufnahme");
+    assert!(onboarding(&t));
+    assert!(!onboarding(&without(&t, "eintritt-weiche")));
+    assert!(!onboarding(&without(&t, "ohne-zugang")));
+    assert!(!onboarding(&t.replacen("{ eintritt: . }", "{ x: . }", 1)));
+    assert!(!onboarding(
+        &t.replace("$context.eintritt.frei != true", "false")
+    ));
+    assert!(!onboarding(&move_after(
+        &t,
+        "eintritt-weiche",
+        "einladung-senden"
+    )));
+    assert_red("menschen-aufnahme", "no step of this flow", |x| {
+        x.replacen("then: ohne-zugang", "then: nirgends", 1)
+    });
+}
+
+#[test]
+fn counter_request_missing_results_are_red_and_calls_are_a_fixed_list() {
+    let t = read("upstream-anfrage");
+    assert!(request(&t));
+    let sneaky = "  - pr:\n      call: open-change:0.0.10@fs\n      metadata:\n        freesynergy.net:summary: \"opens a pull request\"\n  - record:\n";
+    assert!(!request(&t.replacen("  - record:\n", sneaky, 1)));
+    assert!(!request(&t.replace("{ dubletten: . }", "{ x: . }")));
+    assert!(!request(
+        &t.replace("$context.dubletten.treffer == null or ", "")
+    ));
+    assert!(!request(&t.replace("$context.rules.hits == null or ", "")));
+    assert!(!request(
+        &t.replace("$context.textcheck.hits == null or ", "")
+    ));
+    assert!(!request(
+        &t.replace("without a YES, by rule 98", "after the YES")
+    ));
 }

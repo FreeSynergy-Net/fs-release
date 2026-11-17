@@ -124,7 +124,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - checks the user script: shellcheck, the default is the dry run, no glob and no placeholder in a name, no `rm -rf` on an unchecked variable, every name is on the list `weg` and on no list `bleibt`; then it runs the script ONLY with `--dry-run` (NEVER with the apply flag) and compares the printed names with the list. Result `skriptcheck` with `red` and `runde` (+1 for each jump back from `skript-weiche`)."
+        freesynergy.net:summary: "Script - checks the user script: shellcheck, the default is the dry run, no glob and no placeholder in a name, no `rm -rf` on an unchecked variable, every name is on the list `weg` and on no list `bleibt`; only AFTER this static check is green it runs the script ONLY with `--dry-run` (NEVER with the apply flag), and only in a SANDBOX (temporary HOME, no SSH agent, `GIT_TERMINAL_PROMPT=0`, a copy of the roots, no push remote); if the static check is red or the sandbox cannot be made the script does not run at all; it then compares the printed names with the list. Result `skriptcheck` with `red` and `runde` (+1 for each jump back from `skript-weiche`)."
   - skript-weiche:
       switch:
         - runden:
