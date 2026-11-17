@@ -2,7 +2,8 @@
 # Order: `Workflow katalog, parameters modus (neu | heben | entfernen), program, tag, branches, branch, head, delta, scope, tests` (docs/prompt-template.md).
 # Relation to `catalog-bump`: that one is the EVENT path after a release (bump, sign, test, started by net.freesynergy.release.published and the
 # 15-minute net); `katalog` is the run for entries that nobody raised by event (new, removed, hand-raised) and the proofs; it does NOT call
-# `catalog-bump`. Specification (the @fs calls have no script yet). Agents never merge. FS profile: see README.md.
+# `catalog-bump`. Specification (the @fs calls have no script yet). Agents never merge. Chain mode: EVERY step works on the current chain entry (`kette.aktuell`) (branch, program, tag, head of the entry in work), never on the
+# order's single values; the head after a rebase is the NEW head. Loops are counted (red generator checks: at most 3 rounds, raw cache: ONE restart), then `eskalation`. FS profile: see README.md.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -15,6 +16,7 @@ do:
       with:
         repo: FreeSynergy/Catalog
         branches: ${ .input.branches }
+        head: ${ .input.head }
         base: main
       export:
         as: '${ $context + { kette: . } }'
@@ -23,25 +25,53 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Several catalog branches go one after the other, never in parallel: the order is fixed, the base is the CURRENT remote main (`git ls-remote`). Result `kette` with `aktuell` and `rest`."
+        freesynergy.net:summary: "Several catalog branches go one after the other, never in parallel: the order is fixed, the base is the CURRENT remote main (`git ls-remote`). Result `kette` with `aktuell` (object: `branch`, `program`, `tag`, `head` of the entry in work; the first one carries the head of the order) and `rest`."
+  - zaehler-start:
+      set:
+        gen: 0
+        sign: 0
+      export:
+        as: '${ $context + { zaehler: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The counters of the two loops start at 0 for each branch of the chain (`zaehler.gen`: red generator rounds, at most 3 restarts; `zaehler.sign`: sign restarts, at most 1)."
+  - alt-kopf:
+      call: ls-remote-head:0.0.10@fs
+      with:
+        repo: FreeSynergy/Catalog
+        branch: ${ $context.kette.aktuell.branch }
+      export:
+        as: '${ $context + { alt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git ls-remote` of the branch of `kette.aktuell`: the old head is `alt` (lease of a rewrite, old side of the delta of a new review); an own `unreviewed/*` branch only."
   - eintrag:
       call: catalog-entry:0.0.10@fs
       with:
         repo: FreeSynergy/Catalog
+        branch: ${ $context.kette.aktuell.branch }
         modus: ${ .input.modus }
-        program: ${ .input.program }
-        tag: ${ .input.tag }
+        program: ${ $context.kette.aktuell.program }
+        tag: ${ $context.kette.aktuell.tag }
+      export:
+        as: '${ $context + { kette: ($context.kette + { aktuell: ($context.kette.aktuell + { head: .head }) }) } }'
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "In an own worktree of fs-catalog, branch `unreviewed/catalog-<program>`: mode `neu` adds the entry in packages.toml, `heben` raises the tag of an existing entry, `entfernen` removes the entry (with its `replaces` or retired-name note if the order says so). Only packages.toml and the docs of the repo change; the CHANGELOG gets one entry."
+        freesynergy.net:summary: "In an own worktree of fs-catalog, branch `unreviewed/catalog-<program>` (the branch of `kette.aktuell`; the result carries the NEW head, a changed entry is a new head and needs a new JA): mode `neu` adds the entry in packages.toml, `heben` raises the tag of an existing entry, `entfernen` removes the entry (with its `replaces` or retired-name note if the order says so). Only packages.toml and the docs of the repo change; the CHANGELOG gets one entry."
   - asset-pruefen:
       call: asset-check:0.0.10@fs
       with:
-        repo: ${ .input.program }
-        tag: ${ .input.tag }
+        repo: ${ $context.kette.aktuell.program }
+        tag: ${ $context.kette.aktuell.tag }
       if: ${ .input.modus != "entfernen" }
       metadata:
         freesynergy.net:actor: machine
@@ -61,9 +91,12 @@ do:
         freesynergy.net:summary: "`python3 -I scripts/gen_catalog.py --check` (catalog.xml equals what packages.toml says), the `unittest` of the repo and `python3 -m py_compile scripts/*.py`; all three green."
   - gen-rot:
       switch:
+        - rot-dritte:
+            when: '${ $context.gen.red == true and $context.zaehler.gen >= 3 }'
+            then: eskalation
         - rot:
             when: '${ $context.gen.red == true }'
-            then: eintrag
+            then: gen-zaehlen
         - gruen:
             then: continue
       metadata:
@@ -71,7 +104,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red goes back to `eintrag` (the third red round escalates in the caller); green goes on."
+        freesynergy.net:summary: "Control flow - red goes back to `eintrag` over the counter `gen-zaehlen` (at most 3 restarts: with `zaehler.gen` >= 3 the red check goes to `eskalation`); green goes on."
   - frische-pruefung:
       run:
         workflow:
@@ -80,21 +113,44 @@ do:
           version: 0.0.10
         input:
           repo: FreeSynergy/Catalog
-          branch: ${ .input.branch }
-          head: ${ .input.head }
-          delta: ${ .input.delta }
+          branch: ${ $context.kette.aktuell.branch }
+          head: ${ $context.kette.aktuell.head }
+          delta: '${ if $context.alt then ($context.alt.head + ".." + $context.kette.aktuell.head) else .input.delta end }'
           scope: ${ .input.scope }
           tests: ${ .input.tests }
+      export:
+        as: '${ $context + { pruefung: . } }'
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Fresh review by Opus (a new instance, not the author) of exactly this head: sub-workflow `review`, the checks of the steps above attached; a JA is bound to this head, a new head needs a new JA."
+        freesynergy.net:summary: "Fresh review by Opus (a new instance, not the author) of exactly this head: sub-workflow `review`, the checks of the steps above attached; a JA is bound to this head (`kette.aktuell.head`, after a rebase the NEW one, never `.input.head`), a new head needs a new JA. The result is `pruefung` (`verdict`, `runde`)."
+  - pruefung-weiter:
+      switch:
+        - ja:
+            when: '${ $context.pruefung.verdict == "JA" }'
+            then: continue
+        - nein-dritte:
+            when: '${ $context.pruefung.verdict == "NEIN" and ($context.pruefung.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.pruefung.verdict == "NEIN" }'
+            then: eintrag
+        - unbekannt:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ONLY a JA goes on to the ff; a NEIN goes back to `eintrag` (the third NEIN of the delta escalates), an unknown verdict escalates; a NEIN never reaches `ff-ueber-strategie` or `kette-weiter`."
   - ff-ueber-strategie:
       call: merge-ff:0.0.10@fs
       with:
         into: main
+        branch: ${ $context.kette.aktuell.branch }
+        head: ${ $context.kette.aktuell.head }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -116,8 +172,8 @@ do:
       call: catalog-proof:0.0.10@fs
       with:
         repo: FreeSynergy/Catalog
-        program: ${ .input.program }
-        tag: ${ .input.tag }
+        program: ${ $context.kette.aktuell.program }
+        tag: ${ $context.kette.aktuell.tag }
         modus: ${ .input.modus }
       export:
         as: '${ $context + { beleg: . } }'
@@ -129,9 +185,15 @@ do:
         freesynergy.net:summary: "Proof from the signed catalog.xml (read only, like a user): for `neu` and `heben` the entry with its `fs-sha256` is there, for `entfernen` it is gone; the `.asc` was renewed (newer than before the change); the signature verifies against the project key (verify green)."
   - raw-cache:
       switch:
+        - veraltet-wieder:
+            when: '${ ($context.beleg.fehler // "") | contains("does not match the given sha256") and $context.zaehler.sign >= 1 }'
+            then: eskalation
         - veraltet:
             when: '${ ($context.beleg.fehler // "") | contains("does not match the given sha256") }'
-            then: sign-neu
+            then: sign-zaehlen
+        - beleg-rot:
+            when: '${ ($context.beleg.fehler // "") != "" }'
+            then: eskalation
         - gleich:
             then: continue
       metadata:
@@ -139,12 +201,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the message `does not match the given sha256` means the raw cache of GitHub still serves the old file: wait 5 minutes (`sign-neu`), never edit the catalog by hand."
+        freesynergy.net:summary: "Control flow - the message `does not match the given sha256` means the raw cache of GitHub still serves the old file: wait 5 minutes (`sign-zaehlen`, then `sign-neu`), ONE restart only (counter `zaehler.sign`: the second stale proof escalates); any OTHER error of the proof escalates too; never edit the catalog by hand."
   - kette-weiter:
       switch:
         - weiter:
             when: '${ $context.kette.rest > 0 }'
-            then: kette-rebase
+            then: ketten-naechster
         - ende:
             then: fertig
       metadata:
@@ -152,22 +214,63 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the next catalog branch goes on only after the proof of the earlier one."
+        freesynergy.net:summary: "Control flow - the next catalog branch goes on only after the proof of the earlier one (and only after a JA: a NEIN never gets here)."
+  - ketten-naechster:
+      call: chain-next:0.0.10@fs
+      with:
+        repo: FreeSynergy/Catalog
+        branches: ${ .input.branches }
+      then: zaehler-start
+      export:
+        as: '${ $context + { kette: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Takes the next catalog branch of the chain: `kette.aktuell` (branch, program, tag, head = the OLD head of that branch), `rest` counted down; then `zaehler-start` (counters at 0) and `alt-kopf` (`alt` = old head = lease) run again for this branch."
   - kette-rebase:
       call: chain-rebase:0.0.10@fs
       with:
         repo: FreeSynergy/Catalog
-        branch: ${ .input.branches }
+        branch: ${ $context.kette.aktuell.branch }
+        lease: ${ $context.alt.head }
         base: main
       then: asset-pruefen
       export:
         as: '${ $context + { kette: . } }'
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The next catalog branch is rebased onto the new main. The top of the CHANGELOG ALWAYS conflicts: keep BOTH `## Unreleased (...)` sections, the new one on top; packages.toml: both entries kept; identity checked after the rebase (flow `branch-neu-schreiben`, step `identitaet-nach`); a new head needs a new review."
+        freesynergy.net:summary: "The next catalog branch (`kette.aktuell.branch`) is rebased onto the new main. The result carries the NEW head in `kette.aktuell.head`: the review, the ff and the proof use exactly that head, never `.input.head` and never the old one. The top of the CHANGELOG ALWAYS conflicts: keep BOTH `## Unreleased (...)` sections, the new one on top; packages.toml: both entries kept; identity checked after the rebase (flow `branch-neu-schreiben`, step `identitaet-nach`); a new head needs a new review."
+  - gen-zaehlen:
+      set:
+        gen: ${ $context.zaehler.gen + 1 }
+        sign: ${ $context.zaehler.sign }
+      then: eintrag
+      export:
+        as: '${ $context + { zaehler: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Counter of the red generator rounds: `zaehler.gen` +1, then back to `eintrag`; `gen-rot` escalates when it has reached 3."
+  - sign-zaehlen:
+      set:
+        gen: ${ $context.zaehler.gen }
+        sign: ${ $context.zaehler.sign + 1 }
+      then: sign-neu
+      export:
+        as: '${ $context + { zaehler: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Counter of the sign restarts (the raw cache rule): `zaehler.sign` +1, at most ONE; `raw-cache` escalates the second time."
   - sign-neu:
       call: sign-run:0.0.10@fs
       with:
@@ -195,5 +298,18 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The catalog is signed and shows the entry (or no entry after a removal). Sets `status: done`."
+  - eskalation:
+      set:
+        status: escalated
+        eskaliert: true
+      then: end
+      export:
+        as: '${ $context + { ergebnis: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The generator check is red for the third time, the sign proof is stale a second time or red, or a review says NEIN for the third time (or an unknown verdict): the flow ends with `eskaliert: true`; the person decides. Nothing was merged or edited by hand."
 output:
-  as: '${ { status: ($context.ergebnis.status // "skipped"), beleg: ($context.ergebnis.beleg // null) } }'
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), beleg: ($context.ergebnis.beleg // null) } }'

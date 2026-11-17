@@ -4,6 +4,7 @@
 # /srv/FreeSynergy/.scratch/api-runner/rules.md (the one that applies; there is no copy in the repo). FS profile: see README.md.
 # [EFFIZIENZ] (strategy c5) as step rules: a review reads only the delta (git diff <old>..<new>) with the file list of the order;
 # gates run once per head - a green result for exactly this head is reused, the review does not run them again unless told to;
+# [EIGENES-SKRIPT-EIGENER-ORDNER] (decision b7): scripts and logs only in the own TMPDIR under a unique name, never in the shared scratchpad;
 # the order names the files to read; mode DELTA (a recheck after conditions or after a new head): only the diff since the last JA/NEIN is read,
 # the parameter delta is `<last reviewed head>..<new head>`, the rest of the earlier verdict stays (the JA itself is void for the new head); mechanics is a script of the coordinator; after a timeout find the cause first (rc=124).
 document:
@@ -35,7 +36,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The branch CI of ALL workflows for exactly this head (read only, `scripts/check_job_status.py`, also the Windows jobs) is attached to the file of the review as the finding of the branch CI (standing rule ZWEIG-CI): green, red with the failing job, or still running. The review does not run the CI again; a red or hanging CI is a finding, a JA never covers a head whose CI nobody read."
+        freesynergy.net:summary: "The branch CI of ALL workflows for exactly this head (read only, `scripts/check_job_status.py`, also the Windows jobs) is attached to the file of the review as the finding of the branch CI (standing rule ZWEIG-CI): green, red with the failing job, or still running. Scripts and logs of this step only in the own TMPDIR under a unique name, never in the shared scratchpad ([EIGENES-SKRIPT-EIGENER-ORDNER]). The review does not run the CI again; a red or hanging CI is a finding, a JA never covers a head whose CI nobody read."
   - read:
       call: review-ai:0.0.10@fs
       with:
@@ -50,7 +51,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Opus only reads ([REVIEW]); it changes no code, writes only BERICHT.md and runs only the named tests, never the whole workspace while the slots are busy ([GATES]). Check list by kind - code - rules of the order, tests with a counter-test per rule, files <= 300 lines, no stray files, no orphan processes; workflow files - actor/gate/kind per step, sub-workflows exist at the version; docs - sources, DE/EN in step; icons or images - license and look. Findings as file:line, blocker versus small point, and what is not proven. [EFFIZIENZ] - only the delta with the file list of the order is read, not the whole repo; the gate result of exactly this head (head hash in the build report) is reused, not run again; only the files the order names and what they directly need are read; after a timeout or rc=124 the cause is checked first (lock holders, orphans, slot queue), then the review restarts with a continuation prompt, never blindly.
+        freesynergy.net:summary: Opus only reads ([REVIEW]); it changes no code, writes only BERICHT.md and runs only the named tests, never the whole workspace while the slots are busy ([GATES]). Check list by kind - code - rules of the order, tests with a counter-test per rule, files <= 300 lines, no stray files, no orphan processes; workflow files - actor/gate/kind per step, sub-workflows exist at the version; docs - sources, DE/EN in step; icons or images - license and look. Findings as file:line, blocker versus small point, and what is not proven. Own scripts and logs only in the own TMPDIR under a unique name, never in the shared scratchpad ([EIGENES-SKRIPT-EIGENER-ORDNER]). [EFFIZIENZ] - only the delta with the file list of the order is read, not the whole repo; the gate result of exactly this head (head hash in the build report) is reused, not run again; only the files the order names and what they directly need are read; after a timeout or rc=124 the cause is checked first (lock holders, orphans, slot queue), then the review restarts with a continuation prompt, never blindly.
   - verdict:
       call: verdict:0.0.10@fs
       with:

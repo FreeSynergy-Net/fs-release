@@ -38,13 +38,16 @@ do:
             when: '${ $context.ci.status == "hung" }'
             then: eskalation
         - gruen:
+            when: '${ $context.ci.status == "green" }'
             then: continue
+        - unbekannt:
+            then: eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red goes to the person (the cause comes from the log, `bugfix` or `agent-run` for exactly that run; lesson fs-packages typing-test: a hanging job is not a green one); a hang goes to ONE restart, a second hang escalates; only green goes on."
+        freesynergy.net:summary: "Control flow - red goes to the person (the cause comes from the log, `bugfix` or `agent-run` for exactly that run; lesson fs-packages typing-test: a hanging job is not a green one); a hang goes to ONE restart, a second hang escalates; ONLY `status == green` goes on - every other status (running, unknown, empty) escalates (standing rule ZWEIG-CI: red OR unknown = no ff)."
   - ci-neustart:
       call: ci-restart:0.0.10@fs
       with:
@@ -77,6 +80,8 @@ do:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
         dir: ${ .input.workdir }
+      export:
+        as: '${ $context + { klon: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -146,7 +151,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The Opus approval names exactly this head. A JA is void for every other head: new head, new JA (rule of `review`); no JA, no push."
+        freesynergy.net:summary: "The Opus approval names exactly this head. A JA is void for every other head: new head, new JA (rule of `review`); no JA, no push. No tag as long as a delta or re-look result for this head has an open condition: line 1 of the Opus result file must be `JA` for EXACTLY this head; a later NEIN or condition blocks the tag (lesson fs-messages v0.0.3: a condition that came after the tag left an outdated sentence in the release)."
   - push-ff:
       call: push-ff:0.0.10@fs
       with:
@@ -177,12 +182,14 @@ do:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
         head: ${ .input.head }
+      export:
+        as: '${ $context + { beleg: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Proof by `git ls-remote`: refs/heads/main equals the head, refs/tags/<tag> exists and its peeled commit (`^{}`) equals the head; both lines go into the report."
+        freesynergy.net:summary: "Proof by `git ls-remote`: refs/heads/main equals the head, refs/tags/<tag> exists and its peeled commit (`^{}`) equals the head; both lines are the result `beleg` (`zeilen`) and appear in the `output` of the flow."
   - release-beobachten:
       call: release-watch:0.0.10@fs
       with:
@@ -209,22 +216,12 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a release that is not completely green (job red, draft, signature or attestation missing) escalates to the person; the catalog follows only after a green release (`katalog`)."
-  - aufraeumen:
-      call: clean-workdir:0.0.10@fs
-      with:
-        dir: ${ .input.workdir }
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Removes the own work folder of the clone (exactly the named folder, never a pattern) and the temp files of this run; the report keeps the proof lines."
   - fertig:
       set:
         status: done
         head: ${ .input.head }
         tag: ${ .input.tag }
-      then: end
+      then: aufraeumen
       export:
         as: '${ $context + { ergebnis: . } }'
       metadata:
@@ -232,12 +229,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The flow reached its end: head on main, annotated tag, ls-remote proof, release green and published. Sets `status: done`."
+        freesynergy.net:summary: "The flow reached its end: head on main, annotated tag, ls-remote proof, release green and published. Sets `status: done`, then the tidy-up."
   - eskalation:
       set:
         status: escalated
         eskaliert: true
-      then: end
+      then: aufraeumen
       export:
         as: '${ $context + { ergebnis: . } }'
       metadata:
@@ -245,6 +242,18 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The CI is red or hangs twice, a check is red or the release is not green: the flow ends with `eskaliert: true`; the person decides. Nothing was forced."
+        freesynergy.net:summary: "The CI is red, hangs twice or has an unknown status, a check is red or the release is not green: the flow ends with `eskaliert: true` (after the tidy-up); the person decides. Nothing was forced."
+  - aufraeumen:
+      call: clean-workdir:0.0.10@fs
+      with:
+        dir: ${ .input.workdir }
+        created: ${ $context.klon != null }
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Reached from `fertig` AND from `eskalation`: removes the own work folder of the clone (exactly the named folder, never a pattern, never an empty or placeholder name) and the temp files of this run - ONLY a clone that `klon` made itself (`created`); an escalation before `klon` removes nothing; foreign folders and agent worktrees are never touched. The output keeps the proof lines."
 output:
-  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), head: ($context.ergebnis.head // null), tag: ($context.ergebnis.tag // null) } }'
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), head: ($context.ergebnis.head // null), tag: ($context.ergebnis.tag // null), beleg: ($context.beleg // null) } }'

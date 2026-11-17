@@ -9,24 +9,12 @@ document:
   version: 0.0.10
   title: Rewrite an own branch (identity, WIP) or rebase a chain of branches - lease, equal content, new head, new JA
 do:
-  - alter-kopf:
-      call: ls-remote-head:0.0.10@fs
-      with:
-        repo: ${ .input.repo }
-        branch: ${ .input.branch }
-      export:
-        as: '${ $context + { alt: . } }'
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "`git ls-remote` of the branch: the old head is written down (it becomes the lease SHA later); the branch must be an own `unreviewed/*` branch, anything else (main, release-*, tags, a foreign branch) stops the flow here."
   - ketten-plan:
       call: chain-plan:0.0.10@fs
       with:
         repo: ${ .input.repo }
         branches: ${ .input.kette }
+        branch: ${ .input.branch }
         base: main
       export:
         as: '${ $context + { kette: . } }'
@@ -35,7 +23,20 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Mode chain (input kette, a list; empty = a single branch): the ORDER of the branches is fixed here (the one that others build on first; CHANGELOG, usage and README conflict in the same lines, so never in parallel), the base is the CURRENT remote main (`git ls-remote`), not the one of the order's day. Result `kette` with `aktuell`, `rest` and `modus` (einzel | kette)."
+        freesynergy.net:summary: "Mode chain (input kette, a list; empty = a single branch): the ORDER of the branches is fixed here (the one that others build on first; CHANGELOG, usage and README conflict in the same lines, so never in parallel), the base is the CURRENT remote main (`git ls-remote`), not the one of the order's day. Result `kette` with `aktuell` (object `branch`, `head`; for a single branch the branch of the order), `rest` and `modus` (einzel | kette). From here EVERY step works on `$context.kette.aktuell.branch`, never on `.input.branch` (the chain goes on with the next branch)."
+  - alter-kopf:
+      call: ls-remote-head:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        branch: ${ $context.kette.aktuell.branch }
+      export:
+        as: '${ $context + { alt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git ls-remote` of the branch: the old head is written down (it becomes the lease SHA later); the branch must be an own `unreviewed/*` branch, anything else (main, release-*, tags, a foreign branch) stops the flow here."
   - modus:
       switch:
         - kette:
@@ -53,7 +54,7 @@ do:
       call: rewrite:0.0.10@fs
       with:
         repo: ${ .input.repo }
-        branch: ${ .input.branch }
+        branch: ${ $context.kette.aktuell.branch }
         base: main
         allowed_identity_key: FS_ALLOWED_IDENTITY
       then: identitaet-nach
@@ -67,7 +68,8 @@ do:
       call: chain-rebase:0.0.10@fs
       with:
         repo: ${ .input.repo }
-        branch: ${ .input.kette }
+        branch: ${ $context.kette.aktuell.branch }
+        lease: ${ $context.alt.head }
         base: main
         allowed_identity_key: FS_ALLOWED_IDENTITY
       metadata:
@@ -142,7 +144,7 @@ do:
       call: lease-check:0.0.10@fs
       with:
         repo: ${ .input.repo }
-        branch: ${ .input.branch }
+        branch: ${ $context.kette.aktuell.branch }
         lease: ${ $context.alt.head }
       metadata:
         freesynergy.net:actor: machine
@@ -154,7 +156,7 @@ do:
       call: push-lease:0.0.10@fs
       with:
         repo: ${ .input.repo }
-        branch: ${ .input.branch }
+        branch: ${ $context.kette.aktuell.branch }
         lease: ${ $context.alt.head }
       metadata:
         freesynergy.net:actor: human
@@ -166,7 +168,7 @@ do:
       call: ls-remote-proof:0.0.10@fs
       with:
         repo: ${ .input.repo }
-        branch: ${ .input.branch }
+        branch: ${ $context.kette.aktuell.branch }
       export:
         as: '${ $context + { neu: . } }'
       metadata:
@@ -183,17 +185,32 @@ do:
           version: 0.0.10
         input:
           repo: ${ .input.repo }
-          branch: ${ .input.branch }
+          branch: ${ $context.kette.aktuell.branch }
           head: ${ $context.neu.head }
           delta: ${ $context.alt.head }..${ $context.neu.head }
           scope: ${ .input.scope }
           tests: ${ .input.tests }
+      export:
+        as: '${ $context + { pruefung: . } }'
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "A new head is a NEW head: the earlier JA is void and a new review (mode delta of `review`: only the diff old head to new head, the CI of the branch attached) decides; the new head is reported with its hash."
+        freesynergy.net:summary: "A new head is a NEW head: the earlier JA is void and a new review (mode delta of `review`: only the diff old head to new head, the CI of the branch attached) decides; the new head is reported with its hash. The result is `pruefung` (`verdict`, `runde`)."
+  - ja-weiter:
+      switch:
+        - ja:
+            when: '${ $context.pruefung.verdict == "JA" }'
+            then: continue
+        - nein:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ONLY a JA for the new head goes on (`kette-weiter`, the ff of the earlier branch); a NEIN or an unknown verdict escalates and never reaches `vorgaenger-ff` or the next branch of the chain."
   - kette-weiter:
       switch:
         - weiter:
@@ -211,6 +228,8 @@ do:
       call: merge-ff:0.0.10@fs
       with:
         into: main
+        branch: ${ $context.kette.aktuell.branch }
+        head: ${ $context.neu.head }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -222,7 +241,7 @@ do:
       with:
         repo: ${ .input.repo }
         branches: ${ .input.kette }
-      then: rebase
+      then: alter-kopf
       export:
         as: '${ $context + { kette: . } }'
       metadata:
@@ -230,7 +249,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Takes the next branch of the chain (`aktuell`, `rest` counted down) and reads the new remote main; the old head of this branch becomes the new lease SHA."
+        freesynergy.net:summary: "Takes the next branch of the chain (`kette.aktuell`, `rest` counted down) and reads the new remote main; then `alter-kopf` runs again for this branch and sets `alt` = the OLD head of this branch (`git ls-remote`), which is the lease SHA of its push and the old side of its delta review (the flow goes on at `modus`, `rebase`). From here on all steps (rebase, lease, push, proof, review) work on `kette.aktuell.branch` and this `alt`, never on the values of the first branch."
   - fertig:
       set:
         status: done
@@ -256,6 +275,6 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "A check of the rewrite is red (identity, WIP, content): the flow ends with `eskaliert: true`; the person decides. Nothing was pushed after a red check."
+        freesynergy.net:summary: "A check of the rewrite is red (identity, WIP, content) or the review of the new head says NEIN: the flow ends with `eskaliert: true`; the person decides. Nothing was pushed after a red check."
 output:
   as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), head: ($context.ergebnis.head // null) } }'
