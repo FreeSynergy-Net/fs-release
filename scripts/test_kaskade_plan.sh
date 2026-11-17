@@ -78,10 +78,10 @@ chk "plan: a cycle is a finding (rc 1)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" 
 
 # ---- kaskade-glied ----
 py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
-chk "glied: takes offen[0] (fs-interfaces) with the trigger as lib" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" '(d["glied"]["repo"], d["glied"]["libs"], d["glied"]["prioritaet"])')" = "('fs-interfaces', ['fs-types=v0.0.3'], 0)" ]
+chk "glied: takes offen[0] (fs-interfaces) with the trigger as lib" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" '(d["repo"], d["libs"], d["prioritaet"])')" = "('fs-interfaces', ['fs-types=v0.0.3'], 0)" ]
 printf '{"offen":[{"repo":"fs-tasks","art":"programm","tag":"v0.0.2","allow":"x","abhaengig":["fs-types","fs-interfaces","fs-people"]}],"erledigt":[{"repo":"fs-interfaces","tag":"v0.0.2","beleg":"b"},{"repo":"fs-people","tag":"v0.0.5","beleg":"b"}]}' >"$tmp/p3.json"
 py "$here/kaskade-glied" --plan "$tmp/p3.json" --ausloeser v0.0.3 >"$tmp/o.json"
-chk "glied: libs = trigger + tags of the done Glieder the lift knows; fs-people only in tags" [ "$(q "$tmp/o.json" '(d["glied"]["libs"], d["glied"]["tags"]["fs-people"])')" = "(['fs-interfaces=v0.0.2', 'fs-types=v0.0.3'], 'v0.0.5')" ]
+chk "glied: libs = trigger + tags of the done Glieder the lift knows; fs-people only in tags" [ "$(q "$tmp/o.json" '(d["libs"], d["tags"]["fs-people"])')" = "(['fs-interfaces=v0.0.2', 'fs-types=v0.0.3'], 'v0.0.5')" ]
 printf '{"offen":[{"repo":"fs-tasks","art":"programm","tag":"v0.0.2","allow":"x","abhaengig":["fs-types","fs-people"]}],"erledigt":[]}' >"$tmp/p4.json"
 py "$here/kaskade-glied" --plan "$tmp/p4.json" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
 chk "glied: a dependency that is not done is red (rc 1)" [ "$rc" -eq 1 ]

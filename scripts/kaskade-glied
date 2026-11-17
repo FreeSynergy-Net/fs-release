@@ -9,7 +9,7 @@ lift (`fs-release lift --repo NAME=vX.Y.Z`; only the libraries the lift knows: f
 done is red (the order was broken: no Glied is started before the ones it depends on). BUILD_PRIORITY of every build step of the Glied is 0 (`prioritaet`).
 With `--dir` the tool file `.fs-lock-sources.toml` of the Glied worktree is ensured (format as in fs-objects and fs-components: `strict = true`, `only_from_enabled = true`): missing = created, an
 existing `strict = false` / `only_from_enabled = false` is raised to true; `lock_datei` says `angelegt | gehoben | vorhanden` (a raise is also a `hinweise` entry, visible in the report). Only this file is written.
-Result JSON: {status, red, lock_datei, hinweise, glied:{repo, art, tag, allow, besonderes, abhaengig, rev_pins, libs, tags, prioritaet}, befunde}. rc 0 / 1 red / 2 bad input.
+Result JSON (the Glied at TOP level: the workflow reads `$context.glied.repo`): {repo, art, tag, allow, besonderes, abhaengig, rev_pins, libs, tags, prioritaet, status, red, lock_datei, hinweise, befunde}. rc 0 / 1 red / 2 bad input.
 """
 import argparse
 import os
@@ -87,7 +87,7 @@ def main(argv):
             lock = ensure_lock_file(a.dir, hinweise)
         except (OSError, tomllib.TOMLDecodeError) as e:
             return kio.skipped(f"{a.dir}: {e}")
-    kio.emit({"status": "ok", "red": bool(befunde), "lock_datei": lock, "hinweise": hinweise, "glied": glied, "befunde": befunde})
+    kio.emit({**glied, "status": "ok", "red": bool(befunde), "lock_datei": lock, "hinweise": hinweise, "befunde": befunde})
     return 1 if befunde else 0
 
 
