@@ -98,6 +98,17 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (ADR 0094 draft, items 6 and 9, stage 1) - creates the crate `crates/fs-<programm>-<frontend>` with `[[bin]] fs-<programm>-<frontend>`, depending only on the client `fs-<programm>-client` and fs-components (never on -core or -server); the manifest `packaging/frontends/<frontend>.metainfo.xml` (AppStream addon with `<extends>`, `<requires>`, `fs:frontend-id`, `fs:exec`, `fs:contract`); the starter in `fs-<programm>` (secure the server, start the frontend, fallback to the standard frontend with a visible message); a handshake test with a wrong contract version (exit code 3 and a message, never silent); a `cargo tree` check that no dependency leads to -core or -server. The frontend is its own process with a frontend manifest (program, contract and version, capabilities, start command); at least one frontend is mandatory. The manifest format is AppStream per the ADR draft 0094 (the review proposed TOML `~/.local/share/freesynergy/frontend/<programm>/<id>.toml` until the ADR gap is closed: open decision). Own package `fs-<programm>-<frontend>` in the same release (deb/rpm) (stage 1)."
+  - bild-start:
+      set:
+        n: 0
+      export:
+        as: '${ $context + { bild_runde: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Starts the picture round counter `bild_runde.n` at 0 (read and raised by `bild-zaehlen`, never reset by the loop back to `fenster`)."
   - fenster:
       call: window-ai:0.0.10@fs
       with:
@@ -282,22 +293,22 @@ do:
         freesynergy.net:summary: "No picture OK of the user is needed (decision b7, 17 Nov.): the STRATEGY looks at the pictures (window and documentation picture, side by side with the model, the `dossier` handed over like in `frontend-round`) and gives the verdict; the result is `accepted`. Pictures without a green `waechter` (`red == false`) are no evidence. Without a verdict the flow does not go on."
   - bild-zaehlen:
       set:
-        bild_runde: ${ ($context.bild_runde // 0) + 1 }
+        n: ${ ($context.bild_runde.n // 0) + 1 }
       export:
-        as: '${ $context + { bild_runde: .bild_runde } }'
+        as: '${ $context + { bild_runde: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The flow counts the picture rounds itself (`picture-acceptance` delivers no `runde`): `bild_runde` in the context, +1 for each verdict; `bild-weiche` reads it."
+        freesynergy.net:summary: "The flow counts the picture rounds itself (`picture-acceptance` delivers no `runde`): `bild_runde.n` in the context, +1 for each verdict; `bild-weiche` reads it."
   - bild-weiche:
       switch:
         - accepted:
             when: '${ $context.verdict.accepted == true }'
             then: continue
         - runden:
-            when: '${ $context.verdict.accepted == false and ($context.bild_runde // 0) >= 3 }'
+            when: '${ $context.verdict.accepted == false and ($context.bild_runde.n // 0) >= 3 }'
             then: grundfassung-eskalation
         - not-accepted:
             when: '${ $context.verdict.accepted == false }'

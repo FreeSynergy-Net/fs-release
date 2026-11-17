@@ -159,7 +159,7 @@ fn loops_count(text: &str) -> bool {
     ends && gates.contains("- runden:")
         && gates.contains("(($context.gates.runde // 0) >= 3")
         && gates.contains("then: grundfassung-eskalation")
-        && bild.contains("$context.verdict.accepted == false and ($context.bild_runde // 0) >= 3")
+        && bild.contains("$context.verdict.accepted == false and ($context.bild_runde.n // 0) >= 3")
         && bild.contains("then: grundfassung-eskalation")
 }
 
@@ -168,7 +168,7 @@ fn loops_have_a_round_counter_and_escalate() {
     let t = read("grundfassung");
     assert!(loops_count(&t));
     assert!(!loops_count(
-        &t.replace("($context.bild_runde // 0) >= 3", "false")
+        &t.replace("($context.bild_runde.n // 0) >= 3", "false")
     ));
     assert!(!loops_count(
         &t.replace("(($context.gates.runde // 0) >= 3", "((false")
@@ -206,10 +206,18 @@ fn counters_are_carried(text: &str) -> bool {
         && again.contains("$context.binary.runde")
         && again.contains("$context.lehren.runde");
     let counts = text.contains("  - bild-zaehlen:\n")
-        && step_body(text, "bild-zaehlen")
-            .contains("bild_runde: ${ ($context.bild_runde // 0) + 1 }")
+        && step_body(text, "bild-zaehlen").contains("n: ${ ($context.bild_runde.n // 0) + 1 }")
         && step_body(text, "bild-zaehlen").contains("export:")
-        && in_order(text, &["picture-ok", "bild-zaehlen", "bild-weiche"]);
+        && in_order(
+            text,
+            &[
+                "  - bild-start:\n",
+                "  - fenster:\n",
+                "  - picture-ok:\n",
+                "  - bild-zaehlen:\n",
+                "  - bild-weiche:\n",
+            ],
+        );
     gates && reads && counts && !text.contains("$context.verdict.runde")
 }
 
@@ -226,7 +234,7 @@ fn round_counters_are_really_carried() {
         assert!(!counters_are_carried(&weak), "{step}");
     }
     assert!(!counters_are_carried(
-        &t.replace("($context.bild_runde // 0) + 1", "0")
+        &t.replace("($context.bild_runde.n // 0) + 1", "0")
     ));
     assert!(!counters_are_carried(
         &t.replace("  - bild-zaehlen:", "  - bild-zaehlen-aus:")
