@@ -4,7 +4,8 @@
 # (`claim`, `status ... in-progress|done|failed --report <path>`, `note` of at most 500 bytes). Names: `koordinator`, `bahnN-bauer`, `opus-review`, `haiku-text`, `haiku-push`, `claude-strategie`. Agents NEVER change the ORDER of the cards (the order is the wish of the user), only status and notes.
 # If the CLI hangs (`timeout 15` fires): NEVER start a server yourself, report it to the strategy (the server runs at the user's). Remote states (heads, branches, tags) are PROVEN by `git ls-remote`, never taken from memory or from a report.
 # Slots: at most 2 builds at the same time (`pgrep -af 'build-slot.sh cargo'` without the timeout / bash -c lines: fewer than 2, else wait); slot rule: WRITE code without a slot, BUILD only after the release of a slot. Loops are counted: from the third round (`runde >= 3`) `eskalation`.
-# Input: bahnen (the lane names), ids (the id list of the strategy: card ids per lane), reihenfolge (ordered lane list of the strategy; without it the order of the cards), slots (maximum, default 2), nacht (true: night order, see `slots-verteilen`), docs (worktree of fs-documentation for the handoff note).
+# Fixed watch step `upstream-watch` (rule: always answer at the upstream): every 2 to 3 hours (when `upstream.letzte_pruefung` is older than 2 h) the answers to our open Blinc pull requests and issues are read (GET only); a new comment of another person = a card in `bahn5-crates` + a short draft for b7; the helper of b7 sends only after the YES of the user; no `gh` or network = YELLOW, never silently green.
+# Input: upstream (repo, letzte_pruefung, gemerkt, eigene), bahnen (the lane names), ids (the id list of the strategy: card ids per lane), reihenfolge (ordered lane list of the strategy; without it the order of the cards), slots (maximum, default 2), nacht (true: night order, see `slots-verteilen`), docs (worktree of fs-documentation for the handoff note).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -139,12 +140,61 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - more than 2 planned builds (or a missing result) go back to `slots-pruefen`, from the third round (`runde` >= 3) to `eskalation`; only `ueberbucht == false` goes on to the report."
+  - upstream-start:
+      set:
+        repo: ${ .input.upstream.repo // "project-blinc/Blinc" }
+        letzte_pruefung: ${ .input.upstream.letzte_pruefung // null }
+        gemerkt: ${ .input.upstream.gemerkt // [] }
+        eigene: ${ .input.upstream.eigene // [] }
+      export:
+        as: '${ $context + { upstream: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Takes the watch state of the caller into the round: repo (default project-blinc/Blinc), the time of the last check (UTC, ISO 8601, or null), the remembered comment ids and our account names. A missing time stays null (= due), never a made-up fresh time."
+  - upstream-faellig:
+      switch:
+        - faellig:
+            when: '${ ($context.upstream.letzte_pruefung // null) == null or (now - ($context.upstream.letzte_pruefung | fromdateiso8601)) > 7200 }'
+            then: upstream-watch
+        - sonst:
+            then: meldung
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the fixed watch step runs every 2 to 3 hours: when the last check `upstream.letzte_pruefung` (UTC, ISO 8601) is older than 2 hours (7200 s) or missing, it goes to `upstream-watch`, otherwise straight on. A missing time counts as due, never as fresh."
+  - upstream-watch:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: upstream-watch
+          version: 0.0.10
+        input:
+          repo: ${ $context.upstream.repo // "project-blinc/Blinc" }
+          letzte_pruefung: ${ $context.upstream.letzte_pruefung }
+          gemerkt: ${ $context.upstream.gemerkt }
+          eigene: ${ $context.upstream.eigene }
+          datum: ${ now | strftime("%Y%m%d") }
+          docs: katalog-plan/blinc-prs
+      export:
+        as: '${ $context + { upstream: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Sub-workflow upstream-watch.yaml (rule: always answer at the upstream): reads, with GET only, the comments, reviews and state of OUR open pull requests and issues at Blinc; for every new comment of another person a card in the board and a short answer draft (at most 5 sentences) for b7. Sent ONLY by the helper of b7 after the YES of the user (`freigabe-nutzer` before `senden`), never by this flow. No `gh`, no network or no answer ends YELLOW with `Upstream nicht erreichbar`, never silently green; the result `upstream` (status, letzte_pruefung, gemerkt) goes into the report."
   - meldung:
       call: lane-report-ai:0.0.10@fs
       with:
         karten: ${ $context.karten }
         remote: ${ $context.remote }
         verteilung: ${ $context.verteilung }
+        upstream: ${ $context.upstream }
       then: end
       export:
         as: '${ $context + { meldung: . } }'

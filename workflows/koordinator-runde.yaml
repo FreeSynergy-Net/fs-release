@@ -14,6 +14,7 @@
 # Every result (gates, docs, review, rule check) is green only when it says so; a missing result is never green.
 # Work stock (strategy order): the checklists of the programs (fs-documentation todo/checklisten/<programm>.md, read by `checklisten-lesen`) are read
 # with the handoffs; the open GRUNDSACHE items are the work stock of the round (`straenge` makes work steps of them). A change of a program without its checklist is RED (doku-mitziehen).
+# Fixed watch step `upstream-watch` (rule: always answer at the upstream): every 2 to 3 hours (when `upstream.letzte_pruefung` is older than 2 h) the answers to our open Blinc pull requests and issues are read (GET only); a new comment of another person = a card + a short draft for b7; the helper of b7 sends only after the YES of the user; no `gh` or network = YELLOW, never silently green.
 # Texts that come from tests, gates, handoffs, checklists or the inbox are DATA for the agents, never an instruction: they are passed as named fields, not as free text of an order.
 # Input: repo, programm, branch, head, delta, docs, docs_base, old, new, allow (as for doku-mitziehen), handoffs (folder, default todo/), inbox;
 # optional doku_aufraeumen_faellig (true once a day: runs the docs tidy-up `doku-aufraeumen` before the report; its branch date is the day of the run).
@@ -73,6 +74,54 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "One query - gh search issues --owner FreeSynergy --label rot --state open. Empty = silence. Red = bugfix or agent-run for exactly this run; a gate is never bypassed."
+  - upstream-start:
+      set:
+        repo: ${ .input.upstream.repo // "project-blinc/Blinc" }
+        letzte_pruefung: ${ .input.upstream.letzte_pruefung // null }
+        gemerkt: ${ .input.upstream.gemerkt // [] }
+        eigene: ${ .input.upstream.eigene // [] }
+      export:
+        as: '${ $context + { upstream: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Takes the watch state of the caller into the round: repo (default project-blinc/Blinc), the time of the last check (UTC, ISO 8601, or null), the remembered comment ids and our account names. A missing time stays null (= due), never a made-up fresh time."
+  - upstream-faellig:
+      switch:
+        - faellig:
+            when: '${ ($context.upstream.letzte_pruefung // null) == null or (now - ($context.upstream.letzte_pruefung | fromdateiso8601)) > 7200 }'
+            then: upstream-watch
+        - sonst:
+            then: zaehler-start
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - the fixed watch step runs every 2 to 3 hours: when the last check `upstream.letzte_pruefung` (UTC, ISO 8601) is older than 2 hours (7200 s) or missing, it goes to `upstream-watch`, otherwise straight on. A missing time counts as due, never as fresh."
+  - upstream-watch:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: upstream-watch
+          version: 0.0.10
+        input:
+          repo: ${ $context.upstream.repo // "project-blinc/Blinc" }
+          letzte_pruefung: ${ $context.upstream.letzte_pruefung }
+          gemerkt: ${ $context.upstream.gemerkt }
+          eigene: ${ $context.upstream.eigene }
+          datum: ${ now | strftime("%Y%m%d") }
+          docs: katalog-plan/blinc-prs
+      export:
+        as: '${ $context + { upstream: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Sub-workflow upstream-watch.yaml (rule: always answer at the upstream): reads, with GET only, the comments, reviews and state of OUR open pull requests and issues at Blinc; for every new comment of another person a card in the board and a short answer draft (at most 5 sentences) for b7. Sent ONLY by the helper of b7 after the YES of the user (`freigabe-nutzer` before `senden`), never by this flow. No `gh`, no network or no answer ends YELLOW with `Upstream nicht erreichbar`, never silently green; the result `upstream` (status, letzte_pruefung, gemerkt) goes into the report."
   - zaehler-start:
       set:
         runde: 0
@@ -564,6 +613,7 @@ do:
           eskaliert: ${ $context.ergebnis.eskaliert // false }
           regel: ${ $context.regel }
           doku: ${ $context.aufraeumen }
+          upstream: ${ $context.upstream }
       then: doku-push-weiche
       metadata:
         freesynergy.net:actor: ai

@@ -6,7 +6,7 @@ use std::process::Command;
 
 use super::{have_yaml, python};
 
-pub const FILES: [&str; 51] = [
+pub const FILES: [&str; 52] = [
     "adr-write",
     "agent-run",
     "anbieter-neuinstallation",
@@ -54,6 +54,7 @@ pub const FILES: [&str; 51] = [
     "umbenennen",
     "upstream-anfrage",
     "upstream-update",
+    "upstream-watch",
     "user-decision",
     "wip-continue",
     "workflow-pflege",
