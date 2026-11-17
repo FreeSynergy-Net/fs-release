@@ -21,4 +21,3 @@ use part2::*;
 
 #[path = "workflows_pflege7/part3.rs"]
 mod part3;
-use part3::*;
