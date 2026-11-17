@@ -19,6 +19,11 @@ rules_ok() { # <workflow> <example>: 0 when every rule holds
   grep -q 'no-fail-fast' "$wf" || return 1
   grep -qE '_windows-check.yml@v[0-9]+\.[0-9]+\.[0-9]+' "$ex" || return 1
   if grep -q 'secrets:' <<< "$cex"; then return 1; fi
+  grep -qE '^permissions:' "$wf" && grep -qF 'contents: read' "$wf" || return 1
+  grep -qF 'Inputs are plain words' "$wf" && grep -qF '=~ ^windows-[0-9]+$' "$wf" || return 1
+  grep -qE '^[[:space:]]+timeout-minutes:' "$wf" || return 1
+  # no `${{ inputs.` inside a run block (a `run: |` line and the lines indented deeper than it)
+  if awk '/^[[:space:]]+run: \|[[:space:]]*$/ { match($0, /^[[:space:]]+/); ind = RLENGTH; inrun = 1; next } inrun { match($0, /^[[:space:]]*/); if (RLENGTH <= ind && $0 !~ /^[[:space:]]*$/) inrun = 0 } inrun && /\$\{\{ *inputs\./ { bad = 1 } END { exit bad ? 0 : 1 }' <<< "$cwf"; then return 1; fi
   return 0
 }
 if rules_ok "$WF" "$EX"; then pass "windows_check: real files keep every rule"; else fail "windows_check: real files break a rule"; fi
@@ -33,3 +38,8 @@ mutant moving-ref 's#setup-rust@ceddb45[0-9a-f]+#setup-rust@main#' wf
 mutant no-locked 's/ --locked//g' wf
 mutant caller-main 's#@v0\.0\.11#@main#' ex
 mutant caller-secrets 's#^permissions:#secrets: inherit\npermissions:#' ex
+mutant no-permissions 's/^permissions:/xpermissions:/' wf
+mutant no-check-step 's/Inputs are plain words/Inputs/' wf
+mutant no-runner-check 's/\^windows-\[0-9\]\+\$/^windows.*$/' wf
+mutant no-timeout 's/^([[:space:]]+)timeout-minutes:/\1xtimeout:/' wf
+mutant inputs-in-run 's#^( +)set -euo pipefail#\\1set -euo pipefail ${{ inputs.packages }}#' wf

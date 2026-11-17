@@ -73,10 +73,16 @@ The pure-Rust crate is linted and tested on Windows, never cross-built. Steps: c
 | `features` | `--all-features` | feature flags for clippy and test (`--features a,b`, empty = defaults) |
 | `clippy-extra` | `-W clippy::pedantic` | lint flags after `-D warnings` |
 | `no-fail-fast` | `true` | `cargo test --no-fail-fast` |
+| `timeout-minutes` | `90` | job timeout (a hanging clippy or test must not run for hours) |
 
 Pins: inside the workflow `setup-rust` is pinned to the same commit SHA as every other internal reference (`scripts/pin-refs.sh` raises it at release time); the CALLER pins the
 workflow to a fs-release TAG that contains the file (the first one is the tag after v0.0.10), never `@main`. The inputs are checked for plain words before they reach a command line.
 Test: `tests/packaging/windows_check.sh` (rules plus five mutants: `*-latest`, `@main`, missing `--locked`, caller on `@main`, caller with secrets).
+
+The `runner` input must match `windows-<number>`; `packages`, `features` and `clippy-extra` may hold only letters, digits and `_ , / = . : -` and spaces (checked with a bash regex, a line break is refused too).
+The Rust cache comes from `setup-rust` (Swatinem/rust-cache, pinned SHA; key = cache-key `windows` plus rust-cache's own hash of Cargo.lock, toolchain and runner OS). The cache only speeds a run up: the evidence for a tag is a run that is green without a cache hit (a cold run). A later `cache` input of `setup-rust` (default true) would make that a `workflow_dispatch` switch; not part of this change.
+`features` defaults to `--all-features`; a repo whose optional features pull heavy dependencies (GPU, Blinc, e.g. fs-packages) sets `features` in its caller.
+The caller example pins `@v0.0.11`: `pin-refs.sh` does not change `examples/`, so the release tag must be exactly `v0.0.11` (else the example is changed by hand).
 
 Follow-up runs (text only here, the repos themselves are not touched by this run; source `.scratch/katalog-plan/INVENTAR-ci-workflows.md`, 2026-11-17):
 - Windows callers (replace the copied `windows.yml` by the caller): fs-types, fs-components, fs-files, fs-texts; fs-packages (branch `unreviewed/packages-windows-ci`, variant with `windows-2022`). New callers (Rust repos without a Windows gate): fs-activities, fs-broadcast, fs-calendars, fs-capnpc, fs-draw, fs-forms, fs-groups, fs-identity, fs-interfaces, fs-jscalendar, fs-maps, fs-messages, fs-objects, fs-people, fs-registry, fs-release, fs-resources, fs-tasks.

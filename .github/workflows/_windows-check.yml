@@ -9,6 +9,7 @@ on:
       packages: { type: string, default: "", description: "Space separated crate names (-p each); empty = the whole workspace" }
       features: { type: string, default: "--all-features", description: "Feature flags for clippy and test, e.g. --all-features or --features a,b; empty = defaults" }
       clippy-extra: { type: string, default: "-W clippy::pedantic", description: "Extra clippy lint flags after -D warnings; empty = none" }
+      timeout-minutes: { type: number, default: 90, description: "Job timeout in minutes (a hanging clippy or test must not run for hours)" }
       no-fail-fast: { type: boolean, default: true, description: "cargo test --no-fail-fast (run every test, report all failures)" }
 
 permissions:
@@ -21,10 +22,12 @@ env:
 jobs:
   windows:
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     defaults:
       run:
         shell: bash
     env:
+      RUNNER: ${{ inputs.runner }}
       PACKAGES: ${{ inputs.packages }}
       FEATURES: ${{ inputs.features }}
       CLIPPY_EXTRA: ${{ inputs.clippy-extra }}
@@ -41,9 +44,9 @@ jobs:
       - name: Inputs are plain words (they end up on a command line)
         run: |
           set -euo pipefail
-          bad='[^A-Za-z0-9_ ,/=.:-]'
+          [[ $RUNNER =~ ^windows-[0-9]+$ ]] || { echo "::error::runner must be windows-<number> only: $RUNNER"; exit 1; }
           for v in "$PACKAGES" "$FEATURES" "$CLIPPY_EXTRA"; do
-            if printf '%s' "$v" | grep -Eq "$bad"; then echo "::error::input with a character that is not allowed: $v"; exit 1; fi
+            [[ $v =~ ^[A-Za-z0-9_\ ,/=.:-]*$ ]] || { echo "::error::input with a character that is not allowed: $v"; exit 1; }
           done
       - name: fmt
         run: cargo fmt --check
