@@ -11,4 +11,3 @@ use part1::*;
 
 #[path = "workflows_belt/part2.rs"]
 mod part2;
-use part2::*;

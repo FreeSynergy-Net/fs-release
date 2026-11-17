@@ -15,4 +15,3 @@ use part2::*;
 
 #[path = "workflows_programm_neu/part3.rs"]
 mod part3;
-use part3::*;
