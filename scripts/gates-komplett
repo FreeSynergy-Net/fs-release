@@ -6,7 +6,7 @@
 [GATE-GLEICH-CI]: the check scripts (`scripts/gates.sh`, check_rust_rules, check_lock_sources ...) come from the fs-release TAG the repo's own CI files pin (`git archive` of that tag out of
 $FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The tag is the highest `FreeSynergy/fs-release/...@vX.Y.Z` of DIR/.github/workflows/*.yml, or `--skripte-tag`; without
 any (fs-release itself) the scripts of DIR are used. [GATE-VOLLSTAENDIG-LAUFEN]: `cargo fmt --all` FIRST (a tree that fmt changes is red: commit it first), then `gates.sh` COMPLETE, ONE run after the other
-(never parallel): (1) the local environment, (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`) with an OWN
+(never parallel): (1) the local environment (a CI/CARGO_TERM_COLOR of the caller is dropped), (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`) with an OWN
 target (`.scratch/target/<repo>/flach`, [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
 CARGO_BUILD_JOBS=<jobs> and BUILD_PRIORITY=<prioritaet>. [GATE-PIPEFAIL], [GATE-AUSGABE-NIE-KUERZEN]: the output goes to a log file whole; the result lists every `gate <name>: rc=` line and every line with FAILED, ERROR
 or errors, and the rc of every run; a red run stops the rest (`nicht gelaufen`). The head and the working tree must be the same before and after (a change while the gates run is red).
@@ -87,7 +87,7 @@ def main(argv):
             return kio.skipped("no fs-release tag pinned in .github/workflows and no scripts/gates.sh: pass --skripte-tag")
         before = state(d)
         toolchain = os.path.join(os.path.dirname(os.path.dirname(gates)), "RUST_VERSION")
-        env = {**os.environ, "CARGO_BUILD_JOBS": str(a.jobs), "BUILD_PRIORITY": str(a.prioritaet)}
+        env = {**{k: v for k, v in os.environ.items() if k not in ("CI", "CARGO_TERM_COLOR")}, "CARGO_BUILD_JOBS": str(a.jobs), "BUILD_PRIORITY": str(a.prioritaet)}
         if os.path.isfile(toolchain):
             env["RUSTUP_TOOLCHAIN"] = open(toolchain, encoding="utf-8").read().strip()
         fmt = subprocess.run(shlex.split(os.environ.get("FS_GATES_FMT", "cargo fmt --all")), cwd=d, env=env, capture_output=True, text=True, check=False)
