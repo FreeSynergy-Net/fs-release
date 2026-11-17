@@ -73,6 +73,7 @@ The pure-Rust crate is linted and tested on Windows, never cross-built. Steps: c
 | `features` | `--all-features` | feature flags for clippy and test (`--features a,b`, empty = defaults) |
 | `clippy-extra` | `-W clippy::pedantic` | lint flags after `-D warnings` |
 | `no-fail-fast` | `true` | `cargo test --no-fail-fast` |
+| `cache` | `true` | Rust cache on; `false` = cold run (passed to the new input `cache` of `actions/setup-rust`; a tag proof needs `workflow_dispatch` with `cache: false`) |
 | `timeout-minutes` | `90` | job timeout (a hanging clippy or test must not run for hours) |
 
 Pins: inside the workflow `setup-rust` is pinned to the same commit SHA as every other internal reference (`scripts/pin-refs.sh` raises it at release time); the CALLER pins the
@@ -80,7 +81,7 @@ workflow to a fs-release TAG that contains the file (the first one is the tag af
 Test: `tests/packaging/windows_check.sh` (rules plus five mutants: `*-latest`, `@main`, missing `--locked`, caller on `@main`, caller with secrets).
 
 The `runner` input must match `windows-<number>`; `packages`, `features` and `clippy-extra` may hold only letters, digits and `_ , / = . : -` and spaces (checked with a bash regex, a line break is refused too).
-The Rust cache comes from `setup-rust` (Swatinem/rust-cache, pinned SHA; key = cache-key `windows` plus rust-cache's own hash of Cargo.lock, toolchain and runner OS). The cache only speeds a run up: the evidence for a tag is a run that is green without a cache hit (a cold run). A later `cache` input of `setup-rust` (default true) would make that a `workflow_dispatch` switch; not part of this change.
+The Rust cache comes from `setup-rust` (Swatinem/rust-cache, pinned SHA; key = cache-key `windows` plus rust-cache's own hash of Cargo.lock, toolchain and runner OS). The cache only speeds a run up: the evidence for a tag is a run that is green without a cache hit (a cold run). The input `cache` (default true) switches the cache off for a cold run: the evidence for a tag comes ONLY from such a run (`workflow_dispatch`, `cache: false`), never from a run that is green with a cache hit. `actions/setup-rust` got the input `cache` (default true; false skips the rust-cache step); since `actions/` changed, the SHA in `_windows-check.yml` must be raised by a pin round to a commit that contains it (before that the pinned action ignores `cache`).
 `features` defaults to `--all-features`; a repo whose optional features pull heavy dependencies (GPU, Blinc, e.g. fs-packages) sets `features` in its caller.
 The caller example pins `@v0.0.11`: `pin-refs.sh` does not change `examples/`, so the release tag must be exactly `v0.0.11` (else the example is changed by hand).
 

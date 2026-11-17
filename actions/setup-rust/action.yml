@@ -6,6 +6,7 @@ inputs:
   components: { description: "Comma separated components", default: "" }
   working-directory: { description: "Cargo workspace directory", default: "." }
   cache-key: { description: "Extra rust-cache key", default: "" }
+  cache: { description: "Use the Rust cache (true) or not (false: a cold run, the evidence for a tag)", default: "true" }
 runs:
   using: composite
   steps:
@@ -22,7 +23,8 @@ runs:
         toolchain: ${{ steps.tc.outputs.toolchain }}
         targets: ${{ inputs.targets }}
         components: ${{ inputs.components }}
-    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+    - if: inputs.cache != 'false'
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
         workspaces: ${{ inputs.working-directory }}
         key: ${{ inputs.cache-key }}

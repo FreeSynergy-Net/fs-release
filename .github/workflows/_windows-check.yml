@@ -10,6 +10,7 @@ on:
       features: { type: string, default: "--all-features", description: "Feature flags for clippy and test, e.g. --all-features or --features a,b; empty = defaults" }
       clippy-extra: { type: string, default: "-W clippy::pedantic", description: "Extra clippy lint flags after -D warnings; empty = none" }
       timeout-minutes: { type: number, default: 90, description: "Job timeout in minutes (a hanging clippy or test must not run for hours)" }
+      cache: { type: boolean, default: true, description: "Rust cache on (default); false = cold run (evidence for a tag, start by workflow_dispatch)" }
       no-fail-fast: { type: boolean, default: true, description: "cargo test --no-fail-fast (run every test, report all failures)" }
 
 permissions:
@@ -41,6 +42,7 @@ jobs:
           toolchain: pinned
           components: rustfmt,clippy
           cache-key: windows
+          cache: ${{ inputs.cache }}
       - name: Inputs are plain words (they end up on a command line)
         run: |
           set -euo pipefail
