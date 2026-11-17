@@ -1,0 +1,178 @@
+# bahnen: the lanes round of the coordinator - lead the lanes (projects) and the board in fs-tasks, spread the build slots, report to the strategy bundled per lane.
+# Order: `Workflow bahnen, parameters bahnen, ids, slots, nacht, docs` (docs/prompt-template.md). Specification: the `@fs` calls have no script yet, a real run is not proven. It does not replace `koordinator-runde` (the work round with agents, gates and review, a draft); `bahnen` is the book-keeping and slot part of every round. FS profile: see README.md.
+# Rule [ARBEIT-IN-FS-TASKS] (b7, 17 Nov.): ALL agents lead their work in fs-tasks (account `agents`, CLI `timeout 15 fs-tasks ...`, NEVER without `timeout`: start-hang risk 0.0.8). Projects = lanes (`bahn1-komponenten` ... `bahn5-crates`), one card per run, the status is kept current
+# (`claim`, `status ... in-progress|done|failed --report <path>`, `note` of at most 500 bytes). Names: `koordinator`, `bahnN-bauer`, `opus-review`, `haiku-text`, `haiku-push`, `claude-strategie`. Agents NEVER change the ORDER of the cards (the order is the wish of the user), only status and notes.
+# If the CLI hangs (`timeout 15` fires): NEVER start a server yourself, report it to the strategy (the server runs at the user's). Remote states (heads, branches, tags) are PROVEN by `git ls-remote`, never taken from memory or from a report.
+# Slots: at most 2 builds at the same time (`pgrep -af 'build-slot.sh cargo'` without the timeout / bash -c lines: fewer than 2, else wait); slot rule: WRITE code without a slot, BUILD only after the release of a slot. Loops are counted: from the third round (`runde >= 3`) `eskalation`.
+# Input: bahnen (the lane names), ids (the id list of the strategy: card ids per lane), slots (maximum, default 2), nacht (true: night order, see `slots-verteilen`), docs (worktree of fs-documentation for the handoff note).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: bahnen
+  version: 0.0.10
+  title: "Lanes round - lead the lanes and the board in fs-tasks, spread the build slots, report to the strategy bundled per lane"
+do:
+  - ids-lesen:
+      call: read-task-ids:0.0.10@fs
+      with:
+        ids: ${ .input.ids }
+        bahnen: ${ .input.bahnen }
+      export:
+        as: '${ $context + { ids: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Script (no AI): reads the id list of the strategy (one line per card: lane, card id, run) and returns `ids` per lane; a lane without a project in the list is named, never invented. The state changes to read, whatever the list says."
+  - board-lesen:
+      call: tasks-board:0.0.10@fs
+      with:
+        bahnen: ${ .input.bahnen }
+        ids: ${ $context.ids }
+      export:
+        as: '${ $context + { board: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Reads the board ONLY through `timeout 15 fs-tasks list ...` (one call per lane, account `agents`, never without `timeout`); the result `board` has the cards per lane (id, status, owner, report path) and `haenger` (true when one call ended by the timeout, rc 124). It never starts or restarts a server and never changes a card."
+  - haenger-weiche:
+      switch:
+        - haenger:
+            when: '${ $context.board.haenger == true }'
+            then: haenger-melden
+        - ok:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a hanging CLI (the `timeout 15` fired) goes to `haenger-melden`, never on and never to a server restart; a missing `board` result is a hang too (a missing result is never green)."
+  - remote-lage:
+      call: ls-remote-state:0.0.10@fs
+      with:
+        board: ${ $context.board }
+      export:
+        as: '${ $context + { remote: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "`git ls-remote` per repo and branch of every card in work (`unreviewed/*` branch heads, `main`, tags): the result `remote` (repo, branch, head). A claim in a handoff or a report (\"pushed\", \"head X\") counts only when `git ls-remote` shows it; a branch that is not there is said as such. No `gh` call."
+  - karten-abgleichen:
+      call: sync-cards-ai:0.0.10@fs
+      with:
+        board: ${ $context.board }
+        remote: ${ $context.remote }
+        ids: ${ $context.ids }
+      export:
+        as: '${ $context + { karten: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Coordinator (Sonnet) - the board is made to match the real state: projects = lanes, ONE card per run, new orders become cards, the status is current (`timeout 15 fs-tasks claim <id> --as NAME`, `status <id> in-progress|done|failed --report <path>`, `note <id> \"<=500 B>\"`); a card says `done` only when `remote` proves the head. The ORDER of the cards is NEVER changed (the wish of the user), only status and notes. Result `karten` is `red` (a card contradicts the remote state or has no report) or not; carries red and runde (+1 for each jump back from `abgleich-weiche`)."
+  - abgleich-weiche:
+      switch:
+        - runden:
+            when: ${ $context.karten.red != false and ($context.karten.runde // 0) >= 3 }
+            then: eskalation
+        - rot:
+            when: ${ $context.karten.red != false }
+            then: karten-abgleichen
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red or missing `karten` result goes back to `karten-abgleichen`, from the third round (`runde` >= 3) to `eskalation` (the person decides); only `red == false` goes on to the slots."
+  - slots-pruefen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: slot-check
+          version: 0.0.10
+      export:
+        as: '${ $context + { slots: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Runs `slot-check` (holders, processes, memory from the log): the result `slots` has the number of builds that run (`pgrep -af 'build-slot.sh cargo'` without the timeout / bash -c lines) and `frei` (maximum 2 minus running). Orphans are reported, never killed by pattern."
+  - slots-verteilen:
+      call: spread-slots-ai:0.0.10@fs
+      with:
+        slots: ${ $context.slots }
+        karten: ${ $context.karten }
+        maximum: ${ .input.slots }
+        nacht: ${ .input.nacht }
+      export:
+        as: '${ $context + { verteilung: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Coordinator (Sonnet) - at most 2 builds at the same time (`maximum`): the free slots (`slots.frei`) go to the cards that wait for a build, in the order of the cards; night order (`nacht == true`): all five lanes keep running, the lane order given by the strategy for the night, without one the order of the cards. SLOT RULE: an agent WRITES code (and tests, documentation, picture sketches) without a slot and BUILDS only after the release of a slot; waiting for a slot is no idle time. Result `verteilung` has `ueberbucht` (more than `maximum` planned = true) and carries runde (+1 for each jump back from `slots-weiche`)."
+  - slots-weiche:
+      switch:
+        - runden:
+            when: ${ $context.verteilung.ueberbucht != false and ($context.verteilung.runde // 0) >= 3 }
+            then: eskalation
+        - ueberbucht:
+            when: ${ $context.verteilung.ueberbucht != false }
+            then: slots-pruefen
+        - ok:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - more than 2 planned builds (or a missing result) go back to `slots-pruefen`, from the third round (`runde` >= 3) to `eskalation`; only `ueberbucht == false` goes on to the report."
+  - meldung:
+      call: lane-report-ai:0.0.10@fs
+      with:
+        karten: ${ $context.karten }
+        remote: ${ $context.remote }
+        verteilung: ${ $context.verteilung }
+      then: end
+      export:
+        as: '${ $context + { meldung: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Coordinator (Sonnet) - ONE bundled report to the strategy, ONE entry per lane: only final states and blockers (rule [BERICHT-GEBUENDELT]); per lane line 1 of the Opus review verdict WORD FOR WORD, the conditions (Auflagen) word for word, the file path of the report, the head proven by `git ls-remote` (`remote`), the slot distribution. Questions of the lanes come last, after a marker, numbered. The flow ends here."
+  - haenger-melden:
+      set:
+        todo: haenger-melden
+        server_neu_starten: false
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The `fs-tasks` CLI hung (`timeout 15` fired): the hang is REPORTED to the strategy / the user (the server runs at the user's); NO agent starts or restarts a server. The cards stay as they are, no card is changed from memory. This flow ends."
+  - eskalation:
+      set:
+        todo: bahnen-eskalation
+        status: escalated
+        eskaliert: true
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The cards did not match the remote state in the third round, or the slot distribution was over the maximum in the third round: the person decides how to go on. This flow ends."

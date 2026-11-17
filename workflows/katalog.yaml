@@ -257,7 +257,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The next catalog branch (`kette.aktuell.branch`) is rebased onto the new main. The result carries the NEW head in `kette.aktuell.head`: the review, the ff and the proof use exactly that head, never `.input.head` and never the old one. The top of the CHANGELOG ALWAYS conflicts: keep BOTH `## Unreleased (...)` sections, the new one on top; packages.toml: both entries kept; identity checked after the rebase (flow `branch-neu-schreiben`, step `identitaet-nach`); a new head needs a new review."
+        freesynergy.net:summary: "The next catalog branch (`kette.aktuell.branch`) is rebased onto the new main. The result carries the NEW head in `kette.aktuell.head`: the review, the ff and the proof use exactly that head, never `.input.head` and never the old one. The top of the CHANGELOG ALWAYS conflicts: keep BOTH `## Unreleased (...)` sections, the new one on top; packages.toml: both entries kept; identity checked after the rebase (flow `branch-neu-schreiben`, step `identitaet-nach`); a new head needs a new review. HINT for the later script `chain-rebase` (Opus review pflege-1c): the result is exported as `{ kette: . }`, so the script MUST return `aktuell` (with the NEW head), `rest` and `erster` (false for a later branch); a missing field must never silently count as `erster`."
   - gen-zaehlen:
       set:
         gen: ${ $context.zaehler.gen + 1 }
