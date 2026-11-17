@@ -1,0 +1,397 @@
+# pin-kaskade: ONE cascade of the pins after a new tag of fs-types (trigger, here v0.0.3), in the order of the DAG (ADR 0092/0093; plan
+# `katalog-plan/PLAN-baukasten-architektur.md`, user priority "Grundsystem fertig"). Order: `Workflow pin-kaskade, parameters ausloeser-tag, glieder, ab, workdir` (docs/prompt-template.md). FS profile: see README.md.
+# Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
+# SPECIFICATION: the `@fs` calls without a script are specification, a real run is not proven. Agents never push to main, tag or merge; ordinary push only to `unreviewed/pin-kaskade-<repo>`; no `gh` call; reports per [BERICHT]; one board card (fs-tasks, project `bahn5-crates`).
+# Order of the Glieder: fs-interfaces (new tag, capnp regenerated, `catalog_roundtrip`) -> fs-objects -> fs-rpc (with fs-starter-L1 `coded_stub`) -> fs-components (with the fs-settings lift, F1 catalog, `WITHOUT_COMPONENT` extended) -> the programs, one lift each, fs-tasks (pilot) first.
+# Per Glied: pin in Cargo.toml and Cargo.lock by cargo (`lift`, never by hand), `strict` lock check (one source per fs crate), the gates complete in both environments (CARGO_BUILD_JOBS=4, BUILD_PRIORITY=0 = scaffold core, [GATE-*] rules), branch CI at the exact head, Opus review at the head, ff and tag ONLY through `ff-und-tag` - THEN the next Glied.
+# ABORT: a red Glied stops the cascade (`eskalation` to the strategy), no skipping, no parallel build of dependent Glieder. Resume after solving: input `ab` = the Glied that was red. End: the same fs-types version in every lock, one source in the graph.
+# Rule [KEINE-KALTEN-FLACHPROBEN-BIS-AUFRAEUMEN]: no cold flat trial builds in fresh targets until the clean-up is done; every build goes through `build-slot.sh` into the shared target. No AI on servers (not touched).
+# Inputs: `ausloeser-tag` (tag of fs-types, e.g. v0.0.3), `glieder` (list of { repo, art, tag, allow, besonderes } in DAG order), `ab` (optional resume: name of the Glied to start at), `workdir` (own folder for the fresh clones of `ff-und-tag`).
+# Loops: a red check step with repeats jumps back at most twice, the third red round goes to `eskalation`; the Glied steps do NOT repeat: red = abort.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: pin-kaskade
+  version: 0.0.10
+  title: Pin cascade after a new fs-types tag - Glied by Glied in DAG order, lift, lock, gates, CI, review, ff-und-tag, abort on red, resume with ab
+do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.10@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user): before anything is built, look whether it exists and is only extended: the lift (`fs-release lift --repo NAME=vX.Y.Z`, flow `lift`), `scripts/gates-lock.sh`, `scripts/set_components_tag.py`, the flows `ff-und-tag`, `review`, `lift-v1plus`, an earlier cascade on `unreviewed/` branches and in `.scratch`. Result `befund` = { art: vorhanden | neu, verweis, beleg }; the cascade ONLY calls the existing flows, it builds no second pin, push or tag way."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.10@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): a `befund` without proof is RED; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on; a missing result goes to `eskalation`, never to green."
+  - karte:
+      call: board-card:0.0.10@fs
+      with:
+        workflow: pin-kaskade
+        ausloeser: ${ .input["ausloeser-tag"] }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first: a card `pin-kaskade` that exists gets a note, no second card; then claim, in-progress; a note per finished Glied, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
+  - lage:
+      call: kaskade-lage:0.0.10@fs
+      with:
+        ausloeser: ${ .input["ausloeser-tag"] }
+        glieder: ${ .input.glieder }
+        ab: ${ .input.ab // null }
+      export:
+        as: '${ $context + { lage: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, read only - proves by `git ls-remote --tags` (never from an old clone) that the trigger tag of fs-types exists (here v0.0.3) and shows the head of every Glied; with `ab` (resume input = the Glied that was red) the list starts there, the earlier Glieder are read as done ONLY when their tag exists on the remote. Result `lage` = { ausloeser, glieder, ab }."
+  - plan:
+      call: kaskade-plan:0.0.10@fs
+      with:
+        lage: ${ $context.lage }
+      export:
+        as: '${ $context + { plan: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - orders the Glieder by the DAG (ADR 0092/0093): fs-interfaces (new tag, capnp regenerated, `catalog_roundtrip`), fs-objects, fs-rpc (with the fs-starter-L1 `coded_stub`), fs-components (with the fs-settings lift, F1 catalog, `WITHOUT_COMPONENT` extended), then the programs, one lift each, fs-tasks (pilot) FIRST. Result `plan` = { offen: [Glied...], erledigt: [] } where a Glied = { repo, art: bibliothek | programm, tag, allow, besonderes }; `offen[0]` is the next one; a Glied is built only after ALL Glieder it depends on are done (no parallel build of dependent Glieder)."
+  - plan-check:
+      call: kaskade-plan-regeln:0.0.10@fs
+      with:
+        plan: ${ $context.plan }
+      export:
+        as: '${ $context + { plancheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: the order follows the DAG (no Glied before one it depends on), fs-tasks stands before the other programs, every Glied has `tag` and `allow`, `ab` names a Glied of the list."
+  - plan-again:
+      switch:
+        - runden:
+            when: '${ $context.plancheck.red == true and ($context.plancheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.plancheck.red == true }'
+            then: plan
+        - green:
+            when: '${ $context.plancheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `plan` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on; a missing result goes to `eskalation`, never to green."
+  - glied-weiche:
+      switch:
+        - fertig:
+            when: '${ ($context.plan.offen | length) == 0 }'
+            then: lock-ende
+        - weiter:
+            when: '${ ($context.plan.offen | length) > 0 }'
+            then: glied-start
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow of the loop over the Glieder - an empty `plan.offen` goes to the final lock check; otherwise the next Glied; a missing plan goes to `eskalation`."
+  - glied-start:
+      call: kaskade-glied:0.0.10@fs
+      with:
+        plan: ${ $context.plan }
+        ausloeser: ${ .input["ausloeser-tag"] }
+      export:
+        as: '${ $context + { glied: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - takes `plan.offen[0]` as the current Glied (`glied` = { repo, art, tag, allow, besonderes, libs }, `libs` = the trigger tag of fs-types plus the tags of the Glieder already done that this one depends on). One Glied at a time; BUILD_PRIORITY of every build step of a Glied is 0 (scaffold core, `build-slot.sh`)."
+  - pin-lift:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: lift
+          version: 0.0.10
+        input:
+          repo: ${ $context.glied.repo }
+          commit: true
+          libs: ${ $context.glied.libs }
+      export:
+        as: '${ $context + { lift: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (no second pin way): sets the pin in Cargo.toml to the new tag (`--repo NAME=vX.Y.Z`; fs-interfaces never touches fs-types), regenerates Cargo.lock by `cargo update --workspace` (cargo metadata, NEVER by hand), runs fmt, clippy, rules, tests, `lock-sources` and commits with the identity FreeSynergy <support@freesynergy.net>."
+  - besonderes:
+      call: kaskade-besonderes-ai:0.0.10@fs
+      with:
+        glied: ${ $context.glied }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet does what is special for this Glied, from `glied.besonderes`, in the own worktree (local commit, no push): fs-interfaces - new tag, capnp regenerated, test `catalog_roundtrip`; fs-rpc - fs-starter-L1 `coded_stub`; fs-components - fs-settings lift, F1 catalog, `WITHOUT_COMPONENT` extended; a program - nothing more than its lift. Empty `besonderes` = nothing to do."
+  - lock-strikt:
+      call: lock-sources-strict:0.0.10@fs
+      with:
+        repo: ${ $context.glied.repo }
+      export:
+        as: '${ $context + { lockcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - `scripts/gates-lock.sh` / `scripts/check_lock_sources.py` with `strict = true`: EXACTLY ONE source per fs crate in Cargo.lock (also fs-types); a second source is red. The lock was made by cargo, a hand edit is red."
+  - gates:
+      call: gates-komplett:0.0.10@fs
+      with:
+        repo: ${ $context.glied.repo }
+        jobs: 4
+        prioritaet: 0
+      export:
+        as: '${ $context + { bau: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - `scripts/gates.sh` in BOTH environments (the strict CI one and the local one) through `/srv/FreeSynergy/.scratch/build-slot.sh` with CARGO_BUILD_JOBS=4 and BUILD_PRIORITY=0 (scaffold core); [GATES] fmt, clippy pedantic, tests, rules check; [GATE-PIPEFAIL] `set -o pipefail` and one visible rc per gate, no output cut with `tail`/`head`; [GATE-GLEICH-CI] check scripts from the tag the CI of the repo pins. Rule [KEINE-KALTEN-FLACHPROBEN-BIS-AUFRAEUMEN]: no cold flat trial build in a fresh target while the clean-up is open; the Glied builds in its own shared target (`build-slot.sh`)."
+  - gates-weiter:
+      switch:
+        - rot:
+            when: '${ $context.lockcheck.red != false or $context.bau.red != false }'
+            then: eskalation
+        - gruen:
+            when: '${ $context.lockcheck.red == false and $context.bau.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ABORT on a red Glied: lock check or gates red (or no result) stop the cascade at once and go to `eskalation`; no skipping, no next Glied, no parallel build. Only both `red == false` go on."
+  - push-zweig:
+      call: push-unreviewed:0.0.10@fs
+      with:
+        repo: ${ $context.glied.repo }
+        branch: unreviewed/pin-kaskade-${ $context.glied.repo }
+      export:
+        as: '${ $context + { zweig: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Ordinary push of the local commit to the branch `unreviewed/pin-kaskade-<repo>` ONLY (no force, never main, never a tag, no `gh`); result `zweig` = { branch, head } with the head from `git ls-remote`."
+  - zweig-ci:
+      call: branch-ci:0.0.10@fs
+      with:
+        repo: ${ $context.glied.repo }
+        branch: ${ $context.zweig.branch }
+        head: ${ $context.zweig.head }
+      export:
+        as: '${ $context + { ci: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Reads the branch CI of ALL workflows (also Windows) for exactly this head (`scripts/check_job_status.py`, read only): `ci.status` green | red | hung. A green run for an older head does not count."
+  - ci-weiter:
+      switch:
+        - gruen:
+            when: '${ $context.ci.status == "green" }'
+            then: review
+        - rot-oder-unbekannt:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ONLY `status == green` goes on to the review; red, hung, running or unknown stops the cascade (standing rule ZWEIG-CI) and goes to `eskalation`."
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.10
+        input:
+          repo: ${ $context.glied.repo }
+          branch: ${ $context.zweig.branch }
+          head: ${ $context.zweig.head }
+          scope: short
+      export:
+        as: '${ $context + { urteil: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The Opus review at exactly this head (sub-workflow `review`, read only): line 1 JA or NEIN. The one review of the Glied: `ff-und-tag` below only CHECKS the JA for this head, it asks for no second one."
+  - review-weiter:
+      switch:
+        - ja:
+            when: '${ $context.urteil.verdict == "JA" }'
+            then: ff-tag
+        - nein-oder-offen:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ONLY a JA for this head goes on to the ff and tag; a NO, a condition or a missing verdict stops the cascade (`eskalation`); after the Glied is fixed the run resumes with `ab` = this Glied."
+  - ff-tag:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: ff-und-tag
+          version: 0.0.10
+        input:
+          repo: ${ $context.glied.repo }
+          branch: ${ $context.zweig.branch }
+          head: ${ $context.zweig.head }
+          tag: ${ $context.glied.tag }
+          allow: ${ $context.glied.allow }
+          workdir: ${ .input.workdir }
+      export:
+        as: '${ $context + { ff: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The existing sub-workflow `ff-und-tag` UNCHANGED, the ONLY way to main and tag (no own push or tag way in this flow): branch CI, signing entries, expected runs, fresh clone, identity, version, approval for this head, ff push (the push helper of the strategy, `gate: human`), annotated tag, ls-remote proof, release watch."
+  - ff-weiter:
+      switch:
+        - fertig:
+            when: '${ $context.ff.status == "done" and ($context.ff.eskaliert // false) == false }'
+            then: naechstes
+        - sonst:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only `status == done` without escalation counts the Glied as finished; every other result stops the cascade."
+  - naechstes:
+      call: kaskade-glied-fertig:0.0.10@fs
+      with:
+        plan: ${ $context.plan }
+        glied: ${ $context.glied }
+        beleg: ${ $context.ff.beleg }
+      export:
+        as: '${ $context + { plan: . } }'
+      then: glied-weiche
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - moves the Glied from `plan.offen` to `plan.erledigt` with its tag and the ls-remote proof, adds a note to the board card, and returns to the loop: the NEXT Glied starts only now."
+  - lock-ende:
+      call: lock-gleich:0.0.10@fs
+      with:
+        plan: ${ $context.plan }
+        ausloeser: ${ .input["ausloeser-tag"] }
+      export:
+        as: '${ $context + { lockende: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, read only, end check - in every Cargo.lock of the done Glieder (fresh blobless clones of main at the tags) the SAME fs-types version (the trigger tag) and only ONE source per fs crate in the whole graph (`check_lock_sources.py` strict); one differing version or a second source is red."
+  - lock-ende-weiter:
+      switch:
+        - gruen:
+            when: '${ $context.lockende.red == false }'
+            then: bericht
+        - rot-oder-unbekannt:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only `red == false` ends the cascade green; otherwise `eskalation`."
+  - bericht:
+      call: report-write:0.0.10@fs
+      with:
+        plan: ${ $context.plan }
+        lock: ${ $context.lockende }
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report: per Glied repo, tag, head (ls-remote), CI, review head, gates rc; the final lock check; the numbers come from the scripts, not from an estimate."
+  - eskalation:
+      set:
+        todo: eskalation
+        ab: ${ $context.glied.repo // null }
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red (three rounds for the steps with repeats), a Glied is red (lock, gates, CI, review NO, ff or tag not done) or a result is missing: the cascade STOPS, nothing is skipped and nothing runs in parallel. The strategy decides; the report names the Glied, the step and the last red result. After the Glied is solved the cascade resumes from exactly this Glied (input `ab`)."
