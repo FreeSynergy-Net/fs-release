@@ -39,7 +39,7 @@ do:
             then: eskalation
         - gruen:
             when: '${ $context.ci.status == "green" }'
-            then: continue
+            then: secrets-pruefen
         - unbekannt:
             then: eskalation
       metadata:
@@ -47,7 +47,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red goes to the person (the cause comes from the log, `bugfix` or `agent-run` for exactly that run; lesson fs-packages typing-test: a hanging job is not a green one); a hang goes to ONE restart, a second hang escalates; ONLY `status == green` goes on - every other status (running, unknown, empty) escalates (standing rule ZWEIG-CI: red OR unknown = no ff)."
+        freesynergy.net:summary: "Control flow - red goes to the person (the cause comes from the log, `bugfix` or `agent-run` for exactly that run; lesson fs-packages typing-test: a hanging job is not a green one); a hang goes to ONE restart, a second hang escalates; ONLY `status == green` goes on, explicitly to `secrets-pruefen` (it never falls through to the restart step `ci-neustart`, which only `haengt-erstmals` reaches) - every other status (running, unknown, empty) escalates (standing rule ZWEIG-CI: red OR unknown = no ff)."
   - ci-neustart:
       call: ci-restart:0.0.10@fs
       with:
