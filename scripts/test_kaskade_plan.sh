@@ -85,6 +85,16 @@ chk "glied: libs = trigger + tags of the done Glieder the lift knows; fs-people 
 printf '{"offen":[{"repo":"fs-tasks","art":"programm","tag":"v0.0.2","allow":"x","abhaengig":["fs-types","fs-people"]}],"erledigt":[]}' >"$tmp/p4.json"
 py "$here/kaskade-glied" --plan "$tmp/p4.json" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
 chk "glied: a dependency that is not done is red (rc 1)" [ "$rc" -eq 1 ]
+# the tool file .fs-lock-sources.toml of the Glied worktree: created, raised from strict = false (reported), kept
+mkdir -p "$tmp/wt1" "$tmp/wt2" "$tmp/wt3"
+py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 --dir "$tmp/wt1" >"$tmp/o.json"
+chk "glied --dir: a missing .fs-lock-sources.toml is created strict" [ "$(q "$tmp/o.json" 'd["lock_datei"]')" = angelegt ] && grep -q '^strict = true' "$tmp/wt1/.fs-lock-sources.toml" && grep -q '^only_from_enabled = true' "$tmp/wt1/.fs-lock-sources.toml"
+printf 'strict = false\nonly_from_enabled = true\n' >"$tmp/wt2/.fs-lock-sources.toml"
+py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 --dir "$tmp/wt2" >"$tmp/o.json"
+chk "glied --dir: strict = false is raised to true and reported" [ "$(q "$tmp/o.json" '(d["lock_datei"], len(d["hinweise"]))')" = "('gehoben', 1)" ] && grep -q '^strict = true' "$tmp/wt2/.fs-lock-sources.toml"
+printf 'strict = true\nonly_from_enabled = true\n' >"$tmp/wt3/.fs-lock-sources.toml"
+py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 --dir "$tmp/wt3" >"$tmp/o.json"
+chk "glied --dir: a strict file stays (vorhanden)" [ "$(q "$tmp/o.json" 'd["lock_datei"]')" = vorhanden ]
 py "$here/kaskade-glied" --plan '{"offen":[],"erledigt":[]}' --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
 chk "glied: an empty offen is bad input (rc 2)" [ "$rc" -eq 2 ]
 
@@ -114,6 +124,10 @@ chk "mutant plan (dependencies ignored) is caught by the order case" [ "$(q "$tm
 mutate "$here/kaskade-glied" 'befunde.append(f"{g['"'"'repo'"'"']} depends on' 'pass  # ' "$tmp/mut/kaskade-glied" || bad "mutant glied not applied"
 py "$tmp/mut/kaskade-glied" --plan "$tmp/p4.json" --ausloeser v0.0.3 >/dev/null; rc=$?
 chk "mutant glied (broken order accepted) is caught by the not-done case" [ "$rc" -ne 1 ]
+mutate "$here/kaskade-glied" 'if have.get(k) is True:' 'if True:' "$tmp/mut/kaskade-glied" || bad "mutant glied 2 not applied"
+mkdir -p "$tmp/wt4"; printf 'strict = false\n' >"$tmp/wt4/.fs-lock-sources.toml"
+py "$tmp/mut/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 --dir "$tmp/wt4" >/dev/null
+chk "mutant glied (a false switch is kept) is caught by the strict = false case" grep -q '^strict = false' "$tmp/wt4/.fs-lock-sources.toml"
 mutate "$here/kaskade-glied-fertig" 'new["offen_vorher"] = len(offen)' 'new["offen_vorher"] = 0' "$tmp/mut/kaskade-glied-fertig" || bad "mutant fertig not applied"
 py "$tmp/mut/kaskade-glied-fertig" --plan "$tmp/plan.json" --glied '{"repo":"fs-interfaces","tag":"v0.0.2"}' >"$tmp/o.json"
 chk "mutant glied-fertig (loop guard value lost) is caught by the offen_vorher case" [ "$(q "$tmp/o.json" 'd["offen_vorher"]')" != 4 ]

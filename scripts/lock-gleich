@@ -5,7 +5,7 @@
 
 Per done Glied (`plan.erledigt`, at its tag, not at main): (1) `scripts/gates-lock.sh` (= `check_lock_sources.py` with the switches of `--env`): ONE source per library of scripts/lock-sources.toml, and with
 FS_LOCK_ONLY_FROM=1 fs-types ONLY from FreeSynergy/fs-types; (2) EVERY crate of the repo fs-types in the Cargo.lock (fs-types, fs-conformance, ...) stands on the trigger tag from the repo
-FreeSynergy/fs-types: the same version in every lock; (3) no `rev` pin to a FreeSynergy repo is left in any Cargo.toml (also `fs-people-directory`); known foreign sources
+FreeSynergy/fs-types: the same version in every lock; (3) the tool file `.fs-lock-sources.toml` of the Glied has `strict = true` and `only_from_enabled = true`; (4) no `rev` pin to a FreeSynergy repo is left in any Cargo.toml (also `fs-people-directory`); known foreign sources
 (workflows/kaskade-fremdquellen.txt) are skipped. One differing version, a second source or a left `rev` pin is red. Both switches are REQUIRED in `--env` (a call without them is bad input: the strict check
 must not be weakened by the caller). Result JSON: {status, red, ausloeser, glieder:[{repo, tag, fs_types_tags, lock_rc, lock_text, rev_pins}], befunde}. rc 0 / 1 red / 2 bad input or no remote.
 """
@@ -95,6 +95,10 @@ def main(argv):
                     befunde.append(f"{e['repo']} {e['tag']}: lock check red (rc {r.returncode}): {g['lock_text'][:300]}")
                 if found - {a.ausloeser} or bad:
                     befunde.append(f"{e['repo']} {e['tag']}: crates of the repo fs-types on {sorted(found)} (wanted only {a.ausloeser}) {bad}")
+                own = os.path.join(dest, ".fs-lock-sources.toml")
+                sw = tomllib.load(open(own, "rb")) if os.path.isfile(own) else {}
+                if sw.get("strict") is not True or sw.get("only_from_enabled") is not True:
+                    befunde.append(f"{e['repo']} {e['tag']}: .fs-lock-sources.toml is missing or not strict = true and only_from_enabled = true")
                 if pins:
                     befunde.append(f"{e['repo']} {e['tag']}: rev pin(s) to a FreeSynergy repo left: " + ", ".join(f"{x['crate']}@{x['rev']} ({x['datei']})" for x in pins))
     except (RuntimeError, ValueError, OSError, tomllib.TOMLDecodeError) as e:

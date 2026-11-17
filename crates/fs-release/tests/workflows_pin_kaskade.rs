@@ -19,9 +19,12 @@ fn rules_ok(t: &str) -> bool {
         .iter()
         .all(|p| pins.iter().any(|l| l.starts_with(p)))
         && pins.len() == REV_PINS.len()
-        && head.contains("# FREMDQUELLEN: workflows/kaskade-fremdquellen.txt")
-        && head.contains("FreeSynergy/blinc-app-fix")
-        && head.contains("FreeSynergy/blinc-layout-fix")
+        && head.lines().any(|l| {
+            l.starts_with("# FREMDQUELLEN: workflows/kaskade-fremdquellen.txt")
+                && l.contains("FreeSynergy/blinc-app-fix")
+                && l.contains("FreeSynergy/blinc-layout-fix")
+        })
+        && step_body(t, "glied-start").contains(".fs-lock-sources.toml")
         && step_body(t, "rev-pins").contains("9950b51")
         && step_body(t, "rev-pins").contains("blinc-app-fix")
         && [

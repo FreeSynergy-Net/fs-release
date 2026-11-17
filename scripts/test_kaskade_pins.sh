@@ -59,6 +59,7 @@ chk "mutant pins (foreign source not left alone) is caught by the green case" [ 
 # ---- lock-gleich ----
 # fs-interfaces v0.0.2: lock on fs-types v0.0.3 from FreeSynergy/fs-types (green). fs-objects v0.0.2: lock on fs-types v0.0.2 (a second version). fs-tasks v0.0.9: a left rev pin and fs-types from the repo fs-interfaces.
 lock fs-objects "git+$GH/fs-types?tag=v0.0.2#cccccccccccccccccccccccccccccccccccccccc" >"$tmp/work/fs-objects/Cargo.lock"
+printf "strict = true\nonly_from_enabled = true\n" >"$tmp/work/fs-objects/.fs-lock-sources.toml"
 commit_push fs-objects lock; tag_push fs-objects v0.0.2
 tag_push fs-tasks v0.0.9
 plan() { printf '{"erledigt":[%s]}' "$1"; }
@@ -77,7 +78,16 @@ py "$here/lock-gleich" --plan '{"erledigt":[]}' --ausloeser v0.0.3 >"$tmp/o.json
 chk "lock-gleich: no done Glied is never green (rc 2)" [ "$rc" -eq 2 ]
 py "$here/lock-gleich" --plan "$(plan '{"repo":"fs-interfaces","tag":"v9.9.9","beleg":"b"}')" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
 chk "lock-gleich: a tag that is not on the remote is no green (rc 2)" [ "$rc" -eq 2 ]
+# a Glied at a tag without the strict tool file is red even when the lock itself is fine
+newrepo fs-nolock; printf '[package]\nname = "x"\n' >"$tmp/work/fs-nolock/Cargo.toml"; lock fs-nolock "git+$GH/fs-types?tag=v0.0.3#dddddddddddddddddddddddddddddddddddddddd" >"$tmp/work/fs-nolock/Cargo.lock"
+commit_push fs-nolock one; tag_push fs-nolock v0.0.1
+nl='{"repo":"fs-nolock","tag":"v0.0.1","beleg":"b"}'
+py "$here/lock-gleich" --plan "$(plan "$nl")" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
+chk "lock-gleich: a Glied without .fs-lock-sources.toml (strict, only_from) is red (rc 1)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" 'any("fs-lock-sources" in b for b in d["befunde"])')" = True ]
 cp "$here/lock-gleich" "$tmp/mut/"
+mutate "$here/lock-gleich" 'if sw.get("strict") is not True or' 'if False and' "$tmp/mut/lock-gleich" || bad "mutant lock 4 not applied"
+py "$tmp/mut/lock-gleich" --plan "$(plan "$nl")" --ausloeser v0.0.3 >/dev/null; rc=$?
+chk "mutant lock-gleich (tool file not checked) is caught by the missing-file case" [ "$rc" -ne 1 ]
 mutate "$here/lock-gleich" 'if found - {a.ausloeser} or bad:' 'if False:' "$tmp/mut/lock-gleich" || bad "mutant lock 1 not applied"
 py "$tmp/mut/lock-gleich" --plan "$(plan "$e_obj")" --ausloeser v0.0.3 >/dev/null; rc=$?
 chk "mutant lock-gleich (version check removed) is caught by the other-version case" [ "$rc" -ne 1 ]
