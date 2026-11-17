@@ -15,6 +15,12 @@ rules="$here/check_rust_rules.py"
 RUSTUP_TOOLCHAIN="$(tr -d '[:space:]' < "$here/../RUST_VERSION")"
 export RUSTUP_TOOLCHAIN
 cd "$root"
+# Guard (rule [GATES-WAECHTER], scripts/lib_gates_guard.sh): lock `.gates.lock` + hash of the working tree at start and end.
+# shellcheck source=scripts/lib_gates_guard.sh
+. "$here/lib_gates_guard.sh"
+gates_guard_lock "$root" || exit 1
+guard_snap="$(mktemp "${TMPDIR:-/tmp}/gates-guard.XXXXXX")"
+trap 'gates_guard_unlock "$root"; rm -f "$guard_snap" "$guard_snap.end"' EXIT
 if [ -z "${CI:-}" ]; then
   export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
   export TMPDIR="${TMPDIR_GATES:-/srv/FreeSynergy/.scratch}"
@@ -22,6 +28,15 @@ if [ -z "${CI:-}" ]; then
     echo "gates FAILED: uncommitted changes in $root" >&2
     exit 1
   fi
+fi
+gates_guard_snapshot "$root" "$guard_snap"
+if [ -n "${GATES_ONLY_GUARD:-}" ]; then
+  # test mode (scripts/test_gates_guard.sh): no cargo; GATES_GUARD_MIDDLE stands in for the long checks
+  if [ -n "${GATES_GUARD_MIDDLE:-}" ]; then bash -c "$GATES_GUARD_MIDDLE"; fi
+  gates_guard_snapshot "$root" "$guard_snap.end"
+  gates_guard_compare "$guard_snap" "$guard_snap.end" || exit 1
+  echo "gates guard ok: $root"
+  exit 0
 fi
 echo "gates: rustc $(rustc --version)"
 cargo fmt --check
@@ -39,4 +54,7 @@ echo "gate lock: rc=0"
 # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
 bash "$here/gates-files.sh" "$root"
 echo "gate files: rc=0"
+gates_guard_snapshot "$root" "$guard_snap.end"
+gates_guard_compare "$guard_snap" "$guard_snap.end"
+echo "gate guard: rc=0"
 echo "gates ok: $root at $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
