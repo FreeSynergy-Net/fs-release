@@ -42,7 +42,7 @@ fn rules_ok(t: &str) -> bool {
             .all(|r| step_body(t, "gates").contains(r))
         && head.contains("AFTER fs-release v0.0.11")
         && step_body(t, "lage").contains("fs-release-tag: v0.0.11")
-        && step_body(t, "windows-aufrufer").contains("_windows-check.yml@v0.0.11")
+        && step_body(t, "windows-aufrufer").contains("        aufrufer: FreeSynergy/fs-release/.github/workflows/_windows-check.yml@v0.0.11\n")
         && step_body(t, "windows-aufrufer").contains("NO exceptions")
         && step_body(t, "windows-aufrufer").contains("examples/callers/windows.yml")
         && step_body(t, "zweig-ci").contains("`windows`")
