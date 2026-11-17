@@ -2,7 +2,7 @@
 # order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (docs/prompt-template.md). Specification (the @fs calls
 # have no script yet, like the other specification steps). It is the procedure behind the steps `tag`, `push`, `ci` and `main-ff` of
 # `release-flow` (those stay, they follow the code of `fs-release flow`); the checklist here is the hands-on side with the proofs.
-# Order of the end: branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, fresh
+# Order of the end: branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, the expected runs per repo (each one there and green for the head), fresh
 # clone, checklist, approval for exactly this head, push without force, annotated tag, ls-remote proof, watch the release, tidy up.
 # Agents never push or tag. FS profile: see README.md.
 document:
@@ -74,6 +74,36 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Before the push: the repository holds the signing entries GPG_PRIVATE_KEY and GPG_PASSPHRASE (read only: the NAMES from the list of repository entries, never a value, nothing is printed or copied). A missing name stops the flow before any push - an unsigned release cannot be repaired afterwards."
+  - erwartete-laeufe:
+      call: expected-runs:0.0.10@fs
+      with:
+        repo: ${ .input.repo }
+        head: ${ .input.head }
+        tag: ${ .input.tag }
+      export:
+        as: '${ $context + { laeufe: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "BEFORE the tag: lists per repo which runs are expected (`erwartet`, from the callers in `.github/workflows` of the repo; typical: `check` and `typing-test` or the repo-specific ones on the branch; `ci` and `msrv` on main after the ff; `release.yml` only at the tag) and checks with `gh run list --commit <head>` (called by the push helper of the strategy, NOT by an agent) that EVERY run expected on the branch exists and is green for exactly this head. Result `laeufe` with `status` green | red | unknown, `erwartet`, `gefunden`, `fehlend`: a missing run is RED (never green: no run = not checked), also a run for an older commit, a cancelled, skipped or still running run. The runs after the push (`ci`, `msrv` on main for the head; `release.yml` for the tag) are listed too and checked in `release-beobachten` by the same rule (lesson fs-people, fs-messages: a tag without the complete branch CI)."
+  - laeufe-weiter:
+      switch:
+        - nicht-gruen:
+            when: '${ $context.laeufe.status != "green" or ($context.laeufe.fehlend // []) != [] }'
+            then: eskalation
+        - gruen:
+            when: '${ $context.laeufe.status == "green" }'
+            then: continue
+        - unbekannt:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ONLY `status == green` with an empty `fehlend` goes on to the clone and the tag; a missing, red or unknown run escalates (standing rule ZWEIG-CI: red OR unknown OR missing = no ff, no tag)."
   - klon:
       call: fresh-clone:0.0.10@fs
       with:
@@ -202,7 +232,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The release run of the tag is watched until its end (`scripts/check_job_status.py`): ALL jobs green; the release is published (not a draft; a draft is never counted as released); the signature says `signed` with the fingerprint of the project key; the attestation is there. Red goes to `bugfix` with the failing job, never a silent rerun."
+        freesynergy.net:summary: "The release run of the tag is watched until its end (`scripts/check_job_status.py`): ALL jobs green; the release is published (not a draft; a draft is never counted as released); the signature says `signed` with the fingerprint of the project key; the attestation is there. Red goes to `bugfix` with the failing job, never a silent rerun. Also the runs after the push from `laeufe.erwartet` (`ci`, `msrv` on main for the head, `release.yml` for the tag) must EXIST and be green (`gh run list`, called by the push helper); a missing one is red."
   - release-weiter:
       switch:
         - rot:

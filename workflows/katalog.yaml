@@ -144,7 +144,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - ONLY a JA goes on to the ff; a NEIN goes back to `eintrag` (the third NEIN of the delta escalates), an unknown verdict escalates; a NEIN never reaches `ff-ueber-strategie` or `kette-weiter`."
+        freesynergy.net:summary: "Control flow - ONLY a JA goes on to the ff; a NEIN goes back to `eintrag` (the third NEIN of the delta escalates), an unknown verdict escalates; a NEIN never reaches the ff by the strategy or the next chain entry."
   - ff-ueber-strategie:
       call: merge-ff:0.0.10@fs
       with:

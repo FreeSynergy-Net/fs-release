@@ -210,7 +210,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - ONLY a JA for the new head goes on (`kette-weiter`, the ff of the earlier branch); a NEIN or an unknown verdict escalates and never reaches `vorgaenger-ff` or the next branch of the chain."
+        freesynergy.net:summary: "Control flow - ONLY a JA for the new head goes on (`kette-weiter`, the ff of the earlier branch); a NEIN or an unknown verdict escalates and never reaches the ff of the earlier branch or the next branch of the chain."
   - kette-weiter:
       switch:
         - weiter:

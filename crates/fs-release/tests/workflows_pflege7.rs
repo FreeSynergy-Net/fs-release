@@ -11,9 +11,11 @@ fn swapped(text: &str, a: &str, b: &str) -> String {
         .replacen("  - zz-tmp:", &format!("  - {b}:"), 1)
 }
 
-const FF_ORDER: [&str; 17] = [
+const FF_ORDER: [&str; 19] = [
     "zweig-ci",
     "secrets-pruefen",
+    "erwartete-laeufe",
+    "laeufe-weiter",
     "klon",
     "kopf-und-ff",
     "identitaet",
@@ -94,6 +96,7 @@ fn ff_head_bound(text: &str) -> bool {
         )
         && step_body(text, "ja-fuer-kopf")
             .contains("line 1 of the Opus result file must be `JA` for EXACTLY this head")
+        && step_body(text, "ja-fuer-kopf").contains("a later NEIN or condition blocks the tag")
         && step_body(text, "zweig-ci").contains("head: ${ .input.head }")
 }
 
@@ -501,4 +504,69 @@ fn counter_a_late_version_check_or_a_missing_ci_step_is_caught() {
     assert!(!review_own_folder(
         &review.replace("never in the shared scratchpad", "anywhere")
     ));
+}
+
+/// The expected runs per repo are listed BEFORE the tag and every one must exist and be green for the head; a missing run is red.
+fn ff_expected_runs(text: &str) -> bool {
+    if !text.contains("  - erwartete-laeufe:\n") || !text.contains("  - laeufe-weiter:\n") {
+        return false;
+    }
+    let list = step_body(text, "erwartete-laeufe");
+    let next = step_body(text, "laeufe-weiter");
+    let green = next.split("- gruen:").nth(1).unwrap_or("");
+    let unknown = next.split("- unbekannt:").nth(1).unwrap_or("");
+    in_order(text, &["erwartete-laeufe", "laeufe-weiter", "tag"])
+        && list.contains("gh run list --commit <head>")
+        && list.contains("NOT by an agent")
+        && list.contains("EVERY run expected")
+        && list.contains("a missing run is RED")
+        && list.contains("release.yml")
+        && list.contains("`msrv`")
+        && list.contains("typing-test")
+        && list.contains("head: ${ .input.head }")
+        && list.contains("{ laeufe: . }")
+        && next.contains("fehlend")
+        && next.contains("then: eskalation")
+        && green.contains("when: '${ $context.laeufe.status == \"green\" }'")
+        && unknown.contains("then: eskalation")
+        && next.rfind("- unbekannt:") > next.rfind("- gruen:")
+}
+
+#[test]
+fn ff_und_tag_checks_every_expected_run_before_the_tag() {
+    assert!(ff_expected_runs(&read("ff-und-tag")));
+}
+
+#[test]
+fn counter_a_missing_expected_runs_step_is_caught() {
+    let text = read("ff-und-tag");
+    // Mutant 1: the step is struck (both steps removed).
+    let mut gone = text.clone();
+    for s in ["erwartete-laeufe", "laeufe-weiter"] {
+        gone = gone.replace(&step_body(&gone, s), "");
+    }
+    assert!(!ff_expected_runs(&gone));
+    // Mutant 2: the step stands behind `tag`.
+    assert!(!ff_expected_runs(&swapped(
+        &text,
+        "erwartete-laeufe",
+        "tag"
+    )));
+    assert!(!ff_expected_runs(&swapped(&text, "laeufe-weiter", "tag")));
+    // Mutant 3: the rules are weakened.
+    assert!(!ff_expected_runs(
+        &text.replace("a missing run is RED", "a missing run is fine")
+    ));
+    assert!(!ff_expected_runs(
+        &text.replace("EVERY run expected", "one run expected")
+    ));
+    assert!(!ff_expected_runs(
+        &text.replace("gh run list --commit <head>", "gh run view")
+    ));
+    assert!(!ff_expected_runs(&text.replace(
+        "when: '${ $context.laeufe.status == \"green\" }'",
+        ""
+    )));
+    // The whole-flow check catches the moved step as well.
+    assert!(!ff_flow(&swapped(&text, "erwartete-laeufe", "tag")));
 }
