@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""All gates of one Glied, COMPLETE (call `gates-komplett` of the workflow `pin-kaskade`, step `gates`). The ONLY thing it writes is the build output and the logs.
+
+  python3 -I scripts/gates-komplett --repo-dir DIR [--jobs 4] [--prioritaet 0] [--log-dir DIR] [--skripte-tag vX.Y.Z] [--ohne-flachprobe]
+
+[GATE-GLEICH-CI]: the check scripts (`scripts/gates.sh`, check_rust_rules, check_lock_sources ...) come from the fs-release TAG the repo's own CI files pin (`git archive` of that tag out of
+$FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The tag is the highest `FreeSynergy/fs-release/...@vX.Y.Z` of DIR/.github/workflows/*.yml, or `--skripte-tag`; without
+any (fs-release itself) the scripts of DIR are used. [GATE-VOLLSTAENDIG-LAUFEN]: `cargo fmt --all` FIRST (a tree that fmt changes is red: commit it first), then `gates.sh` COMPLETE, ONE run after the other
+(never parallel): (1) the local environment, (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`) with an OWN
+target (`.scratch/target/<repo>/flach`, [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
+CARGO_BUILD_JOBS=<jobs> and BUILD_PRIORITY=<prioritaet>. [GATE-PIPEFAIL], [GATE-AUSGABE-NIE-KUERZEN]: the output goes to a log file whole; the result lists every `gate <name>: rc=` line and every line with FAILED, ERROR
+or errors, and the rc of every run; a red run stops the rest (`nicht gelaufen`). The head and the working tree must be the same before and after (a change while the gates run is red).
+Result JSON: {status, red, kopf, skripte:{tag, quelle}, fmt, laeufe:[{name, rc, log, gates, fehler}], befunde}. rc 0 green / 1 red / 2 bad input.
+"""
+import argparse
+import glob
+import os
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "kaskade_lib"))
+import kgit  # noqa: E402
+import kio  # noqa: E402
+
+PIN = re.compile(r"FreeSynergy/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+)\b")
+SHOW = re.compile(r"rc=|FAILED|ERROR|errors|^error")
+
+
+def pinned_tag(d):
+    tags = set()
+    for f in glob.glob(os.path.join(d, ".github", "workflows", "*.yml")):
+        with open(f, encoding="utf-8") as fh:
+            tags.update(PIN.findall(fh.read()))
+    return max(tags, key=kgit.version_key) if tags else None
+
+
+def state(d):
+    """(head, working tree state) for the 'unchanged while running' check."""
+    return kgit.run(["rev-parse", "HEAD"], cwd=d)[1].strip(), kgit.run(["status", "--porcelain", "--untracked-files=no"], cwd=d)[1]
+
+
+def run_gates(name, gates, d, env, log_dir, repo):
+    slot = os.environ.get("FS_GATES_BUILD_SLOT", "/srv/FreeSynergy/.scratch/build-slot.sh")
+    log = os.path.join(log_dir, f"{repo}-gates-{name}.log")
+    with open(log, "w", encoding="utf-8") as fh:
+        rc = subprocess.run([slot, "bash", gates, d], cwd=d, env=env, stdout=fh, stderr=subprocess.STDOUT, check=False).returncode
+    lines = open(log, encoding="utf-8", errors="replace").read().splitlines()
+    plain = [re.sub(r"\x1b\[[0-9;]*m", "", x) for x in lines]
+    return {"name": name, "rc": rc, "log": log, "gates": [x for x in plain if re.match(r"^gates? ", x) and "rc=" in x or x.startswith("gates ok")],
+            "fehler": [x for x in plain if SHOW.search(x) and "rc=0" not in x and not x.startswith("gates ok")][:200]}
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--repo-dir", required=True)
+    p.add_argument("--jobs", type=int, default=4)
+    p.add_argument("--prioritaet", type=int, default=0)
+    p.add_argument("--log-dir")
+    p.add_argument("--skripte-tag")
+    p.add_argument("--ohne-flachprobe", action="store_true")
+    a = p.parse_args(argv)
+    d = os.path.realpath(a.repo_dir)
+    if not os.path.isdir(os.path.join(d, ".git")) and not os.path.isfile(os.path.join(d, ".git")):
+        return kio.skipped(f"{a.repo_dir} is no git checkout")
+    if not 1 <= a.jobs <= 64 or not 0 <= a.prioritaet <= 9 or (a.skripte_tag and not kio.TAG.match(a.skripte_tag)):
+        return kio.skipped("jobs 1..64, prioritaet 0..9, skripte-tag vX.Y.Z")
+    repo = os.path.basename(d.rstrip("/"))
+    scratch = os.environ.get("FS_GATES_SCRATCH", "/srv/FreeSynergy/.scratch")
+    log_dir = a.log_dir or os.path.join(scratch, "api-runner", "gates-logs")
+    os.makedirs(log_dir, exist_ok=True)
+    tag = a.skripte_tag or pinned_tag(d)
+    befunde, laeufe = [], []
+    with tempfile.TemporaryDirectory(prefix="gates-komplett-", dir=os.environ.get("TMPDIR")) as tmp:
+        if tag:
+            src = os.environ.get("FS_RELEASE_REPO", "/srv/FreeSynergy/fs-release")
+            rc, out = kgit.run(["archive", "--format=tar", "-o", os.path.join(tmp, "s.tar"), tag, "scripts", "RUST_VERSION"], cwd=src)
+            if rc != 0 or subprocess.run(["tar", "-x", "-C", tmp, "-f", os.path.join(tmp, "s.tar")], check=False).returncode != 0:
+                return kio.skipped(f"cannot take the scripts of fs-release {tag} out of {src} (rc {rc}): {out.strip()}")
+            gates, quelle = os.path.join(tmp, "scripts", "gates.sh"), "fs-release " + tag
+        elif os.path.isfile(os.path.join(d, "scripts", "gates.sh")):
+            gates, quelle = os.path.join(d, "scripts", "gates.sh"), "own scripts (no fs-release tag is pinned)"
+        else:
+            return kio.skipped("no fs-release tag pinned in .github/workflows and no scripts/gates.sh: pass --skripte-tag")
+        before = state(d)
+        toolchain = os.path.join(os.path.dirname(os.path.dirname(gates)), "RUST_VERSION")
+        env = {**os.environ, "CARGO_BUILD_JOBS": str(a.jobs), "BUILD_PRIORITY": str(a.prioritaet)}
+        if os.path.isfile(toolchain):
+            env["RUSTUP_TOOLCHAIN"] = open(toolchain, encoding="utf-8").read().strip()
+        fmt = subprocess.run(shlex.split(os.environ.get("FS_GATES_FMT", "cargo fmt --all")), cwd=d, env=env, capture_output=True, text=True, check=False)
+        dirty = state(d)[1]
+        fmt_res = {"rc": fmt.returncode, "geaendert": dirty != before[1], "text": (fmt.stdout + fmt.stderr).strip()[:300]}
+        if fmt.returncode != 0 or fmt_res["geaendert"]:
+            befunde.append("cargo fmt --all failed or changed files: commit the formatted tree first, then run the gates" + (f" ({fmt_res['text']})" if fmt_res["text"] else ""))
+        plan = [("lokal", d, env), ("ci", d, {**env, "CARGO_TERM_COLOR": "always", "CI": "true"})]
+        flach = None
+        if not a.ohne_flachprobe:
+            flach = os.path.join(tmp, "flach")
+            plan.append(("flach-ohne-tags", flach, {**env, "CARGO_TERM_COLOR": "always", "CI": "true", "BUILD_NO_SHARED_TARGET": "1",
+                                                    "CARGO_TARGET_DIR": os.path.join(scratch, "target", repo, "flach")}))
+        for name, wd, e in plan:
+            if befunde:
+                laeufe.append({"name": name, "rc": None, "log": None, "gates": [], "fehler": ["nicht gelaufen (an earlier step is red)"]})
+                continue
+            if name == "flach-ohne-tags":
+                rc, out = kgit.run(["clone", "-q", "--depth", "1", "--no-tags", "file://" + d, flach])
+                if rc != 0:
+                    return kio.skipped(f"flat clone failed: {out.strip()}")
+            laeufe.append(run_gates(name, gates, wd, e, log_dir, repo))
+            if laeufe[-1]["rc"] != 0:
+                befunde.append(f"gates.sh red in the run `{name}` (rc {laeufe[-1]['rc']}), log {laeufe[-1]['log']}")
+        if not befunde and state(d) != before:
+            befunde.append("head or working tree changed while the gates ran: the result is void")
+    kio.emit({"status": "ok", "red": bool(befunde), "kopf": before[0], "skripte": {"tag": tag, "quelle": quelle}, "fmt": fmt_res, "laeufe": laeufe, "befunde": befunde})
+    return 1 if befunde else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

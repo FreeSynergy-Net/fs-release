@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""`rev` pins and wrong sources of one Glied (call `kaskade-fremde-pins` of the workflow `pin-kaskade`, step `rev-pins`; it runs BEFORE the lift).
+
+  python3 -I scripts/kaskade-fremde-pins --glied JSON|FILE|- --dir <worktree of the Glied> [--fremdquellen FILE] [--nur-lesen]
+
+In every Cargo.toml of `--dir` (never target/ or .git): every git dependency on a FreeSynergy repo with a `rev` (today `fs-conformance` of the repo fs-types in fs-rpc and fs-components,
+`fs-people-directory` of the repo fs-people in fs-tasks, `fs-components` crates in fs-calendars-app) is put on the TAG of its owner repo (`glied.tags`: the trigger tag for fs-types, the tag of a done
+Glied for the others): ONLY Cargo.toml is edited, NEVER Cargo.lock (the lift makes it, by cargo). A `rev` whose commit is not contained in that tag (`git merge-base --is-ancestor` in an own bare
+blobless clone, read only) is NOT lifted by guess: it is a `befund`. A pin that cannot be edited on its line is a `befund` too (nothing is changed silently). KNOWN FOREIGN SOURCES
+(workflows/kaskade-fremdquellen.txt, e.g. FreeSynergy/blinc-app-fix, blinc-layout-fix) are listed in `fremdquellen` and left alone: they are an exception list, not findings.
+`falsche_quellen` = a crate that comes from a repo that is not its owner (fs-types from the repo fs-interfaces, `fs-types-frontend`): the lift moves `fs-types`, any other crate is a `befund`.
+Result JSON: {status, red, rev_pins:[{crate, repo, rev, tag, datei, angehoben}], falsche_quellen, fremdquellen, geaendert, befunde}. rc 0 / 1 befunde / 2 bad input or no remote.
+"""
+import argparse
+import os
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "kaskade_lib"))
+import kcargo  # noqa: E402
+import kgit  # noqa: E402
+import kio  # noqa: E402
+
+
+def contained(repo, rev, tag, cache):
+    """True when the commit `rev` is an ancestor of (or is) the tag of the owner repo; the bare clone of a repo is made once."""
+    if repo not in cache:
+        cache[repo] = os.path.join(cache["_dir"], repo)
+        kgit.clone(repo, cache[repo], bare=True)
+    rc, _ = kgit.run(["merge-base", "--is-ancestor", rev, f"refs/tags/{tag}"], cwd=cache[repo])
+    return rc == 0
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--glied", required=True)
+    p.add_argument("--dir", required=True)
+    p.add_argument("--fremdquellen", default=os.path.join(HERE, "..", "workflows", "kaskade-fremdquellen.txt"))
+    p.add_argument("--nur-lesen", action="store_true")
+    a = p.parse_args(argv)
+    try:
+        glied = kio.load_json(a.glied)
+        glied = glied.get("glied", glied)
+        tags = glied["tags"]
+        fremd = kcargo.fremdquellen(a.fremdquellen)
+    except (ValueError, OSError, KeyError, TypeError, AttributeError) as e:
+        return kio.skipped(f"glied: {e}")
+    if not os.path.isdir(a.dir) or not kcargo.cargo_files(a.dir):
+        return kio.skipped(f"{a.dir}: no folder with a Cargo.toml")
+    pins, wrong, fdeps, geaendert, befunde = [], [], set(), set(), []
+    try:
+        with tempfile.TemporaryDirectory(prefix="kaskade-pins-") as tmp:
+            cache = {"_dir": tmp}
+            for f in kcargo.cargo_files(a.dir):
+                rel = os.path.relpath(f, a.dir)
+                with open(f, encoding="utf-8") as fh:
+                    text = fh.read()
+                new = text
+                for d in kcargo.git_deps(text):
+                    if kcargo.is_fremd(d, fremd):
+                        fdeps.add(f"{d['owner']}/{d['repo']}")
+                        continue
+                    if d["owner"].lower() != kcargo.ORG.lower() or d["repo"] == glied.get("repo"):
+                        continue
+                    owner = kcargo.owner_of_crate(d["crate"])
+                    if owner and owner != d["repo"]:
+                        wrong.append({"crate": d["crate"], "repo": d["repo"], "gehoert_zu": owner, "datei": rel, "verschiebbar": d["crate"] == "fs-types"})
+                        if d["crate"] != "fs-types":
+                            befunde.append(f"{rel}: crate {d['crate']} comes from the repo {d['repo']}, its owner is {owner}; the lift cannot move it")
+                    if not d["rev"]:
+                        continue
+                    tag = tags.get(d["repo"])
+                    pin = {"crate": d["crate"], "repo": d["repo"], "rev": d["rev"], "tag": tag, "datei": rel, "angehoben": False}
+                    pins.append(pin)
+                    if not tag:
+                        befunde.append(f"{rel}: {d['crate']} rev {d['rev']} of the repo {d['repo']}: no tag of that repo is known (glied.tags): tag the owner repo first")
+                    elif not contained(d["repo"], d["rev"], tag, cache):
+                        befunde.append(f"{rel}: {d['crate']} rev {d['rev']} is NOT contained in {d['repo']} {tag}: not lifted by guess (tag the owner repo first or add a Glied)")
+                    else:
+                        new, n = kcargo.set_rev_to_tag(new, d["key"], d["repo"], d["rev"], tag)
+                        pin["angehoben"] = n > 0
+                        if n == 0:
+                            befunde.append(f"{rel}: {d['key']} rev {d['rev']}: not on one line, cannot be edited safely")
+                if new != text and not a.nur_lesen:
+                    with open(f, "w", encoding="utf-8") as fh:
+                        fh.write(new)
+                    geaendert.add(rel)
+    except (RuntimeError, ValueError, OSError) as e:
+        return kio.skipped(str(e))
+    kio.emit({"status": "ok", "red": bool(befunde), "rev_pins": pins, "falsche_quellen": wrong, "fremdquellen": sorted(fdeps),
+              "geaendert": sorted(geaendert), "befunde": befunde})
+    return 1 if befunde else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
