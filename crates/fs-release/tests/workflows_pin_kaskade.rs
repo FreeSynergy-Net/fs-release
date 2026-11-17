@@ -204,6 +204,27 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     assert!(bad(t.replace("\"JA\"", "\"NEIN\"")));
     // A4-A8
     assert!(bad(t.replace("FS_LOCK_ONLY_FROM=1", "")));
+
+    assert!(bad(t.replace(
+        "          delta: ${ $context.zweig.basis }..${ $context.zweig.head }\n",
+        ""
+    )));
+    assert!(bad(t.replace("branch-prefix: ", "branch: ")));
+    assert!(bad(t.replace(
+        "OWN target of the worktree",
+        "shared target of the worktree"
+    )));
+    assert!(bad(t.replace(
+        "        ab: ${ if $context.lockende != null then null else",
+        "        ab: ${ if false then null else"
+    )));
+    assert!(bad(t.replace("plan.offen_vorher", "plan.x")));
+}
+
+#[test]
+fn counter_lock_env_foreign_sources_build_rules_and_windows_caller_are_caught() {
+    let t = read("pin-kaskade");
+    let bad = |x: String| x != t && !std::panic::catch_unwind(|| ok(&x)).unwrap_or(false);
     // B1: M11 - the switch removed from the INPUT of ONE step only (the summary text still names it): lock-strikt, then lock-ende
     let weak = "        env: FS_LOCK_STRICT=1\n";
     assert!(ENV_LINE != weak && t.matches(ENV_LINE).count() == 2);
@@ -246,20 +267,6 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     )));
     assert!(bad(t.replace("        fs-release-tag: v0.0.11\n", "")));
     assert!(bad(t.replace("The workflow `windows`", "The workflow `x`")));
-    assert!(bad(t.replace(
-        "          delta: ${ $context.zweig.basis }..${ $context.zweig.head }\n",
-        ""
-    )));
-    assert!(bad(t.replace("branch-prefix: ", "branch: ")));
-    assert!(bad(t.replace(
-        "OWN target of the worktree",
-        "shared target of the worktree"
-    )));
-    assert!(bad(t.replace(
-        "        ab: ${ if $context.lockende != null then null else",
-        "        ab: ${ if false then null else"
-    )));
-    assert!(bad(t.replace("plan.offen_vorher", "plan.x")));
 }
 
 #[test]
