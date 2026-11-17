@@ -262,11 +262,17 @@ fn runden_branch_comes_before_red_and_not_accepted() {
         ("bild-weiche", "- runden:", "- not-accepted:"),
     ] {
         let body = step_body(&t, step);
-        let i = body.find(a).unwrap();
-        let j = body.find(b).unwrap();
-        let (x, y) = (body[i..j].to_string(), body[j..].to_string());
-        let y_end = y.find("      metadata:").unwrap();
-        let swapped = format!("{}{}{}{}{}", &body[..i], &y[..y_end], x, &y[y_end..], "");
+        let from = body.find(a).unwrap();
+        let to = body.find(b).unwrap();
+        let (first, rest) = (body[from..to].to_string(), body[to..].to_string());
+        let rest_end = rest.find("      metadata:").unwrap();
+        let swapped = format!(
+            "{}{}{}{}",
+            &body[..from],
+            &rest[..rest_end],
+            first,
+            &rest[rest_end..]
+        );
         let mutated = t.replacen(&body, &swapped, 1);
         assert!(!runden_first(&mutated), "{step}");
     }

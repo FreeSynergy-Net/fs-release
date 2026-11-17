@@ -289,13 +289,13 @@ fn counter_a_bare_force_in_any_workflow_is_caught() {
         assert!(!bare_force_hits(&bad).is_empty(), "{f}");
     }
     // the allowed forms stay allowed
-    assert!(bare_force_hits(
-        "`--force-with-lease=b:sha`, `--force` alone is refused, never --force"
-    )
-    .is_empty());
+    assert_eq!(
+        bare_force_hits("`--force-with-lease=b:sha`, `--force` alone is refused, never --force"),
+        [] as [std::string::String; 0]
+    );
     let ff = read("ff-und-tag");
     let mutant = ff.replacen("WITHOUT force", "git push --force", 1);
-    assert!(!bare_force_hits(&mutant).is_empty());
+    assert_ne!(bare_force_hits(&mutant), [] as [std::string::String; 0]);
 }
 
 const KAT_ORDER: [&str; 18] = [

@@ -84,7 +84,7 @@ fn every_step_of_every_workflow_is_reachable_from_the_first_step() {
 #[test]
 fn counter_trait_delta_green_review_must_not_fall_into_the_fix() {
     let text = read("trait-delta");
-    assert!(unreachable_steps(&text).is_empty());
+    assert_eq!(unreachable_steps(&text), [] as [std::string::String; 0]);
     let case = "and $context.review.hash == $context.probe.hash }'\n            then: hash\n";
     assert!(text.contains(case));
     let bad = text.replace(case, &case.replace("then: hash", "then: continue"));
@@ -97,7 +97,7 @@ fn counter_trait_delta_green_review_must_not_fall_into_the_fix() {
 #[test]
 fn counter_katalog_without_the_chain_switch_is_caught() {
     let text = read("katalog");
-    assert!(unreachable_steps(&text).is_empty());
+    assert_eq!(unreachable_steps(&text), [] as [std::string::String; 0]);
     // the version 7efabd09: no switch after `alt-kopf`, `kette-rebase` has no way in
     let body = support::workflows::step_body(&text, "kette-weiche");
     let old = text.replacen(&format!("  - kette-weiche:\n{body}\n"), "", 1);

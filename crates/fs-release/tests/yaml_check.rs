@@ -126,7 +126,7 @@ fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// All three groups the script must read: composite actions, FreeSynergy flows, GitHub workflows.
+/// All three groups the script must read: composite actions, `FreeSynergy` flows, GitHub workflows.
 fn yaml_files(root: &Path) -> Vec<PathBuf> {
     let mut v = Vec::new();
     let ext = |p: &Path| matches!(p.extension().and_then(|e| e.to_str()), Some("yml" | "yaml"));
