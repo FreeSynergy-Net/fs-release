@@ -4,7 +4,7 @@
 mod support;
 use support::kaskade::SCRIPTS;
 use support::kaskade_rules::{lock_rules_ok, ENV_LINE};
-use support::workflows::{read, root, step_body};
+use support::workflows::{read, root};
 
 #[test]
 fn counter_lock_env_foreign_sources_build_rules_and_windows_caller_are_caught() {
