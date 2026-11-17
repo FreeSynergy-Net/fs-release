@@ -32,6 +32,7 @@ app="$tmp/app"; git init -q -b main "$app"; mkdir -p "$app/.github/workflows"
 printf 'jobs:\n  a:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n  b:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.10\n' >"$app/.github/workflows/check.yml"
 echo x >"$app/a.txt"; git -C "$app" add -A; git -C "$app" commit -qm one; git -C "$app" tag v0.0.1
 export FS_RELEASE_REPO="$rel" FS_GATES_BUILD_SLOT="$tmp/slot.sh" FS_GATES_FMT=true FS_GATES_SCRATCH="$tmp/scratch" FAKE_OUT="$tmp/out.txt"
+export CI=true CARGO_TERM_COLOR=always  # a caller in CI mode must not leak into the local run
 run() { python3 -I "$here/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" "$@"; }
 
 : >"$FAKE_OUT"; run >"$tmp/o.json"; rc=$?
