@@ -189,7 +189,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Binary test through build-slot.sh - `<programm> --version` and `fs-<programm>-<frontend> --version` exit 0 and the output contains the crate version, `--help` exits 0, an unknown option exits 2 with a message; the result is `red` or not. It mirrors the smoke test of the release flow (deb job, ubuntu:24.04 x86_64/aarch64)."
+        freesynergy.net:summary: "Binary test through build-slot.sh - `<programm> --version` and `fs-<programm>-<frontend> --version` exit 0 and the output contains the crate version, `--help` exits 0, an unknown option exits 2 with a message; the result is `red` or not. Carries red and runde (+1 for each jump back from `gates-again`). It mirrors the smoke test of the release flow (deb job, ubuntu:24.04 x86_64/aarch64)."
   - lehren-pruefen:
       call: lessons-check-ai:0.0.10@fs
       export:
