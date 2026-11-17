@@ -159,8 +159,7 @@ fn loops_count(text: &str) -> bool {
     ends && gates.contains("- runden:")
         && gates.contains("(($context.gates.runde // 0) >= 3")
         && gates.contains("then: grundfassung-eskalation")
-        && bild
-            .contains("$context.verdict.accepted == false and ($context.verdict.runde // 0) >= 3")
+        && bild.contains("$context.verdict.accepted == false and ($context.bild_runde // 0) >= 3")
         && bild.contains("then: grundfassung-eskalation")
 }
 
@@ -169,7 +168,7 @@ fn loops_have_a_round_counter_and_escalate() {
     let t = read("grundfassung");
     assert!(loops_count(&t));
     assert!(!loops_count(
-        &t.replace("($context.verdict.runde // 0) >= 3", "false")
+        &t.replace("($context.bild_runde // 0) >= 3", "false")
     ));
     assert!(!loops_count(
         &t.replace("(($context.gates.runde // 0) >= 3", "((false")
@@ -191,7 +190,72 @@ fn no_stale_texts() {
     assert!(has(
         &t,
         "frontend-crate",
-        &["Own package `fs-<programm>-<frontend>` in the same release"]
+        &["Own package `fs-<programm>-<frontend>` in the same release (deb/rpm)"]
     ));
     assert!(step_body(&t, "release-sperre").contains("v0.0.x"));
+}
+
+/// Every `runde` read in a `runden` branch is set or carried by a step.
+fn counters_are_carried(text: &str) -> bool {
+    let carried = |step: &str| step_body(text, step).contains("Carries red and runde");
+    let gates = ["gates", "binary-test", "lehren-pruefen"]
+        .iter()
+        .all(|s| carried(s));
+    let again = step_body(text, "gates-again");
+    let reads = again.contains("$context.gates.runde")
+        && again.contains("$context.binary.runde")
+        && again.contains("$context.lehren.runde");
+    let bild = step_body(text, "bild-zaehlen");
+    let counts = bild.contains("bild_runde: ${ ($context.bild_runde // 0) + 1 }")
+        && bild.contains("export:")
+        && in_order(text, &["picture-ok", "bild-zaehlen", "bild-weiche"]);
+    gates && reads && counts && !text.contains("$context.verdict.runde")
+}
+
+#[test]
+fn round_counters_are_really_carried() {
+    let t = read("grundfassung");
+    assert!(counters_are_carried(&t));
+    for step in ["gates", "binary-test", "lehren-pruefen"] {
+        let (head, tail) = t.split_once(&format!("  - {step}:\n")).unwrap();
+        let weak = format!(
+            "{head}  - {step}:\n{}",
+            tail.replacen("Carries red and runde", "Carries red", 1)
+        );
+        assert!(!counters_are_carried(&weak), "{step}");
+    }
+    assert!(!counters_are_carried(
+        &t.replace("($context.bild_runde // 0) + 1", "0")
+    ));
+    assert!(!counters_are_carried(
+        &t.replace("  - bild-zaehlen:", "  - bild-zaehlen-aus:")
+    ));
+}
+
+/// In both loops the branch `runden` stands BEFORE the branch it would otherwise be shadowed by.
+fn runden_first(text: &str) -> bool {
+    let before = |step: &str, other: &str| {
+        let b = step_body(text, step);
+        matches!((b.find("- runden:"), b.find(other)), (Some(a), Some(c)) if a < c)
+    };
+    before("gates-again", "- red:") && before("bild-weiche", "- not-accepted:")
+}
+
+#[test]
+fn runden_branch_comes_before_red_and_not_accepted() {
+    let t = read("grundfassung");
+    assert!(runden_first(&t));
+    for (step, a, b) in [
+        ("gates-again", "- runden:", "- red:"),
+        ("bild-weiche", "- runden:", "- not-accepted:"),
+    ] {
+        let body = step_body(&t, step);
+        let i = body.find(a).unwrap();
+        let j = body.find(b).unwrap();
+        let (x, y) = (body[i..j].to_string(), body[j..].to_string());
+        let y_end = y.find("      metadata:").unwrap();
+        let swapped = format!("{}{}{}{}{}", &body[..i], &y[..y_end], x, &y[y_end..], "");
+        let mutated = t.replacen(&body, &swapped, 1);
+        assert!(!runden_first(&mutated), "{step}");
+    }
 }

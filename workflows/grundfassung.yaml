@@ -97,7 +97,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Sonnet (ADR 0094 draft, items 6 and 9, stage 1) - creates the crate `crates/fs-<programm>-<frontend>` with `[[bin]] fs-<programm>-<frontend>`, depending only on the client `fs-<programm>-client` and fs-components (never on -core or -server); the manifest `packaging/frontends/<frontend>.metainfo.xml` (AppStream addon with `<extends>`, `<requires>`, `fs:frontend-id`, `fs:exec`, `fs:contract`); the starter in `fs-<programm>` (secure the server, start the frontend, fallback to the standard frontend with a visible message); a handshake test with a wrong contract version (exit code 3 and a message, never silent); a `cargo tree` check that no dependency leads to -core or -server. The frontend is its own process with a frontend manifest (program, contract and version, capabilities, start command); at least one frontend is mandatory. The manifest format is AppStream per the ADR draft 0094 (the review proposed TOML `~/.local/share/freesynergy/frontend/<programm>/<id>.toml` until the ADR gap is closed: open decision). Own package `fs-<programm>-<frontend>` in the same release (stage 1)."
+        freesynergy.net:summary: "Sonnet (ADR 0094 draft, items 6 and 9, stage 1) - creates the crate `crates/fs-<programm>-<frontend>` with `[[bin]] fs-<programm>-<frontend>`, depending only on the client `fs-<programm>-client` and fs-components (never on -core or -server); the manifest `packaging/frontends/<frontend>.metainfo.xml` (AppStream addon with `<extends>`, `<requires>`, `fs:frontend-id`, `fs:exec`, `fs:contract`); the starter in `fs-<programm>` (secure the server, start the frontend, fallback to the standard frontend with a visible message); a handshake test with a wrong contract version (exit code 3 and a message, never silent); a `cargo tree` check that no dependency leads to -core or -server. The frontend is its own process with a frontend manifest (program, contract and version, capabilities, start command); at least one frontend is mandatory. The manifest format is AppStream per the ADR draft 0094 (the review proposed TOML `~/.local/share/freesynergy/frontend/<programm>/<id>.toml` until the ADR gap is closed: open decision). Own package `fs-<programm>-<frontend>` in the same release (deb/rpm) (stage 1)."
   - fenster:
       call: window-ai:0.0.10@fs
       with:
@@ -178,7 +178,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Binary test through build-slot.sh - `<programm> --version` and `fs-<programm>-<frontend> --version` exit 0 and the output contains the crate version, `--help` exits 0, an unknown option exits 2 with a message; the result is `red` or not. It mirrors the smoke test of the release flow (deb job, ubuntu:24.04 x86_64/aarch64)."
+        freesynergy.net:summary: "Binary test through build-slot.sh - `<programm> --version` and `fs-<programm>-<frontend> --version` exit 0 and the output contains the crate version, `--help` exits 0, an unknown option exits 2 with a message; the result is `red` or not. Carries red and runde (+1 for each jump back from `gates-again`). It mirrors the smoke test of the release flow (deb job, ubuntu:24.04 x86_64/aarch64)."
   - lehren-pruefen:
       call: lessons-check-ai:0.0.10@fs
       export:
@@ -188,7 +188,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Check points from the six basics (draw, messages, resources, forms, activities, tasks) - the result `lehren` is `red` or not, each point with evidence: (1) the `capabilities` result type of each contract (CapabilityList or flat) is read from fs-interfaces and the server answers with exactly that type; (2) `CONTRACT_VERSION` in the server when the core has none; (3) `release.yml`: ALL `uses` at `@v0.0.10` (or the newest chain); (4) `--version`, `-V`, `--help` answer BEFORE any window or socket, proven with `env -i`; (5) deb `depends = \"$auto, fs-<x>-simple (>= v)\"` (not the binary version) and the matching rpm requires; AppStream `compare=\"ge\"` in the metainfo; (6) tests: a Mutex around handshake tests (one server per process stops), ETXTBSY protection for stub starters (close and sync the file before exec); (7) Windows is said honestly (\"Linux (Windows/macOS follow)\"); (8) error texts: since the fs-rpc error codes the display uses `message_key()` and `params()` with MF2 de/en (ADR 0057), no English sentence from a library reaches the user; (9) the data folder is created only through `create_private` / `prepare_data_dir` (lesson fs-tasks: 0755); (10) the placeholder rule is kept (no PNG, stand-ins marked \"vorläufig\", gap list in DESIGN)."
+        freesynergy.net:summary: "Check points from the six basics (draw, messages, resources, forms, activities, tasks) - the result `lehren` is `red` or not, each point with evidence: (1) the `capabilities` result type of each contract (CapabilityList or flat) is read from fs-interfaces and the server answers with exactly that type; (2) `CONTRACT_VERSION` in the server when the core has none; (3) `release.yml`: ALL `uses` at `@v0.0.10` (or the newest chain); (4) `--version`, `-V`, `--help` answer BEFORE any window or socket, proven with `env -i`; (5) deb `depends = \"$auto, fs-<x>-simple (>= v)\"` (not the binary version) and the matching rpm requires; AppStream `compare=\"ge\"` in the metainfo; (6) tests: a Mutex around handshake tests (one server per process stops), ETXTBSY protection for stub starters (close and sync the file before exec); (7) Windows is said honestly (\"Linux (Windows/macOS follow)\"); (8) error texts: since the fs-rpc error codes the display uses `message_key()` and `params()` with MF2 de/en (ADR 0057), no English sentence from a library reaches the user; (9) the data folder is created only through `create_private` / `prepare_data_dir` (lesson fs-tasks: 0755); (10) the placeholder rule is kept (no PNG, stand-ins marked \"vorläufig\", gap list in DESIGN). Carries red and runde (+1 for each jump back from `gates-again`)."
   - gates:
       call: gates:0.0.10@fs
       export:
@@ -198,7 +198,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "scripts/gates.sh ([GATES]) through build-slot.sh, one at a time: cargo fmt --check, clippy (pedantic, -D warnings), tests (--locked), check-rust-rules; the result is `red` or not, rc is kept."
+        freesynergy.net:summary: "scripts/gates.sh ([GATES]) through build-slot.sh, one at a time: cargo fmt --check, clippy (pedantic, -D warnings), tests (--locked), check-rust-rules; the result is `red` or not, rc is kept. Carries red and runde (the number of the round, +1 for each jump back from `gates-again`)."
   - gates-again:
       switch:
         - runden:
@@ -280,13 +280,24 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "No picture OK of the user is needed (decision b7, 17 Nov.): the STRATEGY looks at the pictures (window and documentation picture, side by side with the model, the `dossier` handed over like in `frontend-round`) and gives the verdict; the result is `accepted`. Pictures without a green `waechter` (`red == false`) are no evidence. Without a verdict the flow does not go on."
+  - bild-zaehlen:
+      set:
+        bild_runde: ${ ($context.bild_runde // 0) + 1 }
+      export:
+        as: '${ $context + { bild_runde: .bild_runde } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The flow counts the picture rounds itself (`picture-acceptance` delivers no `runde`): `bild_runde` in the context, +1 for each verdict; `bild-weiche` reads it."
   - bild-weiche:
       switch:
         - accepted:
             when: '${ $context.verdict.accepted == true }'
             then: continue
         - runden:
-            when: '${ $context.verdict.accepted == false and ($context.verdict.runde // 0) >= 3 }'
+            when: '${ $context.verdict.accepted == false and ($context.bild_runde // 0) >= 3 }'
             then: grundfassung-eskalation
         - not-accepted:
             when: '${ $context.verdict.accepted == false }'
@@ -298,7 +309,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - ONLY `accepted == true` goes on to `katalog-vorschlag`; `accepted == false` goes back to `fenster` (from the third round, `runde` >= 3 of the verdict, to `grundfassung-eskalation`) with the words of the strategy as the order (gap list); anything else (no verdict, e.g. `dossier-menue-fehlt`, `menue-bild-fehlt`) goes to `bild-eskalation`, never on."
+        freesynergy.net:summary: "Control flow - ONLY `accepted == true` goes on to `katalog-vorschlag`; `accepted == false` goes back to `fenster` (from the third round, `bild_runde` >= 3, to `grundfassung-eskalation`) with the words of the strategy as the order (gap list); anything else (no verdict, e.g. `dossier-menue-fehlt`, `menue-bild-fehlt`) goes to `bild-eskalation`, never on."
   - katalog-vorschlag:
       call: catalog-proposal-ai:0.0.10@fs
       with:
