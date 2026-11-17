@@ -170,7 +170,7 @@ do:
         ausloeser: ${ .input["ausloeser-tag"] }
         dir: ${ .input.worktrees // "/srv/FreeSynergy/.scratch/api-runner/wt" }/pk-${ $context.plan.offen[0].repo }
       export:
-        as: '${ $context + { glied: .glied, lockdatei: .lock_datei } }'
+        as: '${ $context + { glied: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
