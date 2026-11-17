@@ -5,7 +5,7 @@ mod support;
 use fs_release::lift::{self, LiftOpts};
 use std::fs;
 use std::path::PathBuf;
-use support::workflows::{assert_red, read, root, script, step_names, FILES};
+use support::workflows::{assert_red, read, root, script, step_body, step_names, FILES};
 use support::{have_yaml, python};
 
 #[test]
@@ -231,4 +231,39 @@ fn a_step_without_a_task_type_is_red() {
     assert_red("lift", "no task type", |t| {
         t.replacen("      call: deps:0.0.10@fs\n", "", 1)
     });
+}
+
+#[test]
+fn lift_v1plus_switches_the_api_before_the_lift_and_release_flow_has_no_switch() {
+    let names = step_names(&read("lift-v1plus"));
+    assert_eq!(names, ["api-umstellung", "lift", "umstellung-commit"]);
+    let text = read("lift-v1plus");
+    assert!(text.contains("name: lift\n") && text.contains("fs-rpc: ${ .input.fs_rpc }"));
+    // no lock-bound check right after the switch: the lock has to change, the lift checks and commits
+    let step = text.split("  - lift:").next().unwrap();
+    assert!(step.contains("NO `cargo check --locked` here"));
+    // conditions 4 and 5: the lift does not commit (it takes no *.rs), gets the lock and the env as input
+    let lift = step_body(&text, "lift");
+    assert!(lift.contains("commit: false\n") && !lift.contains("commit: true"));
+    assert!(lift.contains("online: true\n") && lift.contains("FS_LIFT_V1PLUS: \"1\"\n"));
+    // the own step after the switch commits everything in one commit, by name
+    let commit = step_body(&text, "umstellung-commit");
+    assert!(commit.contains("ONE commit") && commit.contains("never `git add -A`"));
+    assert!(commit.contains("support@freesynergy.net") && commit.contains("Co-Authored-By"));
+    assert!(!step_names(&read("release-flow")).contains(&"api-umstellung".to_string()));
+    assert!(!step_names(&read("lift")).contains(&"api-umstellung".to_string()));
+}
+
+#[test]
+fn lift_v1plus_without_the_commit_step_after_the_switch_is_red() {
+    // mutant: the step `umstellung-commit` removed -> the structure test fails
+    let text = read("lift-v1plus");
+    let cut = text.replace("  - umstellung-commit:", "  - weg:");
+    assert_ne!(step_names(&cut), step_names(&text));
+    let names = step_names(&text);
+    let pos = |n: &str| names.iter().position(|x| x == n).unwrap();
+    assert!(
+        pos("umstellung-commit") > pos("api-umstellung") && pos("umstellung-commit") > pos("lift")
+    );
+    assert!(!step_names(&cut).contains(&"umstellung-commit".to_string()));
 }

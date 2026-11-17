@@ -1,0 +1,68 @@
+# The V1+ lift of one program (ADR 0092/0093, decision b7): first the API switch, then the normal `lift`. One repo, one run. FS profile: see README.md.
+# Why a flow of its own: from fs-interfaces v0.0.27 there is no Cargo feature `rpc`; `lift` (step `lock`: cargo update, then clippy/tests) would run with
+# the new fs-interfaces while the program still asks for the feature and be red before any switch could run. So the switch comes FIRST, `lift.yaml`
+# stays equal to the code (test lift_yaml_has_exactly_the_steps_of_the_code_in_order), `release-flow` has no switch step.
+# Input: repo (the program repo, worktree), delta, and the V1+ tags: fs_types, fs_interfaces, fs_objects, fs_jscalendar, fs_components, fs_rpc
+# (v0.0.1, v0.0.27, v0.0.6, v0.0.4, v0.0.25, v0.0.2 for the round of 16/17 Nov); they are given to `lift` as `--repo NAME=vX.Y.Z`.
+# Library order: fs-types -> {fs-interfaces, fs-objects, fs-jscalendar, fs-components} -> fs-rpc -> programs.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: lift-v1plus
+  version: 0.0.10
+  title: Lift a program to the V1+ libraries - API switch (rpc -> fs-rpc) first, then lift
+do:
+  - api-umstellung:
+      call: api-umstellung:0.0.10@fs
+      input:
+        repo: ${ .input.repo }
+        delta: ${ .input.delta }
+        fs_rpc: ${ .input.fs_rpc }
+      export:
+        as: '${ $context + { api_umstellung: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Specification step, no script (decision b7). A program that uses `fs-interfaces` with feature `rpc` (server/client crates) switches to the library fs-rpc (git https://github.com/FreeSynergy/fs-rpc, tag v0.0.2; it was the module `rpc` of fs-interfaces up to v0.0.25; source: README and CHANGELOG of fs-rpc v0.0.2): (1) Cargo.toml: delete the feature `rpc` of `fs-interfaces`, add `fs-rpc = { git = \"https://github.com/FreeSynergy/fs-rpc\", tag = \"v0.0.2\" }`; (2) `use` paths: `fs_interfaces::rpc::X` becomes `fs_rpc::X`, `fs_types::describe::CatalogServer` (feature `rpc`, up to fs-interfaces v0.0.26) becomes `fs_rpc::catalog::CatalogServer`; nothing else is guessed, a name that is not in fs-rpc is looked up in its README/CHANGELOG. NO `cargo check --locked` here: the lock has to change, the check without the feature `rpc` is done by the following `lift` (steps `lock`, `clippy`, `tests`) and it does NOT commit (`commit: false`): the one switch commit is the own step `umstellung-commit` after it. Result `api_umstellung`: `status` (done | skipped when the repo does not use the feature) and `crates` (the changed crates)."
+  - lift:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: lift
+          version: 0.0.10
+        input:
+          repo: ${ .input.repo }
+          commit: false
+          online: true
+          FS_LIFT_V1PLUS: "1"
+          libs:
+            fs-types: ${ .input.fs_types }
+            fs-interfaces: ${ .input.fs_interfaces }
+            fs-objects: ${ .input.fs_objects }
+            fs-jscalendar: ${ .input.fs_jscalendar }
+            fs-components: ${ .input.fs_components }
+            fs-rpc: ${ .input.fs_rpc }
+      export:
+        as: '${ $context + { lift: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sub-workflow lift.yaml with `commit: false`, `online: true` (real tags on GitHub, the lock is written) and `FS_LIFT_V1PLUS=1` as input, and `--repo NAME=vX.Y.Z` for each library of the input: sets the tags, `cargo update --workspace`, proves the lock, then fmt, clippy and tests. It does not commit (the step `commit` of `lift` takes no `*.rs`). Red here (also: a program still asking for the feature `rpc` of fs-interfaces) stops the run; nothing is committed before `umstellung-commit`."
+  - umstellung-commit:
+      call: umstellung-commit:0.0.10@fs
+      input:
+        repo: ${ .input.repo }
+      export:
+        as: '${ $context + { umstellung_commit: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Specification step, no script (human or agent). Only after a green `lift` (needs green: build, clippy and tests of `lift` green BEFORE the commit; red or `api_umstellung.status` skipped without changes: no commit). ONE commit with the whole switch: `Cargo.toml` (feature `rpc` removed, `fs-rpc` added), all `*.rs` files whose `use` paths were changed by `api-umstellung`, `Cargo.lock` (written by `lift` with `online: true`), and `.github/workflows/*.yml` if the lift changed them. Stage by name, never `git add -A`: take the list from `git diff --name-only`, check that it holds only these expected paths (any other path stops the step), then `git add -- <paths>`. Identity: `git -c user.name=FreeSynergy -c user.email=support@freesynergy.net commit`, footer `Co-Authored-By: <model> <noreply@anthropic.com>`. Result `umstellung_commit`: `status` (done | skipped) and `commit` (the hash)."
+output:
+  as: '${ { api_umstellung: ($context.api_umstellung // null), lift: ($context.lift // null), umstellung_commit: ($context.umstellung_commit // null) } }'
