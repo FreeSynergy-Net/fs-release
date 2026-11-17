@@ -1,29 +1,10 @@
 //! Pattern: none (test). Every step of every file under `workflows/` is reachable from the first step: the successor of a step is its `then`,
 //! otherwise the next step; the cases of a `switch` count one by one (a case without `then` goes to the next step); `end` and `exit` stop.
-//! A step that nobody reaches is dead (lesson katalog 7efabd09: `kette-rebase` had no way in). Known older cases are named one by one below.
+//! A step that nobody reaches is dead (lesson katalog 7efabd09: `kette-rebase` had no way in; trait-delta: `review-weiche` fell into `auflagen-fix`). No exception list.
 
 mod support;
 use std::collections::{BTreeSet, HashMap};
 use support::workflows::{read, FILES};
-
-/// Known dead steps of older files, each one named (file, step); NOT a blanket exception. Run 3 repairs them and empties this list.
-/// `trait-delta`: the case `gruen` of `review-weiche` falls with `continue` into `auflagen-fix`, so `hash` and everything after it
-/// up to `fertig` has no way in (Opus side finding of the delta on 7efabd09).
-const KNOWN_DEAD: [(&str, &str); 13] = [
-    ("trait-delta", "hash"),
-    ("trait-delta", "hash-weiche"),
-    ("trait-delta", "strategie-fixpunkt"),
-    ("trait-delta", "absender"),
-    ("trait-delta", "sperrdatei"),
-    ("trait-delta", "konformitaet"),
-    ("trait-delta", "gates"),
-    ("trait-delta", "gates-weiche"),
-    ("trait-delta", "trait-unveraendert"),
-    ("trait-delta", "unveraendert-weiche"),
-    ("trait-delta", "doku"),
-    ("trait-delta", "release-tor"),
-    ("trait-delta", "fertig"),
-];
 
 fn target(t: &str) -> Option<String> {
     t.strip_prefix("then: ").map(|v| v.trim().to_string())
@@ -94,23 +75,23 @@ fn every_step_of_every_workflow_is_reachable_from_the_first_step() {
     let mut dead = Vec::new();
     for f in FILES {
         for s in unreachable_steps(&read(f)) {
-            if !KNOWN_DEAD.contains(&(f, s.as_str())) {
-                dead.push(format!("{f}:{s}"));
-            }
+            dead.push(format!("{f}:{s}"));
         }
     }
     assert!(dead.is_empty(), "unreachable steps: {dead:?}");
 }
 
 #[test]
-fn the_known_dead_steps_are_still_dead() {
-    // an entry that is repaired must leave the list (no stale exception)
-    for (f, s) in KNOWN_DEAD {
-        assert!(
-            unreachable_steps(&read(f)).iter().any(|n| n == s),
-            "{f}:{s} is reachable now: remove it from KNOWN_DEAD"
-        );
-    }
+fn counter_trait_delta_green_review_must_not_fall_into_the_fix() {
+    let text = read("trait-delta");
+    assert!(unreachable_steps(&text).is_empty());
+    let case = "and $context.review.hash == $context.probe.hash }'\n            then: hash\n";
+    assert!(text.contains(case));
+    let bad = text.replace(case, &case.replace("then: hash", "then: continue"));
+    let dead = unreachable_steps(&bad);
+    assert!(dead.contains(&"hash".to_string()) && dead.contains(&"fertig".to_string()));
+    let bad2 = text.replace(case, &case.replace("then: hash", "then: auflagen-fix"));
+    assert!(unreachable_steps(&bad2).contains(&"fertig".to_string()));
 }
 
 #[test]

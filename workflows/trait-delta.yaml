@@ -167,7 +167,7 @@ do:
             then: auflagen-fix
         - ja:
             when: '${ $context.review.verdict == "JA" and $context.review.hash == $context.probe.hash }'
-            then: continue
+            then: hash
         - anderer-hash:
             then: eskalation
       metadata:
@@ -175,7 +175,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a NO goes to `auflagen-fix`, from the third NO to `eskalation`; a JA counts only for exactly the hash of the probe; a missing verdict, a JA for another hash or any other value is NOT a JA and goes to `eskalation`."
+        freesynergy.net:summary: "Control flow - a NO goes to `auflagen-fix`, from the third NO to `eskalation`; a JA counts only for exactly the hash of the probe and goes explicitly to `hash` (never into `auflagen-fix`, which only a NO reaches); a missing verdict, a JA for another hash or any other value is NOT a JA and goes to `eskalation`."
   - auflagen-fix:
       call: conditions-fix-ai:0.0.10@fs
       with:
