@@ -731,3 +731,35 @@ fn the_typed_storage_is_checked_after_the_data_model_adr_0086() {
     )));
     assert!(!step_names(&text).contains(&"doku".to_string()));
 }
+
+/// Opus condition 1 (menues): a `picture-acceptance` that ends without a verdict (`dossier-menue-fehlt`, `menue-bild-fehlt`) must
+/// never let `frontend-round` build; only `accepted == true` continues, everything else ends in the human step `bild-eskalation`.
+fn never_builds_unaccepted(text: &str) -> bool {
+    let body = step_body(text, "picture-again");
+    let lines: Vec<&str> = body.lines().map(str::trim).collect();
+    // exactly one `then: continue`, directly after the `accepted == true` condition
+    let Some(i) = lines.iter().position(|l| l.contains("accepted == true")) else {
+        return false;
+    };
+    let one_continue =
+        body.matches("then: continue").count() == 1 && lines.get(i + 1) == Some(&"then: continue");
+    // the case without `when` (the default) is the last one and goes to the human step
+    let default_ok = lines
+        .iter()
+        .skip_while(|l| !l.starts_with("- no-verdict:"))
+        .find(|l| l.starts_with("then:"))
+        == Some(&"then: bild-eskalation");
+    let esc = step_body(text, "bild-eskalation");
+    one_continue && default_ok && esc.contains("then: end") && esc.contains("actor: human")
+}
+
+#[test]
+fn frontend_round_never_builds_without_an_accepted_picture() {
+    let text = read("frontend-round");
+    assert!(never_builds_unaccepted(&text));
+    assert!(step_body(&text, "picture-again").contains("then: gap-list"));
+    // counter-test (mutant): the default goes back to `continue` (= build) -> red
+    let mutant = text.replacen("then: bild-eskalation", "then: continue", 1);
+    assert_ne!(mutant, text);
+    assert!(!never_builds_unaccepted(&mutant));
+}

@@ -177,17 +177,20 @@ do:
         freesynergy.net:summary: The user's verdict on the images (picture-acceptance.yaml) is taken as it is; the result is `accepted` or not.
   - picture-again:
       switch:
+        - accepted:
+            when: '${ $context.verdict.accepted == true }'
+            then: continue
         - not-accepted:
             when: '${ $context.verdict.accepted == false }'
             then: gap-list
-        - accepted:
-            then: continue
+        - no-verdict:
+            then: bild-eskalation
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - images that are not accepted go back to gap-list with the user's words as the order (the images are rendered from the gap list), accepted ones go on to build.
+        freesynergy.net:summary: Control flow - only `accepted == true` goes on (to build); `accepted == false` goes back to gap-list with the user's words as the order (the images are rendered from the gap list); anything else (no verdict, e.g. picture-acceptance ended in `dossier-menue-fehlt` or `menue-bild-fehlt`) goes to `bild-eskalation`. Never to build without `accepted == true`.
   - build:
       call: build-ai:0.0.10@fs
       with:
@@ -331,3 +334,13 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The style analysis was red three times (`runde` >= 3); the person decides what is wrong, the table or the rules. This flow ends.
+  - bild-eskalation:
+      set:
+        todo: bild-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "picture-acceptance ended without a verdict (`todo: dossier-menue-fehlt` or `menue-bild-fehlt`): the person first completes the dossier (menu tree) or the missing picture pairs; nothing is built. This flow ends."

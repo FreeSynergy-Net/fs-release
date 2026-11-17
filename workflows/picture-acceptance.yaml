@@ -9,7 +9,7 @@ document:
   version: 0.0.10
   title: Show model and our pictures, take the strategy's and the user's verdict
 do:
-  - menue-vergleich:
+  - menue-bilder:
       call: menu-images:0.0.10@fs
       with:
         dossier: ${ .input.dossier }
@@ -22,7 +22,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Specification (@fs, like the other steps; no script yet). Input is the menu tree of the dossier (sections Menübaum (vollständig), Kontextmenüs, Werkzeugleiste, Tastenkürzel). Result `menue_bilder` is the list of pairs model | ours, ONE pair per main menu (opened, every entry, `<programm>-menue-<hauptmenue>-vorbild|unser.png`) and ONE pair per context menu (right click on an element and on empty space, `<programm>-kontext-<ort>-vorbild|unser.png`). Flags: `baum_fehlt` (the dossier has no menu tree), `paar_fehlt` (a pair is missing: a main menu or context menu of the dossier without model picture or without our picture), `red` (one of both). A missing result is never green."
+        freesynergy.net:summary: "Specification (@fs, like the other steps; no script yet). Input is the menu tree of the dossier (sections Menübaum (vollständig), Kontextmenüs, Werkzeugleiste, Tastenkürzel). Result `menue_bilder` is the list of pairs model | ours, ONE pair per main menu (opened, every entry, `<programm>-menue-<hauptmenue>-vorbild|unser.png`) and ONE pair per context menu (right click on an element and on empty space, `<programm>-kontext-<ort>-vorbild|unser.png`). Flags: `baum_fehlt` (the dossier has no menu tree), `paar_fehlt` (a pair is missing: a main menu or context menu of the dossier without model picture or without our picture), `red` (one of both). Class `ohne Vorbild` (dossier gate `[offen]`, programm-grundgeruest): a menu without a model is NOT a `paar_fehlt`; only our `unser.png` counts, never a foreign picture. A missing result is never green."
   - menue-weiche:
       switch:
         - baum-fehlt:

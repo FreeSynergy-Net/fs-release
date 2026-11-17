@@ -303,9 +303,9 @@ Before a branch goes to `main` by fast-forward, the steps `adresse-pruefen` of `
 
 ## Menus (`picture-acceptance`, dossier template)
 
-Menus count as looks. `picture-acceptance` has the objective step `menue-vergleich` (specification, `@fs`, no script yet): input is the
+Menus count as looks. `picture-acceptance` has the objective step `menue-bilder` (specification, `@fs`, no script yet): input is the
 menu tree of the dossier, result `menue_bilder` = one pair model | ours per main menu (`<programm>-menue-<hauptmenue>-vorbild|unser.png`)
-and per context menu (`<programm>-kontext-<ort>-vorbild|unser.png`). No menu tree in the dossier is red (`dossier-menue-fehlt`: first
+and per context menu (`<programm>-kontext-<ort>-vorbild|unser.png`). Class `ohne Vorbild` (dossier gate `[offen]`): a menu without a model is no missing pair; only our `unser.png` counts, never a foreign picture. No menu tree in the dossier is red (`dossier-menue-fehlt`: first
 complete the dossier), a missing pair is red (`menue-bild-fehlt`). Order: picture package model | ours first, THEN build. "Rebuild"
 means structure, naming, order, shortcuts and behaviour; the style comes through the style layers (frontends / style layers), it is
 not copied (ADR 0013).
