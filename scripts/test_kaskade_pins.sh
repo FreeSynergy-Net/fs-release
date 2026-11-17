@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self test of scripts/kaskade-fremde-pins and scripts/lock-gleich (workflow pin-kaskade) on local bare repos (scripts/test_kaskade_fixture.sh), no network:
+# Self test of scripts/kaskade-fremde-pins and scripts/lock-gleich (workflow pin-kaskade) on local bare repos (scripts/kaskade_fixture.sh), no network:
 # a `rev` pin is put on the owner tag only when its commit is on that tag, only Cargo.toml changes (never Cargo.lock), a known foreign source is left alone and listed;
 # the end check is red for a second fs-types version, a left rev pin and a source from the wrong repo, and refuses a weakened --env. One or two mutants per script.
 #   bash scripts/test_kaskade_pins.sh
@@ -11,8 +11,8 @@ fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
 chk() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
-# shellcheck source=scripts/test_kaskade_fixture.sh
-source "$here/test_kaskade_fixture.sh"
+# shellcheck source=scripts/kaskade_fixture.sh
+source "$here/kaskade_fixture.sh"
 py() { python3 -I "$@"; }
 glied='{"glied":{"repo":"fs-tasks","tags":{"fs-types":"v0.0.3","fs-people":"v0.0.2","fs-interfaces":"v0.0.2"}}}'
 # wt <name> <rev>: a work tree of fs-tasks whose fs-people-directory is pinned by `rev`

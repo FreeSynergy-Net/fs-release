@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self test of scripts/kaskade-lage, kaskade-plan, kaskade-glied and kaskade-glied-fertig (workflow pin-kaskade) on local bare repos (scripts/test_kaskade_fixture.sh), no network:
+# Self test of scripts/kaskade-lage, kaskade-plan, kaskade-glied and kaskade-glied-fertig (workflow pin-kaskade) on local bare repos (scripts/kaskade_fixture.sh), no network:
 # lage proves trigger and fs-release tag and the Windows caller per Glied, plan derives the order from the REAL pins (input order wrong on purpose), finds rev pins, wrong
 # sources, known foreign sources and a cycle, glied takes the libs, glied-fertig needs the tag on the remote. One mutant per script must turn a case red.
 #   bash scripts/test_kaskade_plan.sh
@@ -12,8 +12,8 @@ fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
 chk() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
-# shellcheck source=scripts/test_kaskade_fixture.sh
-source "$here/test_kaskade_fixture.sh"
+# shellcheck source=scripts/kaskade_fixture.sh
+source "$here/kaskade_fixture.sh"
 py() { python3 -I "$@"; }
 glieder_json >"$tmp/glieder.json"
 
