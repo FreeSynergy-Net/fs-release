@@ -41,13 +41,14 @@ do:
       call: research-haiku:0.0.10@fs
       with:
         programm: ${ .input.programm }
+        vorbild: ${ .input.vorbild }
         dossier: ${ .input.dossier }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Haiku (reads and writes notes only, never code) - a model dossier of at most one page for the FIRST frontend: states, menus, three workflows; existing dossiers under docs/*/programs/apps/<x>/frontends/ are used first. Foreign pictures are never quoted."
+        freesynergy.net:summary: "Haiku (reads and writes notes only, never code) - the model named in `.input.vorbild` (the choice of the strategy; missing: ask, never pick one yourself); a model dossier of at most one page for the FIRST frontend: states, menus, three workflows; existing dossiers under docs/*/programs/apps/<x>/frontends/ are used first. Foreign pictures are never quoted."
   - feature-liste:
       call: run-flow:0.0.10@fs
       with:
@@ -61,7 +62,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Runs the flow `feature-liste` (`workflows/feature-liste.yaml` of fs-release, in main): the complete feature list from the research goes to fs-documentation `todo/features/<programm>.md`, sorted into today / next / later (`- [ ]`/`- [x]`; note \"Feature-Freeze: offen (Nutzer)\"). `fenster` and `nutzer-doku` read \"today\" and \"next\" from this list (`$context.features`), not from an own input. It also delivers `vorbild` (the model, its pictures) and `hauptansicht` (areas and controls of the main view, from the plan table of the program) as RESULTS (`$context.features.vorbild`, `$context.features.hauptansicht`), read by `hauptansicht`. There is no own input `was_kommt`; it is a RESULT of this step. The flow `feature-liste` is in main."
+        freesynergy.net:summary: "Runs the flow `feature-liste` (`workflows/feature-liste.yaml` of fs-release, in main): the complete feature list from the research goes to fs-documentation `todo/features/<programm>.md`, sorted into today / next / later (`- [ ]`/`- [x]`; note \"Feature-Freeze: offen (Nutzer)\"). `fenster` and `nutzer-doku` read \"today\" and \"next\" from this list (`$context.features`), not from an own input. It also delivers `vorbild` (`features.vorbild` is the model of `.input.vorbild` from the `recherche` dossier, with its pictures) and `hauptansicht` (areas and controls of the main view, from the plan table of the program) as RESULTS (`$context.features.vorbild`, `$context.features.hauptansicht`), read by `hauptansicht`. There is no own input `was_kommt`; it is a RESULT of this step. The flow `feature-liste` is in main."
   - vertrag-standard:
       call: run-flow:0.0.10@fs
       with:
@@ -303,7 +304,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: bilder-gate
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Picture gate of the main view (specification, no script yet): for `main` and `main-empty` (de and en) BOTH pictures exist - the model picture and ours - with the SAME filter and the SAME state (same active filter, language and theme); model pictures come from the model round (podman, local, no terms of service agreed; documentation pictures only from public pages), never from a run that agreed to a licence dialog. A missing model picture, a missing main view picture or a pair with a different state is RED (`red`), never green. HINT for the later script: the model comes from ONE source, `$context.features.vorbild` (`hauptansicht`, `bildpaar`, `picture-ok`); there is no own input `vorbild`. The picture OK of the strategy (b7) on these pairs is MANDATORY: no tag without it (`vor-tag`)."
+        freesynergy.net:summary: "Picture gate of the main view (specification, no script yet): for `main` and `main-empty` (de and en) BOTH pictures exist - the model picture and ours - with the SAME filter and the SAME state (same active filter, language and theme); model pictures come from the model round (podman, local, no terms of service agreed; documentation pictures only from public pages), never from a run that agreed to a licence dialog. A missing model picture, a missing main view picture or a pair with a different state is RED (`red`), never green. HINT for the later script: the model comes from ONE source, `$context.features.vorbild` (`hauptansicht`, `bildpaar`, `picture-ok`); after `feature-liste` there is no second source. The picture OK of the strategy (b7) on these pairs is MANDATORY: no tag without it (`vor-tag`)."
   - bildpaar-weiche:
       switch:
         - rot:

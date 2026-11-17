@@ -453,13 +453,36 @@ fn opus_conditions_hang_pretag_and_order() {
     assert!(ord(&b));
     assert!(!ord(&b.replace("reihenfolge: ${ .input.reihenfolge }", "x")));
     assert!(!ord(&b.replace("2. Opus reviews", "2. x")));
-    assert!(
-        !g.contains(".input.vorbild")
-            && has(&g, "picture-ok", &["model: ${ $context.features.vorbild }"])
-    );
-    assert!(g
-        .replace("$context.features.vorbild", ".input.vorbild")
-        .contains(".input.vorbild"));
+    let one = |t: &str| {
+        t.matches("vorbild: ${ .input.vorbild }").count() == 1
+            && has(
+                t,
+                "recherche",
+                &["vorbild: ${ .input.vorbild }", "never pick one yourself"],
+            )
+            && has(
+                t,
+                "feature-liste",
+                &["`features.vorbild` is the model of `.input.vorbild`"],
+            )
+            && has(t, "picture-ok", &["model: ${ $context.features.vorbild }"])
+            && has(
+                t,
+                "hauptansicht",
+                &["vorbild: ${ $context.features.vorbild }"],
+            )
+            && has(t, "bildpaar", &["vorbild: ${ $context.features.vorbild }"])
+    };
+    assert!(one(&g));
+    assert!(!one(&g.replace(
+        "model: ${ $context.features.vorbild }",
+        "model: ${ .input.vorbild }"
+    )));
+    assert!(!one(&g.replacen(
+        "        vorbild: ${ .input.vorbild }\n        dossier:",
+        "        dossier:",
+        1
+    )));
     assert!(b.contains("lane 3 (people), lane 1 (components), lane 4, lane 5, lane 2"));
     assert!(has(&g, "bildpaar", &["ONE source"]));
 }
