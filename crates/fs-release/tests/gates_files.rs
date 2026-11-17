@@ -58,8 +58,27 @@ fn a_broken_workflow_file_is_red_at_yaml_check() {
     assert!(err.contains("gates FAILED: yaml-check"), "{err}");
 }
 
+/// Valid YAML with the wrong schema (no `document` block, no `do` list): only the schema check can find it.
+const WRONG_SCHEMA: &str = "name: x\n";
+
 #[test]
-fn a_broken_file_in_workflows_is_red_at_the_schema_check() {
+fn valid_yaml_with_a_wrong_schema_in_workflows_is_red_at_the_schema_check() {
+    if !have_yaml() {
+        return;
+    }
+    let tmp = repo();
+    fs::create_dir_all(tmp.path().join("workflows")).unwrap();
+    fs::write(tmp.path().join("workflows/x.yaml"), WRONG_SCHEMA).unwrap();
+    let (code, err) = run(tmp.path());
+    assert_eq!(code, 1, "{err}");
+    assert!(
+        err.contains("gates FAILED: workflows/ schema check"),
+        "{err}"
+    );
+}
+
+#[test]
+fn broken_yaml_in_workflows_is_red_already_at_the_yaml_check() {
     if !have_yaml() {
         return;
     }
@@ -68,8 +87,29 @@ fn a_broken_file_in_workflows_is_red_at_the_schema_check() {
     fs::write(tmp.path().join("workflows/x.yaml"), BAD).unwrap();
     let (code, err) = run(tmp.path());
     assert_eq!(code, 1, "{err}");
-    assert!(
-        err.contains("gates FAILED: workflows/ schema check"),
-        "{err}"
+    assert!(err.contains("gates FAILED: yaml-check"), "{err}");
+    // mutant: the yaml-check no longer fails the gate -> the broken file is then caught by the schema check, not by the yaml-check
+    let src = fs::read_to_string(script()).unwrap();
+    let mutant = src.replacen(
+        "echo \"gates FAILED: yaml-check\" >&2\n  exit 1",
+        "echo skip",
+        1,
     );
+    assert_ne!(mutant, src);
+    let m = tmp.path().join("mutant.sh");
+    fs::write(
+        &m,
+        mutant.replace(
+            "$(dirname \"${BASH_SOURCE[0]}\")",
+            &format!("{}/../../scripts", env!("CARGO_MANIFEST_DIR")),
+        ),
+    )
+    .unwrap();
+    let o = Command::new("bash")
+        .arg(&m)
+        .arg(tmp.path())
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(!err.contains("gates FAILED: yaml-check"), "{err}");
 }
