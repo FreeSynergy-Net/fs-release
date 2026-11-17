@@ -1,6 +1,6 @@
 //! Pattern: none (test). Workflow maintenance run 8: rule [GATE-PIPEFAIL] (`scripts/gates.sh` has `pipefail`, prints an rc per gate, never cuts
 //! a gate output with `tail`/`head`; the review text and docs state the rule) and the branch CI of this repo (`branch-ci.yml` runs on `unreviewed/**`).
-//! Each rule has a counter-test on a changed copy.
+//! Each rule has a counter-test on a changed copy. Seven rc lines: fmt, clippy, test, rust-rules, lock, files, guard ([GATES-WAECHTER]).
 
 mod support;
 use support::workflows::{read, root};
@@ -18,7 +18,7 @@ fn gates_ok(text: &str) -> bool {
     };
     text.contains("set -euo pipefail")
         && text.contains("trap 'echo \"gates FAILED")
-        && text.matches("rc=0\"").count() >= 6
+        && text.matches("rc=0\"").count() >= 7
         && !text.lines().filter(code).any(cut)
 }
 
