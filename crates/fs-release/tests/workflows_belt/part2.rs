@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn testlauf_is_sound(t: &str) -> bool {
+pub(super) fn testlauf_is_sound(t: &str) -> bool {
     if !in_order(t, &["voll", "voll-ende", "zeit"]) {
         return false;
     }

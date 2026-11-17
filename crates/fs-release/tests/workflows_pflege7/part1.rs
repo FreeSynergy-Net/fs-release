@@ -1,6 +1,6 @@
 use super::*;
 
-pub const FF_ORDER: [&str; 19] = [
+pub(super) const FF_ORDER: [&str; 19] = [
     "zweig-ci",
     "secrets-pruefen",
     "erwartete-laeufe",
@@ -23,7 +23,7 @@ pub const FF_ORDER: [&str; 19] = [
 ];
 
 /// CI of all workflows first, then checks on a fresh clone, then the approval for the head, then push and tag by a person, then proof.
-pub fn ff_flow(text: &str) -> bool {
+pub(super) fn ff_flow(text: &str) -> bool {
     let humans = ["push-ff", "tag"].iter().all(|s| {
         step_body(text, s).contains("actor: human") && step_body(text, s).contains("gate: human")
     });
@@ -55,7 +55,7 @@ fn counter_ff_und_tag_rule_breaks_are_caught() {
 }
 
 /// A hanging CI: 30 minutes, ONE restart, then escalation; the lock and version lesson and the secrets names are in the checklist.
-pub fn ff_rules(text: &str) -> bool {
+pub(super) fn ff_rules(text: &str) -> bool {
     let wait = step_body(text, "ci-weiter");
     let hang = step_body(text, "ci-neustart");
     wait.contains("haengt-erstmals")
@@ -77,7 +77,7 @@ pub fn ff_rules(text: &str) -> bool {
 }
 
 /// The approval and the push are bound to the head of the order (a JA for another head is void).
-pub fn ff_head_bound(text: &str) -> bool {
+pub(super) fn ff_head_bound(text: &str) -> bool {
     step_body(text, "ja-fuer-kopf").contains("head: ${ .input.head }")
         && step_body(text, "tag").contains("head: ${ .input.head }")
         && step_body(text, "ja-fuer-kopf").contains(
@@ -90,7 +90,7 @@ pub fn ff_head_bound(text: &str) -> bool {
 }
 
 /// ONLY `status == green` passes the CI check: the case `gruen` has its `when`, every other status goes to the escalation.
-pub fn ff_ci_only_green(text: &str) -> bool {
+pub(super) fn ff_ci_only_green(text: &str) -> bool {
     let wait = step_body(text, "ci-weiter");
     let green = wait.split("- gruen:").nth(1).unwrap_or("");
     let unknown = wait.split("- unbekannt:").nth(1).unwrap_or("");
@@ -100,7 +100,7 @@ pub fn ff_ci_only_green(text: &str) -> bool {
 }
 
 /// The escalation ends with `eskaliert: true` and goes through the tidy-up, which removes only a clone made by this run; the output has the proof.
-pub fn ff_escalation_tidies(text: &str) -> bool {
+pub(super) fn ff_escalation_tidies(text: &str) -> bool {
     let out = text.split("\noutput:\n").nth(1).unwrap_or("");
     step_body(text, "eskalation").contains("eskaliert: true")
         && step_body(text, "eskalation").contains("then: aufraeumen")
@@ -149,7 +149,7 @@ fn counter_a_missing_ff_rule_is_caught() {
     assert!(!ff_rules(&text.replace(&body, &unbound)), "ja without head");
 }
 
-pub const BNS_ORDER: [&str; 14] = [
+pub(super) const BNS_ORDER: [&str; 14] = [
     "ketten-plan",
     "alter-kopf",
     "neu-schreiben",
@@ -167,7 +167,7 @@ pub const BNS_ORDER: [&str; 14] = [
 ];
 
 /// Lease only (never a bare force), checked before the push, the push is a person's, equal content is checked, a new head needs a new JA.
-pub fn rewrite_flow(text: &str) -> bool {
+pub(super) fn rewrite_flow(text: &str) -> bool {
     let lease = step_body(text, "push-lease");
     in_order(text, &BNS_ORDER)
         && lease.contains("actor: human")
@@ -185,7 +185,7 @@ pub fn rewrite_flow(text: &str) -> bool {
 
 /// Chain mode: only `ketten-plan` reads the branch of the order; every other step works on `kette.aktuell`; `ketten-naechster` sets `alt` (the lease);
 /// a NEIN of the new JA goes to the escalation and never to the ff of the earlier branch.
-pub fn chain_on_current(text: &str) -> bool {
+pub(super) fn chain_on_current(text: &str) -> bool {
     let others = text.replace(&step_body(text, "ketten-plan"), "");
     let ja = step_body(text, "ja-weiter");
     !others.contains("${ .input.branch }")
@@ -245,7 +245,7 @@ fn counter_branch_neu_schreiben_rule_breaks_are_caught() {
 }
 
 /// A bare `--force` (not `--force-with-lease`) in a step text: allowed only as a prohibition ("`--force` alone is refused", "never --force").
-pub fn bare_force_hits(text: &str) -> Vec<String> {
+pub(super) fn bare_force_hits(text: &str) -> Vec<String> {
     let mut hits = vec![];
     for (i, _) in text.match_indices("--force") {
         let after = &text[i + 7..];

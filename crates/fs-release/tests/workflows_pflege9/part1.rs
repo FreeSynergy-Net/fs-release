@@ -1,15 +1,15 @@
 use super::*;
 
-pub fn has_step(text: &str, step: &str) -> bool {
+pub(super) fn has_step(text: &str, step: &str) -> bool {
     step_names(text).iter().any(|n| n == step)
 }
 
 /// Steps in this order (a missing step is no order: false, never a panic).
-pub fn order(text: &str, steps: &[&str]) -> bool {
+pub(super) fn order(text: &str, steps: &[&str]) -> bool {
     steps.iter().all(|s| has_step(text, s)) && in_order(text, steps)
 }
 
-pub fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
+pub(super) fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
     has_step(text, step) && {
         let body = step_body(text, step);
         phrases.iter().all(|p| body.contains(p))
@@ -17,7 +17,7 @@ pub fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
 }
 
 /// The `  - name:` blocks of a file (the layout has the steps at level two); the lines before the first step are the head.
-pub fn split(text: &str) -> (Vec<String>, Vec<(String, Vec<String>)>) {
+pub(super) fn split(text: &str) -> (Vec<String>, Vec<(String, Vec<String>)>) {
     let mut head = Vec::new();
     let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
     for l in text.lines() {
@@ -32,20 +32,20 @@ pub fn split(text: &str) -> (Vec<String>, Vec<(String, Vec<String>)>) {
     (head, blocks)
 }
 
-pub fn join(head: Vec<String>, blocks: Vec<(String, Vec<String>)>) -> String {
+pub(super) fn join(head: Vec<String>, blocks: Vec<(String, Vec<String>)>) -> String {
     let mut out = head;
     out.extend(blocks.into_iter().flat_map(|b| b.1));
     out.join("\n") + "\n"
 }
 
-pub fn without(text: &str, step: &str) -> String {
+pub(super) fn without(text: &str, step: &str) -> String {
     let (head, mut blocks) = split(text);
     let at = blocks.iter().position(|b| b.0 == format!("  - {step}:"));
     blocks.remove(at.unwrap());
     join(head, blocks)
 }
 
-pub fn move_after(text: &str, step: &str, after: &str) -> String {
+pub(super) fn move_after(text: &str, step: &str, after: &str) -> String {
     let (head, mut blocks) = split(text);
     let name = |s: &str| format!("  - {s}:");
     let i = blocks.iter().position(|b| b.0 == name(step)).unwrap();
@@ -55,7 +55,7 @@ pub fn move_after(text: &str, step: &str, after: &str) -> String {
     join(head, blocks)
 }
 
-pub fn actor(text: &str, step: &str) -> String {
+pub(super) fn actor(text: &str, step: &str) -> String {
     step_body(text, step)
         .lines()
         .find_map(|l| l.trim().strip_prefix("freesynergy.net:actor: "))
@@ -63,12 +63,12 @@ pub fn actor(text: &str, step: &str) -> String {
         .to_string()
 }
 
-pub fn ends(text: &str, step: &str) -> bool {
+pub(super) fn ends(text: &str, step: &str) -> bool {
     has_step(text, step) && step_body(text, step).contains("\n      then: end\n")
 }
 
 /// The loops end in the escalation: the `switch` has a case `runden` with `>= 3` that goes to `eskalation`, and a case that goes back.
-pub fn loop_ends(text: &str, switch: &str, back: &str) -> bool {
+pub(super) fn loop_ends(text: &str, switch: &str, back: &str) -> bool {
     has(
         text,
         switch,
@@ -83,7 +83,7 @@ pub fn loop_ends(text: &str, switch: &str, back: &str) -> bool {
 
 // ---------------------------------------------------------------- stoerung-diagnose
 
-pub fn diagnose(t: &str) -> bool {
+pub(super) fn diagnose(t: &str) -> bool {
     order(
         t,
         &[
@@ -178,7 +178,7 @@ fn counter_diagnosis_mutants_are_caught() {
 // ---------------------------------------------------------------- branches-aufraeumen
 
 /// Words that mean a removal; an agent or machine step (not the two that describe the user script) must contain none of them.
-pub const REMOVAL: [&str; 13] = [
+pub(super) const REMOVAL: [&str; 13] = [
     " rm ",
     "`rm",
     "rm -",
@@ -194,7 +194,7 @@ pub const REMOVAL: [&str; 13] = [
     "push",
 ];
 
-pub fn no_removal_by_agents(t: &str) -> bool {
+pub(super) fn no_removal_by_agents(t: &str) -> bool {
     step_names(t).iter().all(|s| {
         let a = actor(t, s);
         let body = step_body(t, s).to_lowercase();

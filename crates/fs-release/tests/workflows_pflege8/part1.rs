@@ -1,15 +1,15 @@
 use super::*;
 
-pub fn has_step(text: &str, step: &str) -> bool {
+pub(super) fn has_step(text: &str, step: &str) -> bool {
     step_names(text).iter().any(|n| n == step)
 }
 
 /// Steps in this order (a missing step is no order: false, never a panic).
-pub fn order(text: &str, steps: &[&str]) -> bool {
+pub(super) fn order(text: &str, steps: &[&str]) -> bool {
     steps.iter().all(|s| has_step(text, s)) && in_order(text, steps)
 }
 
-pub fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
+pub(super) fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
     has_step(text, step) && {
         let body = step_body(text, step);
         phrases.iter().all(|p| body.contains(p))
@@ -17,7 +17,7 @@ pub fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
 }
 
 /// Moves the block of `step` directly behind the block of `after` (the layout is `  - name:` lines at level two).
-pub fn move_after(text: &str, step: &str, after: &str) -> String {
+pub(super) fn move_after(text: &str, step: &str, after: &str) -> String {
     let is_head = |l: &str| l.starts_with("  - ") && l.ends_with(':');
     let mut head = Vec::new();
     let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
@@ -41,7 +41,7 @@ pub fn move_after(text: &str, step: &str, after: &str) -> String {
 }
 
 /// The main view: step after `fenster`, before `manifest`, with the rules of AUSSEHEN-SOFORT and AUSSEHEN-LEHREN.
-pub fn main_view(text: &str) -> bool {
+pub(super) fn main_view(text: &str) -> bool {
     order(text, &["fenster", "hauptansicht", "manifest"])
         && has(
             text,
@@ -75,7 +75,7 @@ fn main_view_step_comes_after_the_window() {
 }
 
 /// The picture pair gate: model | ours with the same state before the verdict; red goes to `bild-eskalation`.
-pub fn pair_gate(text: &str) -> bool {
+pub(super) fn pair_gate(text: &str) -> bool {
     order(
         text,
         &[
@@ -124,7 +124,7 @@ fn picture_pair_gate_comes_before_the_verdict() {
 }
 
 /// The mandatory test `server-unresponsive`: in `binary-test`, in `gates`, in the lessons; a missing test is red.
-pub fn unresponsive(text: &str) -> bool {
+pub(super) fn unresponsive(text: &str) -> bool {
     has(
         text,
         "binary-test",
@@ -162,7 +162,7 @@ fn test_server_unresponsive_is_mandatory_and_missing_is_red() {
 }
 
 /// The bundle switch sits BEFORE `release`; not complete (or no answer) goes to `buendel-sammeln`, which ends.
-pub fn bundle(text: &str) -> bool {
+pub(super) fn bundle(text: &str) -> bool {
     order(
         text,
         &[

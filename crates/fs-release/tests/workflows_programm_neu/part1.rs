@@ -1,7 +1,7 @@
 use super::*;
 
-pub const FLOW: &str = "programm-neu";
-pub const MAIN: [&str; 19] = [
+pub(super) const FLOW: &str = "programm-neu";
+pub(super) const MAIN: [&str; 19] = [
     "wessen-daten",
     "katalog-suche",
     "standards",
@@ -23,7 +23,7 @@ pub const MAIN: [&str; 19] = [
     "abnahme",
 ];
 
-pub fn position(text: &str, step: &str) -> usize {
+pub(super) fn position(text: &str, step: &str) -> usize {
     step_names(text)
         .iter()
         .position(|n| n == step)
@@ -31,7 +31,7 @@ pub fn position(text: &str, step: &str) -> usize {
 }
 
 /// Every step names at least one ADR (`freesynergy.net:adr: '0076, 0061'`) and its phase.
-pub fn all_have_adr(text: &str) -> bool {
+pub(super) fn all_have_adr(text: &str) -> bool {
     step_names(text).iter().all(|s| {
         let b = step_body(text, s);
         b.lines().any(|l| {
@@ -43,7 +43,7 @@ pub fn all_have_adr(text: &str) -> bool {
 }
 
 /// Every objective agent step is followed by a machine step of kind objective (the objective check).
-pub fn agent_steps_are_checked(text: &str) -> bool {
+pub(super) fn agent_steps_are_checked(text: &str) -> bool {
     let names = step_names(text);
     names.iter().enumerate().all(|(i, n)| {
         let b = step_body(text, n);
@@ -234,14 +234,14 @@ fn counter_a_jump_to_a_missing_step_is_red() {
 
 // ---- structure rules: graph, loops, order, inputs (each with a counter-test; the prose `contains` tests above are no proof of behaviour)
 
-pub fn swapped(text: &str, a: &str, b: &str) -> String {
+pub(super) fn swapped(text: &str, a: &str, b: &str) -> String {
     text.replacen(&format!("  - {a}:"), "  - zz-tmp:", 1)
         .replacen(&format!("  - {b}:"), &format!("  - {a}:"), 1)
         .replacen("  - zz-tmp:", &format!("  - {b}:"), 1)
 }
 
 /// The steps a step can go to: switch cases (12 spaces), else the step `then` (6 spaces), else the next step.
-pub fn successors(text: &str, i: usize) -> Vec<usize> {
+pub(super) fn successors(text: &str, i: usize) -> Vec<usize> {
     let names = step_names(text);
     let body = step_body(text, &names[i]);
     let want = if body.contains("      switch:\n") {

@@ -1,31 +1,31 @@
 use super::*;
 
-pub fn pos(text: &str, step: &str) -> usize {
+pub(super) fn pos(text: &str, step: &str) -> usize {
     step_names(text)
         .iter()
         .position(|n| n == step)
         .unwrap_or_else(|| panic!("no step {step}"))
 }
 
-pub fn in_order(text: &str, order: &[&str]) -> bool {
+pub(super) fn in_order(text: &str, order: &[&str]) -> bool {
     let names = step_names(text);
     order.iter().all(|o| names.iter().any(|n| n == o))
         && order.windows(2).all(|w| pos(text, w[0]) < pos(text, w[1]))
 }
 
-pub fn escalates(text: &str, again: &str, back: &str) -> bool {
+pub(super) fn escalates(text: &str, again: &str, back: &str) -> bool {
     let b = step_body(text, again);
     b.contains("then: eskalation") && b.contains(">= 3") && b.contains(&format!("then: {back}"))
 }
 
 /// A switch is strict when its green case needs an explicit `== false` / `== green` and a missing result goes to `eskalation`.
-pub fn strict(text: &str, step: &str, green_when: &str) -> bool {
+pub(super) fn strict(text: &str, step: &str, green_when: &str) -> bool {
     let b = step_body(text, step);
     b.contains(green_when) && b.contains("ohne-ergebnis:\n            then: eskalation")
 }
 
 /// A3: the hash alone is readable by agents - the sender of the approval is checked at the event.
-pub fn sender_is_checked(t: &str) -> bool {
+pub(super) fn sender_is_checked(t: &str) -> bool {
     let ok = step_body(t, "strategie-ok");
     ok.contains("freigabe: .")
         && step_body(t, "absender").contains("$context.freigabe.source")
@@ -39,7 +39,7 @@ pub fn sender_is_checked(t: &str) -> bool {
 }
 
 /// A missing verdict of the review or of the pictures escalates; only the explicit answer goes on (G6).
-pub fn verdicts_are_read(t: &str) -> bool {
+pub(super) fn verdicts_are_read(t: &str) -> bool {
     step_body(t, "review-again").contains("$context.review.verdict == \"NEIN\"")
         && step_body(t, "review-again").contains("$context.review.verdict == \"JA\"")
         && step_body(t, "review-again").contains("ohne-ergebnis:\n            then: eskalation")
@@ -55,7 +55,7 @@ pub fn verdicts_are_read(t: &str) -> bool {
         && step_body(t, "review-again").contains("then: stufe-3")
 }
 
-pub fn belt_is_sound(t: &str) -> bool {
+pub(super) fn belt_is_sound(t: &str) -> bool {
     let s1 = step_body(t, "stufe-1");
     let s3 = step_body(t, "stufe-3");
     let ok = step_body(t, "strategie-ok");

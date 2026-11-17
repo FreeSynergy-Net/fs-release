@@ -6,7 +6,7 @@ use support::workflows::{assert_red, read, step_body, step_names};
 
 #[path = "workflows_pflege6/part1.rs"]
 mod part1;
-pub use part1::*;
+use part1::*;
 
 #[path = "workflows_pflege6/part2.rs"]
 mod part2;

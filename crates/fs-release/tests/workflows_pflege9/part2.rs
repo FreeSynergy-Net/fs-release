@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn cleanup(t: &str) -> bool {
+pub(super) fn cleanup(t: &str) -> bool {
     order(
         t,
         &[
@@ -136,7 +136,7 @@ fn counter_cleanup_mutants_are_caught() {
 // ---------------------------------------------------------------- menschen-aufnahme
 
 /// Every consent, vote and release is a `human` step with `gate: human`; the agent steps only prepare and report.
-pub fn consents_by_people(t: &str) -> bool {
+pub(super) fn consents_by_people(t: &str) -> bool {
     let people = [
         "einwilligung-daten",
         "rolle-klaeren",
@@ -154,7 +154,7 @@ pub fn consents_by_people(t: &str) -> bool {
     }) && ai_steps == ["willkommen-vorbereiten", "aufnahme-beleg"]
 }
 
-pub fn onboarding(t: &str) -> bool {
+pub(super) fn onboarding(t: &str) -> bool {
     order(
         t,
         &[

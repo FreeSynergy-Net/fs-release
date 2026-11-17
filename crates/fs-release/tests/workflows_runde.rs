@@ -9,8 +9,8 @@ use support::workflows::{read, step_body, step_names};
 
 #[path = "workflows_runde/part1.rs"]
 mod part1;
-pub use part1::*;
+use part1::*;
 
 #[path = "workflows_runde/part2.rs"]
 mod part2;
-pub use part2::*;
+use part2::*;

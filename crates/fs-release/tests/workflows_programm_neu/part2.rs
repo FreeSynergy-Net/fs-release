@@ -1,7 +1,7 @@
 use super::*;
 
 /// Every step is reachable from the first one (a stub or a branch that nothing leads to is dead).
-pub fn all_reachable(text: &str) -> bool {
+pub(super) fn all_reachable(text: &str) -> bool {
     let n = step_names(text).len();
     let mut seen = vec![false; n];
     let mut todo = vec![0];
@@ -16,7 +16,7 @@ pub fn all_reachable(text: &str) -> bool {
 }
 
 /// A jump back must land on a step that can change the thing the check looks at: an agent or a person, never a machine step.
-pub fn back_jumps_land_on_workers(text: &str) -> bool {
+pub(super) fn back_jumps_land_on_workers(text: &str) -> bool {
     let names = step_names(text);
     (0..names.len()).all(|i| {
         successors(text, i)
@@ -28,7 +28,7 @@ pub fn back_jumps_land_on_workers(text: &str) -> bool {
 
 /// Every red loop of the flow stops in the third red round: its switch has a case whose `when` tests `runde` against exactly `>= 3`,
 /// that case goes to `escalate` (a human step), and it stands before the first case that jumps back. `skip` = loops without a counter by design.
-pub fn red_loops_escalate(text: &str, escalate: &str, skip: &[&str]) -> bool {
+pub(super) fn red_loops_escalate(text: &str, escalate: &str, skip: &[&str]) -> bool {
     let names = step_names(text);
     (0..names.len()).all(|i| {
         let back = successors(text, i).into_iter().any(|j| j <= i);
@@ -63,20 +63,20 @@ pub fn red_loops_escalate(text: &str, escalate: &str, skip: &[&str]) -> bool {
 }
 
 /// The `when` line compares against exactly `>= 3` (not 30, not 99).
-pub fn threshold_is_3(line: &str) -> bool {
+pub(super) fn threshold_is_3(line: &str) -> bool {
     line.split(">= ").nth(1).is_some_and(|rest| {
         let mut c = rest.chars();
         c.next() == Some('3') && !c.next().is_some_and(|d| d.is_ascii_digit())
     })
 }
 
-pub fn human_step(text: &str, step: &str) -> bool {
+pub(super) fn human_step(text: &str, step: &str) -> bool {
     let b = step_body(text, step);
     b.contains("actor: human") && b.contains("gate: human")
 }
 
 /// The step has the flow directive `then: end` at task level (6 spaces), so it ends the flow and does not fall into the next step.
-pub fn ends_the_flow(text: &str, step: &str) -> bool {
+pub(super) fn ends_the_flow(text: &str, step: &str) -> bool {
     let thens: Vec<String> = step_body(text, step)
         .lines()
         .filter(|l| l.len() - l.trim_start().len() == 6)
@@ -85,12 +85,12 @@ pub fn ends_the_flow(text: &str, step: &str) -> bool {
     thens == ["end"]
 }
 
-pub fn at(text: &str, s: &str) -> usize {
+pub(super) fn at(text: &str, s: &str) -> usize {
     position(text, s)
 }
 
 /// Security, packages, release, server run, in this order; the Frontend round does not release by itself.
-pub fn release_comes_last(text: &str) -> bool {
+pub(super) fn release_comes_last(text: &str) -> bool {
     at(text, "sprache") < at(text, "release")
         && at(text, "sicherheit-again") < at(text, "pakete")
         && at(text, "pakete-again") < at(text, "release")
@@ -100,7 +100,7 @@ pub fn release_comes_last(text: &str) -> bool {
 }
 
 /// Step 5 checks only what step 5 makes; the commands and the round trip belong to step 9a.
-pub fn formats_before_commands(text: &str) -> bool {
+pub(super) fn formats_before_commands(text: &str) -> bool {
     let u = step_body(text, "umzug-check");
     let g = step_body(text, "grenz-check");
     u.contains("call: format-check:")
@@ -110,12 +110,12 @@ pub fn formats_before_commands(text: &str) -> bool {
         && g.contains("round trip")
 }
 
-pub fn core_outcome_is_checkable(text: &str) -> bool {
+pub(super) fn core_outcome_is_checkable(text: &str) -> bool {
     step_body(text, "kern-crate").contains("eigener-kern")
         && step_body(text, "kern-check").contains("no pin is asked for")
 }
 
-pub fn p0_exits_are_reported(text: &str) -> bool {
+pub(super) fn p0_exits_are_reported(text: &str) -> bool {
     let w = step_body(text, "katalog-weiter");
     w.contains("when: '${ $context.katalog.fehler }'")
         && w.contains("then: vorhanden-bericht")
@@ -127,11 +127,11 @@ pub fn p0_exits_are_reported(text: &str) -> bool {
 }
 
 /// Every `.input.X` that the called flow reads is passed by the calling step.
-pub fn run_inputs_are_given(caller: &str) -> Vec<String> {
+pub(super) fn run_inputs_are_given(caller: &str) -> Vec<String> {
     run_inputs_missing(caller, &read(caller))
 }
 
-pub fn run_inputs_missing(caller: &str, text: &str) -> Vec<String> {
+pub(super) fn run_inputs_missing(caller: &str, text: &str) -> Vec<String> {
     let mut missing = vec![];
     for s in step_names(text) {
         let b = step_body(text, &s);
@@ -170,7 +170,7 @@ pub fn run_inputs_missing(caller: &str, text: &str) -> Vec<String> {
 }
 
 /// Every `.input.X` of programm-neu is named in its header (the caller knows what to give).
-pub fn inputs_are_declared(text: &str) -> bool {
+pub(super) fn inputs_are_declared(text: &str) -> bool {
     let header: String = text
         .lines()
         .take_while(|l| l.starts_with('#'))

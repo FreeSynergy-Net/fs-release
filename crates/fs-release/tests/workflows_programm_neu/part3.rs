@@ -165,7 +165,7 @@ fn sub_workflows_get_every_input_they_read_and_the_dossier_is_the_models() {
 }
 
 /// ADR 0086: after the data model comes the script check of the typed storage; red goes back to the data model, the third red round escalates.
-pub fn storage_check_is_sound(text: &str) -> bool {
+pub(super) fn storage_check_is_sound(text: &str) -> bool {
     let c = step_body(text, "speicher-check");
     let a = step_body(text, "speicher-again");
     position(text, "modell-again") < position(text, "speicher-check")
@@ -206,7 +206,7 @@ fn the_typed_storage_is_checked_after_the_data_model_adr_0086() {
 
 /// Opus condition 1 (menues): a `picture-acceptance` that ends without a verdict (`dossier-menue-fehlt`, `menue-bild-fehlt`) must
 /// never let `frontend-round` build; only `accepted == true` continues, everything else ends in the human step `bild-eskalation`.
-pub fn never_builds_unaccepted(text: &str) -> bool {
+pub(super) fn never_builds_unaccepted(text: &str) -> bool {
     let body = step_body(text, "picture-again");
     let lines: Vec<&str> = body.lines().map(str::trim).collect();
     // exactly one `then: continue`, directly after the `accepted == true` condition

@@ -17,7 +17,7 @@ fn counter_a_bare_force_in_any_workflow_is_caught() {
     assert_ne!(bare_force_hits(&mutant), [] as [std::string::String; 0]);
 }
 
-pub const KAT_ORDER: [&str; 18] = [
+pub(super) const KAT_ORDER: [&str; 18] = [
     "zaehler-start",
     "alt-kopf",
     "kette-weiche",
@@ -40,7 +40,7 @@ pub const KAT_ORDER: [&str; 18] = [
 
 /// Asset check (not for a removal), the three generator checks, the fresh review, the ff by a person, the signed proof; the raw cache rule;
 /// `catalog-bump` stays the event path and is not called.
-pub fn catalog_flow(text: &str) -> bool {
+pub(super) fn catalog_flow(text: &str) -> bool {
     in_order(text, &KAT_ORDER)
         && step_body(text, "asset-pruefen").contains("if: ${ .input.modus != \"entfernen\" }")
         && step_body(text, "asset-pruefen").contains("NEVER a draft")
@@ -59,7 +59,7 @@ pub fn catalog_flow(text: &str) -> bool {
 
 /// Every step works on `kette.aktuell` (only `ketten-plan` reads the head of the order), the review gets the NEW head, a NEIN never goes on,
 /// the two loops are counted and end in the escalation which is in the output.
-pub fn catalog_loops_and_head(text: &str) -> bool {
+pub(super) fn catalog_loops_and_head(text: &str) -> bool {
     let others = text.replace(&step_body(text, "ketten-plan"), "");
     let review = step_body(text, "frische-pruefung");
     let next = step_body(text, "pruefung-weiter");
@@ -184,13 +184,13 @@ fn release_flow_compares_versions_before_the_review_and_review_reads_the_ci() {
 }
 
 /// The delta mode is described in the header AND in the step `verdict`, the CI step reads all workflows.
-pub fn review_delta(review: &str) -> bool {
+pub(super) fn review_delta(review: &str) -> bool {
     review.contains("mode DELTA")
         && step_body(review, "verdict").contains("Delta mode - the report names")
 }
 
 /// Decision b7: scripts and logs only in the own TMPDIR, never in the shared scratchpad - in the header and in the steps `ci-lesen` and `read`.
-pub fn review_own_folder(review: &str) -> bool {
+pub(super) fn review_own_folder(review: &str) -> bool {
     let head = review.split("\ndocument:").next().unwrap_or("");
     let sentence = "only in the own TMPDIR under a unique name, never in the shared scratchpad";
     head.contains("[EIGENES-SKRIPT-EIGENER-ORDNER]")
@@ -227,7 +227,7 @@ fn counter_a_late_version_check_or_a_missing_ci_step_is_caught() {
 }
 
 /// The expected runs per repo are listed BEFORE the tag and every one must exist and be green for the head; a missing run is red.
-pub fn ff_expected_runs(text: &str) -> bool {
+pub(super) fn ff_expected_runs(text: &str) -> bool {
     if !text.contains("  - erwartete-laeufe:\n") || !text.contains("  - laeufe-weiter:\n") {
         return false;
     }

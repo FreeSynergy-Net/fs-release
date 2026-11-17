@@ -13,12 +13,12 @@ fn swapped(text: &str, a: &str, b: &str) -> String {
 
 #[path = "workflows_pflege7/part1.rs"]
 mod part1;
-pub use part1::*;
+use part1::*;
 
 #[path = "workflows_pflege7/part2.rs"]
 mod part2;
-pub use part2::*;
+use part2::*;
 
 #[path = "workflows_pflege7/part3.rs"]
 mod part3;
-pub use part3::*;
+use part3::*;

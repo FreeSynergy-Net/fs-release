@@ -1,24 +1,24 @@
 use super::*;
 
-pub fn pos(text: &str, step: &str) -> usize {
+pub(super) fn pos(text: &str, step: &str) -> usize {
     step_names(text)
         .iter()
         .position(|n| n == step)
         .unwrap_or_else(|| panic!("no step {step}"))
 }
 
-pub fn in_order(text: &str, order: &[&str]) -> bool {
+pub(super) fn in_order(text: &str, order: &[&str]) -> bool {
     let names = step_names(text);
     order.iter().all(|o| names.iter().any(|n| n == o))
         && order.windows(2).all(|w| pos(text, w[0]) < pos(text, w[1]))
 }
 
-pub fn escalates(text: &str, again: &str, back: &str) -> bool {
+pub(super) fn escalates(text: &str, again: &str, back: &str) -> bool {
     let b = step_body(text, again);
     b.contains("then: eskalation") && b.contains(">= 3") && b.contains(&format!("then: {back}"))
 }
 
-pub const ORDER: [&str; 33] = [
+pub(super) const ORDER: [&str; 33] = [
     "handoffs-lesen",
     "posteingang-lesen",
     "checklisten-lesen",
@@ -55,7 +55,7 @@ pub const ORDER: [&str; 33] = [
 ];
 
 // R8: the docs gate runs per work step with the repo, branch, delta, programm and docs worktree of the step - never with the data of the round start
-pub fn doku_is_per_step(d: &str) -> bool {
+pub(super) fn doku_is_per_step(d: &str) -> bool {
     d.contains("for:")
         && d.contains("in: ${ $context.plan.schritte }")
         && d.contains("name: doku-mitziehen")
@@ -66,7 +66,7 @@ pub fn doku_is_per_step(d: &str) -> bool {
         && !d.contains(".input.")
 }
 
-pub fn round_is_sound(t: &str) -> bool {
+pub(super) fn round_is_sound(t: &str) -> bool {
     let rule = step_body(t, "regel-check");
     let push = step_body(t, "push-unreviewed");
     let fix = step_body(t, "korrektur");
@@ -168,7 +168,7 @@ pub fn round_is_sound(t: &str) -> bool {
         && !t.contains("then: continue")
 }
 
-pub fn starts_in_background(t: &str) -> bool {
+pub(super) fn starts_in_background(t: &str) -> bool {
     let start = step_body(t, "agenten-starten");
     start.contains("background: true")
         && start.contains("report_to: coordinator")

@@ -119,7 +119,7 @@ fn the_rule_of_the_issues_stays_in_upstream_anfrage_and_the_watch_names_it() {
     assert!(u.contains("NEVER a pull request and NEVER a comment"));
 }
 
-pub fn step_block(text: &str, step: &str) -> String {
+pub(super) fn step_block(text: &str, step: &str) -> String {
     let head = format!("  - {step}:\n");
     let start = text.find(&head).unwrap();
     let rest = &text[start + head.len()..];
@@ -127,6 +127,6 @@ pub fn step_block(text: &str, step: &str) -> String {
     format!("{head}{}", &rest[..end])
 }
 
-pub fn remove(text: &str, step: &str) -> String {
+pub(super) fn remove(text: &str, step: &str) -> String {
     text.replacen(&step_block(text, step), "", 1)
 }

@@ -13,8 +13,8 @@ fn in_order(text: &str, steps: &[&str]) -> bool {
 
 #[path = "workflows_pflege10/part1.rs"]
 mod part1;
-pub use part1::*;
+use part1::*;
 
 #[path = "workflows_pflege10/part2.rs"]
 mod part2;
-pub use part2::*;
+use part2::*;

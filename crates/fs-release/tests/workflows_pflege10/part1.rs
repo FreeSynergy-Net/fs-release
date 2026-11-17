@@ -1,17 +1,17 @@
 use super::*;
 
-pub fn has_step(text: &str, step: &str) -> bool {
+pub(super) fn has_step(text: &str, step: &str) -> bool {
     step_names(text).iter().any(|n| n == step)
 }
 
-pub fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
+pub(super) fn has(text: &str, step: &str, phrases: &[&str]) -> bool {
     has_step(text, step) && {
         let body = step_body(text, step);
         phrases.iter().all(|p| body.contains(p))
     }
 }
 
-pub fn actor(text: &str, step: &str) -> String {
+pub(super) fn actor(text: &str, step: &str) -> String {
     step_body(text, step)
         .lines()
         .find_map(|l| l.trim().strip_prefix("freesynergy.net:actor: "))
@@ -19,12 +19,12 @@ pub fn actor(text: &str, step: &str) -> String {
         .to_string()
 }
 
-pub fn ends(text: &str, step: &str) -> bool {
+pub(super) fn ends(text: &str, step: &str) -> bool {
     has_step(text, step) && step_body(text, step).contains("\n      then: end\n")
 }
 
 /// Write words that must not be in the watch text (the watch reads with GET only).
-pub const WRITE_WORDS: [&str; 14] = [
+pub(super) const WRITE_WORDS: [&str; 14] = [
     "POST",
     "PATCH",
     "DELETE",
@@ -41,12 +41,12 @@ pub const WRITE_WORDS: [&str; 14] = [
     "-f body",
 ];
 
-pub fn read_only(text: &str) -> bool {
+pub(super) fn read_only(text: &str) -> bool {
     WRITE_WORDS.iter().all(|w| !text.contains(w))
 }
 
 /// The calls of the sub-workflow are a FIXED list (a new call that writes at the upstream is red until the list is changed on purpose).
-pub const CALLS: [&str; 11] = [
+pub(super) const CALLS: [&str; 11] = [
     "read-upstream-list",
     "upstream-reachable",
     "fetch-upstream",
@@ -60,7 +60,7 @@ pub const CALLS: [&str; 11] = [
     "remember-check",
 ];
 
-pub fn fixed_calls(t: &str) -> bool {
+pub(super) fn fixed_calls(t: &str) -> bool {
     let calls: Vec<&str> = t
         .lines()
         .filter_map(|l| l.trim().strip_prefix("call: "))
@@ -72,7 +72,7 @@ pub fn fixed_calls(t: &str) -> bool {
         })
 }
 
-pub fn watch(t: &str) -> bool {
+pub(super) fn watch(t: &str) -> bool {
     in_order(
         t,
         &[
@@ -173,7 +173,7 @@ pub fn watch(t: &str) -> bool {
         && fixed_calls(t)
 }
 
-pub fn due_step(t: &str) -> bool {
+pub(super) fn due_step(t: &str) -> bool {
     in_order(t, &["upstream-start", "upstream-faellig", "upstream-watch"])
         && has(
             t,

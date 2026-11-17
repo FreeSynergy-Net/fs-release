@@ -36,7 +36,7 @@ fn counter_a_missing_expected_runs_step_is_caught() {
 
 /// No step falls sequentially into `ci-neustart`: the step before it is the switch `ci-weiter`, its `gruen` goes explicitly to `secrets-pruefen`
 /// (no `then: continue` anywhere in it), and `ci-neustart` is named only by `haengt-erstmals`.
-pub fn ff_no_fall_into_restart(text: &str) -> bool {
+pub(super) fn ff_no_fall_into_restart(text: &str) -> bool {
     let names = step_names(text);
     let i = names.iter().position(|n| n == "ci-neustart").unwrap_or(0);
     let wait = step_body(text, "ci-weiter");

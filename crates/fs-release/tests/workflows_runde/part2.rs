@@ -148,7 +148,7 @@ fn the_new_flows_are_checked_by_the_schema_check() {
     }
 }
 
-pub fn agent_run_has_a_round_variant(t: &str) -> bool {
+pub(super) fn agent_run_has_a_round_variant(t: &str) -> bool {
     let order = step_body(t, "order");
     let sw = step_body(t, "ende-weiche");
     order.contains("background: ${ .input.background // false }")

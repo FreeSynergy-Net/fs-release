@@ -38,7 +38,7 @@ fn counter_onboarding_mutants_are_caught() {
 
 // ---------------------------------------------------------------- upstream-anfrage (extended)
 
-pub fn request(t: &str) -> bool {
+pub(super) fn request(t: &str) -> bool {
     order(
         t,
         &[
@@ -138,7 +138,7 @@ pub fn request(t: &str) -> bool {
 }
 
 /// The calls of the flow are a FIXED list (a new call, e.g. one that opens a pull request or writes a comment, is red until the list is changed on purpose).
-pub const CALLS: [&str; 14] = [
+pub(super) const CALLS: [&str; 14] = [
     "request-kind",
     "prove-ai",
     "search-duplicates-ai",
@@ -155,7 +155,7 @@ pub const CALLS: [&str; 14] = [
     "note-history",
 ];
 
-pub fn no_pr_calls(t: &str) -> bool {
+pub(super) fn no_pr_calls(t: &str) -> bool {
     let calls: Vec<&str> = t
         .lines()
         .filter_map(|l| l.trim().strip_prefix("call: "))

@@ -1,7 +1,7 @@
 use super::*;
 
 /// The lanes round `bahnen`: fs-tasks only with `timeout 15`, never change the order of cards, hang reported, remote by `ls-remote`, max 2 builds.
-pub fn lanes(text: &str) -> bool {
+pub(super) fn lanes(text: &str) -> bool {
     order(
         text,
         &[

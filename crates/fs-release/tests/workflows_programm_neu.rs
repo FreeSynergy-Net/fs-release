@@ -7,12 +7,12 @@ use support::workflows::{assert_red, read, step_body, step_names};
 
 #[path = "workflows_programm_neu/part1.rs"]
 mod part1;
-pub use part1::*;
+use part1::*;
 
 #[path = "workflows_programm_neu/part2.rs"]
 mod part2;
-pub use part2::*;
+use part2::*;
 
 #[path = "workflows_programm_neu/part3.rs"]
 mod part3;
-pub use part3::*;
+use part3::*;

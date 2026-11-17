@@ -1,8 +1,8 @@
 use super::*;
 
-pub const RULES_MD: &str = "/srv/FreeSynergy/.scratch/api-runner/rules.md";
+pub(super) const RULES_MD: &str = "/srv/FreeSynergy/.scratch/api-runner/rules.md";
 
-pub fn position(text: &str, step: &str) -> usize {
+pub(super) fn position(text: &str, step: &str) -> usize {
     step_names(text)
         .iter()
         .position(|n| n == step)
@@ -10,18 +10,18 @@ pub fn position(text: &str, step: &str) -> usize {
 }
 
 /// Swaps the names of two steps (the bodies stay): the same flow with the two steps in the other order.
-pub fn swapped(text: &str, a: &str, b: &str) -> String {
+pub(super) fn swapped(text: &str, a: &str, b: &str) -> String {
     text.replacen(&format!("  - {a}:"), "  - zz-tmp:", 1)
         .replacen(&format!("  - {b}:"), &format!("  - {a}:"), 1)
         .replacen("  - zz-tmp:", &format!("  - {b}:"), 1)
 }
 
 /// The [EFFIZIENZ] rules as step rules: every phrase is in the file.
-pub fn has_rules(text: &str, phrases: &[&str]) -> bool {
+pub(super) fn has_rules(text: &str, phrases: &[&str]) -> bool {
     text.contains("[EFFIZIENZ]") && phrases.iter().all(|p| text.contains(p))
 }
 
-pub const BUILD_RULES: [&str; 6] = [
+pub(super) const BUILD_RULES: [&str; 6] = [
     "one gate cycle",
     "once per head",
     "head hash",
@@ -29,7 +29,7 @@ pub const BUILD_RULES: [&str; 6] = [
     "script",
     "rc=124",
 ];
-pub const REVIEW_RULES: [&str; 6] = [
+pub(super) const REVIEW_RULES: [&str; 6] = [
     "delta",
     "file list",
     "once per head",
@@ -71,7 +71,7 @@ fn the_place_of_rules_md_is_named_where_the_orders_are_explained() {
 }
 
 /// Look up first, evaluate, ask only on `open`, write down; the question step of `user-decision` also starts with the search.
-pub fn decision_flow(text: &str) -> bool {
+pub(super) fn decision_flow(text: &str) -> bool {
     let ask = step_body(text, "ask");
     step_names(text) == ["adr-search", "evaluate", "ask", "record"]
         && step_body(text, "adr-search").contains("actor: machine")
@@ -112,7 +112,7 @@ fn counter_asking_first_or_a_search_by_the_agent_is_caught() {
 }
 
 /// First the texts (ADR 0057, Words/MF2, de and en, gate `texts-check`), then the tokens; the check is a script.
-pub fn texts_before_tokens(text: &str) -> bool {
+pub(super) fn texts_before_tokens(text: &str) -> bool {
     let texte = step_body(text, "texte");
     ["texte", "texts-check", "texts-again"]
         .iter()
@@ -171,7 +171,7 @@ fn counter_a_jump_to_a_missing_step_is_red() {
 }
 
 /// The fixed order of a Frontend round as a rule: block analysis (dossier), look (stil-analyse and its check), composition (build).
-pub fn block_look_composition(text: &str) -> bool {
+pub(super) fn block_look_composition(text: &str) -> bool {
     position(text, "dossier") < position(text, "stil-analyse")
         && position(text, "stil-analyse") < position(text, "stil-check")
         && position(text, "stil-check") < position(text, "stil-again")
@@ -241,7 +241,7 @@ fn bad_input_of_the_block_check_goes_to_the_person_not_back_to_research() {
 
 /// The release of `frontend-round` is skipped by a `switch` step in front of it (case `release == false` goes to `end`), not by an `if` on the
 /// release step: a skipped step falls into the next step (`stil-eskalation`) in Serverless Workflow 1.0.
-pub fn release_is_skipped_by_a_switch(text: &str) -> bool {
+pub(super) fn release_is_skipped_by_a_switch(text: &str) -> bool {
     let r = position(text, "release");
     let weiche = step_body(text, "release-weiche");
     position(text, "release-weiche") + 1 == r
