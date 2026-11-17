@@ -292,12 +292,12 @@ Branch CI = `lint` + `branch-ci`: a push to `unreviewed/**` runs the Rust gates 
 Run 9, specification (the `@fs` calls have no script yet, a real run is not proven; source `katalog-plan/PFLEGE9-AUFTRAG-workflows.md`, plan section c2).
 `workflows/geruest-heben.yaml` sorts code of the programs into scaffold crates: state (heads by `git ls-remote`), trait draft, review through `trait-delta` (part `review`),
 crate scaffold, help part, then the sort-in step WITHOUT a build ("Zunächst NICHT kompilieren (spart Slots)"; every copied file starts with `//! Herkunft: <repo>@<kopf>:<pfad>`, the programs stay unchanged),
-the unclear list `UNKLAR-<crate>.md`, the conversation `talk` (user and Opus, gate user) and only then, when the layer is complete, the bundled build through `build-slot.sh`
+the unclear list `UNKLAR-<crate>.md`, the conversation `talk` (user and Opus, gate `human`) and only then, when the layer is complete, the bundled build through `build-slot.sh`
 (`set -o pipefail`, rc per gate, no output cut with `tail`/`head`). `modul-neu` and `bausatz-neu` create a module or a data kit only when nothing exists (existing first),
 enough programs need it (module 2, specialist module 1, kit 2) and every field has a standard. `ausnahme-gespraech` (replaces `ausnahme-beleg`): an `[[exception]]` exists only with `talk`,
 the protocol of a conversation of the user and Opus; no agent decides it alone. Every check step is `<step>-check` plus `<step>-again` (at most two repeats, then `eskalation`).
 The step `doku-hilfe` (help = docs) proves a marked help part of the program page in fs-documentation (en and de, input `programmseite`); it stands in `modul-neu`, `geruest-heben` and `grundfassung`.
-The plan renames the former lift flow to `geruest-lift`; `lift` and `lift-v1plus` keep their names until a run renames them.
+`lift` and `lift-v1plus` stay as they are (they raise library tags; `geruest-heben` is the sorting in).
 
 ## Trait delta (`trait-delta`)
 

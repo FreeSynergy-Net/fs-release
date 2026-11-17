@@ -1,5 +1,5 @@
 //! Pattern: none (test). Workflow maintenance run 9: the flow `ausnahme-gespraech` (no agent decides an exception alone, no `[[exception]]` without `talk`), the step `doku-hilfe`
-//! and the name note for `geruest-lift`. Each rule has a counter-test on a changed copy.
+//! (a `lift` rename is NOT part of it). Each rule has a counter-test on a changed copy.
 
 mod support;
 use support::flowcheck::{broken, starts_with_card, with_checks};
@@ -22,7 +22,7 @@ fn exception_ok(t: &str) -> bool {
         && starts_with_card(t)
         && with_checks(t, &[("vorbereiten", "vorbereiten"), ("eintragen", "eintragen")])
         && talk.contains("freesynergy.net:actor: human")
-        && talk.contains("freesynergy.net:gate: user")
+        && talk.contains("freesynergy.net:gate: human")
         && talk.contains("call: talk:")
         && weiche.contains("entscheidung == null")
         && weiche.contains("then: eskalation")
@@ -30,8 +30,8 @@ fn exception_ok(t: &str) -> bool {
         && step_body(t, "eintragen").contains("talk: ${ $context.protokoll.pfad }")
         && step_body(t, "eintragen-check").contains("without `talk` is red")
         && step_body(t, "vorbereiten-check").contains("at least 2 alternatives")
-        // no step but the conversation and the sort-in decides: no AI or machine step of the flow is a gate `user`
-        && step_names(t).iter().all(|n| n == "gespraech" || !step_body(t, n).contains("gate: user"))
+        // no step but the conversation (and the escalation to the person) is a human gate: no AI or machine step decides
+        && step_names(t).iter().all(|n| n == "gespraech" || n == "eskalation" || !step_body(t, n).contains("gate: human"))
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn counter_ausnahme_gespraech_agent_talk_missing_talk_and_decision_less_run_are_
     ));
     assert!(broken(
         exception_ok,
-        &t.replace(&talk, &talk.replace("gate: user", "gate: none"))
+        &t.replace(&talk, &talk.replace("gate: human", "gate: none"))
     ));
     assert!(broken(
         exception_ok,
@@ -117,13 +117,4 @@ fn counter_doku_hilfe_input_languages_and_single_source_are_caught() {
         help_ok,
         &t.replace("  - doku-hilfe-check:", "  - doku-hilfe-x:")
     ));
-}
-
-#[test]
-fn the_old_lift_flows_keep_their_names_and_the_readme_names_geruest_lift_as_the_future_name() {
-    // the plan renames `lift` / `lift-v1plus` to `geruest-lift` (plan section c2); no rename here, only the note
-    assert!(!support::workflows::FILES.contains(&"geruest-lift"));
-    let readme =
-        std::fs::read_to_string(support::workflows::root().join("workflows/README.md")).unwrap();
-    assert!(readme.matches("geruest-lift").count() >= 2, "de + en note");
 }

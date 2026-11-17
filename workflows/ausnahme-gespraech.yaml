@@ -4,7 +4,7 @@
 # Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
 # Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
 # Inputs: `programm`, `was` (the part), `warum` (draft of the reason), `kandidaten` (checked building blocks: modules, kits, rule sets, workflows, components).
-# Rules. (1) No agent decides an exception alone: the step `gespraech` is the user with Opus (gate user). (2) `[[exception]]` carries `what`, `why`, `checked`, `alternatives`, `talk`; without `talk` it is red. (3) The protocol `talk-<programm>-<thema>-<datum>.md` (place: ADR 0097 open 8) holds the decision.
+# Rules. (1) No agent decides an exception alone: the step `gespraech` is the user with Opus (gate `human`). (2) `[[exception]]` carries `what`, `why`, `checked`, `alternatives`, `talk`; without `talk` it is red. (3) The protocol `talk-<programm>-<thema>-<datum>.md` (place: ADR 0097 open 8) holds the decision.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -79,7 +79,7 @@ do:
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
-        freesynergy.net:gate: user
+        freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Conversation of the user and Opus: learn, compromise, another view; not the line count. Output the protocol `talk-<programm>-<thema>-<datum>.md`; the decision stands in the protocol."
   - gespraech-weiche:
