@@ -1,5 +1,5 @@
 //! Pattern: none (test). `pin-kaskade` (specification): ONE cascade after a new fs-types tag, Glied by Glied in DAG order. Per Glied: the existing `lift`,
-//! strict lock check, gates (CARGO_BUILD_JOBS=4, BUILD_PRIORITY=0), branch CI, Opus review, `ff-und-tag` as the only way to main and tag, THEN the next Glied.
+//! strict lock check, gates (`CARGO_BUILD_JOBS=4`, `BUILD_PRIORITY=0`), branch CI, Opus review, `ff-und-tag` as the only way to main and tag, THEN the next Glied.
 //! A red Glied aborts (no skipping, no repeat), resume with `ab`; the end checks one fs-types version in every lock. Counter-tests on changed copies.
 
 mod support;
@@ -74,11 +74,7 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     assert!(bad(t.replace("strict = true", "strict = false")));
     assert!(bad(t.replace("then: glied-weiche", "then: lock-ende")));
     assert!(bad(t.replace("  - lock-strikt:", "  - lock-x:")));
-    assert!(bad(t.replacen(
-        "gate: opus-ja",
-        "gate: none",
-        1
-    )));
+    assert!(bad(t.replacen("gate: opus-ja", "gate: none", 1)));
     assert!(bad(format!("{t}\n# tag-annotated\n")));
 }
 
@@ -87,7 +83,10 @@ fn the_cascade_calls_each_other_flow_only_by_run_and_passes_the_inputs() {
     let t = read("pin-kaskade");
     let ff = step_body(&t, "ff-tag");
     for k in ["repo", "branch", "head", "tag", "allow", "workdir"] {
-        assert!(ff.contains(&format!("          {k}: ")), "ff-und-tag input {k}");
+        assert!(
+            ff.contains(&format!("          {k}: ")),
+            "ff-und-tag input {k}"
+        );
     }
     let lift = step_body(&t, "pin-lift");
     for k in ["repo", "commit", "libs"] {
