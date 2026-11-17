@@ -83,3 +83,28 @@ fn counter_not_first_no_proof_check_not_read_and_no_inventory_are_caught() {
         );
     }
 }
+
+#[test]
+fn counter_the_round_limit_must_be_exactly_three() {
+    // review of pflege 9: `>= 3` changed to `>= 30` stayed green when only `contains(">= 3")` was asked
+    for (f, esc, reader) in FLOWS {
+        let t = read(f);
+        let again = step_body(&t, "vorhanden-pruefen-again");
+        for wrong in [">= 30 }", ">= 2 }", ">= 300 }"] {
+            let bad = t.replace(&again, &again.replace(">= 3 }", wrong));
+            assert!(bad != t && !passes(&bad, esc, reader), "{f} {wrong}");
+        }
+    }
+    let t = read("bausatz-neu");
+    let again = step_body(&t, "standard-pruefen-again");
+    let bad = t.replace(&again, &again.replace(">= 3 }", ">= 30 }"));
+    assert!(
+        bad != t
+            && !support::flowcheck::again_ok(
+                &bad,
+                "standard-pruefen-again",
+                "standard-pruefen",
+                "eskalation"
+            )
+    );
+}

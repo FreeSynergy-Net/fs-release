@@ -1,8 +1,8 @@
 # Slim basics for a program: scaffold, window with name, icon and `was_kommt`, package metadata, user documentation stub, callers, gates, picture OK, catalog proposal.
 # Replaces nothing: `programm-grundgeruest` (draft, not runnable) stays for the feature work; `programm-neu` stays the entry for NEW programs with an interface decision.
 # The USER creates the repository; this flow prepares the scaffold in an own worktree and creates no repository. Agents never push, tag or merge; the tag goes through the strategy's helper after the review YES.
-# Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, icon, frontend, art, repo, branch, head, delta, tag, vorbild, dossier, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
-# Help = docs after ADR 0072 [akz.] (manual in the wiki, blocks with purpose `help.<topic>`) (pflege 9, G2b): input `programmseite` (program page in fs-documentation en + de) and `hilfe_marker`; step `doku-hilfe` after `nutzer-doku`.
+# Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, icon, frontend, art, repo, branch, head, delta, tag, vorbild, dossier, frontend_crate, programmseite, hilfe_marker, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
+# Help = docs after ADR 0072 [akz.] (manual in the wiki, blocks with purpose `help.<topic>`) (pflege 9, G2b): input `programmseite` (program page in fs-documentation en + de, default `programs/apps/<programm>/index.md`) and `hilfe_marker`; step `doku-hilfe` after `nutzer-doku`.
 # Inputs: programm (name after the naming rule, ADR 0087), beschreibung (one sentence), icon (path; missing: the nearest existing icon of the catalog, marked "vorläufig" and in the gap list - no PNG placeholder), frontend (frontend id, ASCII lower case, e.g. `simple`; the display name e.g. Einfach is translated; not core, server, client, app, bin, cli, engine, testserver - ADR 0094 draft, item 6), repo (name; the user creates it), art (`grundfassung` or `feature`; decides at `release-sperre` whether the trait lock is needed).
 # Rules of 17 Nov. (b7): (a) NO PNG placeholder: a missing component is replaced by the nearest EXISTING component, honestly marked "vorläufig" (tooltip or hint) and listed in the gap list ("Lücken") of the program's DESIGN; the real component is built in the background (lane 1) and replaces it. (b) Versions may currently JUMP (e.g. the basics directly v0.0.2, even with gaps); later no longer (the user announces it); version = tag. (c) No picture OK of the user is needed: the STRATEGY looks at the pictures (step `picture-ok`); only `accepted == true` goes on to `katalog-vorschlag`, otherwise gap list or escalation, never on.
 # (d) SLOT RULE (hint): WRITE code, tests, documentation and picture sketches without a build slot; BUILD only after the release of a slot (`build-slot.sh`, at most 2 builds at the same time); waiting for a slot is no idle time.
@@ -213,18 +213,18 @@ do:
   - doku-hilfe:
       call: doku-hilfe-ai:0.0.10@fs
       with:
-        programmseite: ${ .input.programmseite }
+        programmseite: ${ .input.programmseite // ("programs/apps/" + .input.programm + "/index.md") }
         hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
+        freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`, default `programs/apps/<programm>/index.md`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
   - doku-hilfe-check:
       call: doku-hilfe-regel:0.0.10@fs
       with:
-        programmseite: ${ .input.programmseite }
+        programmseite: ${ .input.programmseite // ("programs/apps/" + .input.programm + "/index.md") }
       export:
         as: '${ $context + { hilfecheck: . } }'
       metadata:
