@@ -1,5 +1,5 @@
 name: library-release
-description: Release of a pure library: check tag = workspace version = non-empty CHANGELOG section, create the Pre-release with the notes of that section. No artefacts, no signatures.
+description: "Release of a pure library: check tag = workspace version = non-empty CHANGELOG section, create the Pre-release with the notes of that section. No artefacts, no signatures."
 inputs:
   tag: { description: "Release tag", required: true }
   name: { description: "Release name prefix (default - repository name)", default: "" }
