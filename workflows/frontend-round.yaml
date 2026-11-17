@@ -163,6 +163,7 @@ do:
           name: picture-acceptance
           version: 0.0.10
         input:
+          dossier: ${ .input.dossier }
           model: ${ .input.model }
           ours: ${ $context.images }
           waechter: ${ $context.waechter }
