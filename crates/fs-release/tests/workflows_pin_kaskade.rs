@@ -3,9 +3,8 @@
 //! A red Glied aborts (no skipping, no repeat), resume with `ab`; the end checks one fs-types version in every lock. Counter-tests on changed copies.
 
 mod support;
-use support::kaskade::{
-    cases, graph_ok, list_lines, switches_ok, with_then, REV_PINS, SCRIPTS, SWITCHES,
-};
+use support::kaskade::{cases, graph_ok, switches_ok, with_then, SWITCHES};
+use support::kaskade_rules::lock_rules_ok;
 use support::workflows::{in_order, read, step_body};
 
 fn ok(t: &str) -> bool {
