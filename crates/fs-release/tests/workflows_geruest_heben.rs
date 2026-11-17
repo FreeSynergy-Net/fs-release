@@ -22,7 +22,7 @@ fn heben_ok(t: &str) -> bool {
     ];
     let talk = step_body(t, "talk");
     let sort = step_body(t, "einsortieren");
-    // nothing before the bundled build may compile: no cargo, no build slot, no test run in these steps
+    // the steps of THIS flow before the bundled build do not compile (no cargo, no build slot); the compile probe inside the called flow `trait-delta` is allowed
     let before = step_names(t)
         .iter()
         .take_while(|n| *n != "bau-buendel")
@@ -46,11 +46,12 @@ fn heben_ok(t: &str) -> bool {
         && again_ok(t, "trait-pruefung-again", "trait-entwurf", "eskalation")
         && sort.contains("Zunächst NICHT kompilieren (spart Slots)")
         && sort.contains("Herkunft: <repo>@<kopf>:<pfad>")
+        && step_body(t, "trait-pruefung").contains("compile probe INSIDE `trait-delta` is allowed")
         && !sort.contains("cargo")
         && !before.contains("cargo")
         && !before.contains("build-slot")
         && talk.contains("freesynergy.net:actor: human")
-        && talk.contains("freesynergy.net:gate: user")
+        && talk.contains("freesynergy.net:gate: human")
         && step_body(t, "unklar-liste-check").contains("UNKLAR-<crate>.md")
         && step_body(t, "bau-buendel").contains("build-slot.sh")
         && step_body(t, "bau-buendel").contains("GATE-PIPEFAIL")
@@ -85,7 +86,7 @@ fn counter_geruest_heben_a_build_before_the_unclear_list_a_machine_talk_or_a_ski
     let talk = step_body(&t, "talk");
     assert!(broken(
         heben_ok,
-        &t.replace(&talk, &talk.replace("gate: user", "gate: none"))
+        &t.replace(&talk, &talk.replace("gate: human", "gate: none"))
     ));
     assert!(broken(
         heben_ok,

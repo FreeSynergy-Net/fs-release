@@ -127,7 +127,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Opus look at `traits.md` through the flow `trait-delta` (part `review`): verdict YES or NO for exactly this draft."
+        freesynergy.net:summary: "Opus look at `traits.md` through the flow `trait-delta` (part `review`): verdict YES or NO for exactly this draft. The compile probe INSIDE `trait-delta` is allowed here; the no-build rule of this flow is for the sort-in steps and for the core build, which comes only in `bau-buendel`."
   - trait-pruefung-again:
       switch:
         - runden:
@@ -327,7 +327,7 @@ do:
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
-        freesynergy.net:gate: user
+        freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Conversation of the user and Opus about the unclear cases (user, conversation 2: \"dann wird er aussortiert ... ggf. schrott, dann kann das weg\"). Protocol `talk-<crate>-<datum>.md`; no agent decides a case alone."
   - talk-again:
