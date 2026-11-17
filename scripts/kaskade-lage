@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Lage of the pin cascade (call `kaskade-lage` of the workflow `pin-kaskade`, step `lage`). READ ONLY: `git ls-remote`, blobless clones into an own temp folder, GET of the public REST API.
+
+  python3 -I scripts/kaskade-lage --ausloeser vX.Y.Z --glieder JSON|FILE|- [--ab NAME] [--fs-release-tag v0.0.11] [--ohne-ci]
+
+Proves (never from an old clone): the trigger tag of fs-types exists; the tag of fs-release that holds `_windows-check.yml` exists (the cascade starts only after it,
+rule B4); the head of main of every Glied. With `--ab` (resume) the list starts there and the Glieder BEFORE it count as done ONLY when their tag exists on the
+remote. Rule B4 (no exception): per Glied it reports whether `.github/workflows/windows.yml` calls `_windows-check.yml` at a tag >= the fs-release tag
+(`windows[].aufrufer`) and the Windows run of exactly that head (`windows_ci`: gruen | rot | laeuft | keiner | unbekannt: ..., older heads never count). A missing caller is
+NOT red here (the step `windows-aufrufer` of every Glied creates it before the tag); a Glied without caller is listed in `ohne_aufrufer`.
+Output JSON: {status, red, ausloeser:{tag, beleg}, fs_release:{tag, beleg}, glieder:[{repo, art, tag, allow, besonderes, kopf, tag_vorhanden}] (the input, kept for `kaskade-plan`), ab, erledigt:[{repo, tag, beleg}],
+windows:[{repo, kopf, aufrufer, pin, pin_ok, windows_ci}], ohne_aufrufer:[repo], befunde:[text]}. rc 0 = ok, 1 = red (befunde), 2 = bad input or no remote.
+"""
+import argparse
+import os
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "kaskade_lib"))
+import kgit  # noqa: E402
+import kio  # noqa: E402
+import kwindows  # noqa: E402
+
+
+def windows_of(repo, kopf, minimum, ci):
+    res = {"repo": repo, "kopf": kopf, "aufrufer": False, "pin": None, "pin_ok": False, "windows_ci": "nicht gelesen"}
+    with tempfile.TemporaryDirectory(prefix="kaskade-lage-") as tmp:
+        d = os.path.join(tmp, repo)
+        kgit.clone(repo, d)
+        text = kgit.show(d, "HEAD", kwindows.CALLER)
+    res["aufrufer"], res["pin"], res["pin_ok"] = kwindows.caller(text, minimum)
+    if ci and kopf:
+        res["windows_ci"] = kwindows.runs_state(repo, kopf)
+    return res
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--ausloeser", required=True)
+    p.add_argument("--glieder", required=True)
+    p.add_argument("--ab")
+    p.add_argument("--fs-release-tag", default="v0.0.11")
+    p.add_argument("--ohne-ci", action="store_true")
+    a = p.parse_args(argv)
+    try:
+        glieder = kio.load_json(a.glieder)
+    except ValueError as e:
+        return kio.skipped(str(e))
+    err = kio.check_glieder(glieder)
+    if not kio.TAG.match(a.ausloeser):
+        err.append("ausloeser: must be vX.Y.Z")
+    if not kio.TAG.match(a.fs_release_tag):
+        err.append("fs-release-tag: must be vX.Y.Z")
+    names = [g["repo"] for g in glieder if isinstance(g, dict) and "repo" in g]
+    if a.ab and a.ab not in names:
+        err.append(f"ab: {a.ab} is no Glied of the list")
+    if err:
+        return kio.skipped("; ".join(err))
+    befunde = []
+    try:
+        trigger = kgit.tags("fs-types").get(a.ausloeser)
+        frtag = kgit.tags("fs-release").get(a.fs_release_tag)
+        kopf = {g["repo"]: kgit.main_head(g["repo"]) for g in glieder}
+        rtags = {g["repo"]: kgit.tags(g["repo"]) for g in glieder}
+        start = names.index(a.ab) if a.ab else 0
+        windows = [windows_of(g["repo"], kopf[g["repo"]], a.fs_release_tag, not a.ohne_ci) for g in glieder[start:]]
+    except (RuntimeError, ValueError) as e:
+        return kio.skipped(str(e))
+    if not trigger:
+        befunde.append(f"trigger tag {a.ausloeser} of fs-types is not on the remote")
+    if not frtag:
+        befunde.append(f"fs-release tag {a.fs_release_tag} (holds _windows-check.yml) is not on the remote: the cascade starts only after it")
+    erledigt = []
+    for g in glieder[:start]:
+        sha = rtags[g["repo"]].get(g["tag"])
+        if sha:
+            erledigt.append({"repo": g["repo"], "tag": g["tag"], "beleg": f"ls-remote {g['repo']} refs/tags/{g['tag']} = {sha}"})
+        else:
+            befunde.append(f"{g['repo']} is before `ab` but its tag {g['tag']} is not on the remote: not done")
+    out = {"status": "ok", "red": bool(befunde), "ausloeser": {"tag": a.ausloeser, "beleg": trigger},
+           "fs_release": {"tag": a.fs_release_tag, "beleg": frtag}, "ab": a.ab,
+           "glieder": [{**g, "kopf": kopf[g["repo"]], "tag_vorhanden": g["tag"] in rtags[g["repo"]]} for g in glieder],
+           "erledigt": erledigt, "windows": windows, "ohne_aufrufer": [w["repo"] for w in windows if not w["pin_ok"]], "befunde": befunde}
+    kio.emit(out)
+    return 1 if befunde else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
