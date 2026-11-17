@@ -6,9 +6,10 @@ fs-release offers two reusable workflows. A repo adds two tiny caller files; eve
 |----------|---------|
 | `.github/workflows/ci.yml` | fmt, clippy, tests, our coding rules (ADR 0043), licence check |
 | `.github/workflows/check.yml` | the push gate: fmt, clippy pedantic, tests, coding rules (below) |
+| `.github/workflows/_windows-check.yml` | the Windows gate: fmt, clippy pedantic, tests on an explicit Windows runner (below); called through `examples/callers/windows.yml` |
 | `.github/workflows/release.yml` | plan, build per platform, SBOM, signatures, provenance, **draft** release |
 
-Internal building blocks (`_release-*.yml`, `actions/*`) are not meant to be called directly.
+Internal building blocks (`_release-*.yml`, `actions/*`) are not meant to be called directly; the one exception is `_windows-check.yml` (a caller of its own, see "Windows gate").
 All third-party actions are pinned to commit SHAs (the version is in a comment); Dependabot
 or a manual bump keeps them current (ADR 0026).
 
@@ -57,6 +58,30 @@ Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env`
 `mesa-vulkan-drivers libvulkan1 fonts-dejavu-core fonts-noto-core` (lavapipe is the software graphics adapter, the fonts make the
 rendered text the same on every runner). It is merged with `apt-packages` into one list without duplicates, so a repo needs only
 `software-gpu: true` instead of naming the packages.
+
+## Windows gate (`_windows-check.yml`)
+
+One reusable workflow instead of a copied `windows.yml` per repo. A repo copies [`examples/callers/windows.yml`](../examples/callers/windows.yml)
+(`on: push` without a branch filter, so `unreviewed/*` is covered, plus `workflow_dispatch`; `uses: ...@<tag>`; no secrets, so no `secrets: inherit`).
+The pure-Rust crate is linted and tested on Windows, never cross-built. Steps: checkout, `setup-rust` (toolchain from `RUST_VERSION`), `cargo fmt --check`,
+`cargo clippy ... --all-targets --locked -- -D warnings -W clippy::pedantic`, `cargo test ... --locked --no-fail-fast` (same flags as `check.yml`).
+
+| Input | Default | Meaning |
+|-------|---------|---------|
+| `runner` | `windows-2022` | runner label, always explicit (no `*-latest`) |
+| `packages` | empty = `--workspace` | space separated crate names, each becomes `-p <name>` |
+| `features` | `--all-features` | feature flags for clippy and test (`--features a,b`, empty = defaults) |
+| `clippy-extra` | `-W clippy::pedantic` | lint flags after `-D warnings` |
+| `no-fail-fast` | `true` | `cargo test --no-fail-fast` |
+
+Pins: inside the workflow `setup-rust` is pinned to the same commit SHA as every other internal reference (`scripts/pin-refs.sh` raises it at release time); the CALLER pins the
+workflow to a fs-release TAG that contains the file (the first one is the tag after v0.0.10), never `@main`. The inputs are checked for plain words before they reach a command line.
+Test: `tests/packaging/windows_check.sh` (rules plus five mutants: `*-latest`, `@main`, missing `--locked`, caller on `@main`, caller with secrets).
+
+Follow-up runs (text only here, the repos themselves are not touched by this run; source `.scratch/katalog-plan/INVENTAR-ci-workflows.md`, 2026-11-17):
+- Windows callers (replace the copied `windows.yml` by the caller): fs-types, fs-components, fs-files, fs-texts; fs-packages (branch `unreviewed/packages-windows-ci`, variant with `windows-2022`). New callers (Rust repos without a Windows gate): fs-activities, fs-broadcast, fs-calendars, fs-capnpc, fs-draw, fs-forms, fs-groups, fs-identity, fs-interfaces, fs-jscalendar, fs-maps, fs-messages, fs-objects, fs-people, fs-registry, fs-release, fs-resources, fs-tasks.
+- Rolling runner `ubuntu-latest` to a fixed version (maintenance item 10): fs-components `check.yml` (line 21), fs-icons `check.yml` (line 10); `release.yml` of Blinc is not ours (ticket via git-bug, if at all).
+- `@main` pins of fs-release to a tag (v0.0.10 or the new one, `scripts/pin-refs.sh --dir <repo> <tag>`): fs-identity, fs-interfaces, fs-registry (`check.yml`), fs-tasks (`check.yml`; its `release.yml` is already on v0.0.10), fs-types (`check.yml` and the `setup-rust@main` of its `windows.yml`). SHA pins (fs-files, fs-components) move to the tag at the next lift.
 
 ## Release
 

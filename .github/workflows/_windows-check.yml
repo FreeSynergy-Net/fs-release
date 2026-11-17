@@ -1,0 +1,65 @@
+# Reusable Windows gate: fmt, clippy (pedantic) and tests on an explicit Windows runner. The pure-Rust crate is linted and tested
+# here, never cross-built. One definition for every repo (a caller is a few lines: examples/callers/windows.yml). No secrets.
+# Same flags as check.yml (with --locked); the toolchain comes from RUST_VERSION through setup-rust, pinned like every internal reference.
+name: _windows-check
+on:
+  workflow_call:
+    inputs:
+      runner: { type: string, default: windows-2022, description: "Runner label, always an explicit version" }
+      packages: { type: string, default: "", description: "Space separated crate names (-p each); empty = the whole workspace" }
+      features: { type: string, default: "--all-features", description: "Feature flags for clippy and test, e.g. --all-features or --features a,b; empty = defaults" }
+      clippy-extra: { type: string, default: "-W clippy::pedantic", description: "Extra clippy lint flags after -D warnings; empty = none" }
+      no-fail-fast: { type: boolean, default: true, description: "cargo test --no-fail-fast (run every test, report all failures)" }
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  windows:
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      PACKAGES: ${{ inputs.packages }}
+      FEATURES: ${{ inputs.features }}
+      CLIPPY_EXTRA: ${{ inputs.clippy-extra }}
+      NO_FAIL_FAST: ${{ inputs.no-fail-fast }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@ceddb45ce0d3ddc97e85c60bb24427806868c81c
+        with:
+          toolchain: pinned
+          components: rustfmt,clippy
+          cache-key: windows
+      - name: Inputs are plain words (they end up on a command line)
+        run: |
+          set -euo pipefail
+          bad='[^A-Za-z0-9_ ,/=.:-]'
+          for v in "$PACKAGES" "$FEATURES" "$CLIPPY_EXTRA"; do
+            if printf '%s' "$v" | grep -Eq "$bad"; then echo "::error::input with a character that is not allowed: $v"; exit 1; fi
+          done
+      - name: fmt
+        run: cargo fmt --check
+      - name: clippy
+        run: |
+          set -euo pipefail
+          sel=(--workspace)
+          if [ -n "$PACKAGES" ]; then sel=(); for p in $PACKAGES; do sel+=(-p "$p"); done; fi
+          # shellcheck disable=SC2086
+          cargo clippy "${sel[@]}" --all-targets $FEATURES --locked -- -D warnings $CLIPPY_EXTRA
+      - name: test
+        run: |
+          set -euo pipefail
+          sel=(--workspace)
+          if [ -n "$PACKAGES" ]; then sel=(); for p in $PACKAGES; do sel+=(-p "$p"); done; fi
+          extra=()
+          if [ "$NO_FAIL_FAST" = "true" ]; then extra+=(--no-fail-fast); fi
+          # shellcheck disable=SC2086
+          cargo test "${sel[@]}" $FEATURES --locked "${extra[@]}"
