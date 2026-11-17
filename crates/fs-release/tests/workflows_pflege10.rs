@@ -205,7 +205,7 @@ fn due_step(t: &str) -> bool {
                 "YELLOW",
                 "Upstream nicht erreichbar",
                 "YES of the user",
-                "{ upstream: . }",
+                "{ upstream: ($context.upstream + .) }",
             ],
         )
         && actor(t, "upstream-watch") == "machine"

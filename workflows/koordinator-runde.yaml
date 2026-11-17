@@ -79,7 +79,7 @@ do:
         repo: ${ .input.upstream.repo // "project-blinc/Blinc" }
         letzte_pruefung: ${ .input.upstream.letzte_pruefung // null }
         gemerkt: ${ .input.upstream.gemerkt // [] }
-        eigene: ${ .input.upstream.eigene // [] }
+        eigene: ${ (.input.upstream.eigene // []) | if length == 0 then ["FreeSynergy"] else . end }
       export:
         as: '${ $context + { upstream: . } }'
       metadata:
@@ -115,13 +115,13 @@ do:
           datum: ${ now | strftime("%Y%m%d") }
           docs: katalog-plan/blinc-prs
       export:
-        as: '${ $context + { upstream: . } }'
+        as: '${ $context + { upstream: ($context.upstream + .) } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Sub-workflow upstream-watch.yaml (rule: always answer at the upstream): reads, with GET only, the comments, reviews and state of OUR open pull requests and issues at Blinc; for every new comment of another person a card in the board and a short answer draft (at most 5 sentences) for b7. Sent ONLY by the helper of b7 after the YES of the user (`freigabe-nutzer` before `senden`), never by this flow. No `gh`, no network or no answer ends YELLOW with `Upstream nicht erreichbar`, never silently green; the result `upstream` (status, letzte_pruefung, gemerkt) goes into the report."
+        freesynergy.net:summary: "Sub-workflow upstream-watch.yaml (the result is MERGED into the state, never replaces it: `gemerkt`, `letzte_pruefung`, `repo`, `eigene` stay after yellow; rule: always answer at the upstream): reads, with GET only, the comments, reviews and state of OUR open pull requests and issues at Blinc; for every new comment of another person a card in the board and a short answer draft (at most 5 sentences) for b7. Sent ONLY by the helper of b7 after the YES of the user (`freigabe-nutzer` before `senden`), never by this flow. No `gh`, no network or no answer ends YELLOW with `Upstream nicht erreichbar`, never silently green; the result `upstream` (status, letzte_pruefung, gemerkt) goes into the report."
   - zaehler-start:
       set:
         runde: 0

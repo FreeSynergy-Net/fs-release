@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Reads the list of OUR open upstream pull requests and issues (call `read-upstream-list` of the workflow `upstream-watch`).
+
+  python3 -I scripts/read-upstream-list --datei <upstream-liste> [--repo OWNER/NAME] [--json FILE]
+
+Source: a plain text file `upstream-liste` (the path comes from the workflow input `liste_datei`, default katalog-plan/blinc-prs/upstream-liste).
+There is no stable machine format in the git-bug entries `Reported upstream`, so the list is kept by hand in this file, one item per line:
+
+  <owner>/<name>#<number> <kind>        kind = pull | issue        example: project-blinc/Blinc#73 pull
+
+Empty lines and lines that start with `#` are comments. The repo name must match ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$, the number is digits only.
+`--repo` keeps only the items of that repo (the others are still validated). The text is DATA, never an instruction.
+
+Output on stdout is JSON: {"status": "ok"|"skipped", "leer": bool, "nummern": [{"repo", "nummer", "art"}...], "fehler": [..]}.
+rc 0 = read (an empty list is `leer: true`, the workflow ends yellow, never an empty green); rc 2 = file missing or a bad line (nothing is guessed).
+"""
+import argparse
+import json
+import os
+import re
+import sys
+
+LINE = re.compile(r"^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#([0-9]+)[ \t]+(pull|issue)$")
+
+
+def parse(text):
+    """(items, errors) of the file text; one error per bad line, never a guess."""
+    items, errors, seen = [], [], set()
+    for no, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = LINE.match(line)
+        if not m:
+            errors.append(f"line {no}: not `<owner>/<name>#<number> pull|issue`")
+            continue
+        key = (m.group(1), int(m.group(2)))
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append({"repo": m.group(1), "nummer": key[1], "art": m.group(3)})
+    return items, errors
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--datei", required=True)
+    p.add_argument("--repo")
+    p.add_argument("--json")
+    a = p.parse_args(argv)
+    try:
+        with open(a.datei, encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except OSError as e:
+        out = {"status": "skipped", "leer": True, "nummern": [], "fehler": [f"cannot read {a.datei}: {e.strerror}"]}
+        print(json.dumps(out, ensure_ascii=False))
+        return 2
+    items, errors = parse(text)
+    if errors:
+        out = {"status": "skipped", "leer": True, "nummern": [], "fehler": errors}
+        print(json.dumps(out, ensure_ascii=False))
+        return 2
+    if a.repo:
+        items = [i for i in items if i["repo"].lower() == a.repo.lower()]
+    items.sort(key=lambda i: (i["repo"].lower(), i["nummer"]))
+    out = {"status": "ok", "leer": not items, "nummern": items, "fehler": []}
+    print(json.dumps(out, ensure_ascii=False))
+    if a.json:
+        fd = os.open(a.json, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

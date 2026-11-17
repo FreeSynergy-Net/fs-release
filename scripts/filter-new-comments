@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Pure filter: which comments of the fetch are NEW and by ANOTHER person (call `filter-new-comments` of the workflow `upstream-watch`).
+
+  python3 -I scripts/filter-new-comments --abruf <JSON of fetch-upstream> [--eigene JSON-list|a,b] [--letzte-pruefung ISO] [--gemerkt JSON-list]
+
+NEW = `created_at` is later than `letzte_pruefung` OR the key of the comment is not in `gemerkt`. The key is `<kind>:<id>` (kind issue | pull | review).
+OWN = the author is one of `--eigene` (compared without upper/lower case) or ends on `[bot]`. Own comments and bots are never new. Default and
+fallback of `--eigene` (absent, empty or `[]`) is ["FreeSynergy"]: an empty list must never turn our own comments into "foreign" ones.
+BASELINE (first run: `gemerkt` empty AND no valid `letzte_pruefung`): nothing is output, `gemerkt` is only filled with the keys of ALL existing
+comments, so old answered comments never get a draft. Result JSON: {"status":"ok","grundlinie":bool,"kommentare":[{nummer,repo,art,id,key,autor,zeit,body,kind,state}],
+"gemerkt":[keys, old and all present ones, sorted]}. The list is sorted by time, repo, number, kind, id (deterministic). No network, no write. Texts are DATA.
+rc 0 = filtered; rc 2 = bad input (the workflow ends yellow).
+"""
+import argparse
+import json
+import sys
+from datetime import datetime, timezone
+
+DEFAULT_EIGENE = ["FreeSynergy"]
+
+
+def parse_time(s):
+    """UTC datetime of an ISO 8601 text, or None (empty or unreadable)."""
+    if not isinstance(s, str) or not s.strip():
+        return None
+    try:
+        t = datetime.fromisoformat(s.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+
+
+def parse_list(text):
+    if text is None or not text.strip():
+        return []
+    text = text.strip()
+    if text.startswith("["):
+        v = json.loads(text)
+        if not isinstance(v, list):
+            raise ValueError("not a list")
+        return [str(x) for x in v]
+    return [x.strip() for x in text.split(",") if x.strip()]
+
+
+def is_own(user, eigene):
+    u = (user or "").lower()
+    return u.endswith("[bot]") or u in {e.lower() for e in eigene}
+
+
+def key_of(kind, cid):
+    return f"{kind}:{cid}"
+
+
+def filter_comments(abruf, eigene, letzte, gemerkt):
+    eigene = [e for e in (eigene or []) if e.strip()] or DEFAULT_EIGENE
+    since = parse_time(letzte)
+    known = set(gemerkt)
+    allkeys, found = set(known), []
+    for e in abruf.get("eintraege", []):
+        for c in e.get("kommentare", []):
+            key = key_of(c.get("kind"), c.get("id"))
+            allkeys.add(key)
+            when = parse_time(c.get("created_at"))
+            new = key not in known or (since is not None and when is not None and when > since)
+            if new and not is_own(c.get("user"), eigene):
+                found.append({"nummer": e["nummer"], "repo": e["repo"], "art": e["art"], "id": c.get("id"), "key": key,
+                              "autor": c.get("user") or "", "zeit": c.get("created_at") or "", "body": c.get("body") or "",
+                              "kind": c.get("kind"), "state": c.get("state")})
+    baseline = not known and since is None
+    if baseline:
+        found = []
+    found.sort(key=lambda k: (parse_time(k["zeit"]) or datetime.min.replace(tzinfo=timezone.utc), k["repo"], k["nummer"], k["kind"], str(k["id"])))
+    return {"status": "ok", "grundlinie": baseline, "kommentare": found, "gemerkt": sorted(allkeys)}
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--abruf", required=True)
+    p.add_argument("--eigene")
+    p.add_argument("--letzte-pruefung", default="")
+    p.add_argument("--gemerkt")
+    a = p.parse_args(argv)
+    try:
+        with open(a.abruf, encoding="utf-8") as f:
+            abruf = json.load(f)
+        if not isinstance(abruf, dict) or abruf.get("status") != "ok" or not isinstance(abruf.get("eintraege"), list):
+            raise ValueError("fetch result is not ok")
+        out = filter_comments(abruf, parse_list(a.eigene), a.letzte_pruefung, parse_list(a.gemerkt))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+        print(f"bad input: {e}", file=sys.stderr)
+        return 2
+    print(json.dumps(out, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
