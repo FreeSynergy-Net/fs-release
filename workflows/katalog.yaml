@@ -25,7 +25,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Several catalog branches go one after the other, never in parallel: the order is fixed, the base is the CURRENT remote main (`git ls-remote`). Result `kette` with `aktuell` (object: `branch`, `program`, `tag`, `head` of the entry in work; the first one carries the head of the order) and `rest`."
+        freesynergy.net:summary: "Several catalog branches go one after the other, never in parallel: the order is fixed, the base is the CURRENT remote main (`git ls-remote`). Result `kette` with `aktuell` (object: `branch`, `program`, `tag`, `head` of the entry in work; the first one carries the head of the order), `erster` (true for the first entry) and `rest`."
   - zaehler-start:
       set:
         gen: 0
@@ -51,6 +51,19 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "`git ls-remote` of the branch of `kette.aktuell`: the old head is `alt` (lease of a rewrite, old side of the delta of a new review); an own `unreviewed/*` branch only."
+  - kette-weiche:
+      switch:
+        - erster:
+            when: '${ $context.kette.erster == true }'
+            then: eintrag
+        - spaeterer:
+            then: kette-rebase
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow in chain mode - the FIRST entry of the chain (`kette.erster`, set by `ketten-plan`; `ketten-naechster` sets it to false) goes to `eintrag`; EVERY later entry goes to `kette-rebase` (lease `$context.alt.head`, onto the new main) and from there with the NEW head through `asset-pruefen` ... `frische-pruefung`, so that the ff by the strategy is a real ff and the new head is reviewed."
   - eintrag:
       call: catalog-entry:0.0.10@fs
       with:
@@ -228,7 +241,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Takes the next catalog branch of the chain: `kette.aktuell` (branch, program, tag, head = the OLD head of that branch), `rest` counted down; then `zaehler-start` (counters at 0) and `alt-kopf` (`alt` = old head = lease) run again for this branch."
+        freesynergy.net:summary: "Takes the next catalog branch of the chain: `kette.aktuell` (branch, program, tag, head = the OLD head of that branch), `erster: false`, `rest` counted down; then `zaehler-start` (counters at 0) and `alt-kopf` (`alt` = old head = lease) run again for this branch."
   - kette-rebase:
       call: chain-rebase:0.0.10@fs
       with:

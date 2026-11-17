@@ -298,9 +298,10 @@ fn counter_a_bare_force_in_any_workflow_is_caught() {
     assert!(!bare_force_hits(&mutant).is_empty());
 }
 
-const KAT_ORDER: [&str; 17] = [
+const KAT_ORDER: [&str; 18] = [
     "zaehler-start",
     "alt-kopf",
+    "kette-weiche",
     "eintrag",
     "asset-pruefen",
     "gen-catalog",
