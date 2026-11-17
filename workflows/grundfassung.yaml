@@ -4,6 +4,10 @@
 # Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, icon, frontend, art, repo, branch, head, delta, tag, vorbild, dossier, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
 # Inputs: programm (name after the naming rule, ADR 0087), beschreibung (one sentence), icon (path; missing: the nearest existing icon of the catalog, marked "vorläufig" and in the gap list - no PNG placeholder), frontend (frontend id, ASCII lower case, e.g. `simple`; the display name e.g. Einfach is translated; not core, server, client, app, bin, cli, engine, testserver - ADR 0094 draft, item 6), repo (name; the user creates it), art (`grundfassung` or `feature`; decides at `release-sperre` whether the trait lock is needed).
 # Rules of 17 Nov. (b7): (a) NO PNG placeholder: a missing component is replaced by the nearest EXISTING component, honestly marked "vorläufig" (tooltip or hint) and listed in the gap list ("Lücken") of the program's DESIGN; the real component is built in the background (lane 1) and replaces it. (b) Versions may currently JUMP (e.g. the basics directly v0.0.2, even with gaps); later no longer (the user announces it); version = tag. (c) No picture OK of the user is needed: the STRATEGY looks at the pictures (step `picture-ok`); only `accepted == true` goes on to `katalog-vorschlag`, otherwise gap list or escalation, never on.
+# (d) SLOT RULE (hint): WRITE code, tests, documentation and picture sketches without a build slot; BUILD only after the release of a slot (`build-slot.sh`, at most 2 builds at the same time); waiting for a slot is no idle time.
+# (e) LOOK AT ONCE (rule [AUSSEHEN-SOFORT], b7, 17 Nov.): a basics release shows more than "what comes" - step `hauptansicht` adds the first REAL main view in the look of the model (lessons [AUSSEHEN-LEHREN]); the pictures go as a PAIR model | ours with the SAME filter and state (step `bildpaar`); NO tag without the picture OK of the strategy (b7) (`vor-tag`).
+# (f) BUNDLE ([BUENDEL-RELEASE], b7, 17 Nov.): do not release every small change alone: step `buendel-frage` asks the strategy "bundle complete? otherwise keep collecting" before `release`; a single release only for a blocker (program does not start, data loss, security).
+# (g) MANDATORY test `server-unresponsive` ("hanging instance") in `binary-test`: a missing test = RED, never green.
 # Release lock by `art` (decision b7, 17 Nov.; it replaces condition 2 of the Opus NO on f5bfc276 for the basics): a BASICS release (window, "what comes" and documentation only; stores no data over the contract) MAY release as v0.0.x WITHOUT the trait lock; the contract is then visibly a DRAFT in README and catalog. The lock `release_frei` (`sperren/<programm>_v1.sha256`) is MANDATORY before the first FEATURE release (data over the contract). The Opus conditions 1, 3, 4, 5 are kept.
 # Every check is green only when it says so (`red == false`); a missing result is never green.
 document:
@@ -58,7 +62,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Runs the flow `feature-liste` (`workflows/feature-liste.yaml` of fs-release, in main): the complete feature list from the research goes to fs-documentation `todo/features/<programm>.md`, sorted into today / next / later (`- [ ]`/`- [x]`; note \"Feature-Freeze: offen (Nutzer)\"). `fenster` and `nutzer-doku` read \"today\" and \"next\" from this list (`$context.features`), not from an own input. There is no own input `was_kommt`; it is a RESULT of this step. The flow `feature-liste` is in main."
+        freesynergy.net:summary: "Runs the flow `feature-liste` (`workflows/feature-liste.yaml` of fs-release, in main): the complete feature list from the research goes to fs-documentation `todo/features/<programm>.md`, sorted into today / next / later (`- [ ]`/`- [x]`; note \"Feature-Freeze: offen (Nutzer)\"). `fenster` and `nutzer-doku` read \"today\" and \"next\" from this list (`$context.features`), not from an own input. It also delivers `vorbild` (the model, its pictures) and `hauptansicht` (areas and controls of the main view, from the plan table of the program) as RESULTS (`$context.features.vorbild`, `$context.features.hauptansicht`), read by `hauptansicht`. There is no own input `was_kommt`; it is a RESULT of this step. The flow `feature-liste` is in main."
   - vertrag-standard:
       call: run-flow:0.0.10@fs
       with:
@@ -122,6 +126,19 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - fills the crate `fs-<programm>-<frontend>` made by `frontend-crate` (no window compiled into the program) with fs-components (blocks first, none painted by hand): a window with the name, the icon and the list `was_kommt` (`$context.features.was_kommt`); PLACEHOLDER RULE (17 Nov.): a component or an icon that is missing is NOT replaced by a PNG placeholder but by the nearest EXISTING component (it may do less), honestly marked \"vorläufig\" (tooltip or hint in the window) and written into the gap list \"Lücken\" (DESIGN of the program) with the name of the missing real component (built in the background by lane 1, it replaces the stand-in later); elements that do not work yet are locked with \"kommt noch\" (ADR 0066), no grey window without a reason, STOP-KI wherever AI is used. Engine and frontend stay separate processes and crates."
+  - hauptansicht:
+      call: main-view-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        frontend: ${ .input.frontend }
+        vorbild: ${ $context.features.vorbild }
+        ansicht: ${ $context.features.hauptansicht }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: bilder-gate
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet (rule AUSSEHEN-SOFORT, b7 17 Nov.; specification: the workflow `main-view-ai:0.0.10@fs` has no script yet) - adds the FIRST REAL main view in the look of the model to the crate `fs-<programm>-<frontend>` as start page next to `Start` and `Was kommt` (screen `main`, pictures `--picture --screen main|main-empty`). Plan table per program: draw = board with tool bar and canvas; messages = conversation list, history, input; resources = list and detail; forms = form list and editor view; activities = timeline; broadcast = dashboard; decisions, workflows, data, paint likewise from their model dossier. Built ONLY from existing fs-components blocks (placeholder rule: the nearest existing component, marked \"vorläufig\", gap list \"Lücken\" in DESIGN, no PNG). Example data ONLY in `fs-<programm>-<frontend>/src/preview.rs` (typed, ids with the prefix `preview:`, no real personal data, never in core, server or client, never stored, exported or sent over the contract); `mode(capabilities)` switches them off as soon as the capability to read the area is there (per area never mixed); every write action in the preview is locked with a reason. Preview marker EXACTLY ONCE: an Alert (Info, title \"Vorschau\" / \"Preview\") at the top plus the title addition; per row at most the example name. LESSONS [AUSSEHEN-LEHREN], built against the model PICTURE, not against the plan text: navigation as a LEFT bar with symbols (the title of the main area = the active filter); groups as LARGE headings; rows with type symbol left, sentence with the object name in bold, time right and NO coloured badges per row; readable font size like the model and generous white space; an empty state with symbol and explanatory text (`main-empty`). Gate (picture gate `bilder-gate`): the picture pair model | ours with the SAME filter and state, see `bildpaar`; without the pair and the picture OK of the strategy there is no tag."
   - manifest:
       call: manifest-ai:0.0.10@fs
       with:
@@ -189,7 +206,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Binary test through build-slot.sh - `<programm> --version` and `fs-<programm>-<frontend> --version` exit 0 and the output contains the crate version, `--help` exits 0, an unknown option exits 2 with a message; the result is `red` or not. Carries red and runde (+1 for each jump back from `gates-again`). It mirrors the smoke test of the release flow (deb job, ubuntu:24.04 x86_64/aarch64)."
+        freesynergy.net:summary: "Binary test through build-slot.sh - `<programm> --version` and `fs-<programm>-<frontend> --version` exit 0 and the output contains the crate version, `--help` exits 0, an unknown option exits 2 with a message; MANDATORY test `server-unresponsive` (\"hanging instance\"): a server that does not answer ends the start in BOUNDED time with an error (code and parameters, MF2 key per ADR 0057), never a hang and never silent (pattern: fs-broadcast `a_hanging_instance_ends_the_start_with_an_error_in_bounded_time`); the result has `server_unresponsive` (test found and green); a missing test is RED (`red == true`), never green. The result is `red` or not. Carries red and runde (+1 for each jump back from `gates-again`). It mirrors the smoke test of the release flow (deb job, ubuntu:24.04 x86_64/aarch64)."
   - lehren-pruefen:
       call: lessons-check-ai:0.0.10@fs
       export:
@@ -199,7 +216,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Check points from the six basics (draw, messages, resources, forms, activities, tasks) - the result `lehren` is `red` or not, each point with evidence: (1) the `capabilities` result type of each contract (CapabilityList or flat) is read from fs-interfaces and the server answers with exactly that type; (2) `CONTRACT_VERSION` in the server when the core has none; (3) `release.yml`: ALL `uses` at `@v0.0.10` (or the newest chain); (4) `--version`, `-V`, `--help` answer BEFORE any window or socket, proven with `env -i`; (5) deb `depends = \"$auto, fs-<x>-simple (>= v)\"` (not the binary version) and the matching rpm requires; AppStream `compare=\"ge\"` in the metainfo; (6) tests: a Mutex around handshake tests (one server per process stops), ETXTBSY protection for stub starters (close and sync the file before exec); (7) Windows is said honestly (\"Linux (Windows/macOS follow)\"); (8) error texts: since the fs-rpc error codes the display uses `message_key()` and `params()` with MF2 de/en (ADR 0057), no English sentence from a library reaches the user; (9) the data folder is created only through `create_private` / `prepare_data_dir` (lesson fs-tasks: 0755); (10) the placeholder rule is kept (no PNG, stand-ins marked \"vorläufig\", gap list in DESIGN). Carries red and runde (+1 for each jump back from `gates-again`)."
+        freesynergy.net:summary: "Check points from the six basics (draw, messages, resources, forms, activities, tasks) - the result `lehren` is `red` or not, each point with evidence: (1) the `capabilities` result type of each contract (CapabilityList or flat) is read from fs-interfaces and the server answers with exactly that type; (2) `CONTRACT_VERSION` in the server when the core has none; (3) `release.yml`: ALL `uses` at `@v0.0.10` (or the newest chain); (4) `--version`, `-V`, `--help` answer BEFORE any window or socket, proven with `env -i`; (5) deb `depends = \"$auto, fs-<x>-simple (>= v)\"` (not the binary version) and the matching rpm requires; AppStream `compare=\"ge\"` in the metainfo; (6) tests: a Mutex around handshake tests (one server per process stops), ETXTBSY protection for stub starters (close and sync the file before exec); (7) Windows is said honestly (\"Linux (Windows/macOS follow)\"); (8) error texts: since the fs-rpc error codes the display uses `message_key()` and `params()` with MF2 de/en (ADR 0057), no English sentence from a library reaches the user; (9) the data folder is created only through `create_private` / `prepare_data_dir` (lesson fs-tasks: 0755); (10) the placeholder rule is kept (no PNG, stand-ins marked \"vorläufig\", gap list in DESIGN); (11) main view present (screen `main`), preview marker and `main-empty` picture exist, `mode()` test plus mutant, no real personal data in `preview.rs`, the lessons AUSSEHEN-LEHREN are met (left bar with symbols, large headings, rows without badges, readable font, empty state with symbol); (12) the test `server-unresponsive` exists and is green (missing = red); (13) the slot rule is kept (code written without a slot, built only after the release of a slot). Carries red and runde (+1 for each jump back from `gates-again`)."
   - gates:
       call: gates:0.0.10@fs
       export:
@@ -209,7 +226,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "scripts/gates.sh ([GATES]) through build-slot.sh, one at a time: cargo fmt --check, clippy (pedantic, -D warnings), tests (--locked), check-rust-rules; the result is `red` or not, rc is kept. Carries red and runde (the number of the round, +1 for each jump back from `gates-again`)."
+        freesynergy.net:summary: "scripts/gates.sh ([GATES]) through build-slot.sh, one at a time: cargo fmt --check, clippy (pedantic, -D warnings), tests (--locked), check-rust-rules; the test `server-unresponsive` is one of the tests (missing = red); the result is `red` or not, rc is kept. Carries red and runde (the number of the round, +1 for each jump back from `gates-again`)."
   - gates-again:
       switch:
         - runden:
@@ -271,7 +288,36 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "[THEME-WAECHTER] - every picture carries the requested theme and a token colour at a fixed place must fit it; a wrong theme is RED. A picture of a run whose guard is missing or red is no evidence: the verdict is not asked for. Specification: `theme-waechter-check` has no script yet, a missing result stops the flow before `picture-ok`, never green."
+        freesynergy.net:summary: "[THEME-WAECHTER] - every picture carries the requested theme and a token colour at a fixed place must fit it; a wrong theme is RED. A picture of a run whose guard is missing or red is no evidence: the verdict is not asked for. Pictures `main` and `main-empty` of the main view (`hauptansicht`) are taken too. Specification: `theme-waechter-check` has no script yet, a missing result stops the flow before `picture-ok`, never green."
+  - bildpaar:
+      call: picture-pair-check:0.0.10@fs
+      with:
+        images: ${ $context.images }
+        vorbild: ${ $context.features.vorbild }
+        screens:
+          - main
+          - main-empty
+      export:
+        as: '${ $context + { bildpaar: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: bilder-gate
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Picture gate of the main view (specification, no script yet): for `main` and `main-empty` (de and en) BOTH pictures exist - the model picture and ours - with the SAME filter and the SAME state (same active filter, language and theme); model pictures come from the model round (podman, local, no terms of service agreed; documentation pictures only from public pages), never from a run that agreed to a licence dialog. A missing model picture, a missing main view picture or a pair with a different state is RED (`red`), never green. The picture OK of the strategy (b7) on these pairs is MANDATORY: no tag without it (`vor-tag`)."
+  - bildpaar-weiche:
+      switch:
+        - rot:
+            when: ${ $context.bildpaar.red != false }
+            then: bild-eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red or missing picture pair goes to `bild-eskalation` (the person completes the model pictures), never on to the verdict; only `red == false` goes on to `picture-ok`."
   - picture-ok:
       run:
         workflow:
@@ -283,6 +329,7 @@ do:
           model: ${ .input.vorbild }
           ours: ${ $context.images }
           waechter: ${ $context.waechter }
+          paare: ${ $context.bildpaar }
       export:
         as: '${ $context + { verdict: . } }'
       metadata:
@@ -290,7 +337,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "No picture OK of the user is needed (decision b7, 17 Nov.): the STRATEGY looks at the pictures (window and documentation picture, side by side with the model, the `dossier` handed over like in `frontend-round`) and gives the verdict; the result is `accepted`. Pictures without a green `waechter` (`red == false`) are no evidence. Without a verdict the flow does not go on."
+        freesynergy.net:summary: "No picture OK of the user is needed (decision b7, 17 Nov.): the STRATEGY looks at the pictures (window, main view and documentation picture, side by side with the model as a pair with the same filter and state, `bildpaar`, the `dossier` handed over like in `frontend-round`) and gives the verdict; the result is `accepted`. Pictures without a green `waechter` (`red == false`) are no evidence. Without a verdict the flow does not go on."
   - bild-zaehlen:
       set:
         n: ${ ($context.bild_runde.n // 0) + 1 }
@@ -347,7 +394,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Sonnet - the result of the run: `was_kommt` (from `feature-liste`, `$context.features.was_kommt`, no own input), the gap list \"Lücken\" (every stand-in component marked \"vorläufig\" with the name of the missing real component; no PNG placeholder), the contract state (draft or locked), the version = tag (versions may currently jump, e.g. the basics directly v0.0.2; later no longer; the user announces it) and the verdict of the strategy. Honest: what is only a stand-in is said as such."
+        freesynergy.net:summary: "Sonnet - the result of the run: `was_kommt` (from `feature-liste`, `$context.features.was_kommt`, no own input), the gap list \"Lücken\" (every stand-in component marked \"vorläufig\" with the name of the missing real component; no PNG placeholder), the contract state (draft or locked), the version = tag (versions may currently jump, e.g. the basics directly v0.0.2; later no longer; the user announces it) and the verdict of the strategy, the state of the main view (preview marker, picture pairs `main` and `main-empty`) and the bundle answer. Honest: what is only a stand-in is said as such."
   - release-sperre:
       switch:
         - ohne-sperre:
@@ -374,7 +421,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Before ANY tag: (1) the branch CI of ALL workflows (also Windows where it exists) is green on exactly this head - checked, not assumed; (2) every condition of the Opus review (also of the Nachblick, delta look) is resolved: NO tag with an open condition (lesson messages v0.0.3); (3) for `art: feature` the lock `release_frei` is there. The result is `red` or not; a missing result is never green."
+        freesynergy.net:summary: "Before ANY tag: (1) the branch CI of ALL workflows (also Windows where it exists) is green on exactly this head - checked, not assumed; (2) every condition of the Opus review (also of the Nachblick, delta look) is resolved: NO tag with an open condition (lesson messages v0.0.3); (3) for `art: feature` the lock `release_frei` is there; (4) the picture OK of the strategy (b7) on the picture pairs of the main view is there (`bildpaar`, `picture-ok`): no tag without it. The result is `red` or not; a missing result is never green."
   - vor-tag-weiche:
       switch:
         - rot:
@@ -388,6 +435,36 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - `red` or a missing result ends the flow here (the person decides); only `red == false` goes on to the release."
+  - buendel-frage:
+      call: ask:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        tag: ${ .input.tag }
+        frage: "Bundle complete? Otherwise keep collecting."
+      export:
+        as: '${ $context + { buendel: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Decision question to the STRATEGY before every release ([BUENDEL-RELEASE], b7 17 Nov.): \"Bundle complete? Otherwise keep collecting.\" The question names the content of the bundle - the functions, the fixes and the dependencies (pins) that go out with this tag; at most ONE release per program and day. The answer is `buendel` with `vollstaendig` (true/false) and `blocker` (true only for a blocker for the user: program does not start, data loss, security). Every release costs CI time and a signing release of the user. No answer is no yes."
+  - buendel-weiche:
+      switch:
+        - blocker:
+            when: ${ $context.buendel.blocker == true }
+            then: continue
+        - vollstaendig:
+            when: ${ $context.buendel.vollstaendig == true }
+            then: continue
+        - sammeln:
+            then: buendel-sammeln
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a complete bundle or a blocker goes on to the release; everything else (bundle not complete, no answer) goes to `buendel-sammeln`: keep collecting, NO tag. A single release only for a blocker."
   - release:
       then: end
       run:
@@ -411,6 +488,16 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: "release-flow.yaml holds the ONE Opus review of this head (bound to exactly this head, green branch CI of all workflows first), then tag, CI, release; for `art: feature` the trait lock `release_frei` must be there first (`vertrag-standard`, `release-sperre`); a basics release may go out with the draft contract; push and tag only through the flow `ff-und-tag` (until that file exists: the steps of `release-flow`), the tag only after the review YES (and the open Opus conditions resolved, `vor-tag`) through the strategy's helper, never by an agent. Versions may currently jump (the basics directly v0.0.2); version = tag. There is no second review here."
+  - buendel-sammeln:
+      set:
+        todo: buendel-sammeln
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The bundle is not complete (rule [BUENDEL-RELEASE]): the work stays on the collecting branch (branch chain), Opus reviews each part as before, nothing is tagged; the next functions and fixes are collected and the question `buendel-frage` is asked again at the next head. This flow ends."
   - bild-eskalation:
       set:
         todo: bild-eskalation
