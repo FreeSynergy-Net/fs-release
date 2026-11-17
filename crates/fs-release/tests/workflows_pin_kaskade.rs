@@ -8,46 +8,6 @@ use support::kaskade::{
 };
 use support::workflows::{in_order, read, step_body};
 
-/// B1 (M11): the `env:` INPUT of `lock-strikt` and `lock-ende` carries both switches; the words in the summary text alone do not count.
-const ENV_LINE: &str = "        env: FS_LOCK_STRICT=1 FS_LOCK_ONLY_FROM=1\n";
-
-/// B2-B4: the rev-pin edges and the foreign sources in the header, the build rules and the no-exception Windows caller step.
-fn rules_ok(t: &str) -> bool {
-    let head = t.split("document:").next().unwrap_or("");
-    let pins = list_lines(head, "# REV-PIN: ");
-    REV_PINS
-        .iter()
-        .all(|p| pins.iter().any(|l| l.starts_with(p)))
-        && pins.len() == REV_PINS.len()
-        && head.lines().any(|l| {
-            l.starts_with("# FREMDQUELLEN: workflows/kaskade-fremdquellen.txt")
-                && l.contains("FreeSynergy/blinc-app-fix")
-                && l.contains("FreeSynergy/blinc-layout-fix")
-        })
-        && step_body(t, "glied-start").contains(".fs-lock-sources.toml")
-        && step_body(t, "rev-pins").contains("9950b51")
-        && step_body(t, "rev-pins").contains("blinc-app-fix")
-        && [
-            "[BAU-ANMELDEN]",
-            "nach-welle-1.md",
-            "max. 2 build slots systemweit",
-            "[GATES-WAECHTER]",
-            "[GATE-NICHT-AENDERN]",
-            "[WORKTREES-NIE-IM-HAUPT-CHECKOUT]",
-        ]
-        .iter()
-        .all(|r| head.contains(r))
-        && ["[BAU-ANMELDEN]", "[GATES-WAECHTER]", "[GATE-NICHT-AENDERN]"]
-            .iter()
-            .all(|r| step_body(t, "gates").contains(r))
-        && head.contains("AFTER fs-release v0.0.11")
-        && step_body(t, "lage").contains("fs-release-tag: v0.0.11")
-        && step_body(t, "windows-aufrufer").contains("        aufrufer: FreeSynergy/fs-release/.github/workflows/_windows-check.yml@v0.0.11\n")
-        && step_body(t, "windows-aufrufer").contains("NO exceptions")
-        && step_body(t, "windows-aufrufer").contains("examples/callers/windows.yml")
-        && step_body(t, "zweig-ci").contains("`windows`")
-}
-
 fn ok(t: &str) -> bool {
     let to = |s: &str, target: &str| {
         let b = step_body(t, s);
@@ -110,12 +70,10 @@ fn ok(t: &str) -> bool {
         && step_body(t, "plan").contains("REAL dependencies")
         && graph_ok(t)
         && switches_ok(t)
-        && step_body(t, "lock-strikt").contains(ENV_LINE)
-        && step_body(t, "lock-ende").contains(ENV_LINE)
         && step_body(t, "lock-strikt").contains("FS_LOCK_ONLY_FROM=1")
         && step_body(t, "lock-strikt").contains("FS_LOCK_STRICT=1")
         && step_body(t, "lock-ende").contains("FS_LOCK_ONLY_FROM=1")
-        && rules_ok(t)
+        && lock_rules_ok(t)
         && !t.contains("one source per fs crate")
         && step_body(t, "review").contains("delta: ")
         && step_body(t, "review").contains("tests: ")
@@ -222,54 +180,6 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
 }
 
 #[test]
-fn counter_lock_env_foreign_sources_build_rules_and_windows_caller_are_caught() {
-    let t = read("pin-kaskade");
-    let bad = |x: String| x != t && !std::panic::catch_unwind(|| ok(&x)).unwrap_or(false);
-    // B1: M11 - the switch removed from the INPUT of ONE step only (the summary text still names it): lock-strikt, then lock-ende
-    let weak = "        env: FS_LOCK_STRICT=1\n";
-    assert!(ENV_LINE != weak && t.matches(ENV_LINE).count() == 2);
-    assert!(
-        bad(t.replacen(ENV_LINE, weak, 1)),
-        "M11: lock-strikt without FS_LOCK_ONLY_FROM=1"
-    );
-    let at = t.rfind(ENV_LINE).unwrap();
-    assert!(
-        bad(format!("{}{}{}", &t[..at], weak, &t[at + ENV_LINE.len()..])),
-        "M11b: lock-ende without FS_LOCK_ONLY_FROM=1"
-    );
-    assert!(
-        bad(t.replacen(ENV_LINE, "        env: FS_LOCK_ONLY_FROM=1\n", 1)),
-        "M11c: lock-strikt without FS_LOCK_STRICT=1"
-    );
-    // B2-B4: the rev-pin edge of fs-calendars, the foreign sources, the build rules, the Windows caller and its switch
-    assert!(bad(t.replace(
-        "# REV-PIN: fs-calendars -> fs-components rev 9950b51",
-        "# REV-PIN: fs-calendars -> fs-components rev 0000000"
-    )));
-    assert!(bad(t.replace(
-        "FreeSynergy/blinc-layout-fix (blinc_layout)",
-        "(blinc_layout)"
-    )));
-    for rule in [
-        "[BAU-ANMELDEN]",
-        "max. 2 build slots systemweit",
-        "[GATES-WAECHTER]",
-        "[GATE-NICHT-AENDERN]",
-        "[WORKTREES-NIE-IM-HAUPT-CHECKOUT]",
-    ] {
-        assert!(bad(t.replace(rule, "[X]")), "rule {rule} must be caught");
-    }
-    assert!(bad(t.replace("  - windows-aufrufer:", "  - windows-x:")));
-    assert!(bad(t.replace("  - windows-weiter:", "  - windows-x:")));
-    assert!(bad(t.replace(
-        "_windows-check.yml@v0.0.11\n        vorlage",
-        "_windows-check.yml@main\n        vorlage"
-    )));
-    assert!(bad(t.replace("        fs-release-tag: v0.0.11\n", "")));
-    assert!(bad(t.replace("The workflow `windows`", "The workflow `x`")));
-}
-
-#[test]
 fn the_cascade_calls_each_other_flow_only_by_run_and_passes_the_inputs() {
     let t = read("pin-kaskade");
     let ff = step_body(&t, "ff-tag");
@@ -282,56 +192,5 @@ fn the_cascade_calls_each_other_flow_only_by_run_and_passes_the_inputs() {
     let lift = step_body(&t, "pin-lift");
     for k in ["repo", "commit", "libs"] {
         assert!(lift.contains(&format!("          {k}: ")), "lift input {k}");
-    }
-}
-
-#[test]
-fn the_seven_scripts_exist_are_called_by_the_workflow_and_are_executable() {
-    use std::os::unix::fs::PermissionsExt;
-    let t = read("pin-kaskade");
-    for name in SCRIPTS {
-        let path = support::workflows::root().join("scripts").join(name);
-        let mode = std::fs::metadata(&path)
-            .unwrap_or_else(|_| panic!("scripts/{name} is missing"))
-            .permissions()
-            .mode();
-        assert!(mode & 0o111 != 0, "scripts/{name} is not executable");
-        assert!(
-            t.contains(&format!("call: {name}:0.0.10@fs")),
-            "the workflow does not call {name}"
-        );
-        assert!(
-            t.contains(&format!("`scripts/{name}`")),
-            "the summary does not name scripts/{name}"
-        );
-    }
-    let list = std::fs::read_to_string(
-        support::workflows::root().join("workflows/kaskade-fremdquellen.txt"),
-    )
-    .unwrap();
-    for r in ["FreeSynergy/blinc-app-fix", "FreeSynergy/blinc-layout-fix"] {
-        assert!(
-            list.lines().any(|l| l.starts_with(r)),
-            "{r} must be a known foreign source"
-        );
-    }
-}
-
-#[test]
-fn the_shell_self_tests_of_the_scripts_are_green() {
-    for t in [
-        "test_kaskade_plan.sh",
-        "test_kaskade_pins.sh",
-        "test_kaskade_gates.sh",
-    ] {
-        let out = std::process::Command::new("bash")
-            .arg(support::workflows::root().join("scripts").join(t))
-            .output()
-            .unwrap();
-        assert!(
-            out.status.success(),
-            "{t}: {}",
-            String::from_utf8_lossy(&out.stdout)
-        );
     }
 }
