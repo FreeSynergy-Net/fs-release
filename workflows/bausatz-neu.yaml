@@ -12,6 +12,65 @@ document:
   version: 0.0.10
   title: Create a data kit (ADR 0098) - existing first, 2 users, standard per field, description, storage plan, release, trait review
 do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.10@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.10@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): `befund` without proof is RED - `neu` needs a reason and a proof (what was searched), `vorhanden` needs a reference \"extend X\"; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - vorhanden-weiche:
+      switch:
+        - vorhanden:
+            when: '${ $context.befund.art == "vorhanden" }'
+            then: abbruch
+        - neu:
+            when: '${ $context.befund.art == "neu" }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - `vorhanden` ends the run with the reference \"extend X\" (no new build); `neu` (with proof, checked above) goes on; a missing result goes to the escalation."
   - karte:
       call: board-card:0.0.10@fs
       with:
@@ -23,40 +82,12 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
-  - vorhandenes-zuerst:
-      call: vorhandenes-zuerst-ai:0.0.10@fs
-      with:
-        name: ${ .input.name }
-        felder: ${ .input.felder }
-      export:
-        as: '${ $context + { vorhanden: . } }'
-      metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Look at the kits in fs-types and the base types (`types.capnp`) and at the `unreviewed/` branches and `.scratch` (N10). Result `treffer`; a hit means: no new kit."
-  - vorhanden-weiche:
-      switch:
-        - treffer:
-            when: '${ $context.vorhanden.treffer != null and ($context.vorhanden.treffer | length) > 0 }'
-            then: abbruch
-        - keine:
-            when: '${ $context.vorhanden.treffer != null and ($context.vorhanden.treffer | length) == 0 }'
-            then: continue
-        - ohne-ergebnis:
-            then: eskalation
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a hit ends the run with a reference; an empty list goes on; a missing result goes to `eskalation`."
   - nutzer-pruefen:
       call: nutzer-zaehlen:0.0.10@fs
       with:
         art: bausatz
         nutzer: ${ .input.nutzer }
+        befund: ${ $context.befund }
       export:
         as: '${ $context + { nutzer: . } }'
       metadata:
@@ -127,12 +158,13 @@ do:
       with:
         name: ${ .input.name }
         medientyp: ${ .input.medientyp }
+        befund: ${ $context.befund }
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Description of the kit in fs-types: fields, form duty, media type; no duty beyond the form (a duty only in contracts)."
+        freesynergy.net:summary: "Description of the kit in fs-types on the branch `unreviewed/bausatz-<name>` (local commit, no push): fields, form duty, media type; no duty beyond the form (a duty only in contracts)."
   - beschreibung-check:
       call: bausatz-form-regel:0.0.10@fs
       with:
@@ -247,15 +279,10 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `freigabe-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
-  - trait-pruefung:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: trait-delta
-          version: 0.0.10
-        input:
-          name: ${ .input.name }
-          teil: review
+  - trait-review:
+      call: trait-review-opus:0.0.10@fs
+      with:
+        name: ${ .input.name }
       export:
         as: '${ $context + { urteil: . } }'
       metadata:
@@ -263,8 +290,8 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Opus look through the flow `trait-delta`: verdict YES or NO for the kit."
-  - trait-pruefung-again:
+        freesynergy.net:summary: "Own review step of Opus (NOT the flow `trait-delta`): report, line 1 YES or NO for the kit. Reads only; no build."
+  - trait-review-again:
       switch:
         - runden:
             when: '${ $context.urteil.verdict == "NEIN" and ($context.urteil.runde // 0) >= 3 }'
@@ -303,7 +330,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Abort with a reference (hit of `vorhandenes-zuerst` or fewer than 2 users): no new kit; the report names the reference. The run ends here."
+        freesynergy.net:summary: "Abort with a reference (hit of `vorhanden-pruefen` or fewer than 2 users): no new kit; the report names the reference. The run ends here."
   - eskalation:
       set:
         todo: eskalation

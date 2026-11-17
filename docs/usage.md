@@ -290,18 +290,22 @@ Branch CI = `lint` + `branch-ci`: a push to `unreviewed/**` runs the Rust gates 
 ## Scaffold of the kit (`geruest-heben`, `modul-neu`, `bausatz-neu`, `ausnahme-gespraech`)
 
 Run 9, specification (the `@fs` calls have no script yet, a real run is not proven; source `katalog-plan/PFLEGE9-AUFTRAG-workflows.md`, plan section c2).
-`workflows/geruest-heben.yaml` sorts code of the programs into scaffold crates: state (heads by `git ls-remote`), trait draft, review through `trait-delta` (part `review`),
+`workflows/geruest-heben.yaml` sorts code of the programs into scaffold crates: state (heads by `git ls-remote`), trait draft, review through the own Opus step `trait-review` (not `trait-delta`),
 crate scaffold, help part, then the sort-in step WITHOUT a build ("Zunächst NICHT kompilieren (spart Slots)"; every copied file starts with `//! Herkunft: <repo>@<kopf>:<pfad>`, the programs stay unchanged),
-the unclear list `UNKLAR-<crate>.md`, the conversation `talk` (user and Opus, gate `human`) and only then, when the layer is complete, the bundled build through `build-slot.sh`
+the unclear list `UNKLAR-<crate>.md`, `talk-vorbereiten`, the conversation `talk` (user and Opus, gate `human`) and only then, when the input `schicht_fertig` is true, the bundled build through `build-slot.sh`
 (`set -o pipefail`, rc per gate, no output cut with `tail`/`head`). `modul-neu` and `bausatz-neu` create a module or a data kit only when nothing exists (existing first),
 enough programs need it (module 2, specialist module 1, kit 2) and every field has a standard. `ausnahme-gespraech` (replaces `ausnahme-beleg`): an `[[exception]]` exists only with `talk`,
 the protocol of a conversation of the user and Opus; no agent decides it alone. Every check step is `<step>-check` plus `<step>-again` (at most two repeats, then `eskalation`).
 The step `doku-hilfe` (help = docs) proves a marked help part of the program page in fs-documentation (en and de, input `programmseite`); it stands in `modul-neu`, `geruest-heben` and `grundfassung`.
-`lift` and `lift-v1plus` stay as they are (they raise library tags; `geruest-heben` is the sorting in).
+`lift` and `lift-v1plus` stay as they are (they raise library tags; `geruest-heben` is the sorting in). `geruest-lift` is created INACTIVE (until `fs-blueprint` exists): it raises `skeleton`, generates, calls `lift` unchanged and checks.
 
 ## Review template frontend (`frontend-nur-komponenten`)
 
 Review template frontend (rule of the user, lane 3): a frontend holds ONLY the plugging together of components from fs-components plus theme, style, menu tree and texts; logic, own widgets or data conversion are a finding. Step `frontend-nur-komponenten` (input `frontend_crate`, Opus reads only the crate; a finding goes to the conversation `frontend-befund-talk`, user + Opus, at most two repeats, then `eskalation`) before the picture acceptance in `grundfassung` (before `picture-ok`), `frontend-round` (before `acceptance`) and `frontend-umbau` (before `release`); the description is in `review`. A missing component is built in fs-components (or the nearest existing one stands in); logic belongs into the program or the modules through the contract.
+
+## Look first (`vorhanden-pruefen`)
+
+Mandatory first step `vorhanden-pruefen` (rule of the user: before anything is built, look whether it already exists and whether it is only extended): the first step in `geruest-heben`, `modul-neu`, `bausatz-neu`, `grundfassung`, `frontend-umbau` and `stil-neu`; it searches all repos, `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`); output `befund` = `vorhanden` ("extend X") or `neu` WITH a reason and proof; a `befund` without proof is red (`vorhanden-pruefen-check`, at most two repeats); the next step reads `befund`. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. `doku-hilfe` follows ADR 0072 [akz.] (manual in the wiki, block with purpose `help.<topic>`, one source).
 
 ## Trait delta (`trait-delta`)
 

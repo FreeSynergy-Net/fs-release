@@ -10,6 +10,7 @@
 # and `abstand` therefore run the Rust tests of fs-components (`block_tokens.rs`: one entry per style for ALL blocks, 16 block_tokens; `blocks_styles.rs`: distance r >= 0.25 to
 # every other style) through /srv/FreeSynergy/.scratch/build-slot.sh; the scripts follow as their own work, then the call names `stil-vollstaendigkeit` and `zwei-stile` replace the test run.
 # The names `contrast-gate`, `theme-guard` and `picture-gate` are specifications, not runnable (see the status table in README.md).
+# Mandatory first step `vorhanden-pruefen` (rule of the user): look whether it exists or is only extended; the result `befund` (with proof) is read by the following steps.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -17,9 +18,53 @@ document:
   version: 0.0.10
   title: Create a new style in fs-components-styles - dossier, contract, tokens, blocks, gates, pictures, review, user OK, release
 do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.10@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. The following steps read `befund`; nothing is built without it."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.10@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): `befund` without proof is RED - `neu` needs a reason and a proof (what was searched), `vorhanden` needs a reference \"extend X\"; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never on."
   - dossier:
       call: dossier-ai:0.0.10@fs
       with:
+        befund: ${ $context.befund }
         stil: ${ .input.stil }
         vorbild: ${ .input.vorbild }
         dossier: ${ .input.dossier }

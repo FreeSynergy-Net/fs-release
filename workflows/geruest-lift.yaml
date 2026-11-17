@@ -1,0 +1,91 @@
+# INACTIVE (only created, not to be run): lifts the `skeleton` version in the blueprint of a program, generates, runs the existing flow `lift` UNCHANGED and checks. Active only when `fs-blueprint` exists (plan section e, M4).
+# Order: `Workflow geruest-lift, step <id>, parameters programm, repo, skeleton_neu, libs` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
+# DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main, tag or merge; output only on `unreviewed/<workflow>-<ziel>` branches; no `gh` call; reports per [BERICHT]; one board card per run (fs-tasks).
+# Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
+# Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
+# Inputs: `programm`, `repo`, `skeleton_neu` (the new scaffold version), `libs` (tags of the libraries, as `lift` takes them).
+# `lift` and `lift-v1plus` stay as they are: `lift` lifts library tags per program, this flow lifts the `skeleton` of the blueprint and then CALLS `lift`. No step runs before `fs-blueprint` exists.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: geruest-lift
+  version: 0.0.10
+  title: Lift the scaffold version of a program - INACTIVE, only created; active from fs-blueprint on (plan baukasten section c2)
+do:
+  - bauplan-anheben:
+      call: bauplan-anheben-ai:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+        skeleton_neu: ${ .input.skeleton_neu }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "INACTIVE until `fs-blueprint` exists. Raise `skeleton` in the blueprint of the program to `skeleton_neu` (local commit on `unreviewed/geruest-lift-<programm>`, no push)."
+  - erzeugen:
+      call: fs-blueprint-generate:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "INACTIVE until `fs-blueprint` exists. `fs-blueprint generate` - the generated part is not written by hand."
+  - lift:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: lift
+          version: 0.0.10
+        input:
+          repo: ${ .input.repo }
+          commit: true
+          libs: ${ .input.libs }
+      export:
+        as: '${ $context + { lift: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (library tags of the program)."
+  - check:
+      call: fs-blueprint-check:0.0.10@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { bauplancheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "INACTIVE until `fs-blueprint` exists. `fs-blueprint check` - the generated part equals the blueprint; red is a finding."
+  - check-again:
+      switch:
+        - red:
+            when: '${ $context.bauplancheck.red == true }'
+            then: eskalation
+        - green:
+            when: '${ $context.bauplancheck.red == false }'
+            then: end
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red or a missing result goes to `eskalation`; only `red == false` ends the flow."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a NO came for the third time, a decision is open, or a result is missing: the loop stops and the person decides. The report names the step and the last red result; nothing goes on by itself."

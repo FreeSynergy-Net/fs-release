@@ -9,7 +9,7 @@ fn stop_on_hit_ok(t: &str) -> bool {
     in_order(
         t,
         &[
-            "vorhandenes-zuerst",
+            "vorhanden-pruefen",
             "vorhanden-weiche",
             "nutzer-pruefen",
             "nutzer-weiche",
@@ -22,14 +22,14 @@ fn stop_on_hit_ok(t: &str) -> bool {
 
 fn modul_ok(t: &str) -> bool {
     let order = [
+        "vorhanden-pruefen",
         "karte",
-        "vorhandenes-zuerst",
         "nutzer-pruefen",
         "standard-pruefen",
         "ort",
         "kommunikation",
         "beschreibung",
-        "trait-pruefung",
+        "trait-review",
         "anlegen",
         "katalog-vorschlag",
         "doku-hilfe",
@@ -50,13 +50,15 @@ fn modul_ok(t: &str) -> bool {
                 ("doku-hilfe", "doku-hilfe"),
             ],
         )
-        && again_ok(t, "trait-pruefung-again", "beschreibung", "eskalation")
+        && again_ok(t, "trait-review-again", "beschreibung", "eskalation")
         && step_body(t, "nutzer-pruefen").contains("at least 2 users")
         && step_body(t, "nutzer-pruefen").contains("at least 1")
         && step_body(t, "ort").contains("crates.io")
         && step_body(t, "kommunikation").contains("WebAssembly")
         && step_body(t, "katalog-vorschlag-check").contains("gen_catalog --check")
-        && step_body(t, "trait-pruefung").contains("name: trait-delta")
+        && step_body(t, "trait-review").contains("call: trait-review-opus:")
+        && !step_body(t, "trait-review").contains("name: trait-delta")
+        && step_body(t, "katalog-vorschlag").contains("freesynergy.net:gate: strategie-ok")
 }
 
 #[test]
@@ -87,14 +89,14 @@ fn counter_modul_neu_a_hit_that_does_not_abort_and_a_green_on_missing_result_are
 
 fn kit_ok(t: &str) -> bool {
     let order = [
+        "vorhanden-pruefen",
         "karte",
-        "vorhandenes-zuerst",
         "nutzer-pruefen",
         "standard-pruefen",
         "beschreibung",
         "erzeugen-plan",
         "freigabe-pruefen",
-        "trait-pruefung",
+        "trait-review",
         "bericht",
         "abbruch",
         "eskalation",
@@ -111,7 +113,7 @@ fn kit_ok(t: &str) -> bool {
                 ("freigabe-pruefen", "freigabe-pruefen"),
             ],
         )
-        && again_ok(t, "trait-pruefung-again", "beschreibung", "eskalation")
+        && again_ok(t, "trait-review-again", "beschreibung", "eskalation")
         && step_body(t, "nutzer-pruefen").contains("at least 2 programs")
         && step_body(t, "erzeugen-plan").contains("no JSON or blob column")
         && step_body(t, "freigabe-pruefen").contains("ADR 0098 point 4.6")
