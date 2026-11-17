@@ -301,6 +301,35 @@ flow as step 1b; it also runs alone. The `@fs` calls have no script yet (specifi
 
 Before a branch goes to `main` by fast-forward, the steps `adresse-pruefen` of `release-flow` (after `lock-pruefung`, before `review-request`) and `agent-run` (after `fmt`, before `review`) check the range `main..HEAD`: `git log --format='%ae %ce' main..HEAD` lists author and committer address of every commit, and only the identity in the key `FS_ALLOWED_IDENTITY` (value `support@freesynergy.net`) is allowed. Every other address, as author or as committer, is a hit without exception (also machine and bot addresses): the step is red, the branch is rewritten first (author and committer = the allowed identity) and the check runs again. The step names the commit, never an address. The check sits before the review because a rewrite makes a new head and a JA is bound to exactly one head (a new head makes a JA invalid); after the tag a rewrite would leave a public tag on the old commits. Agents and bots must commit with the allowed identity (FS_ALLOWED_IDENTITY); any other author or committer address in `main..HEAD` counts as a finding and the branch is rewritten before the review. Specification: the `@fs` call `identity-check` has no script yet.
 
+## Menus (`picture-acceptance`, dossier template)
+
+Menus count as looks. `picture-acceptance` has the objective step `menue-vergleich` (specification, `@fs`, no script yet): input is the
+menu tree of the dossier, result `menue_bilder` = one pair model | ours per main menu (`<programm>-menue-<hauptmenue>-vorbild|unser.png`)
+and per context menu (`<programm>-kontext-<ort>-vorbild|unser.png`). No menu tree in the dossier is red (`dossier-menue-fehlt`: first
+complete the dossier), a missing pair is red (`menue-bild-fehlt`). Order: picture package model | ours first, THEN build. "Rebuild"
+means structure, naming, order, shortcuts and behaviour; the style comes through the style layers (frontends / style layers), it is
+not copied (ADR 0013).
+
+Dossier template (flow `dossier`, step `research`; the short dossier of `feature-liste` has the same sections): required sections
+`Menübaum (vollständig)` (every main menu opened: entries, order, separators, submenus, check marks / radio groups, disabled entries,
+shortcuts), `Kontextmenüs` (right click on an element and on empty space, per place), `Werkzeugleiste` (buttons in order) and
+`Tastenkürzel`. Source: official documentation screenshots or the real program in a container (concept only, no code, no graphics).
+Rule: what is not proven is written `nicht belegt`, never invented. `feature-liste` takes the section `Menübaum je Vorbild` into the list.
+
+Capabilities `fs-components` must offer, so that every program defines its menus freely (a program that follows its model needs all of them):
+
+- menu bar and menus per program, freely defined (entries, order, names)
+- submenus (any depth)
+- separators and groups
+- shortcut display (and the binding itself)
+- check marks and radio groups
+- disabled entries (and hidden ones)
+- context menus (on an element and on empty space)
+- keyboard operation (open with Alt / F10, arrow keys, mnemonic letters, Enter, Esc)
+
+If one of these is missing, the round does not work around it in the program: it starts a component run in fs-components (the
+workflow of the component care; none exists as a file yet, so `workflow-pflege` writes it first) and builds on the result.
+
 ## Required package metadata
 
 The plan step fails early unless every package that owns binaries declares `authors`, `description`,

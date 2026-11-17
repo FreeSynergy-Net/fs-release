@@ -1,5 +1,7 @@
 # Pictures of a Frontend: model (Vorbild) against ours, two verdicts. FS profile: see README.md.
 # [THEME-WAECHTER]: pictures count as evidence only with a green theme guard (`waechter.red == false`, see testlauf); without it the verdict is not asked for.
+# [MENUES-ZUM-AUSSEHEN] Menus count as looks (user, b7): the pictures show not only the content area but, per main menu and per context menu, the model and ours side by side; the picture package names are `<programm>-menue-<hauptmenue>-vorbild|unser.png` and `<programm>-kontext-<ort>-vorbild|unser.png`. Order: picture package (model | ours) first, THEN build (frontend-round). The look is made through the style layers, not copied; \"rebuild\" means structure, naming, order, shortcuts and behaviour (ADR 0013).
+# Input: model, ours, waechter, dossier (folder of the model dossier with the full menu tree: menus.md, context-menus.md, toolbar, shortcuts; see docs/usage.md \"Menus\").
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -7,6 +9,36 @@ document:
   version: 0.0.10
   title: Show model and our pictures, take the strategy's and the user's verdict
 do:
+  - menue-vergleich:
+      call: menu-images:0.0.10@fs
+      with:
+        dossier: ${ .input.dossier }
+        model: ${ .input.model }
+        ours: ${ .input.ours }
+      export:
+        as: '${ $context + { menue_bilder: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Specification (@fs, like the other steps; no script yet). Input is the menu tree of the dossier (sections Menübaum (vollständig), Kontextmenüs, Werkzeugleiste, Tastenkürzel). Result `menue_bilder` is the list of pairs model | ours, ONE pair per main menu (opened, every entry, `<programm>-menue-<hauptmenue>-vorbild|unser.png`) and ONE pair per context menu (right click on an element and on empty space, `<programm>-kontext-<ort>-vorbild|unser.png`). Flags: `baum_fehlt` (the dossier has no menu tree), `paar_fehlt` (a pair is missing: a main menu or context menu of the dossier without model picture or without our picture), `red` (one of both). A missing result is never green."
+  - menue-weiche:
+      switch:
+        - baum-fehlt:
+            when: '${ $context.menue_bilder.baum_fehlt }'
+            then: dossier-menue-fehlt
+        - paar-fehlt:
+            when: '${ $context.menue_bilder.paar_fehlt or $context.menue_bilder.red }'
+            then: menue-bild-fehlt
+        - gruen:
+            then: pictures
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a missing menu tree in the dossier is red and goes to `dossier-menue-fehlt` (first complete the dossier); a missing picture pair is red and goes to `menue-bild-fehlt`; only a complete package goes on to `pictures`. Nothing is built before the package Vorbild|unser exists."
   - pictures:
       call: show-images:0.0.10@fs
       with:
@@ -43,3 +75,24 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The result is `accepted` or not; the calling round decides where it goes on (in frontend-round `picture-again` sends a not accepted result back to gap-list with the user's words as the order).
+      then: end
+  - dossier-menue-fehlt:
+      set:
+        todo: dossier-menue-fehlt
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Escalation - the dossier has no complete menu tree; the order is \"first complete the dossier\" (flow `dossier`, step `research`: sections Menübaum (vollständig), Kontextmenüs, Werkzeugleiste, Tastenkürzel). Without it no picture of ours is taken and nothing is built. This flow ends."
+  - menue-bild-fehlt:
+      set:
+        todo: menue-bild-fehlt
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A picture pair is missing (a main menu or a context menu without model or without our picture); the round that called this flow takes the missing pictures first (name scheme in the header). This flow ends."
