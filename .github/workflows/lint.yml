@@ -21,7 +21,7 @@ jobs:
       - name: shellcheck
         run: shellcheck -x -S warning scripts/*.sh scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh actions/*/*.sh
       - name: python
-        run: python3 -I -m py_compile actions/plan/plan.py actions/library-release/notes.py scripts/check-no-pkill scripts/check_lock_sources.py scripts/check_job_status.py scripts/check-mkdocs-quiet scripts/check-signing-env scripts/read-upstream-list scripts/fetch-upstream scripts/filter-new-comments actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py scripts/typing-test/summary.py tests/typing-test/caret.py tests/typing-test/glyphs.py
+        run: python3 -I -m py_compile actions/plan/plan.py actions/library-release/notes.py scripts/check-no-pkill scripts/check_lock_sources.py scripts/check_job_status.py scripts/check-mkdocs-quiet scripts/check-signing-env scripts/read-upstream-list scripts/fetch-upstream scripts/filter-new-comments scripts/kaskade-lage scripts/kaskade-plan scripts/kaskade-glied scripts/kaskade-glied-fertig scripts/kaskade-fremde-pins scripts/lock-gleich scripts/gates-komplett scripts/kaskade_lib/kgit.py scripts/kaskade_lib/kcargo.py scripts/kaskade_lib/kio.py scripts/kaskade_lib/kwindows.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py scripts/typing-test/summary.py tests/typing-test/caret.py tests/typing-test/glyphs.py
   # Released history is never rewritten: this job needs ALL history and tags (a flat clone is "skipped", rc 2, and the job is red). It exists only in
   # the CI of fs-release itself: the reusable ci.yml / check.yml run in the CALLING repos, keep their flat clone and do not call this script.
   changelog-released:
@@ -56,6 +56,11 @@ jobs:
         run: bash scripts/test_check_lock_sources.sh
       - name: set_components_tag self test (fs-types stays out of the fs-interfaces lift, --move, mutants)
         run: bash scripts/test_set_components_tag.sh
+      - name: pin-kaskade scripts self tests (local bare repos, fake build slot, mutants)
+        run: |
+          bash scripts/test_kaskade_plan.sh
+          bash scripts/test_kaskade_pins.sh
+          bash scripts/test_kaskade_gates.sh
       - name: packaging tests (plan, package groups, fs-capnpc compatibility)
         run: scripts/test-packaging.sh
       - name: typing test, caret and field detection on synthetic pictures
