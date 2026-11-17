@@ -7,14 +7,16 @@ use support::workflows::{in_order, read, step_body, step_names};
 
 fn heben_ok(t: &str) -> bool {
     let order = [
+        "vorhanden-pruefen",
         "karte",
         "lage",
         "trait-entwurf",
-        "trait-pruefung",
+        "trait-review",
         "crate-geruest",
         "doku-hilfe",
         "einsortieren",
         "unklar-liste",
+        "talk-vorbereiten",
         "talk",
         "bau-buendel",
         "bericht",
@@ -22,7 +24,7 @@ fn heben_ok(t: &str) -> bool {
     ];
     let talk = step_body(t, "talk");
     let sort = step_body(t, "einsortieren");
-    // the steps of THIS flow before the bundled build do not compile (no cargo, no build slot); the compile probe inside the called flow `trait-delta` is allowed
+    // the steps of THIS flow before the bundled build do not compile (no cargo, no build slot); the trait review is an own step and does not call `trait-delta`
     let before = step_names(t)
         .iter()
         .take_while(|n| *n != "bau-buendel")
@@ -37,16 +39,20 @@ fn heben_ok(t: &str) -> bool {
                 ("trait-entwurf", "trait-entwurf"),
                 ("crate-geruest", "crate-geruest"),
                 ("einsortieren", "einsortieren"),
+                ("talk-vorbereiten", "talk-vorbereiten"),
                 ("unklar-liste", "unklar-liste"),
                 ("doku-hilfe", "doku-hilfe"),
             ],
         )
-        && step_body(t, "trait-pruefung").contains("name: trait-delta")
-        && step_body(t, "trait-pruefung").contains("teil: review")
-        && again_ok(t, "trait-pruefung-again", "trait-entwurf", "eskalation")
+        && step_body(t, "trait-review").contains("call: trait-review-opus:")
+        && step_body(t, "trait-review").contains("freesynergy.net:gate: opus-ja")
+        && !step_body(t, "trait-review").contains("name: trait-delta")
+        && step_body(t, "schicht-weiche").contains(".input.schicht_fertig")
+        && step_body(t, "bericht").contains("freesynergy.net:actor: machine")
+        && again_ok(t, "trait-review-again", "trait-entwurf", "eskalation")
         && sort.contains("Zunächst NICHT kompilieren (spart Slots)")
         && sort.contains("Herkunft: <repo>@<kopf>:<pfad>")
-        && step_body(t, "trait-pruefung").contains("compile probe INSIDE `trait-delta` is allowed")
+        && step_body(t, "trait-review").contains("NOT the flow `trait-delta`")
         && !sort.contains("cargo")
         && !before.contains("cargo")
         && !before.contains("build-slot")

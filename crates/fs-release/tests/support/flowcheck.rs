@@ -29,7 +29,10 @@ pub fn with_checks(text: &str, pairs: &[(&str, &str)]) -> bool {
 }
 
 pub fn starts_with_card(text: &str) -> bool {
-    step_names(text).first().is_some_and(|n| n == "karte")
+    // the board card is the first step, or the first one after the mandatory first block `vorhanden-pruefen` (+ check, again, switch)
+    let names = step_names(text);
+    let rest = names.iter().filter(|n| !n.starts_with("vorhanden-"));
+    rest.clone().next().is_some_and(|n| n == "karte")
         && step_body(text, "karte").contains("fs-tasks")
 }
 

@@ -5,6 +5,7 @@
 # branch, head, delta, group` (docs/prompt-template.md). FS profile: see README.md.
 # Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 # Review template frontend: step `frontend-nur-komponenten` (input `frontend_crate`) before the picture acceptance: only component calls; logic or a widget is a finding (conversation `frontend-befund-talk`).
+# Mandatory first step `vorhanden-pruefen` (rule of the user): look whether it exists or is only extended; the result `befund` (with proof) is read by the following steps.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -12,9 +13,53 @@ document:
   version: 0.0.10
   title: Convert one group of building blocks to the layers of ADR 0074
 do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.10@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. The following steps read `befund`; nothing is built without it."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.10@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): `befund` without proof is RED - `neu` needs a reason and a proof (what was searched), `vorhanden` needs a reference \"extend X\"; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: umbau-eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: umbau-eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never on."
   - texte:
       call: texts-convert-ai:0.0.10@fs
       with:
+        befund: ${ $context.befund }
         group: ${ .input.group }
         repo: ${ .input.repo }
         branch: ${ .input.branch }

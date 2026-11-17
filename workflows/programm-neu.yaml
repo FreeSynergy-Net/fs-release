@@ -1,4 +1,4 @@
-# Input: contract (the theme contract file), tag (the release tag), programm, vorbild (the model program, name), bestand (block inventory of the fs-components family), blinc (inventory of the Blinc widgets), dossier (folder of the model dossier), model (pictures of the model), dump, exceptions (menu dump and exception list), repo, branch, head, delta, docs, docs_base (clone of fs-documentation and its commit at the start of the run, for `doku`), old, new, allow (empty lists unless names changed).
+# Input: contract (the theme contract file), tag (the release tag), programm, frontend_crate (the frontend crate, for the review template frontend), vorbild (the model program, name), bestand (block inventory of the fs-components family), blinc (inventory of the Blinc widgets), dossier (folder of the model dossier), model (pictures of the model), dump, exceptions (menu dump and exception list), repo, branch, head, delta, docs, docs_base (clone of fs-documentation and its commit at the start of the run, for `doku`), old, new, allow (empty lists unless names changed).
 # Loops: a red check jumps back at most twice (red rounds 1 and 2); the third red round goes to `eskalation` (the person). The script carries `runde`
 # (red rounds of that check so far). `runde` is NOT reset by a green result inside one loop (a loop of several checks counts its rounds together);
 # it is reset only when the flow leaves the phase.
@@ -6,7 +6,7 @@
 # Every agent step (objective) is followed by an objective script check; red goes back (switch with then); every step names its ADRs
 # (freesynergy.net:adr). Outcomes Facette, Modul and Suite leave the flow at a stub (facette-abzweig, modul-abzweig, suite-abzweig, at the
 # end of the file); `facette-anlegen` does not exist yet (TODO, not invented). Agents never push, tag or merge, never touch a real server,
-# never handle secrets. Order: `Workflow programm-neu, step <id>, parameters contract, tag, repo, branch, head, delta, programm, vorbild, bestand, blinc, dossier, model, dump, exceptions`
+# never handle secrets. Order: `Workflow programm-neu, step <id>, parameters contract, tag, repo, branch, head, delta, programm, frontend_crate, vorbild, bestand, blinc, dossier, model, dump, exceptions`
 # (docs/prompt-template.md). FS profile: see README.md.
 # Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 document:
@@ -616,6 +616,7 @@ do:
           tag: ${ .input.tag }
           vorbild: ${ .input.vorbild }
           frontend: ${ .input.programm }
+          frontend_crate: ${ .input.frontend_crate }
           bestand: ${ .input.bestand }
           blinc: ${ .input.blinc }
           dossier: ${ .input.dossier }

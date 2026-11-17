@@ -3,7 +3,7 @@
 # DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main, tag or merge; output only on `unreviewed/<workflow>-<ziel>` branches; no `gh` call; reports per [BERICHT]; one board card per run (fs-tasks).
 # Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
 # Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
-# Inputs: `crate` (name from plan section b1, binding order), `quellen` (list repo@head), `trait_datei` (`TRAIT-ENTWUERFE-geruest.md` or `traits.md` of the crate), `schicht` (layer repo of plan section b0), `programmseite` (program page in fs-documentation en + de, for the help part), `hilfe_marker` (optional).
+# Inputs: `crate` (name from plan section b1, binding order), `quellen` (list repo@head), `trait_datei` (`TRAIT-ENTWUERFE-geruest.md` or `traits.md` of the crate), `schicht` (layer repo of plan section b0), `schicht_fertig` (true when ALL crates of the layer are sorted in, each with its `talk` protocol; else no bundled build), `programmseite` (program page in fs-documentation en + de, for the help part), `hilfe_marker` (optional).
 # Rules. (1) Traits first: no crate without a trait draft the review has passed. (2) NO build in the sort-in steps (user, conversation 2: "noch nicht kompilieren"); the gates run only in the bundled step `bau-buendel`. (3) Origin: every copied file starts with `//! Herkunft: <repo>@<kopf>:<pfad>` (line 2, after the pattern line); the programs stay unchanged until their lift. (4) Only sort in, never rewrite (N10); what does not fit goes to the unclear list, never silently dropped. (5) An exception is a conversation (answer 128): no `[[exception]]` without a protocol (`talk`).
 document:
   dsl: 1.0.3
@@ -12,6 +12,49 @@ document:
   version: 0.0.10
   title: Lift code from the programs into scaffold crates - trait draft, trait review, crate scaffold, sort in WITHOUT build, unclear list, talk, bundled build
 do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.10@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.10@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): `befund` without proof is RED - `neu` needs a reason and a proof (what was searched), `vorhanden` needs a reference \"extend X\"; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - karte:
       call: board-card:0.0.10@fs
       with:
@@ -28,6 +71,7 @@ do:
       with:
         crate: ${ .input.crate }
         quellen: ${ .input.quellen }
+        befund: ${ $context.befund }
       export:
         as: '${ $context + { lage: . } }'
       metadata:
@@ -110,16 +154,11 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `trait-entwurf` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
-  - trait-pruefung:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: trait-delta
-          version: 0.0.10
-        input:
-          teil: review
-          crate: ${ .input.crate }
-          trait_datei: ${ .input.trait_datei }
+  - trait-review:
+      call: trait-review-opus:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        trait_datei: ${ .input.trait_datei }
       export:
         as: '${ $context + { urteil: . } }'
       metadata:
@@ -127,8 +166,8 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Opus look at `traits.md` through the flow `trait-delta` (part `review`): verdict YES or NO for exactly this draft. The compile probe INSIDE `trait-delta` is allowed here; the no-build rule of this flow is for the sort-in steps and for the core build, which comes only in `bau-buendel`."
-  - trait-pruefung-again:
+        freesynergy.net:summary: "Own review step of Opus on `traits.md` (NOT the flow `trait-delta`: that one treats the data trait of one program, runs a compile probe and sets a lock): report, line 1 YES or NO for exactly this draft. Reads only; no build."
+  - trait-review-again:
       switch:
         - runden:
             when: '${ $context.urteil.verdict == "NEIN" and ($context.urteil.runde // 0) >= 3 }'
@@ -200,7 +239,7 @@ do:
         freesynergy.net:actor-type: Application
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Help = docs (step G2b): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`) has a MARKED help part (marker `hilfe_marker`, default `<!-- fs:help -->` ... `<!-- /fs:help -->`); if not, a placeholder part is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
+        freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
   - doku-hilfe-check:
       call: doku-hilfe-regel:0.0.10@fs
       with:
@@ -317,6 +356,50 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `unklar-liste` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
+  - talk-vorbereiten:
+      call: talk-vorbereiten-ai:0.0.10@fs
+      with:
+        crate: ${ .input.crate }
+        liste: UNKLAR-${ .input.crate }.md
+      export:
+        as: '${ $context + { vorlage: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Per unclear case: alternatives and \"to what does it fit?\"; output `talk-vorlage-<crate>.md`. The conversation reads this template."
+  - talk-vorbereiten-check:
+      call: vorlage-regel:0.0.10@fs
+      with:
+        vorlage: ${ $context.vorlage }
+      export:
+        as: '${ $context + { vorlagecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: every unclear case has at least 2 alternatives, or the template says why there is none."
+  - talk-vorbereiten-again:
+      switch:
+        - runden:
+            when: '${ $context.vorlagecheck.red == true and ($context.vorlagecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.vorlagecheck.red == true }'
+            then: talk-vorbereiten
+        - green:
+            when: '${ $context.vorlagecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `talk-vorbereiten` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - talk:
       call: talk:0.0.10@fs
       with:
@@ -352,10 +435,10 @@ do:
   - schicht-weiche:
       switch:
         - fertig:
-            when: '${ $context.gespraech.schicht_fertig == true }'
+            when: '${ .input.schicht_fertig == true }'
             then: bau-buendel
         - offen:
-            when: '${ $context.gespraech.schicht_fertig == false }'
+            when: '${ .input.schicht_fertig == false }'
             then: bericht
         - ohne-ergebnis:
             then: eskalation
@@ -415,8 +498,8 @@ do:
         zahlen: inventur-classify.py
       then: end
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Report: lines before and after per program (script `inventur-classify.py`), state of the unclear list; the numbers come from the script, not from an estimate."
