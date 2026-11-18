@@ -196,4 +196,7 @@ chk "flat target: the local and CI runs set no target of the tool" [ "$(grep -c 
 mutate "$here/gates-komplett" '"geaendert": dirty != before[1]' '"geaendert": False' "$tmp/mut/gates-komplett" || bad "mutant MF not applied"
 FS_GATES_FMT="sh -c 'echo y >>a.txt'" python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >"$tmp/o2.json" 2>/dev/null; git -C "$app" checkout -q a.txt
 chk "mutant MF (fmt change ignored) is caught by the fmt-changes-files case (both parts checked)" [ "$(q "$tmp/o2.json" '(d["fmt"]["geaendert"], d["laeufe"][0]["rc"])')" != "(True, None)" ]
+# the failure counter of THIS script, tested in every form and with six mutants (shared test scripts/test_kaskade_counter.sh)
+# shellcheck source=scripts/test_kaskade_counter.sh
+source "$here/test_kaskade_counter.sh"; counter_selftest "${BASH_SOURCE[0]}"
 wait; nfail="$(wc -l <"$tmp/.fails")"; if [ "$nfail" -eq 0 ] && [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$nfail failed (counter file), $fails in the main shell"; exit 1; fi
