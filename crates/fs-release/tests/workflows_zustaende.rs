@@ -1,4 +1,4 @@
-//! Pattern: none (test). The eight workflow states and the transition rules (`workflows/ZUESTAENDE.md`): every flow carries them,
+//! Pattern: none (test). The eight workflow states and the transition rules (`workflows/STATES.md`): every flow carries them,
 //! and each rule of `scripts/check_workflows.py` has a counter-test on a changed copy.
 
 mod support;
@@ -27,7 +27,7 @@ fn every_workflow_carries_the_eight_states_and_the_transition_rules() {
         let t = read(f);
         assert!(
             t.contains(STATES_LINE),
-            "{f}.yaml: the eight states (workflows/ZUESTAENDE.md)"
+            "{f}.yaml: the eight states (workflows/STATES.md)"
         );
         for rule in [
             "      pausiert: [",
@@ -41,7 +41,7 @@ fn every_workflow_carries_the_eight_states_and_the_transition_rules() {
 
 #[test]
 fn the_state_standard_document_names_every_state_and_rule() {
-    let doc = fs::read_to_string(root().join("workflows/ZUESTAENDE.md")).unwrap();
+    let doc = fs::read_to_string(root().join("workflows/STATES.md")).unwrap();
     for s in [
         "offen",
         "wartet-auf-entscheidung",
@@ -55,7 +55,7 @@ fn the_state_standard_document_names_every_state_and_rule() {
     ] {
         assert!(
             doc.contains(&format!("`{s}`")) || doc.contains(s),
-            "ZUESTAENDE.md: {s}"
+            "STATES.md: {s}"
         );
         assert!(STATES_LINE.contains(s) || s == "stationen", "{s}");
     }
