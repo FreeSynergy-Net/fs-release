@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Pattern: none (test support, sourced by scripts/test_kaskade_{plan,pins,gates}.sh).
+# shellcheck disable=SC2154  # $here and $tmp come from the sourcing test
 # Self test of the FAILURE COUNTER of a test script (Opus N4/N5): `bad()` also writes into $tmp/.fails and the end line (`wait; nfail=...`) reads that file, so a failing chk cannot be lost in a
 # subshell, pipe, background job, if, case, !, $( ), function, env prefix, eval, while, ||, ; or a trailing &&. `counter_selftest <script>` takes the helper lines (ok/bad/chk) and the end line
 # out of THAT script (so a mutation of them in any of the three scripts turns THAT script red), runs a failing chk in every form, and mutates them six ways (M1..M6), each must turn it red.
