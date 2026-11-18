@@ -149,3 +149,33 @@ fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_
         "the hand-written file is covered by the exception: {out}"
     );
 }
+
+#[test]
+fn the_drift_is_shown_together_with_a_hand_written_file_that_no_exception_covers() {
+    let dir = made("with-unowned");
+    let main = dir
+        .join("crates")
+        .join("fs-demo-bin")
+        .join("src")
+        .join("main.rs");
+    let text = std::fs::read_to_string(&main).unwrap();
+    std::fs::write(&main, format!("{text}// hand\n")).unwrap();
+    std::fs::write(
+        dir.join("crates")
+            .join("fs-demo-core")
+            .join("src")
+            .join("extra.rs"),
+        "pub fn x() {}\n",
+    )
+    .unwrap();
+    let (code, out) = check(&dir);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
+        "the drift is hidden by the hand-written file: {out}"
+    );
+    assert!(
+        out.contains("file-unowned{path=crates/fs-demo-core/src/extra.rs}"),
+        "{out}"
+    );
+}
