@@ -13,9 +13,9 @@ or errors, and the rc of every run; a red run stops the rest (`nicht gelaufen`).
 NAMED EXCEPTION (c0 18.11.2026, rule [GATE-FLACHER-KLON-OHNE-TAGS]; the ONLY one, the list `AUSNAHMEN` below): in the repo fs-release itself the flat clone has no tags, and its test
 `released_changelog_sections_equal_their_tags` demands tags on purpose, so the flat run of fs-release is red there by design. Only in the run `flach-ohne-tags`, only for the repo `fs-release`, only for that one test
 the run gets `FS_GATES_SKIP_TEST=<test>` (scripts/gates.sh then runs `cargo test ... -- --skip <test>` and says so). It is never silent: every run prints `SKIPPED test ... by named exception ...` on stderr, the result lists it
-under `ausnahmen` (`angewendet`, `gruen_fuer_test: false`: the test counts as SKIPPED, never as green) and the flat run of fs-release is only green WITHOUT that test. The test runs in the real CI (with tags), which stays decisive.
+under `ausnahmen` (`angewendet`, `gruen_fuer_test: false`: the test counts as SKIPPED, never as green) and the flat run of fs-release is only green WITHOUT that test. The exception is TIME-LIMITED (`bis`, here v0.0.12): every run prints until when it holds; once fs-release v0.0.12 is tagged (ls-remote, not readable = red) and the list is not empty, gates-komplett is RED. It is then replaced by the real solution (the flat run of fs-release fetches the tags in an own step, only for this repo; the list is empty again). The test runs in the real CI (with tags), which stays decisive.
 Any other repo, run or test: no exception. A flat run of fs-release is therefore meant to be red without the exception (that is the known state, not a bug of the cascade).
-Result JSON: {status, red, kopf, skripte:{tag, quelle}, fmt, laeufe:[{name, rc, log, gates, fehler}], ausnahmen:[{name, repo, lauf, test, grund, angewendet, gruen_fuer_test}], befunde}. rc 0 green / 1 red / 2 bad input.
+Result JSON: {status, red, kopf, skripte:{tag, quelle}, fmt, laeufe:[{name, rc, log, gates, fehler}], ausnahmen:[{name, repo, lauf, bis, test, grund, angewendet, gruen_fuer_test}], ausnahmen_liste (the whole list, with `bis`), befunde}. rc 0 green / 1 red / 2 bad input.
 """
 import argparse
 import glob
@@ -33,7 +33,9 @@ import kio  # noqa: E402
 
 PIN = re.compile(r"FreeSynergy/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+)\b")
 # The ONE list of named exceptions (never scattered in the code): repo + run + test. `grund` is printed on every run.
-AUSNAHMEN = [{"name": "flach-changelog-tags", "repo": "fs-release", "lauf": "flach-ohne-tags", "test": "released_changelog_sections_equal_their_tags",
+# EVERY entry has `bis` (the fs-release release that replaces it, here v0.0.12): once fs-release `bis` is tagged (ls-remote of fs-release, `FS_KASKADE_BASE`; not readable = red, never a guess)
+# and the list is not empty, gates-komplett is RED. The real solution then: the flat run of fs-release fetches the tags in an own step for this repo only; the list is empty again.
+AUSNAHMEN = [{"name": "flach-changelog-tags", "repo": "fs-release", "lauf": "flach-ohne-tags", "bis": "v0.0.12", "test": "released_changelog_sections_equal_their_tags",
               "grund": "the test demands v* tags and a flat clone without tags (rule [GATE-FLACHER-KLON-OHNE-TAGS]) has none: red by design; the real CI (with tags) runs it"}]
 SHOW = re.compile(r"rc=|FAILED|ERROR|errors|^error")
 
@@ -51,6 +53,24 @@ def repo_name(d):
     rc, out = kgit.run(["remote", "get-url", "origin"], cwd=d)
     m = re.search(r"([^/:]+?)(?:\.git)?/?$", out.strip()) if rc == 0 and out.strip() else None
     return m.group(1) if m else os.path.basename(d.rstrip("/"))
+
+
+def fristen():
+    """Findings of the deadlines of AUSNAHMEN: an entry without a valid `bis`, a `bis` that is tagged already (the exception has expired), a remote that cannot be read."""
+    out = []
+    for x in AUSNAHMEN:
+        bis = x.get("bis")
+        if not isinstance(bis, str) or not kio.TAG.match(bis):
+            out.append(f"named exception {x['name']} has no valid `bis` (deadline vX.Y.Z)")
+            continue
+        try:
+            tags = kgit.tags("fs-release")
+        except (RuntimeError, ValueError) as e:
+            out.append(f"cannot check whether fs-release {bis} is released (named exception {x['name']}): {e}")
+            continue
+        if bis in tags:
+            out.append(f"named exception {x['name']} has EXPIRED: fs-release {bis} is tagged; replace it by the real solution (flat run of fs-release fetches its tags) and empty AUSNAHMEN")
+    return out
 
 
 def ausnahme_for(repo, lauf):
@@ -115,6 +135,9 @@ def main(argv):
         fmt_res = {"rc": fmt.returncode, "geaendert": dirty != before[1], "text": (fmt.stdout + fmt.stderr).strip()[:300]}
         if fmt.returncode != 0 or fmt_res["geaendert"]:
             befunde.append("cargo fmt --all failed or changed files: commit the formatted tree first, then run the gates" + (f" ({fmt_res['text']})" if fmt_res["text"] else ""))
+        for x in AUSNAHMEN:
+            print(f"gates-komplett: named exception {x['name']} ({x['repo']}, run {x['lauf']}, test {x['test']}) is valid until fs-release {x.get('bis')}", file=sys.stderr)
+        befunde.extend(fristen())
         plan = [("lokal", d, env), ("ci", d, {**env, "CARGO_TERM_COLOR": "always", "CI": "true"})]
         flach = None
         if not a.ohne_flachprobe:
@@ -139,7 +162,7 @@ def main(argv):
                 befunde.append(f"gates.sh red in the run `{name}` (rc {laeufe[-1]['rc']}), log {laeufe[-1]['log']}")
         if not befunde and state(d) != before:
             befunde.append("head or working tree changed while the gates ran: the result is void")
-    kio.emit({"status": "ok", "red": bool(befunde), "kopf": before[0], "skripte": {"tag": tag, "quelle": quelle}, "fmt": fmt_res, "laeufe": laeufe, "ausnahmen": ausnahmen, "befunde": befunde})
+    kio.emit({"status": "ok", "red": bool(befunde), "kopf": before[0], "skripte": {"tag": tag, "quelle": quelle}, "fmt": fmt_res, "laeufe": laeufe, "ausnahmen": ausnahmen, "ausnahmen_liste": AUSNAHMEN, "befunde": befunde})
     return 1 if befunde else 0
 
 

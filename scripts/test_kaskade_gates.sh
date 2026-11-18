@@ -32,6 +32,8 @@ app="$tmp/app"; git init -q -b main "$app"; mkdir -p "$app/.github/workflows"
 printf 'jobs:\n  a:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n  b:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.10\n' >"$app/.github/workflows/check.yml"
 echo x >"$app/a.txt"; git -C "$app" add -A; git -C "$app" commit -qm one; git -C "$app" tag v0.0.1
 export FS_RELEASE_REPO="$rel" FS_GATES_BUILD_SLOT="$tmp/slot.sh" FS_GATES_FMT=true FS_GATES_SCRATCH="$tmp/scratch" FAKE_OUT="$tmp/out.txt"
+# the remote base for the deadline check (ls-remote of fs-release): a local bare repo without the tag v0.0.12 (never the network)
+base="$tmp/base"; git init -q --bare -b main "$base/fs-release"; export FS_KASKADE_BASE="file://$base"
 export CI=true CARGO_TERM_COLOR=always  # a caller in CI mode must not leak into the local run
 export FS_GATES_SKIP_TEST=leaked  # nor a skip of the caller (the real flat run of fs-release has it set): only the named exception may set it
 run() { python3 -I "$here/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" "$@"; }
@@ -122,6 +124,45 @@ chk "mutant exception (counted green for the test) is caught by the not-green ca
 mutate "$here/gates-komplett" ', "FS_GATES_SKIP_TEST")}' ')}' "$tmp/mut/gates-komplett" || bad "mutant skip-leak not applied"
 : >"$FAKE_OUT"; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>&1
 chk "mutant exception (a skip of the caller leaks into the runs) is caught by the no-skip case" [ "$(grep -c 'skip=$' "$FAKE_OUT")" != 3 ]
+# ---- the deadline `bis` of the named exception (c0/user: not for ever) ----
+: >"$FAKE_OUT"; exrun "$tmp/wt-fs-release" >"$tmp/o.json"
+chk "deadline: every run says until when the exception holds (stderr and result field bis)" grep -q 'valid until fs-release v0.0.12' "$tmp/err.txt" && chk "deadline: the result carries bis" [ "$(q "$tmp/o.json" '(d["ausnahmen"][0]["bis"], d["ausnahmen_liste"][0]["bis"])')" = "('v0.0.12', 'v0.0.12')" ]
+: >"$FAKE_OUT"; exrun "$app" >"$tmp/o.json"
+chk "deadline: also a run of another repo prints it" grep -q 'valid until fs-release v0.0.12' "$tmp/err.txt"
+# fs-release v0.0.12 tagged: the list is not empty -> RED, no gate runs
+git clone -q "$base/fs-release" "$tmp/frw" 2>/dev/null; git -C "$tmp/frw" commit -q --allow-empty -m x; git -C "$tmp/frw" tag v0.0.12; git -C "$tmp/frw" push -q origin main v0.0.12 2>/dev/null
+: >"$FAKE_OUT"; rc=0; exrun "$app" >"$tmp/o.json" || rc=$?
+chk "deadline: fs-release v0.0.12 is tagged and the list is not empty: RED (rc 1), no gate run" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" '"EXPIRED" in d["befunde"][0]')" = True ] && [ "$(wc -l <"$FAKE_OUT")" = 0 ]
+mutate "$here/gates-komplett" 'if bis in tags:' 'if False:' "$tmp/mut/gates-komplett" || bad "mutant deadline-ignored not applied"
+rc=0; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>&1 || rc=$?
+chk "mutant deadline (tag check always false) is caught by the expired case" [ "$rc" -ne 1 ]
+mutate "$here/gates-komplett" 'out.append(f"named exception {x['"'"'name'"'"']} has EXPIRED' 'pass; (f"named exception {x['"'"'name'"'"']} has EXPIRED' "$tmp/mut/gates-komplett" || bad "mutant deadline-ignored 2 not applied"
+rc=0; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>&1 || rc=$?
+chk "mutant deadline (the deadline is ignored) is caught by the expired case" [ "$rc" -ne 1 ]
+# the unreadable remote is red, never a guess
+rc=0; FS_KASKADE_BASE="file://$tmp/nowhere" exrun "$app" >"$tmp/o.json" || rc=$?
+chk "deadline: a remote that cannot be read is RED (never a guess)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" '"cannot check" in d["befunde"][0]')" = True ]
+mutate "$here/gates-komplett" 'out.append(f"cannot check whether' 'pass; (f"cannot check whether' "$tmp/mut/gates-komplett" || bad "mutant unreadable not applied"
+rc=0; FS_KASKADE_BASE="file://$tmp/nowhere" python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>&1 || rc=$?
+chk "mutant deadline (unreadable remote swallowed) is caught by the unreadable case" [ "$rc" -ne 1 ]
+# a list entry without `bis` is red; the mutant removes that check too
+mutate "$here/gates-komplett" '"bis": "v0.0.12", ' '' "$tmp/mut/gates-komplett" || bad "mutant no-bis not applied"
+rc=0; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >"$tmp/o.json" 2>/dev/null || rc=$?
+chk "deadline: an entry without bis is RED" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" '"no valid" in d["befunde"][0]')" = True ]
+python3 -I - "$tmp/mut/gates-komplett" <<'PY'
+import sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+old = "if not isinstance(bis, str) or not kio.TAG.match(bis):"
+assert old in t
+open(p, "w", encoding="utf-8").write(t.replace(old, "if False:", 1))
+PY
+rc=0; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>&1 || rc=$?
+chk "mutant deadline (a missing bis is accepted) is caught by the no-bis case" [ "$rc" -ne 1 ]
+mutate "$here/gates-komplett" 'print(f"gates-komplett: named exception {x['"'"'name'"'"']} ({x['"'"'repo'"'"']}, run' 'pass  # print(f"gates-komplett: named exception {x['"'"'name'"'"']} ({x['"'"'repo'"'"']}, run' "$tmp/mut/gates-komplett" || bad "mutant no-output not applied"
+rc=0; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>"$tmp/err3.txt" || rc=$?
+chk "mutant deadline (the until-output is missing) is caught by the output case" [ "$(grep -c 'valid until' "$tmp/err3.txt")" = 0 ]
+git -C "$tmp/frw" push -q origin :refs/tags/v0.0.12 2>/dev/null  # the tag is gone again for the cases below
 # K2 / MF: gates-komplett ignores a fmt that changes files (the result must still say geaendert=True and run NO gate)
 mutate "$here/gates-komplett" '"geaendert": dirty != before[1]' '"geaendert": False' "$tmp/mut/gates-komplett" || bad "mutant MF not applied"
 FS_GATES_FMT="sh -c 'echo y >>a.txt'" python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >"$tmp/o2.json" 2>/dev/null; git -C "$app" checkout -q a.txt
