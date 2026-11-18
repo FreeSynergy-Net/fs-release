@@ -4,7 +4,7 @@
 same eight mandatory states plus its own steps (the work stations, "in progress"). The states stand in `document.metadata` of the file
 (`freesynergy.net:states`) with the transition rules (`freesynergy.net:transitions`); the swimlanes are the eight states and the `do` steps.
 Only the state names are fixed, no step may carry one of these names (and not `stationen`). The check is `scripts/check_workflows.py`
-(rules in the constant `TRANSITIONS`, the one place), the test is `crates/fs-release/tests/workflows.rs`. No build logic lives here: building belongs to the
+(rules in the constant `TRANSITIONS`, the one place), the test is `crates/fs-release/tests/workflows_zustaende.rs`. No build logic lives here: building belongs to the
 construction kit, not to fs-tasks.
 
 **DE.** Workflows sind Swimlanes: jede Spalte in fs-tasks ist eine Station des Workflows. Jede Datei `workflows/*.yaml` trägt deshalb
