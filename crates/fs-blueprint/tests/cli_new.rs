@@ -164,3 +164,24 @@ fn new_needs_exactly_one_blueprint_and_a_readable_one() {
         );
     }
 }
+
+#[test]
+fn new_without_out_makes_the_folder_fs_name_in_the_current_folder() {
+    let work = scratch("new-default");
+    std::fs::create_dir_all(&work).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_fs-blueprint"))
+        .arg("new")
+        .arg(fixture("ok").join("scaffold.toml"))
+        .current_dir(&work)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert!(
+        work.join("fs-demo").join("Cargo.toml").is_file()
+            && work.join("fs-demo").join("scaffold.toml").is_file()
+    );
+}
