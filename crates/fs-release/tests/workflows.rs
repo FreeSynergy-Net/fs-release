@@ -272,14 +272,16 @@ const STATES_LINE: &str = "    freesynergy.net:states: [offen, wartet-auf-entsch
 
 fn drop_line(t: &str, start: &str) -> String {
     let mut gone = false;
-    t.lines()
-        .filter(|l| {
-            let hit = !gone && l.starts_with(start);
-            gone |= hit;
-            !hit
-        })
-        .map(|l| format!("{l}\n"))
-        .collect()
+    let mut out = String::new();
+    for l in t.lines() {
+        if !gone && l.starts_with(start) {
+            gone = true;
+            continue;
+        }
+        out.push_str(l);
+        out.push('\n');
+    }
+    out
 }
 
 #[test]
