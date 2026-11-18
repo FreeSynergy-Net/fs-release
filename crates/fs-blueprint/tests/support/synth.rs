@@ -31,7 +31,7 @@ pub fn text(i: usize) -> String {
         _ => String::new(),
     };
     format!(
-        "schema = 2\n\n[program]\nname = \"{name}\"\nskeleton = \"0.1.0\"\ncapability = \"{cap}\"\nsummary = {{ en = \"Summary of {name}\", de = \"Kurz {name}\" }}\ndescription = {{ en = \"Long text about {cap} number {i}.\", de = \"Langtext {cap} Nummer {i}.\" }}\ncategories = [\"Utility\", \"Cat{i}\"]\n\n[contract]\nversion = \"{ver}\"\nid = \"{id}\"\nprovides = [\"cap.{i}\"]\n\n{extra}[frontend]\nstandard = \"front{i}\"\nlayout = \"layout/f{i}.toml\"\ncovers = \"all\"\n"
+        "schema = 2\n\n[program]\nname = \"{name}\"\nskeleton = \"0.1.0\"\ncapability = \"{cap}\"\nsummary = {{ en = \"Summary of {name}\", de = \"Kurz {name}\" }}\ndescription = {{ en = \"Long text about {cap} number {i}.\", de = \"Langtext {cap} Nummer {i}.\" }}\ncategories = [\"Utility\", \"Cat{i}\"]\n\n[contract]\nversion = \"{ver}\"\nid = \"{id}\"\nprovides = [\"cap.{i}\"]\n\n{extra}[frontend]\nstandard = \"front{i}\"\nlayout = \"forms/f{i}.toml\"\ncovers = \"all\"\n"
     )
 }
 

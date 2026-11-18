@@ -34,5 +34,5 @@ label = { en = "Assigned to", de = "Eingeteilt" }
 
 [frontend]
 standard = "list"
-layout = "layout/list.toml"
+layout = "forms/list.toml"
 covers = "all"

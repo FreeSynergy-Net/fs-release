@@ -8,7 +8,7 @@ use fs_blueprint::Blueprint;
 use std::path::Path;
 use support::{FakeCatalog, TASKS};
 
-const HASH: &str = "da5356be763d0aea5847a78b5eb331393c3888e8ff63b81a217e8ae536c192f9";
+const HASH: &str = "835df0cc43b36dfe0dab6d9c5d586b6c36e6f883ff1b16f9f211cec4490c8f32";
 
 fn gold_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/gold/tasks")

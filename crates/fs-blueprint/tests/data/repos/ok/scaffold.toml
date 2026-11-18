@@ -1,0 +1,37 @@
+schema = 2
+
+[program]
+name = "demo"
+skeleton = "0.1.0"
+capability = "people"
+summary = { en = "A demo program", de = "Ein Demo-Programm" }
+description = { en = "Only here to prove the command line check.", de = "Nur da, um die Prüfung auf der Kommandozeile zu belegen." }
+categories = ["Office"]
+
+[contract]
+version = "0.1"
+id = "0xc04d258971543411"
+provides = ["people.persons"]
+
+[[module]]
+name = "board"
+kind = "component"
+version = "0.0.29"
+
+[[type]]
+name = "Thing"
+standard = "https://www.rfc-editor.org/rfc/rfc9553#section-2"
+envelope = "Profile"
+media_type = "application/jscontact+json"
+label = { en = "Thing", de = "Ding" }
+
+[[type.field]]
+name = "uid"
+basic = "text"
+standard = "https://www.rfc-editor.org/rfc/rfc9553#section-2.1.9"
+label = { en = "Identifier", de = "Kennung" }
+
+[frontend]
+standard = "board"
+layout = "forms/demo.toml"
+covers = "all"

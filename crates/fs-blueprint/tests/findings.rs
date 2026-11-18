@@ -15,7 +15,7 @@ fn b3_every_finding_has_the_parameters_of_its_code_and_renders_in_both_languages
         edit(TASKS, "item = \"Task\"", "item = \"Nope\""),
         edit(TASKS, "default = \"freesynergy\"", "default = \"zzz\""),
         edit(TASKS, "from = \"fs-planning\"", "from = \"board\""),
-        edit(TASKS, "layout = \"layout/board.toml\"", "layout = \"nope/x\""),
+        edit(TASKS, "layout = \"forms/board.toml\"", "layout = \"nope/x\""),
         edit(TASKS, "covers = [\"Items.list\"", "covers = [\"zz\", \"Items.list\""),
         edit(TASKS, "paths = [\"crates/fs-tasks-core/src/secret_guard.rs\"]", "paths = [\"../x\", \"crates/none.rs\", \"crates/fs-tasks-bin/src/main.rs\"]"),
         edit(TASKS, "skeleton = \"0.1.0\"", "skeleton = \"9.9.9\""),

@@ -1,0 +1,35 @@
+schema = 2
+
+[program]
+name = "demo"
+skeleton = "0.1.0"
+capability = "people"
+summary = { en = "A demo program", de = "Ein Demo-Programm" }
+description = { en = "Only here to prove the command line check.", de = "Nur da, um die Prüfung auf der Kommandozeile zu belegen." }
+categories = ["Office"]
+
+[contract]
+version = "0.1"
+id = "0xc04d258971543411"
+
+[[module]]
+name = "fs-ghost"
+kind = "standard"
+version = "0.0.1"
+
+[[type]]
+name = "Thing"
+module = "fs-ghost"
+
+[frontend]
+standard = "board"
+layout = "layout/demo.toml"
+covers = "all"
+
+[[exception]]
+what = "A thing without a standard"
+why = "for the test"
+checked = ["fs-ghost"]
+alternatives = []
+talk = "conventions/talks/2026-11-18-demo.md"
+paths = ["crates/fs-demo-core/src/own.rs"]

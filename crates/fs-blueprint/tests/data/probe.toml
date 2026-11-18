@@ -14,5 +14,5 @@ id = "0xc04d258971543499"
 
 [frontend]
 standard = "simple"
-layout = "layout/simple.toml"
+layout = "forms/simple.toml"
 covers = "all"

@@ -47,7 +47,7 @@ default = "freesynergy"
 
 [frontend]
 standard = "board"
-layout = "layout/board.toml"
+layout = "forms/board.toml"
 covers = ["Items.list", "Items.query", "Items.create", "Items.editIf", "Items.readiness"]
 
 [[exception]]

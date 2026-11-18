@@ -59,12 +59,21 @@ fn source_presets(s: &mut Sink, bp: &Blueprint, from: &str) -> Option<Vec<String
     None
 }
 
+/// The place of the forms description: a folder in the root of the repo.
+pub const FORMS_DIR: &str = "forms/";
+
 pub fn frontend(s: &mut Sink, bp: &Blueprint) {
     let f = &bp.frontend;
-    if !is_repo_path(&f.layout) {
+    if is_repo_path(&f.layout) {
+        // the forms description lies in the folder `forms/` in the root of the repo, next to `scaffold.toml` (decision of the strategy 2026-11-18)
+        if !f.layout.starts_with(FORMS_DIR) || f.layout.len() == FORMS_DIR.len() {
+            s.err(Coded::new("layout-outside-forms").with("path", f.layout.as_str()));
+        }
+        if !s.view.exists(&f.layout) {
+            s.err(Coded::new("layout-not-found").with("path", f.layout.as_str()));
+        }
+    } else {
         s.err(Coded::new("path-invalid").with("path", f.layout.as_str()));
-    } else if !s.view.exists(&f.layout) {
-        s.err(Coded::new("layout-not-found").with("path", f.layout.as_str()));
     }
     if f.standard.is_empty() {
         s.err(

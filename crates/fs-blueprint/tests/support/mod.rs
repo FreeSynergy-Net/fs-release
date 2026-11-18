@@ -91,8 +91,8 @@ impl FakeView {
     pub fn standard() -> Self {
         let mut v = FakeView::default();
         for f in [
-            "layout/board.toml",
-            "layout/list.toml",
+            "forms/board.toml",
+            "forms/list.toml",
             "crates/fs-tasks-core/src/secret_guard.rs",
             "crates/fs-tasks-core/src/extra.rs",
             "crates/fs-tasks-core/src/lib.rs",

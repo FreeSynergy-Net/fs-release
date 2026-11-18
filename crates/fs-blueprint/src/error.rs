@@ -43,6 +43,7 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("ruleset-default-missing", &["ruleset"]),
     ("preset-unknown", &["ruleset", "preset"]),
     ("layout-not-found", &["path"]),
+    ("layout-outside-forms", &["path"]),
     ("covers-invalid", &["found"]),
     ("path-invalid", &["path"]),
     ("path-not-found", &["path"]),

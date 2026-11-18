@@ -127,13 +127,41 @@ fn a_rule_set_needs_a_type_and_a_source_of_the_right_kind() {
 }
 
 #[test]
+fn the_forms_description_lies_in_the_forms_folder_in_the_root() {
+    for bad in [
+        "layout/board.toml",
+        "board.toml",
+        "crates/x/forms/board.toml",
+        "forms",
+        "forms/",
+        "Forms/board.toml",
+    ] {
+        let src = edit(TASKS, "forms/board.toml", bad);
+        let r = run(&src, true);
+        assert!(
+            r.errors
+                .iter()
+                .any(|e| e.to_string() == format!("layout-outside-forms{{path={bad}}}")),
+            "{bad}: {:?}",
+            r.errors
+        );
+    }
+    assert!(!run(TASKS, true).has("layout-outside-forms"));
+    assert!(!run(
+        &edit(TASKS, "forms/board.toml", "forms/sub/board.toml"),
+        true
+    )
+    .has("layout-outside-forms"));
+}
+
+#[test]
 fn the_frontend_needs_its_layout_file_and_a_valid_cover() {
     assert!(has(
-        &edit(TASKS, "layout/board.toml", "layout/missing.toml"),
-        "layout-not-found{path=layout/missing.toml}"
+        &edit(TASKS, "forms/board.toml", "forms/missing.toml"),
+        "layout-not-found{path=forms/missing.toml}"
     ));
     assert!(has(
-        &edit(TASKS, "layout/board.toml", "../board.toml"),
+        &edit(TASKS, "forms/board.toml", "../board.toml"),
         "path-invalid{path=../board.toml}"
     ));
     assert!(has(&edit(TASKS, "covers = [\"Items.list\", \"Items.query\", \"Items.create\", \"Items.editIf\", \"Items.readiness\"]", "covers = \"some\""), "covers-invalid{found=some}"));

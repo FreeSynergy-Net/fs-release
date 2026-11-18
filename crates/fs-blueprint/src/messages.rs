@@ -42,6 +42,7 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("ruleset-default-missing", "The default of rule set {$ruleset} is not one of its presets", "Die Voreinstellung des Regelwerks {$ruleset} steht nicht unter seinen Sätzen"),
     ("preset-unknown", "Rule set {$ruleset} names the unknown preset {$preset}", "Regelwerk {$ruleset} nennt den unbekannten Satz {$preset}"),
     ("layout-not-found", "The layout file {$path} does not exist", "Die Layout-Datei {$path} gibt es nicht"),
+    ("layout-outside-forms", "The forms description {$path} must lie in the folder forms/ in the root of the repo, next to scaffold.toml", "Die forms-Beschreibung {$path} muss im Ordner forms/ im Wurzelordner des Repos liegen, neben scaffold.toml"),
     ("covers-invalid", "{$found} is not all and not an entry of the form Interface.method or Type.field", "{$found} ist weder all noch ein Eintrag der Form Schnittstelle.Methode oder Typ.Feld"),
     ("path-invalid", "{$path} is no valid repo path (relative, with slash, no .. and no wildcard)", "{$path} ist kein gültiger Repo-Pfad (relativ, mit Schrägstrich, ohne .. und ohne Platzhalter)"),
     ("path-not-found", "The path {$path} of the exception does not exist", "Der Pfad {$path} der Ausnahme existiert nicht"),

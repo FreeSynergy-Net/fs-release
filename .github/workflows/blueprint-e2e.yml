@@ -39,3 +39,42 @@ jobs:
         run: cargo test -p fs-blueprint --locked --no-fail-fast
       - name: one blueprint becomes a program that builds, starts and answers
         run: cargo test -p fs-blueprint --locked --test e2e -- --ignored --nocapture
+      - name: the command `fs-blueprint check` on the fixtures (a good repo is ok, a bad one gives exit code 1 and its codes)
+        shell: bash
+        run: |
+          cargo build -p fs-blueprint --locked --bin fs-blueprint
+          bin="target/debug/fs-blueprint$([ "$RUNNER_OS" = Windows ] && echo .exe)"
+          "$bin" --version
+          "$bin" check --repo crates/fs-blueprint/tests/data/repos/ok
+          rc=0
+          "$bin" check --repo crates/fs-blueprint/tests/data/repos/bad > bad.out || rc=$?
+          cat bad.out
+          test "$rc" = 1
+          grep -q 'layout-outside-forms' bad.out
+          grep -q 'talk-not-found' bad.out
+          grep -q 'module-unknown' bad.out
+          echo "$bin" > .fs-blueprint-bin
+      # Acceptance on the two real blueprints (informational: the branches may move; the expected red reasons are in the CHANGELOG and the report of the step S4).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true
+        with:
+          repository: FreeSynergy/fs-tasks
+          ref: unreviewed/bauplan-schema2-2
+          path: acceptance/tasks
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true
+        with:
+          repository: FreeSynergy/fs-people
+          ref: unreviewed/bauplan-schema2-2
+          path: acceptance/people
+          persist-credentials: false
+      - name: fs-blueprint check on the blueprints of tasks and people (shows the findings; does not fail the job)
+        shell: bash
+        continue-on-error: true
+        run: |
+          bin=$(cat .fs-blueprint-bin)
+          for p in tasks people; do
+            echo "== $p"
+            "$bin" check --repo "acceptance/$p" | sed -e 's/  .*//' -e 's/{.*//' | sort | uniq -c | sort -rn || true
+          done

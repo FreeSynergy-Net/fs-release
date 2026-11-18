@@ -108,8 +108,8 @@ fn every_finding_of_every_kind_of_fault_is_a_code_of_the_list_with_its_parameter
         edit(TASKS, "from = \"fs-planning\"", "from = \"nobody\""),
         edit(
             TASKS,
-            "layout = \"layout/board.toml\"",
-            "layout = \"layout/none.toml\"",
+            "layout = \"forms/board.toml\"",
+            "layout = \"forms/none.toml\"",
         ),
         edit(TASKS, "covers = [", "covers = [] # ["),
         edit(

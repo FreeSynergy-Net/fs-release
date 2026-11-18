@@ -1,0 +1,29 @@
+# The catalog of the building blocks that exist, as `fs-blueprint check` knows them (a file, no code: it is read by `FileCatalog`; `--catalog FILE` takes another one).
+# Every list says where it comes from. A block that is NOT listed does not exist for the check: a blueprint that names it is refused (`module-unknown`, `bundle-unknown`).
+# Checked 2026-11-18. To be replaced by the real registry of the catalog repo once it carries modules and tags.
+
+# Capability keys that programs declare today (ADR 0068; code of fs-tasks `wire_caps.rs`, fs-people).
+capabilities = ["tasks", "people", "dependency.evaluate", "dependency.cycle-check", "people.persons"]
+
+# Data kits and basic types of fs-types (tag v0.0.4, `types_capnp.rs`, enum BasicType; no kit exists in v0.0.4, ADR 0098 names them).
+kits = []
+basics = [
+    "text", "multilineText", "email", "phone", "name", "address", "place", "date", "dateTime", "language", "link", "image",
+    "key", "choice", "keywords", "reference", "integer", "duration", "flag", "whole",
+]
+
+# The skeleton versions (ADR 0099, `emit/skeleton.rs` holds the pins of the same versions) and the parts of the skeleton that do not exist yet (ADR 0097 decision 2).
+[[skeleton]]
+version = "0.1.0"
+pending = ["session", "update", "mcp-switch"]
+
+# Art 3 (components): crates of fs-components (tag v0.0.29): `task_card` in fs-components-widgets, the board in fs-components-kanban.
+[[module]]
+name = "task-card"
+kind = "component"
+tags = ["0.0.29"]
+
+[[module]]
+name = "board"
+kind = "component"
+tags = ["0.0.29"]
