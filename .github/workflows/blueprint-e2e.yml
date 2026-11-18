@@ -62,6 +62,17 @@ jobs:
           "$bin" new crates/fs-blueprint/tests/data/repos/bad/scaffold.toml --out "$RUNNER_TEMP/not-made" > /dev/null || rc=$?
           test "$rc" = 1
           test ! -e "$RUNNER_TEMP/not-made"
+          # the check on the program that was made: clean; then a hand change to a generated file and a file without a head under crates/ are red
+          made="$RUNNER_TEMP/made"
+          "$bin" check --repo "$made" --drift
+          printf '// hand\n' >> "$made/crates/fs-demo-bin/src/main.rs"
+          printf 'pub fn x() {}\n' > "$made/crates/fs-demo-core/src/extra.rs"
+          rc=0
+          "$bin" check --repo "$made" --drift > "$RUNNER_TEMP/drift.out" || rc=$?
+          cat "$RUNNER_TEMP/drift.out"
+          test "$rc" = 1
+          grep -q 'generated-changed{path=crates/fs-demo-bin/src/main.rs}' "$RUNNER_TEMP/drift.out"
+          grep -q 'file-unowned{path=crates/fs-demo-core/src/extra.rs}' "$RUNNER_TEMP/drift.out"
           echo "$bin" > .fs-blueprint-bin
       # Acceptance on the two real blueprints (informational: the branches may move; the expected red reasons are in the CHANGELOG and the report of the step S4).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,3 +98,24 @@ jobs:
             echo "== $p"
             "$bin" check --repo "acceptance/$p" | sed -e 's/  .*//' -e 's/{.*//' | sort | uniq -c | sort -rn || true
           done
+
+  # The step of the reusable check.yml (input `blueprint`): the command is built from the pinned commit with `cargo install --git ... --rev`; this job proves that
+  # the very same install line works and that the installed command checks a good repo (Linux; the reusable workflow runs on ubuntu by default).
+  install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@eb353790cf603a0ef119996012e01049b5d7545d
+        with:
+          toolchain: pinned
+          cache-key: blueprint-install
+      - name: the install line of check.yml, with its default revision
+        run: |
+          rev=$(sed -n 's/.*blueprint-rev: .*default: "\([0-9a-f]\{40\}\)".*/\1/p' .github/workflows/check.yml)
+          test -n "$rev"
+          cargo install --git https://github.com/FreeSynergy/fs-release --rev "$rev" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
+          "$RUNNER_TEMP/fsbp/bin/fs-blueprint" --version
+          "$RUNNER_TEMP/fsbp/bin/fs-blueprint" check --repo crates/fs-blueprint/tests/data/repos/ok
