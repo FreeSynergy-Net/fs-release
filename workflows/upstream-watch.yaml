@@ -12,6 +12,18 @@ document:
   name: upstream-watch
   version: 0.0.12
   title: "Upstream watch - read the answers to our open Blinc pull requests and issues, a card and a short draft for every new comment, the user releases, the helper sends"
+  metadata:
+    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
+    freesynergy.net:transitions:
+      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
+      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
+      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
+      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
+      abgebrochen: [offen, archiviert]
+      erledigt: [offen, archiviert]
+      archiviert: []
 do:
   - liste-lesen:
       call: read-upstream-list:0.0.12@fs

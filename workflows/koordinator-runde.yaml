@@ -25,6 +25,18 @@ document:
   name: koordinator-runde
   version: 0.0.12
   title: "One working round of the coordinator: read the handoffs, one background agent per step, collect, gates, one bundled report"
+  metadata:
+    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
+    freesynergy.net:transitions:
+      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
+      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
+      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
+      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
+      abgebrochen: [offen, archiviert]
+      erledigt: [offen, archiviert]
+      archiviert: []
 do:
   - handoffs-lesen:
       call: read-handoffs:0.0.12@fs
