@@ -33,6 +33,7 @@ printf 'jobs:\n  a:\n    uses: FreeSynergy/fs-release/.github/workflows/check.ym
 echo x >"$app/a.txt"; git -C "$app" add -A; git -C "$app" commit -qm one; git -C "$app" tag v0.0.1
 export FS_RELEASE_REPO="$rel" FS_GATES_BUILD_SLOT="$tmp/slot.sh" FS_GATES_FMT=true FS_GATES_SCRATCH="$tmp/scratch" FAKE_OUT="$tmp/out.txt"
 export CI=true CARGO_TERM_COLOR=always  # a caller in CI mode must not leak into the local run
+export FS_GATES_SKIP_TEST=leaked  # nor a skip of the caller (the real flat run of fs-release has it set): only the named exception may set it
 run() { python3 -I "$here/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" "$@"; }
 
 : >"$FAKE_OUT"; run >"$tmp/o.json"; rc=$?
@@ -118,6 +119,9 @@ chk "mutant exception (not printed) is caught by the visibility case" [ "$(grep 
 mx '"gruen_fuer_test": False' '"gruen_fuer_test": True' "exception-green"
 python3 -I "$tmp/mut/gates-komplett" --repo-dir "$tmp/wt-fs-release" --log-dir "$tmp/logs" >"$tmp/o2.json" 2>/dev/null
 chk "mutant exception (counted green for the test) is caught by the not-green case" [ "$(q "$tmp/o2.json" '[x["gruen_fuer_test"] for x in d["ausnahmen"]]')" != "[False]" ]
+mutate "$here/gates-komplett" ', "FS_GATES_SKIP_TEST")}' ')}' "$tmp/mut/gates-komplett" || bad "mutant skip-leak not applied"
+: >"$FAKE_OUT"; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>&1
+chk "mutant exception (a skip of the caller leaks into the runs) is caught by the no-skip case" [ "$(grep -c 'skip=$' "$FAKE_OUT")" != 3 ]
 # K2 / MF: gates-komplett ignores a fmt that changes files (the result must still say geaendert=True and run NO gate)
 mutate "$here/gates-komplett" '"geaendert": dirty != before[1]' '"geaendert": False' "$tmp/mut/gates-komplett" || bad "mutant MF not applied"
 FS_GATES_FMT="sh -c 'echo y >>a.txt'" python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >"$tmp/o2.json" 2>/dev/null; git -C "$app" checkout -q a.txt
