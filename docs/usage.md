@@ -450,3 +450,7 @@ The catalog is raised by fs-catalog itself, within 15 minutes (see DESIGN.md "Re
 
 Recommendation: switch on "Immutable releases" (repo Settings, General) in every program repo, so a published release and its
 assets can never be changed or replaced, not even by an owner. Not switched on by this workflow; the repo owner does it.
+
+## Blueprint check and program from a blueprint (S5, ADR 0099)
+
+`check.yml` has the input `blueprint` (`off` by default, `warn` or `block`) and `blueprint-rev` (the commit of fs-release the command is built from; a full SHA). With `warn` or `block`, a repo that has a `scaffold.toml` gets the step `fs-blueprint check --drift` after the gates: structure of the blueprint, the building blocks (catalog), the files of the repo, the talk records of the exceptions (a flat checkout of fs-documentation main) and the generated files (a hand change is `generated-changed`, a file under `crates/` without a head or an exception is `file-unowned`). `warn` shows the findings and stays green (for a repo that is not converted yet), `block` fails the job. Callers pinned to an older tag keep what they have. The step `generieren` of `workflows/grundfassung.yaml` replaces the AI step `geruest`: `fs-blueprint new <bauplan> --out <worktree>` checks the blueprint, generates the program and writes it; on an error nothing is written. The workflow `blueprint-e2e` proves on Linux and Windows that a blueprint becomes a program that builds and starts, that the check finds a hand change, and that the install line of `check.yml` works.

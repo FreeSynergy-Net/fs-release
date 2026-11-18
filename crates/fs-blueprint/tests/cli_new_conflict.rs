@@ -124,3 +124,88 @@ fn new_of_another_blueprint_into_the_repo_of_a_first_one_changes_nothing() {
         "the repo is still the output of the first blueprint: {out}"
     );
 }
+
+fn new_words(bp: &Path, target: &Path) -> Vec<String> {
+    [
+        "new",
+        &bp.to_string_lossy(),
+        "--out",
+        &target.to_string_lossy(),
+    ]
+    .iter()
+    .map(|s| (*s).to_string())
+    .collect()
+}
+
+#[test]
+fn a_folder_at_the_place_of_the_blueprint_or_of_a_forms_file_is_a_conflict_and_nothing_is_written()
+{
+    let bp = fixture("ok").join("scaffold.toml");
+    for (name, place) in [
+        ("scaffold", "scaffold.toml"),
+        ("forms-file", "forms/demo.toml"),
+    ] {
+        let t = scratch(&format!("folder-{name}"));
+        std::fs::create_dir_all(t.join(place).join("inside")).unwrap();
+        std::fs::write(t.join(place).join("inside").join("x.txt"), "x").unwrap();
+        let before = snapshot(&t);
+        let (code, _, err) = cli(&["new", &bp.to_string_lossy(), "--out", &t.to_string_lossy()]);
+        assert_eq!(code, 2, "{name}: {err}");
+        assert!(err.contains("nothing was written"), "{err}");
+        assert_eq!(snapshot(&t), before, "{name}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_file_that_cannot_be_read_at_the_place_is_a_conflict_and_nothing_is_written() {
+    use std::os::unix::fs::PermissionsExt;
+    let bp = fixture("ok").join("scaffold.toml");
+    let t = scratch("unreadable");
+    std::fs::create_dir_all(&t).unwrap();
+    let file = t.join("scaffold.toml");
+    std::fs::write(&file, "# mine\n").unwrap();
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o000)).unwrap();
+    if std::fs::read(&file).is_ok() {
+        // running with rights that read everything: the situation cannot be made here
+        return;
+    }
+    let before = files(&t);
+    let (code, _, err) = cli(&["new", &bp.to_string_lossy(), "--out", &t.to_string_lossy()]);
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert_eq!(code, 2, "{err}");
+    assert!(err.contains("nothing was written"), "{err}");
+    assert_eq!(files(&t), before);
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "# mine\n");
+}
+
+#[test]
+fn a_file_that_appears_between_the_look_and_the_write_is_never_overwritten_and_the_message_says_what_was_written(
+) {
+    let bp = fixture("ok").join("scaffold.toml");
+    let t = scratch("race");
+    let late = t.join("scaffold.toml");
+    let (mut out, words) = (Vec::new(), new_words(&bp, &t));
+    let err = fs_blueprint::cli_new::new_with_hook(&words[1..], &mut out, &|| {
+        std::fs::create_dir_all(&t).unwrap();
+        std::fs::write(&late, "# appeared late\n").unwrap();
+    })
+    .unwrap_err();
+    assert!(
+        err.contains("already written") && !err.contains("nothing was written"),
+        "{err}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&late).unwrap(),
+        "# appeared late\n",
+        "the late file was not touched"
+    );
+    assert!(
+        t.join("crates")
+            .join("fs-demo-bin")
+            .join("src")
+            .join("main.rs")
+            .is_file(),
+        "the program files are there, as the message says"
+    );
+}

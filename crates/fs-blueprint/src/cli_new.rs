@@ -52,7 +52,7 @@ fn conflicts(places: &[Place]) -> Result<(), String> {
         };
         if !same {
             return Err(format!(
-                "{} exists and is not the same as {}: nothing was written",
+                "{} exists and is not the same as {}",
                 to.display(),
                 from.display()
             ));
@@ -63,8 +63,10 @@ fn conflicts(places: &[Place]) -> Result<(), String> {
 
 /// Puts the files in place (made when missing, left when the same).
 fn apply(places: &[Place]) -> Result<(), String> {
-    // the same look again: nothing is ever overwritten, whatever the caller did before
-    conflicts(places)?;
+    // the same look again: nothing is ever overwritten, whatever the caller did before; at this point the program files are already written
+    conflicts(places).map_err(|e| {
+        format!("{e}: this file was left as it is, but the program files are already written")
+    })?;
     for (from, to) in places {
         let bytes =
             std::fs::read(from).map_err(|e| format!("cannot read {}: {e}", from.display()))?;
@@ -83,7 +85,24 @@ fn same_folder(a: &Path, b: &Path) -> bool {
     matches!((a.canonicalize(), b.canonicalize()), (Ok(x), Ok(y)) if x == y)
 }
 
+/// `new` (the words AFTER `new`) with a hook that runs between the look at the conflicts and the first write (a test makes a file appear there: the race the look cannot prevent).
+///
+/// # Errors
+/// The words are wrong, or a file cannot be read, or a place is taken (the text says whether anything was written).
+pub fn new_with_hook(
+    words: &[String],
+    out: &mut dyn Write,
+    between: &dyn Fn(),
+) -> Result<i32, String> {
+    let o = crate::cli::parse(words)?;
+    run_new_with(&o, out, between)
+}
+
 pub(crate) fn run_new(o: &Options, out: &mut dyn Write) -> Result<i32, String> {
+    run_new_with(o, out, &|| {})
+}
+
+fn run_new_with(o: &Options, out: &mut dyn Write, between: &dyn Fn()) -> Result<i32, String> {
     let [file] = o.positional.as_slice() else {
         return Err("new needs the blueprint: fs-blueprint new BAUPLAN [--out DIR]".to_string());
     };
@@ -142,7 +161,8 @@ pub(crate) fn run_new(o: &Options, out: &mut dyn Write) -> Result<i32, String> {
     } else {
         list_places(file, source, &target)
     };
-    conflicts(&places)?;
+    conflicts(&places).map_err(|e| format!("{e}: nothing was written"))?;
+    between();
     let outcome = match write(&artifacts, &mut DirStore::new(&target)) {
         Ok(outcome) => outcome,
         Err(errors) => {
