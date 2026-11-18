@@ -37,7 +37,7 @@ R="$tmp/repo"; mkrepo "$R"
 
 # 1 unchanged tree
 run "$tmp/real" "$R" "true"; rc=$?
-{ [ "$rc" -eq 0 ] && grep -q "gates guard ok" "$tmp/out"; } && ok "unchanged tree: rc 0" || bad "unchanged tree: rc $rc"
+{ [ "$rc" -eq 0 ] && grep -q "^gates ok: " "$tmp/out"; } && ok "unchanged tree: rc 0" || bad "unchanged tree: rc $rc"
 [ ! -e "$R/.gates.lock" ] && ok "lock removed after the run" || bad "lock left behind"
 [ -z "$(git -C "$R" status --porcelain=v1 --untracked-files=all)" ] && ok "the guard leaves no file in the tree" || bad "guard left a file"
 
@@ -66,7 +66,7 @@ for _ in $(seq 1 50); do [ -e "$R/.gates.lock" ] && break; sleep 0.1; done
 run "$tmp/real" "$R" "true"; rc=$?
 { [ "$rc" -ne 0 ] && grep -q "gates läuft bereits" "$tmp/out"; } && ok "second parallel run: rc $rc, gates läuft bereits" || bad "second parallel run: rc $rc"
 wait "$first"; rc1=$?
-{ [ "$rc1" -eq 0 ] && grep -q "gates guard ok" "$tmp/out1"; } && ok "the first run is not disturbed (rc 0)" || bad "first run rc $rc1"
+{ [ "$rc1" -eq 0 ] && grep -q "^gates ok: " "$tmp/out1"; } && ok "the first run is not disturbed (rc 0)" || bad "first run rc $rc1"
 
 # 4 orphaned lock
 sleep 0.1 & dead=$!; wait "$dead"
@@ -77,10 +77,30 @@ echo "garbage" > "$R/.gates.lock"
 run "$tmp/real" "$R" "true"; rc=$?
 [ "$rc" -eq 0 ] && ok "unreadable lock replaced: rc 0" || bad "unreadable lock: rc $rc"
 
+# 4b the lock PID is alive but no gates.sh (reused PID): the lock is replaced
+sleep 5 & other=$!
+echo "$other" > "$R/.gates.lock"
+run "$tmp/real" "$R" "true"; rc=$?
+kill "$other" 2>/dev/null; wait "$other" 2>/dev/null
+[ "$rc" -eq 0 ] && ok "lock with a live PID that is no gates.sh replaced: rc 0" || bad "reused PID lock: rc $rc"
+
+# 4c the snapshot is not in /tmp but in <git dir>/gates-guard; an orphaned one (dead PID) is swept, one of a live PID stays
+mkdir -p "$R/.git/gates-guard"; echo old > "$R/.git/gates-guard/snap.$dead"; echo old > "$R/.git/gates-guard/snap.$dead.end"
+sleep 5 & live=$!
+echo keep > "$R/.git/gates-guard/snap.$live"
+run "$tmp/real" "$R" 'ls "$(git rev-parse --absolute-git-dir)/gates-guard" > '"$tmp/ls"; rc=$?
+kill "$live" 2>/dev/null; wait "$live" 2>/dev/null
+{ [ "$rc" -eq 0 ] && grep -q '^snap\.[0-9]*$' "$tmp/ls"; } && ok "snapshot lives in <git dir>/gates-guard" || bad "snapshot location (rc $rc)"
+{ [ ! -e "$R/.git/gates-guard/snap.$dead" ] && [ ! -e "$R/.git/gates-guard/snap.$dead.end" ]; } && ok "orphaned snapshots (dead PID) swept" || bad "orphaned snapshot left"
+[ -e "$R/.git/gates-guard/snap.$live" ] && ok "snapshot of a live PID is kept" || bad "live snapshot swept"
+rm -f "$R/.git/gates-guard/snap.$live"
+[ -z "$(ls -A "$R/.git/gates-guard")" ] && ok "no snapshot left after the run" || bad "snapshot left after the run"
+
 # 5 mutants: each must turn a case red
-mutant() { # <label> <sed expr on the library> <case: change|parallel>
-  mkscripts "$tmp/m"; sed -i "$2" "$tmp/m/s/scripts/lib_gates_guard.sh"
-  if cmp -s "$tmp/m/s/scripts/lib_gates_guard.sh" "$here/lib_gates_guard.sh"; then bad "mutant $1: the sed expression changed nothing"; return; fi
+mutant() { # <label> <sed expr> <case: change|content|parallel|orphan> [file in scripts/, default lib_gates_guard.sh]
+  local mf="${4:-lib_gates_guard.sh}"
+  mkscripts "$tmp/m"; sed -i "$2" "$tmp/m/s/scripts/$mf"
+  if cmp -s "$tmp/m/s/scripts/$mf" "$here/$mf"; then bad "mutant $1: the sed expression changed nothing"; return; fi
   if [ "$3" = change ] || [ "$3" = content ]; then
     # content: an untracked file that exists at the start gets other content (the status lines stay equal, only the hash shows it)
     echo u > "$R/u.txt"
@@ -88,6 +108,11 @@ mutant() { # <label> <sed expr on the library> <case: change|parallel>
     rc=$?
     git -C "$R" clean -fdq
     [ "$rc" -eq 0 ] && ok "mutant $1: change in the middle goes unnoticed (test would be red)" || bad "mutant $1 not caught (rc $rc)"
+  elif [ "$3" = orphan ]; then
+    mkdir -p "$R/.git/gates-guard"; echo old > "$R/.git/gates-guard/snap.$dead"
+    run "$tmp/m" "$R" "true"
+    [ -e "$R/.git/gates-guard/snap.$dead" ] && ok "mutant $1: orphaned snapshot stays (test would be red)" || bad "mutant $1 not caught"
+    rm -f "$R/.git/gates-guard/snap.$dead"
   else
     GATES_ONLY_GUARD=1 GATES_GUARD_MIDDLE="sleep 2" CI=1 bash "$tmp/m/s/scripts/gates.sh" "$R" > "$tmp/out1" 2>&1 &
     local p=$!
@@ -103,6 +128,19 @@ mutant "files not hashed" 's/echo "\$(sha256sum < "\$root\/\$f" | cut -d. . -f1)
 mutant "lock check removed" 's/kill -0 "\$pid" 2>\/dev\/null/false/' parallel
 mutant "lock never taken" 's/if (set -o noclobber; echo "\$\$" > "\$lock") 2>\/dev\/null; then/if true; then/' parallel
 mutant "gates.sh without guard end" 's/^gates_guard_compare().*/gates_guard_compare() { return 0; }\n_unused() {/' change
+
+# the end of the REAL run (gates.sh, the lines after the checks) is the same code in test mode: remove / neutralise its compare
+mutant "gates.sh: end compare removed" '/^gates_guard_compare "\$guard_snap" "\$guard_snap.end"$/d' change gates.sh
+mutant "gates.sh: end compare || true" 's/^gates_guard_compare "\$guard_snap" "\$guard_snap.end"$/& || true/' change gates.sh
+mutant "gates.sh: snapshot in /tmp" 's|^guard_dir=.*|guard_dir="/tmp"|' orphan gates.sh
+mutant "sweep removed" 's/kill -0 "\$pid" 2>\/dev\/null || rm -f -- "\$f"/true/' orphan
+# mutant: the PID check does not look at gates.sh -> a lock with a live foreign PID blocks the run (the case of 4b turns red)
+mkscripts "$tmp/m"; sed -i 's/grep -q .gates\\.sh./true/' "$tmp/m/s/scripts/lib_gates_guard.sh"
+if cmp -s "$tmp/m/s/scripts/lib_gates_guard.sh" "$here/lib_gates_guard.sh"; then bad "mutant pid check: sed changed nothing"; else
+  sleep 5 & other=$!; echo "$other" > "$R/.gates.lock"
+  run "$tmp/m" "$R" "true"; rc=$?; kill "$other" 2>/dev/null; wait "$other" 2>/dev/null; rm -f "$R/.gates.lock"
+  [ "$rc" -ne 0 ] && ok "mutant pid check ignores gates.sh: reused-PID case goes red (rc $rc)" || bad "mutant pid check not caught"
+fi
 
 # 6 gates.sh really uses the guard (the wiring)
 grep -q 'gates_guard_lock' "$here/gates.sh" && grep -q 'gates_guard_compare' "$here/gates.sh" && ok "gates.sh calls lock and compare" || bad "gates.sh has no guard"

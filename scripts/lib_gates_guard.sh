@@ -10,6 +10,31 @@
 GATES_GUARD_LOCK_NAME=".gates.lock"
 GATES_GUARD_TEXT="Arbeitsbaum während der Prüfung geändert"
 
+# gates_guard_is_gates <pid>: rc 0 unless /proc shows a process that is not a gates.sh
+gates_guard_is_gates() {
+  [ -r "/proc/$1/cmdline" ] || return 0
+  tr '\0' ' ' < "/proc/$1/cmdline" | grep -q 'gates\.sh'
+}
+
+# gates_guard_snapdir <root>: prints (and creates) the snapshot folder <git dir>/gates-guard
+gates_guard_snapdir() {
+  local d
+  d="$(git -C "$1" rev-parse --absolute-git-dir)/gates-guard"
+  mkdir -p "$d" && echo "$d"
+}
+
+# gates_guard_sweep <snapshot folder>: removes snapshots (snap.<pid>[.end]) of dead PIDs; only in that folder, only that name form
+gates_guard_sweep() {
+  local f pid
+  for f in "$1"/snap.*; do
+    [ -f "$f" ] || continue
+    pid="${f##*/snap.}"; pid="${pid%.end}"
+    case "$pid" in ''|*[!0-9]*) continue ;; esac
+    kill -0 "$pid" 2>/dev/null || rm -f -- "$f"
+  done
+  return 0
+}
+
 # gates_guard_lock <root>: rc 0 = lock taken, rc 1 = another gates.sh lives in this worktree
 gates_guard_lock() {
   local lock="$1/$GATES_GUARD_LOCK_NAME" pid
@@ -18,7 +43,9 @@ gates_guard_lock() {
       return 0
     fi
     pid="$(tr -d '[:space:]' < "$lock" 2>/dev/null || true)"
-    if [ -n "$pid" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null; then
+    # Note (H2): a PID can be reused by an unrelated process after a SIGKILL; so a live PID counts only if it is a gates.sh
+    # (/proc cmdline; without /proc the check falls back to "alive"). Two runs replacing the same stale lock at once is accepted.
+    if [ -n "$pid" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null && gates_guard_is_gates "$pid"; then
       echo "gates FAILED: gates läuft bereits in $1 (PID $pid, $lock)" >&2
       return 1
     fi
