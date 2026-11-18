@@ -9,8 +9,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$here/../.test-tmp"; tmp="$(TMPDIR="${TEST_TMPDIR:-$here/../.test-tmp}" mktemp -d)"  # never /tmp (RAM, rule [PLATTE])
 trap 'rm -rf "$tmp"; rmdir "$here/../.test-tmp" 2>/dev/null' EXIT
 fails=0
+: >"$tmp/.fails"  # every failure is ALSO written to this file: a failure in a subshell, pipe or background job cannot be lost (Opus N4)
 ok() { echo "ok   $1"; }
-bad() { echo "FAIL $1"; fails=$((fails + 1)); }
+bad() { echo "FAIL $1"; fails=$((fails + 1)); echo "$1" >>"$tmp/.fails"; }
 chk() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 q() { python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(eval(sys.argv[2]))' "$1" "$2"; }
@@ -195,4 +196,4 @@ chk "flat target: the local and CI runs set no target of the tool" [ "$(grep -c 
 mutate "$here/gates-komplett" '"geaendert": dirty != before[1]' '"geaendert": False' "$tmp/mut/gates-komplett" || bad "mutant MF not applied"
 FS_GATES_FMT="sh -c 'echo y >>a.txt'" python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >"$tmp/o2.json" 2>/dev/null; git -C "$app" checkout -q a.txt
 chk "mutant MF (fmt change ignored) is caught by the fmt-changes-files case (both parts checked)" [ "$(q "$tmp/o2.json" '(d["fmt"]["geaendert"], d["laeufe"][0]["rc"])')" != "(True, None)" ]
-if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
+wait; nfail="$(wc -l <"$tmp/.fails")"; if [ "$nfail" -eq 0 ] && [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$nfail failed (counter file), $fails in the main shell"; exit 1; fi

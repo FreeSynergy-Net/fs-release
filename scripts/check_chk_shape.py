@@ -6,7 +6,7 @@ logical line by `&&`, `||` or `;` that is not itself a `chk` call (or a closing 
   python3 -I scripts/check_chk_shape.py FILE...      rc 0 = clean, 1 = findings (`file:line: text` on stdout), 2 = bad input
 
 Covers: the pattern INDENTED (in a loop or function), `;`, `||`, `&&`, and continuation lines (`\\` at the end of a line joins the next one first); `&&`, `||` and `;` inside quotes or `$( )` do not count.
-Here-document bodies are data and are skipped. A `chk` call also counts after `do`, `then`, `else`, `{`. Two chk calls on one line (`chk "a" [ x ] && chk "b" [ y ]`) are fine: every part is checked.
+Here-document bodies are data and are skipped (an unterminated one is a finding); `eval` is a finding; a trailing `&&`, `||` or `|` joins the next line. A `chk` call also counts after `do`, `then`, `else`, `{`. Two chk calls on one line (`chk "a" [ x ] && chk "b" [ y ]`) are fine: every part is checked.
 """
 import re
 import sys
@@ -14,23 +14,58 @@ import sys
 KEYWORDS = ("done", "fi", "then", "do", "else", "}")
 
 
-HEREDOC = re.compile(r"<<-?\s*(?:'([A-Za-z_]+)'|\"([A-Za-z_]+)\"|([A-Za-z_]+))")
-
-
 def strip_heredocs(text):
-    """The bodies of here-documents are data, not commands: blanked (the line numbers stay)."""
-    out, end = [], None
-    for raw in text.split("\n"):
+    """The bodies of here-documents are data, not commands: blanked (the line numbers stay). Only a `<<WORD` OUTSIDE quotes counts (not `<<<`, not `"<<WORD"`, not `$(( 1 << x ))`);
+    a here-document without its end marker is a FINDING (returned in `bad`), never a reason to swallow the rest of the file."""
+    out, end, bad, lines = [], None, [], text.split("\n")
+    for n, raw in enumerate(lines, 1):
         if end is not None:
-            if raw.strip() == end:
+            if raw.strip() == end[0]:
                 end = None
             out.append("")
             continue
         out.append(raw)
-        m = HEREDOC.search(raw)
+        m = heredoc_marker(raw)
         if m:
-            end = next(g for g in m.groups() if g)
-    return "\n".join(out)
+            if any(x.strip() == m for x in lines[n:]):
+                end = (m,)
+            else:
+                bad.append((n, raw.strip()))
+    return "\n".join(out), bad
+
+
+def heredoc_marker(line):
+    """The end marker of a `<<WORD` / `<<-WORD` / `<<'WORD'` outside quotes and `$(( ))`, or None."""
+    st, i = [], 0
+    while i < len(line):
+        c, top = line[i], (st[-1] if st else None)
+        if top == "s":
+            if c == "'":
+                st.pop()
+        elif top == "d":
+            if c == "\\":
+                i += 1
+            elif c == '"':
+                st.pop()
+        elif c == "'":
+            st.append("s")
+        elif c == '"':
+            st.append("d")
+        elif line.startswith("$((", i):
+            st.append("a")
+            i += 2
+        elif top == "a":
+            if line.startswith("))", i):
+                st.pop()
+                i += 1
+        elif line.startswith("<<<", i):
+            i += 2
+        elif line.startswith("<<", i):
+            m = re.match(r"<<-?\s*(?:'([A-Za-z_]+)'|\"([A-Za-z_]+)\"|([A-Za-z_][A-Za-z_0-9]*))", line[i:])
+            if m:
+                return next(g for g in m.groups() if g)
+        i += 1
+    return None
 
 
 def logical_lines(text):
@@ -41,6 +76,9 @@ def logical_lines(text):
             start = n
         if raw.endswith("\\"):
             buf += raw[:-1] + " "
+            continue
+        if re.search(r"(&&|\|\||\|)\s*$", raw) and not raw.strip().startswith("#"):
+            buf += raw + " "  # a trailing && || | continues on the next line, no backslash needed
             continue
         out.append((start, buf + raw))
         buf = ""
@@ -103,8 +141,12 @@ def is_chk(part):
 
 
 def findings(text):
-    out = []
-    for n, line in logical_lines(strip_heredocs(text)):
+    body, out = strip_heredocs(text)
+    for n, line in logical_lines(body):
+        bare = re.sub(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"", "''", line)  # words inside quotes are data
+        if re.search(r"(^|[\s;&|(])eval\s", bare) and not line.lstrip().startswith("#"):
+            out.append((n, line.strip()))
+            continue
         parts = [p.strip() for p in split_top(line)]
         for k, p in enumerate(parts[:-1]):
             if not is_chk(p):

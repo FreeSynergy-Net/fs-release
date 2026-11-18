@@ -9,8 +9,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$here/../.test-tmp"; tmp="$(TMPDIR="${TEST_TMPDIR:-$here/../.test-tmp}" mktemp -d)"  # never /tmp (RAM, rule [PLATTE])
 trap 'rm -rf "$tmp"; rmdir "$here/../.test-tmp" 2>/dev/null' EXIT
 fails=0
+: >"$tmp/.fails"  # every failure is ALSO written to this file: a failure in a subshell, pipe or background job cannot be lost (Opus N4)
 ok() { echo "ok   $1"; }
-bad() { echo "FAIL $1"; fails=$((fails + 1)); }
+bad() { echo "FAIL $1"; fails=$((fails + 1)); echo "$1" >>"$tmp/.fails"; }
 chk() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
 # shellcheck source=scripts/kaskade_fixture.sh
 source "$here/kaskade_fixture.sh"
@@ -98,4 +99,4 @@ chk "mutant lock-gleich (required switches not enforced) is caught by the weaken
 mutate "$here/lock-gleich" 'if pins:' 'if False:' "$tmp/mut/lock-gleich" || bad "mutant lock 3 not applied"
 py "$tmp/mut/lock-gleich" --plan "$(plan "$e_tsk")" --ausloeser v0.0.3 | python3 -I -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if any("rev pin" in b for b in d["befunde"]) else 1)'; rc=$?
 chk "mutant lock-gleich (rev pin check removed) is caught by the left-rev-pin case" [ "$rc" -ne 0 ]
-if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
+wait; nfail="$(wc -l <"$tmp/.fails")"; if [ "$nfail" -eq 0 ] && [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$nfail failed (counter file), $fails in the main shell"; exit 1; fi

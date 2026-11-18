@@ -10,8 +10,9 @@ mkdir -p "$here/../.test-tmp"; tmp="$(TMPDIR="${TEST_TMPDIR:-$here/../.test-tmp}
 srv=""
 trap '[ -z "$srv" ] || kill "$srv" 2>/dev/null; rm -rf "$tmp"; rmdir "$here/../.test-tmp" 2>/dev/null' EXIT
 fails=0
+: >"$tmp/.fails"  # every failure is ALSO written to this file: a failure in a subshell, pipe or background job cannot be lost (Opus N4)
 ok() { echo "ok   $1"; }
-bad() { echo "FAIL $1"; fails=$((fails + 1)); }
+bad() { echo "FAIL $1"; fails=$((fails + 1)); echo "$1" >>"$tmp/.fails"; }
 chk() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
 # shellcheck source=scripts/kaskade_fixture.sh
 source "$here/kaskade_fixture.sh"
@@ -185,6 +186,39 @@ EOF
 cat >"$tmp/shape/bad6" <<'EOF'
 chk "x" [ 1 -eq 1 ] && chk "y" [ 1 -eq 1 ] && [ 1 -eq 2 ]
 EOF
+cat >"$tmp/shape/bad7" <<'EOF'
+chk "x" [ 1 -eq 1 ] &&
+  [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad8" <<'EOF'
+eval 'chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]'
+EOF
+cat >"$tmp/shape/bad9" <<'EOF'
+x=$(cat <<< "a")
+chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad10" <<'EOF'
+echo "cat <<END"
+chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad11" <<'EOF'
+cat <<END
+text without its end marker
+EOF
+cat >"$tmp/shape/bad12" <<'EOF'
+chk "x" [ 1 -eq 1 ] ||
+  [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad13" <<'EOF'
+cat <<EOT
+data
+EOT
+chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/good7" <<'EOF'
+y=$(( 1 << 3 ))
+chk "x" [ "$y" -eq 8 ]
+EOF
 cat >"$tmp/shape/good1" <<'EOF'
 chk "x" [ 1 -eq 1 ] && chk "x [part 2]" [ 2 -eq 2 ]
 EOF
@@ -232,11 +266,44 @@ shape_mut() { # <old> <new> <label>
 }
 shape_mut 's.startswith("&&", i) or' 'False and' "&& ignored"
 shape_mut 'parts = [p.strip() for p in split_top(line)]' 'parts = list(split_top(line))' "indent ignored (G3)"
-shape_mut 'logical_lines(strip_heredocs(text))' 'logical_lines(text)' "heredoc bodies not skipped"
+shape_mut 'body, out = strip_heredocs(text)' 'body, out = text, []' "heredoc bodies not skipped"
+shape_mut 'if raw.strip() == end[0]:' 'if False:' "heredoc end never found (swallows the rest)"
+shape_mut 'if any(x.strip() == m for x in lines[n:]):' 'if True:' "unterminated heredoc swallowed"
+shape_mut '(^|[\s;&|(])eval\s' '(^|[\s;&|(])evalX\s' "eval not a finding"
+shape_mut 'if re.search(r"(&&|\|\||\|)\s*$", raw)' 'if False' "trailing connector not joined"
 shape_mut 'elif top is None and c == ";":' 'elif top is None and c == "\x00":' "; ignored (G4)"
 shape_mut 'if raw.endswith("\\"):' 'if raw.endswith("\x00"):' "continuation ignored (G5)"
 shape_mut 'or s.startswith("||", i)' 'or s.startswith("\x00\x00", i)' "|| ignored"
 shape_mut 'elif c == "'"'"'":
                 st.append("s")' 'elif c == "\x00":
                 st.append("s")' "quotes ignored"
-if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
+# ---- the COUNTER (Opus N4, the real solution): bad() also writes into $tmp/.fails and the end check reads it, so a failing chk cannot be lost in a subshell, pipe, background job, if, case, ! , $( ) ... ----
+helpers="$(grep -E '^(ok|bad|chk)\(\)' "$here/test_kaskade_gates.sh")"
+endline="$(grep -E '^wait; nfail=' "$here/test_kaskade_gates.sh")"
+mkdir -p "$tmp/ctr"
+# counted <helpers> <form>: the number of lines in the counter file after running the form (a FAILING chk inside it)
+counted() { bash -c 'tmp="$1"; fails=0; : >"$tmp/.fails"; eval "$2"; { eval "$3"; wait; } >/dev/null 2>&1; wc -l <"$tmp/.fails"' _ "$tmp/ctr" "$1" "$2" 2>/dev/null; }
+counter_all() { # <helpers>: every form leaves at least one line in the counter file
+  local form
+  for form in '( chk "f" [ 1 -eq 2 ] )' 'chk "f" [ 1 -eq 2 ] | tee /dev/null' 'chk "f" [ 1 -eq 2 ] &' 'if chk "f" [ 1 -eq 2 ]; then :; fi' \
+    'case a in a) chk "f" [ 1 -eq 2 ] ;; esac' '! chk "f" [ 1 -eq 2 ]' 'x=$(chk "f" [ 1 -eq 2 ])' 'f() { chk "f" [ 1 -eq 2 ]; }; f' 'X=1 chk "f" [ 1 -eq 2 ]' \
+    "eval 'chk \"f\" [ 1 -eq 2 ]'" 'chk "f" [ 1 -eq 2 ] &&
+  [ 1 -eq 1 ]' 'while chk "f" [ 1 -eq 2 ]; do break; done' 'chk "f" [ 1 -eq 2 ] || true' 'chk "f" [ 1 -eq 2 ]; true'; do
+    [ "$(counted "$1" "$form")" -ge 1 ] || { echo "not counted: $form" >&2; return 1; }
+  done
+}
+chk "counter: a failing chk is counted in EVERY form (subshell, pipe, background, if, case, !, \$( ), function, env prefix, eval, trailing &&, while, ||, ;)" counter_all "$helpers"
+chk "counter: a passing chk is not counted" [ "$(counted "$helpers" 'chk "p" [ 1 -eq 1 ]')" = 0 ]
+# the end check of the real script: a failure inside a subshell must end the run with rc 1 (and never print all ok)
+endrun() { bash -c 'tmp="$1"; fails=0; : >"$tmp/.fails"; eval "$2"; ( chk "f" [ 1 -eq 2 ] ) >/dev/null; eval "$3"' _ "$tmp/ctr" "$1" "$endline"; }
+rc=0; out="$(endrun "$helpers" 2>&1)" || rc=$?
+chk "counter: the end check turns a failure lost in a subshell into rc 1 (no all ok)" [ "$rc" -eq 1 ]
+chk "counter: ... and does not print all ok" [ "$(printf '%s' "$out" | grep -c 'all ok')" = 0 ]
+# mutants: bad() without the file write; an end check that reads only the main-shell variable
+mh="$(printf '%s\n' "$helpers" | sed 's|; echo "\$1" >>"\$tmp/.fails"||')"
+chk "mutant counter (bad() does not write the file) is caught by the form cases" [ "$(counter_all "$mh" >/dev/null 2>&1 && echo green || echo red)" = red ]
+mend="$(printf '%s\n' "$endline" | sed 's/nfail="$(wc -l <"$tmp\/.fails")"/nfail=0/')"
+rc=0; bash -c 'tmp="$1"; fails=0; : >"$tmp/.fails"; eval "$2"; ( chk "f" [ 1 -eq 2 ] ) >/dev/null; eval "$3"' _ "$tmp/ctr" "$helpers" "$mend" >/dev/null 2>&1 || rc=$?
+chk "mutant counter (end check ignores the file) is caught by the subshell case" [ "$rc" -eq 0 ]
+[ -z "$srv" ] || kill "$srv" 2>/dev/null  # the stand-in API server is a child of this shell: stop it before `wait`
+wait; nfail="$(wc -l <"$tmp/.fails")"; if [ "$nfail" -eq 0 ] && [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$nfail failed (counter file), $fails in the main shell"; exit 1; fi
