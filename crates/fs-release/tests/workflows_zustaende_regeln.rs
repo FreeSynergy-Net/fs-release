@@ -2,6 +2,7 @@
 //! EVERY state removed from the states line, EVERY state name (and `stationen`) as the name of a step. Each turns the check red.
 
 mod support;
+use std::fmt::Write;
 use support::workflows::{assert_red, read};
 
 const SRC_STATES: [&str; 8] = [
@@ -43,7 +44,7 @@ fn without_pair(t: &str, src: &str, item: &str) -> String {
             let mut items: Vec<&str> = l[prefix.len()..l.len() - 1].split(", ").collect();
             let at = items.iter().position(|x| *x == item).unwrap();
             items.remove(at);
-            out.push_str(&format!("{prefix}{}]\n", items.join(", ")));
+            let _ = writeln!(out, "{prefix}{}]", items.join(", "));
         } else {
             out.push_str(l);
             out.push('\n');
@@ -56,7 +57,7 @@ fn without_pair(t: &str, src: &str, item: &str) -> String {
 fn the_real_flow_has_all_nine_rules_with_many_pairs() {
     let r = rules(&read("bugfix"));
     assert_eq!(r.len(), 9, "{r:?}");
-    assert!(r.iter().map(|(_, t)| t.len()).sum::<usize>() == 38);
+    assert_eq!(r.iter().map(|(_, t)| t.len()).sum::<usize>(), 38);
 }
 
 #[test]
