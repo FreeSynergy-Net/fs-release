@@ -107,7 +107,7 @@ def main(argv):
             return kio.skipped("no fs-release tag pinned in .github/workflows and no scripts/gates.sh: pass --skripte-tag")
         before = state(d)
         toolchain = os.path.join(os.path.dirname(os.path.dirname(gates)), "RUST_VERSION")
-        env = {**{k: v for k, v in os.environ.items() if k not in ("CI", "CARGO_TERM_COLOR")}, "CARGO_BUILD_JOBS": str(a.jobs), "BUILD_PRIORITY": str(a.prioritaet)}
+        env = {**{k: v for k, v in os.environ.items() if k not in ("CI", "CARGO_TERM_COLOR", "FS_GATES_SKIP_TEST")}, "CARGO_BUILD_JOBS": str(a.jobs), "BUILD_PRIORITY": str(a.prioritaet)}  # a skip of the caller never leaks: only the named exception sets it
         if os.path.isfile(toolchain):
             env["RUSTUP_TOOLCHAIN"] = open(toolchain, encoding="utf-8").read().strip()
         fmt = subprocess.run(shlex.split(os.environ.get("FS_GATES_FMT", "cargo fmt --all")), cwd=d, env=env, capture_output=True, text=True, check=False)
