@@ -112,10 +112,11 @@ fn build(
                 return Err(Coded::new("line-ending").with("path", a.path));
             }
             let art = Artifact::new(a.path.clone(), class, content);
-            if !lower.insert(a.path.to_lowercase()) || sorted.insert(a.path.clone(), art).is_some()
-            {
+            // the lower case set decides: the same path twice is also a path that differs only in case
+            if !lower.insert(a.path.to_lowercase()) {
                 return Err(Coded::new("artifact-duplicate").with("path", a.path));
             }
+            sorted.insert(a.path.clone(), art);
         }
     }
     Ok(sorted.into_values().collect())
