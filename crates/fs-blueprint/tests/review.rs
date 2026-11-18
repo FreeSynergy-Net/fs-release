@@ -195,3 +195,33 @@ fn b6_words_may_only_name_modules_that_stand_in_the_blueprint() {
         "a bundle part is no module of the blueprint"
     );
 }
+
+#[test]
+fn k2_the_envelope_is_a_type_of_the_activitystreams_vocabulary_or_a_full_iri() {
+    let with = |e: &str| {
+        edit(
+            SHIFT,
+            "envelope = \"Event\"",
+            &format!("envelope = \"{e}\""),
+        )
+    };
+    for bad in ["Task", "Shift", "note", "Event ", "Events"] {
+        assert!(
+            has(
+                &with(bad),
+                &format!("envelope-invalid{{type=Shift, found={bad}}}")
+            ),
+            "{bad}"
+        );
+    }
+    for good in [
+        "Event",
+        "Note",
+        "Person",
+        "Create",
+        "Collection",
+        "https://x.org/ns#Shift",
+    ] {
+        assert!(none(&with(good), "envelope-invalid"), "{good}");
+    }
+}

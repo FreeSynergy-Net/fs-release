@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use fs_blueprint::emit::write::Store;
+use fs_blueprint::emit::write::{Found, Store};
 use fs_blueprint::Blueprint;
 
 /// (program name, capability, contract id, contract version) of the synthetic blueprints.
@@ -47,8 +47,10 @@ pub struct MemStore {
 }
 
 impl Store for MemStore {
-    fn read(&self, path: &str) -> Option<String> {
-        self.files.get(path).cloned()
+    fn read(&self, path: &str) -> Found {
+        self.files
+            .get(path)
+            .map_or(Found::Missing, |c| Found::Text(c.clone()))
     }
     fn put(&mut self, path: &str, content: &str) -> Result<(), String> {
         if self.fail {

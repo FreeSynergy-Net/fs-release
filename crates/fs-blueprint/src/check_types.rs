@@ -1,7 +1,7 @@
 //! Pattern: Template method (types and their fields, rule sets and the frontend of the blueprint).
 
 use crate::error::Coded;
-use crate::form::{is_camel, is_iri, is_media_type, is_pascal, is_standard_uri};
+use crate::form::{is_camel, is_iri, is_media_type, is_pascal, is_standard_uri, AS2_TYPES};
 use crate::kit::Kind;
 use crate::model::{Blueprint, Field, TypeDef};
 use crate::rules::Rule;
@@ -97,7 +97,7 @@ fn own(s: &mut Sink, bp: &Blueprint, t: &TypeDef) {
     }
     match &t.envelope {
         None => missing(s, "envelope"),
-        Some(e) if !is_pascal(e) && !is_iri(e) => s.err(
+        Some(e) if !AS2_TYPES.contains(&e.as_str()) && !is_iri(e) => s.err(
             Coded::new("envelope-invalid")
                 .with("type", t.name.as_str())
                 .with("found", e.as_str()),

@@ -149,14 +149,14 @@ impl Emitter for Own {
     fn emit(&self, _: &Blueprint, _: &dyn KitCatalog) -> Result<Vec<Artifact>, Coded> {
         Ok(vec![Artifact::new(
             "crates/fs-beta-shelf-planner-core/src/own1.rs",
-            Class::Generated,
+            Class::Seed,
             "x\n",
         )])
     }
 }
 
 #[test]
-fn a_file_covered_by_an_exception_of_the_blueprint_is_class_exception_without_head() {
+fn a_seed_covered_by_an_exception_of_the_blueprint_is_class_exception_without_head() {
     let bp = blueprint(1);
     assert_eq!(
         bp.exception[0].paths[0],

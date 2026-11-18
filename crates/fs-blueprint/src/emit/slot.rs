@@ -108,10 +108,12 @@ impl Values {
 /// Fills a template. `path` names the file for the error.
 ///
 /// # Errors
-/// `slot-unknown{name}` for a name that is no slot; `slot-open{path}` for a `{{` without `}}` and for a `{{` that is left in the result.
+/// `slot-unknown{name}` for a name that is no slot; `slot-open{path}` for a `{{` without `}}` and for a `{{` that is left in the result; `line-ending{path}` for a lone CR.
 pub fn fill(template: &str, values: &Values, path: &str) -> Result<String, Coded> {
+    // a template checked out with CRLF (git autocrlf) gives the same bytes as one with LF
+    let template = template.replace("\r\n", "\n");
     let mut out = String::with_capacity(template.len());
-    let mut rest = template;
+    let mut rest = template.as_str();
     while let Some(i) = rest.find("{{") {
         out.push_str(&rest[..i]);
         let tail = &rest[i + 2..];
@@ -126,6 +128,9 @@ pub fn fill(template: &str, values: &Values, path: &str) -> Result<String, Coded
     out.push_str(rest);
     if out.contains("{{") {
         return Err(Coded::new("slot-open").with("path", path));
+    }
+    if out.contains('\r') {
+        return Err(Coded::new("line-ending").with("path", path));
     }
     Ok(out)
 }

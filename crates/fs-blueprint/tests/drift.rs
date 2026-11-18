@@ -2,7 +2,7 @@
 mod support;
 use fs_blueprint::emit::check::check;
 use fs_blueprint::emit::generate;
-use fs_blueprint::emit::write::{write, DirStore, Store};
+use fs_blueprint::emit::write::{write, DirStore, Found, Store};
 use fs_blueprint::Report;
 use support::synth::{blueprint, MemStore};
 use support::{FakeCatalog, FakeView};
@@ -187,7 +187,7 @@ fn the_directory_store_writes_nested_paths_with_exact_bytes() {
             std::fs::read(a.path.split('/').fold(root.clone(), |p, c| p.join(c))).unwrap();
         assert_eq!(on_disk, a.content.as_bytes(), "{}", a.path);
         assert!(!on_disk.contains(&b'\r'));
-        assert_eq!(store.read(&a.path).as_deref(), Some(a.content.as_str()));
+        assert_eq!(store.read(&a.path), Found::Text(a.content.clone()));
     }
-    assert!(store.read("nope/x.rs").is_none());
+    assert_eq!(store.read("nope/x.rs"), Found::Missing);
 }

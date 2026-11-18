@@ -1,0 +1,2 @@
+# fs-blueprint writes files byte for byte (templates, golden files, reference file): LF on every platform, also with core.autocrlf
+crates/fs-blueprint/** text eol=lf
