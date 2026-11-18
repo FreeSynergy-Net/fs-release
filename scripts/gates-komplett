@@ -7,15 +7,14 @@
 [GATE-GLEICH-CI]: the check scripts (`scripts/gates.sh`, check_rust_rules, check_lock_sources ...) come from the fs-release TAG the repo's own CI files pin (`git archive` of that tag out of
 $FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The tag is the highest `FreeSynergy/fs-release/...@vX.Y.Z` of DIR/.github/workflows/*.yml, or `--skripte-tag`; without
 any (fs-release itself) the scripts of DIR are used. [GATE-VOLLSTAENDIG-LAUFEN]: `cargo fmt --all` FIRST (a tree that fmt changes is red: commit it first), then `gates.sh` COMPLETE, ONE run after the other
-(never parallel): (1) the local environment (a CI/CARGO_TERM_COLOR of the caller is dropped), (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`) with an OWN
+(never parallel): (1) the local environment (a CI/CARGO_TERM_COLOR of the caller is dropped), (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`; in the repo fs-release the tags and the history are fetched afterwards) with an OWN
 target (`.scratch/target/<repo>/<folder>-flach`: <repo> = the repo name of the `origin` URL (the folder name only without an `origin`), <folder> = the folder of the checkout, so every clone has ITS OWN flat target; [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
 CARGO_BUILD_JOBS=<jobs> and BUILD_PRIORITY=<prioritaet>. [GATE-PIPEFAIL], [GATE-AUSGABE-NIE-KUERZEN]: the output goes to a log file whole; the result lists every `gate <name>: rc=` line and every line with FAILED, ERROR
 or errors, and the rc of every run; a red run stops the rest (`nicht gelaufen`). The head and the working tree must be the same before and after (a change while the gates run is red).
-NAMED EXCEPTION (c0 18.11.2026, rule [GATE-FLACHER-KLON-OHNE-TAGS]; the ONLY one, the list `AUSNAHMEN` below): in the repo fs-release itself the flat clone has no tags, and its test
-`released_changelog_sections_equal_their_tags` demands tags on purpose, so the flat run of fs-release is red there by design. Only in the run `flach-ohne-tags`, only for the repo `fs-release`, only for that one test
-the run gets `FS_GATES_SKIP_TEST=<test>` (scripts/gates.sh then runs `cargo test ... -- --skip <test>` and says so). It is never silent: every run prints `SKIPPED test ... by named exception ...` on stderr, the result lists it
-under `ausnahmen` (`angewendet`, `gruen_fuer_test: false`: the test counts as SKIPPED, never as green) and the flat run of fs-release is only green WITHOUT that test. The exception is TIME-LIMITED (`bis`, here v0.0.12): every run prints until when it holds; once fs-release v0.0.12 is tagged (ls-remote, not readable = red) and the list is not empty, gates-komplett is RED. It is then replaced by the real solution (the flat run of fs-release fetches the tags in an own step, only for this repo; the list is empty again). The test runs in the real CI (with tags), which stays decisive.
-Any other repo, run or test: no exception. A flat run of fs-release is therefore meant to be red without the exception (that is the known state, not a bug of the cascade).
+FLAT RUN OF fs-release (c0/strategy 18.11.2026): in the repo fs-release itself the test `released_changelog_sections_equal_their_tags` demands the tags and a full history, so after the flat clone the run fetches them in an OWN step
+(`git fetch --unshallow --tags` from the origin = the checkout, only for the repo `fs-release`; every other repo keeps its flat clone without tags). The test then runs and must be green: there is NO exception any more.
+The MECHANISM of named exceptions stays (the list `AUSNAHMEN` below, now EMPTY; an entry = repo + run + test + `bis`): the run gets `FS_GATES_SKIP_TEST=<test>`, it is printed on every run (`SKIPPED test ... by named exception ...`), the result lists it
+under `ausnahmen` (`gruen_fuer_test: false`), every entry has a deadline `bis` (fs-release tagged = RED, remote not readable = RED); the self test `scripts/test_kaskade_gates.sh` runs the mechanism with a sample entry in its own copy.
 Result JSON: {status, red, kopf, skripte:{tag, quelle}, fmt, laeufe:[{name, rc, log, gates, fehler}], ausnahmen:[{name, repo, lauf, bis, test, grund, angewendet, gruen_fuer_test}], ausnahmen_liste (the whole list, with `bis`), befunde}. rc 0 green / 1 red / 2 bad input.
 """
 import argparse
@@ -33,11 +32,10 @@ import kgit  # noqa: E402
 import kio  # noqa: E402
 
 PIN = re.compile(r"FreeSynergy/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+)\b")
-# The ONE list of named exceptions (never scattered in the code): repo + run + test. `grund` is printed on every run.
-# EVERY entry has `bis` (the fs-release release that replaces it, here v0.0.12): once fs-release `bis` is tagged (ls-remote of fs-release, `FS_KASKADE_BASE`; not readable = red, never a guess)
-# and the list is not empty, gates-komplett is RED. The real solution then: the flat run of fs-release fetches the tags in an own step for this repo only; the list is empty again.
-AUSNAHMEN = [{"name": "flach-changelog-tags", "repo": "fs-release", "lauf": "flach-ohne-tags", "bis": "v0.0.12", "test": "released_changelog_sections_equal_their_tags",
-              "grund": "the test demands v* tags and a flat clone without tags (rule [GATE-FLACHER-KLON-OHNE-TAGS]) has none: red by design; the real CI (with tags) runs it"}]
+# The ONE list of named exceptions (never scattered in the code): repo + run + test. EMPTY since v0.0.12 (the flat run of fs-release fetches its tags, see the flat clone step below); the mechanism stays.
+# An entry needs `bis` (the fs-release release that replaces it): once fs-release `bis` is tagged (ls-remote of fs-release, `FS_KASKADE_BASE`; not readable = red, never a guess) and the list is not empty, gates-komplett is RED.
+# Entry form: {"name": ..., "repo": ..., "lauf": ..., "bis": "vX.Y.Z", "test": ..., "grund": ...}; `grund` is printed on every run.
+AUSNAHMEN = []
 SHOW = re.compile(r"rc=|FAILED|ERROR|errors|^error")
 
 
@@ -153,6 +151,11 @@ def main(argv):
                 rc, out = kgit.run(["clone", "-q", "--depth", "1", "--no-tags", "file://" + d, flach])
                 if rc != 0:
                     return kio.skipped(f"flat clone failed: {out.strip()}")
+                if repo == "fs-release":  # the test `released_changelog_sections_equal_their_tags` needs the tags and a full history: an own step, only for this repo
+                    shallow = kgit.run(["rev-parse", "--is-shallow-repository"], cwd=flach)[1].strip() == "true"
+                    rc, out = kgit.run(["fetch", "-q", *(["--unshallow"] if shallow else []), "--tags", "origin"], cwd=flach)
+                    if rc != 0:
+                        return kio.skipped(f"fetch of the tags into the flat clone failed: {out.strip()}")
             ex = ausnahme_for(repo, name)
             if ex:
                 e = {**e, "FS_GATES_SKIP_TEST": ex["test"]}
