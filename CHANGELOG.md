@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (draft, no version, no tag)
+
+- Run states (`workflow-zustaende-4`, replaces the idea of states in every workflow file): the states belong to the run, ONCE: new rule set `workflows/run/rules.yaml` (nine states with `fehlgeschlagen`, three wait states with their reason, the default transitions; `stationen` is no state), standard `workflows/STATES.md` (default of the run, pair-by-pair equal to the rule set). The 12-line states block is REMOVED from all 58 `workflows/*.yaml` (a file must not carry `freesynergy.net:states` / `transitions`). A workflow may own rules for its own stations (`freesynergy.net:station-rules`: `allow`, `on-enter`; a rule for an unknown station is red) and steps with a status command (`freesynergy.net:status-command`: Serverless Workflow `timeout` 1 to 3600 s, `freesynergy.net:origin: local`, no shell, script under `scripts/` or `freesynergy.net:allow`). New `scripts/check_run_rules.py`, `scripts/check_workflows.py` checks one rule set instead of 58 copies; tests `crates/fs-release/tests/workflows_lauf*.rs` (mutants: state missing, archiviert with a way out, `fehlgeschlagen` without a way to `abgebrochen`, rule for an unknown station, status command without `timeout` or with a shell). DE: Zustände eines Laufs: die Zustände gehören dem Lauf, einmal (`workflows/run/rules.yaml`, Standard `workflows/STATES.md`); der Zustandsblock ist aus allen 58 Workflow-Dateien entfernt; ein Workflow besitzt nur Regeln für seine Stationen und Status-Befehle (mit `timeout`, lokal, ohne Shell); Prüfer gegen EIN Regelwerk; keine Bau-Logik geändert.
+
 ## 0.0.12
 
 Released 2026-11-18 (UTC; the date of the version commit, the tag follows after the pin rounds). / Veröffentlicht am 2026-11-18 (UTC; Datum des Version-Commits, der Tag folgt nach den Pin-Runden).

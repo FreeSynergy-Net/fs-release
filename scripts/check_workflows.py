@@ -10,36 +10,22 @@ Per file: parses; `document` has dsl (1.0.x), namespace, name, version; `do` is 
 state whatever the result, e.g. show images, ask for a verdict). A `then` (task or `switch` case) is continue, exit, end
 or the name of a step of the same flow.
 
-States (standard `workflows/STATES.md`): `document.metadata` of EVERY flow carries `freesynergy.net:states` (exactly the eight
-mandatory states) and `freesynergy.net:transitions` (state -> targets; the word `stationen` stands for the own steps of the flow, which are
-the swimlanes in between). The transitions must contain every rule of the standard (TRANSITIONS below); `archiviert` is reached only from
-`erledigt` / `abgebrochen` and has no way out; no step may carry the name of a state.
+States (standard `workflows/STATES.md`): the states belong to the RUN, once: the rule set `workflows/run/rules.yaml` (checked by
+`check_run_rules.py`). A flow carries no states; it may carry rules only for its own steps (`freesynergy.net:station-rules`: who may, what
+happens on entry) and steps with a status command (`timeout`, local origin, no shell). No step may carry the name of a state.
 """
 import glob
 import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import check_run_rules as runrules  # noqa: E402
+
 ACTORS = {"human": "Person", "ai": "Application", "machine": "Service"}
 TASK_TYPES = {"call", "do", "emit", "for", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"}
 KINDS = ("objective", "subjective")
 FLOW_WORDS = {"continue", "exit", "end"}
-STATES = ("offen", "wartet-auf-entscheidung", "auf-anfrage", "in-prüfung", "pausiert", "abgebrochen", "erledigt", "archiviert")
-STATIONS = "stationen"  # the own steps of a flow (work in progress), the swimlanes between the mandatory states
-_WORK = ["wartet-auf-entscheidung", "auf-anfrage", "in-prüfung", "pausiert", "abgebrochen"]
-# The standard transition rules (the ONE place; workflows/STATES.md says the same). pausiert + abgebrochen from every live state.
-TRANSITIONS = {
-    "offen": [STATIONS, "wartet-auf-entscheidung", "auf-anfrage", "pausiert", "abgebrochen"],
-    STATIONS: [STATIONS, *_WORK, "erledigt"],
-    "wartet-auf-entscheidung": [STATIONS, "in-prüfung", "pausiert", "abgebrochen", "erledigt"],
-    "auf-anfrage": [STATIONS, "in-prüfung", "pausiert", "abgebrochen", "erledigt"],
-    "in-prüfung": [STATIONS, "wartet-auf-entscheidung", "auf-anfrage", "pausiert", "abgebrochen", "erledigt"],
-    "pausiert": ["offen", STATIONS, "wartet-auf-entscheidung", "auf-anfrage", "in-prüfung", "abgebrochen"],
-    "abgebrochen": ["offen", "archiviert"],
-    "erledigt": ["offen", "archiviert"],
-    "archiviert": [],
-}
-META_STATES, META_TRANS = "freesynergy.net:states", "freesynergy.net:transitions"
 ACTOR, ATYPE, GATE = "freesynergy.net:actor", "freesynergy.net:actor-type", "freesynergy.net:gate"
 KIND = "freesynergy.net:kind"
 
@@ -60,6 +46,7 @@ def check_step(item, seen, where):
     meta = task.get("metadata")
     if not isinstance(meta, dict):
         return problems + [f"{where}: no metadata (actor and gate are required)"]
+    problems += runrules.check_status_command(where, task, meta)
     actor = meta.get(ACTOR)
     if actor not in ACTORS:
         problems.append(f"{where}: {ACTOR} is {actor!r}, allowed: {', '.join(ACTORS)}")
@@ -73,49 +60,11 @@ def check_step(item, seen, where):
 
 
 def check_states(head, step_names):
-    """The state standard: the eight mandatory states, the transition rules, no step named like a state."""
-    meta = head.get("metadata") if isinstance(head, dict) else None
-    if not isinstance(meta, dict):
-        return ["document.metadata is missing (states and transitions are required, see STATES.md)"]
-    problems = []
-    states = meta.get(META_STATES)
-    if not isinstance(states, list):
-        problems.append(f"document.metadata {META_STATES} is missing (a list of the eight states)")
-        states = []
-    for s in STATES:
-        if s not in states:
-            problems.append(f"state {s!r} is missing in {META_STATES}")
-    for s in states:
-        if s not in STATES:
-            problems.append(f"unknown state {s!r} in {META_STATES} (allowed: {', '.join(STATES)})")
-    for s in STATES:
-        if states.count(s) > 1:
-            problems.append(f"state {s!r} is listed more than once in {META_STATES} (exactly the eight states, each once)")
+    """No states in a flow, rules only for its own steps, no step named like a state."""
+    problems = runrules.check_station_rules(head.get("metadata") if isinstance(head, dict) else None, step_names)
     for n in step_names:
-        if n in STATES or n == STATIONS:
-            problems.append(f"step {n!r} carries the name of a state (own steps are the swimlanes between the states)")
-    trans = meta.get(META_TRANS)
-    if not isinstance(trans, dict):
-        return problems + [f"document.metadata {META_TRANS} is missing (state -> targets)"]
-    names = set(STATES) | {STATIONS}
-    for src, targets in trans.items():
-        if src not in names:
-            problems.append(f"transition from unknown state {src!r}")
-        if not isinstance(targets, list) or any(not isinstance(t, str) or t not in names for t in targets):
-            problems.append(f"transitions of {src!r}: a list of states (or `{STATIONS}`) is required")
-            continue
-        if "archiviert" in targets and src not in ("erledigt", "abgebrochen"):
-            problems.append(f"transition {src!r} -> 'archiviert' is not allowed (only from erledigt / abgebrochen)")
-        if src == "archiviert" and targets:
-            problems.append("'archiviert' has no way out")
-    for src, targets in TRANSITIONS.items():
-        got = trans.get(src)
-        if got is None:
-            problems.append(f"transition rule of {src!r} is missing")
-        elif isinstance(got, list):
-            for t in targets:
-                if t not in got:
-                    problems.append(f"transition {src!r} -> {t!r} is missing")
+        if n in runrules.STATES or n == runrules.STATIONS:
+            problems.append(f"step {n!r} carries the name of a state (own steps are the stations between the states)")
     return problems
 
 
@@ -210,6 +159,15 @@ def main(argv):
         print(f"{folder}: no workflow files")
         return 1
     bad = 0
+    rules_path = os.path.join(folder, runrules.RULES_FILE)
+    try:
+        with open(rules_path, encoding="utf-8") as f:
+            rule_problems = runrules.check_rules(yaml.safe_load(f))
+    except (OSError, yaml.YAMLError) as e:
+        rule_problems = [f"the run rule set is not readable: {e}"]
+    for p in rule_problems:
+        print(f"{runrules.RULES_FILE}: {p}")
+        bad += 1
     readme_path = os.path.join(folder, "README.md")
     readme = open(readme_path, encoding="utf-8").read() if os.path.exists(readme_path) else None
     for path in files:
