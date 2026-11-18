@@ -88,8 +88,8 @@ fn a_generated_file_that_was_deleted_and_a_seed_that_was_deleted_are_red() {
 fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_a_tests_file_are_not(
 ) {
     let dir = made("unowned");
-    let core = dir.join("crates").join("fs-demo-core");
-    std::fs::write(core.join("src").join("extra.rs"), "pub fn x() {}\n").unwrap();
+    let core_dir = dir.join("crates").join("fs-demo-core");
+    std::fs::write(core_dir.join("src").join("extra.rs"), "pub fn x() {}\n").unwrap();
     let (code, out) = check(&dir);
     assert_eq!(code, 1, "{out}");
     assert!(
@@ -101,12 +101,12 @@ fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_
         "the seed is the program's: {out}"
     );
     // the seed changed by the program and a file in a tests folder: clean again
-    std::fs::remove_file(core.join("src").join("extra.rs")).unwrap();
-    let lib = core.join("src").join("lib.rs");
+    std::fs::remove_file(core_dir.join("src").join("extra.rs")).unwrap();
+    let lib = core_dir.join("src").join("lib.rs");
     let text = std::fs::read_to_string(&lib).unwrap();
     std::fs::write(&lib, format!("{text}pub fn mine() {{}}\n")).unwrap();
-    std::fs::create_dir_all(core.join("tests")).unwrap();
-    std::fs::write(core.join("tests").join("t.rs"), "#[test]\nfn t() {}\n").unwrap();
+    std::fs::create_dir_all(core_dir.join("tests")).unwrap();
+    std::fs::write(core_dir.join("tests").join("t.rs"), "#[test]\nfn t() {}\n").unwrap();
     let (code, out) = check(&dir);
     assert_eq!(code, 0, "{out}");
 }
