@@ -132,14 +132,21 @@ fn a_word_list_needs_a_choice_field_and_an_existing_list() {
             &format!("basic = \"{basic}\"\nwords = \"{words}\""),
         )
     };
-    assert!(run(&word("choice", "fs-progress:state"), true).is_ok());
+    let with_module = |t: String| {
+        edit(
+            &t,
+            "[[type]]",
+            "[[module]]\nname = \"fs-progress\"\nkind = \"standard\"\nversion = \"0.0.1\"\n\n[[type]]",
+        )
+    };
+    assert!(run(&with_module(word("choice", "fs-progress:state")), true).is_ok());
     assert!(has(
-        &word("choice", "fs-progress:ghost"),
+        &with_module(word("choice", "fs-progress:ghost")),
         "words-unknown{ref=fs-progress:ghost}"
     ));
     assert!(has(&word("choice", "ghost"), "words-unknown{ref=ghost}"));
     assert!(has(
-        &word("text", "fs-progress:state"),
+        &with_module(word("text", "fs-progress:state")),
         "words-unknown{ref=fs-progress:state}"
     ));
 }

@@ -71,6 +71,8 @@ pub trait RepoView {
     fn unowned_files(&self) -> Vec<String>;
     /// Every `main.rs` of the repo: the entry point is purely generated (user decision 45), so no exception may cover one.
     fn main_files(&self) -> Vec<String>;
+    /// The content of a file of the repo (text), or `None` when it is not there. The drift check reads the generated files and the seeds with it.
+    fn read(&self, path: &str) -> Option<String>;
     /// The talk record of an exception (a path in the documentation repo).
     fn talk_exists(&self, path: &str) -> bool;
 }

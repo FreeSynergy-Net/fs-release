@@ -6,6 +6,8 @@ use fs_blueprint::{
 };
 use std::collections::BTreeSet;
 
+pub mod synth;
+
 pub const TASKS: &str = include_str!("../data/tasks.toml");
 pub const SHIFT: &str = include_str!("../data/shift.toml");
 
@@ -81,6 +83,7 @@ pub struct FakeView {
     pub generated: Vec<String>,
     pub unowned: Vec<String>,
     pub talks: BTreeSet<String>,
+    pub contents: std::collections::BTreeMap<String, String>,
 }
 
 impl FakeView {
@@ -134,6 +137,9 @@ impl RepoView for FakeView {
             .cloned()
             .collect()
     }
+    fn read(&self, path: &str) -> Option<String> {
+        self.contents.get(path).cloned()
+    }
     fn talk_exists(&self, path: &str) -> bool {
         self.talks.contains(path)
     }
@@ -175,4 +181,15 @@ pub fn codes(src: &str) -> Vec<&'static str> {
 /// How many errors of a code a report has.
 pub fn only(report: &Report, code: &str) -> usize {
     report.errors.iter().filter(|e| e.code == code).count()
+}
+
+impl FakeView {
+    /// A view whose files are exactly the contents of a store (for the drift check).
+    #[must_use]
+    pub fn of_store(store: &synth::MemStore) -> Self {
+        FakeView {
+            contents: store.files.clone(),
+            ..FakeView::default()
+        }
+    }
 }

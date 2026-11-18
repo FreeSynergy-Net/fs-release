@@ -51,11 +51,26 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("file-unowned", &["path"]),
     ("main-reserved", &["path"]),
     ("talk-not-found", &["path"]),
+    ("envelope-invalid", &["type", "found"]),
+    ("generated-changed", &["path"]),
+    ("generated-missing", &["path"]),
+    ("seed-missing", &["path"]),
+    ("slot-unknown", &["name"]),
+    ("slot-open", &["path"]),
+    ("header-unsupported", &["path"]),
+    ("artifact-duplicate", &["path"]),
+    ("exception-undeclared", &["path"]),
+    ("write-failed", &["path"]),
+    ("blueprint-unserializable", &[]),
     ("text-pair", &["key", "missing"]),
     ("text-vars", &["key"]),
 ];
 
 /// One finding: a code of [`CODES`] and its named parameters.
+///
+/// Mirror of the `coded` form of fs-types (`Coded` + `Code`, tag v0.0.4): same message key (`blueprint-error-<code>`), same order of the parameters, same
+/// log text. The equality is enforced by a test against a checked-in reference file (`tests/data/fs-types-coded.ref`, no crate dependency).
+/// To be merged with fs-types at the first reuse.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Coded {
     pub code: &'static str,
@@ -76,6 +91,27 @@ impl Coded {
     pub fn with(mut self, name: &'static str, value: impl Into<String>) -> Self {
         self.params.push((name, value.into()));
         self
+    }
+
+    /// The message key, as in fs-types: prefix `blueprint-error-` and the code.
+    #[must_use]
+    pub fn message_key(&self) -> String {
+        format!("blueprint-error-{}", self.code)
+    }
+
+    /// The log text in the form of fs-types `Code`: `key (name=value, ...)`; for logs only.
+    #[must_use]
+    pub fn log_text(&self) -> String {
+        let list: Vec<String> = self
+            .params
+            .iter()
+            .map(|(n, v)| format!("{n}={v}"))
+            .collect();
+        if list.is_empty() {
+            self.message_key()
+        } else {
+            format!("{} ({})", self.message_key(), list.join(", "))
+        }
     }
 
     /// The value of a parameter.

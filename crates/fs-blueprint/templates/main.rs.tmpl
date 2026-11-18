@@ -1,0 +1,16 @@
+//! Pattern: none (generated entry point: load the blueprint and start; exchangeable, nothing program-specific lives here).
+
+/// The blueprint of this program, read at build time (reference: the file `scaffold.toml` in the repo root).
+const BLUEPRINT: &str = include_str!("../../../scaffold.toml");
+/// The program name (reference into the blueprint).
+const PROGRAM: &str = "{{program}}";
+
+fn main() {
+    std::process::exit(start(PROGRAM, BLUEPRINT));
+}
+
+/// Placeholder of this generator step: the call of the shared starter replaces it (fs-starter pin, a later step); until then the entry only proves that the blueprint is there.
+fn start(program: &str, blueprint: &str) -> i32 {
+    eprintln!("{program}: blueprint with {} lines loaded", blueprint.lines().count());
+    0
+}

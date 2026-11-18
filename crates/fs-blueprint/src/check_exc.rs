@@ -7,7 +7,8 @@ use crate::rules::Rule;
 use crate::sink::Sink;
 
 /// True when path `a` covers path `b`: the same path, or `a` is a folder (end slash) that contains `b`.
-fn covers(a: &str, b: &str) -> bool {
+#[must_use]
+pub fn covers(a: &str, b: &str) -> bool {
     a == b || (a.ends_with('/') && b.starts_with(a))
 }
 
@@ -15,6 +16,15 @@ pub fn exceptions(s: &mut Sink, bp: &Blueprint) {
     let mains = s.view.main_files();
     let mut valid: Vec<(usize, &str)> = Vec::new();
     for (i, e) in bp.exception.iter().enumerate() {
+        for (key, text) in [("what", &e.what), ("why", &e.why)] {
+            if text.trim().is_empty() {
+                s.err(
+                    Coded::new("field-empty")
+                        .with("table", "exception")
+                        .with("field", key),
+                );
+            }
+        }
         if e.checked.is_empty() {
             s.err(
                 Coded::new("field-empty")

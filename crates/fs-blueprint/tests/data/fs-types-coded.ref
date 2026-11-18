@@ -1,0 +1,12 @@
+# Reference for the form of `coded` (fs-types), checked in; fs-blueprint has no dependency on fs-types.
+# Source: https://github.com/FreeSynergy/fs-types  crates/fs-types/src/coded.rs
+# Tag: v0.0.4 (tag object e2bf8f3084a8591c25580e9cdd0fde2dedbb5d30, commit 0dbc9b685746ea55ceb789fe1043a162e34ac387)
+# Source file: git blob 2dd5de892cfe4ff1d19a2e56c5a85034ab6d6766, sha256 0d2cf9b486e82ed3356a62635327737354e15445854eee101f1ec3dea42c39a9
+# Made by running Coded<E>::new(..).with_text(..), message_key() and Code::to_string() of that tag with an enum whose PREFIX is "blueprint-error-".
+# Line: <code> | <parameters name=value, separated by ;> | <expected message key> | <expected log text>
+category-main-missing | | blueprint-error-category-main-missing | blueprint-error-category-main-missing
+unknown-key | path=program.nope | blueprint-error-unknown-key | blueprint-error-unknown-key (path=program.nope)
+path-overlap | path=crates/a/;first=1;second=2 | blueprint-error-path-overlap | blueprint-error-path-overlap (path=crates/a/, first=1, second=2)
+duplicate | name=x;table=module | blueprint-error-duplicate | blueprint-error-duplicate (name=x, table=module)
+unknown-key | path=a;path=b | blueprint-error-unknown-key | blueprint-error-unknown-key (path=a, path=b)
+unknown-key | path=7 | blueprint-error-unknown-key | blueprint-error-unknown-key (path=7)

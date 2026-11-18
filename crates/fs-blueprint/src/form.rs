@@ -73,6 +73,29 @@ pub fn is_standard_uri(s: &str) -> bool {
             .is_some_and(|(h, f)| h.len() > 8 && !f.is_empty())
 }
 
+/// A full IRI: a scheme, `://` and a rest without white space (the envelope of an extension type).
+#[must_use]
+pub fn is_iri(s: &str) -> bool {
+    s.split_once("://").is_some_and(|(scheme, rest)| {
+        scheme
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic())
+            && scheme
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
+            && !rest.is_empty()
+            && !s.contains(char::is_whitespace)
+    })
+}
+
+/// An entry of `covers`: `Interface.method` or `Type.field` (`Pascal.camel`).
+#[must_use]
+pub fn is_covers_entry(s: &str) -> bool {
+    s.split_once('.')
+        .is_some_and(|(a, b)| is_pascal(a) && is_camel(b))
+}
+
 /// The variables `{$name}` of an MF2 message.
 #[must_use]
 pub fn variables(message: &str) -> BTreeSet<String> {

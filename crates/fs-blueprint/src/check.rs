@@ -1,7 +1,8 @@
 //! Pattern: Template method (the check runs the parts in a fixed order; program, contract, modules, bundles here, types and the rest in the siblings).
 
 use crate::check_exc::exceptions;
-use crate::check_types::{frontend, rulesets, types};
+use crate::check_front::{frontend, rulesets};
+use crate::check_types::types;
 use crate::error::{Coded, Report};
 use crate::form::{is_file_id, is_kebab, is_major_minor, is_semver};
 use crate::kit::{Kind, KitCatalog, RepoView};
