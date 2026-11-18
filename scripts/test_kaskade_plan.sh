@@ -247,7 +247,7 @@ shape_ok() {
   for f in "$tmp"/shape/good*; do rc=0; python3 -I "$1" "$f" >/dev/null 2>&1 || rc=$?; [ "$rc" -eq 0 ] || return 1; done
 }
 chk "shape gate: finds && , indented, ; , continuation line, || and a mixed chain, and passes the good forms" shape_ok "$shape"
-chk "shape gate: no chk line of the test scripts has an unchecked part (relapse of K2)" python3 -I "$shape" "$here"/test_kaskade_plan.sh "$here"/test_kaskade_pins.sh "$here"/test_kaskade_gates.sh
+chk "shape gate: no chk line of the test scripts has an unchecked part (relapse of K2)" python3 -I "$shape" "$here"/test_kaskade_plan.sh "$here"/test_kaskade_pins.sh "$here"/test_kaskade_gates.sh "$here"/test_kaskade_counter.sh
 # the five forbidden forms put INTO a copy of a real test script (G1 &&, G3 indented, G4 ;, G5 continuation, ||) turn the gate red
 inj() { # <label> <text>
   cp "$here/test_kaskade_gates.sh" "$tmp/inj.sh"; printf '%s\n' "$2" >>"$tmp/inj.sh"
