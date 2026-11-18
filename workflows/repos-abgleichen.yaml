@@ -10,6 +10,18 @@ document:
   name: repos-abgleichen
   version: 0.0.12
   title: Sync all local repos with origin - https remote, fetch, fast-forward main only, report the rest
+  metadata:
+    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
+    freesynergy.net:transitions:
+      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
+      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
+      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
+      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
+      abgebrochen: [offen, archiviert]
+      erledigt: [offen, archiviert]
+      archiviert: []
 do:
   - remotes:
       call: repos-remote-https:0.0.12@fs
