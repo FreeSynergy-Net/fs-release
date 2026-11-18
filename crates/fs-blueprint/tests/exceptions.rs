@@ -217,3 +217,21 @@ fn no_exception_may_cover_a_main_file_neither_as_file_nor_through_a_folder() {
 fn an_exception_over_other_files_leaves_main_alone() {
     assert!(!run(TASKS, true).has("main-reserved"));
 }
+
+#[test]
+fn unowned_files_are_listed_in_sorted_order_whatever_the_view_returns() {
+    let mut view = talk();
+    view.unowned = vec![
+        "crates/z.rs".to_string(),
+        "crates/a.rs".to_string(),
+        "crates/m.rs".to_string(),
+    ];
+    let r = run_with(TASKS, view, &Rules::projekt());
+    let got: Vec<&str> = r
+        .errors
+        .iter()
+        .filter(|e| e.code == "file-unowned")
+        .filter_map(|e| e.param("path"))
+        .collect();
+    assert_eq!(got, ["crates/a.rs", "crates/m.rs", "crates/z.rs"]);
+}
