@@ -170,16 +170,41 @@ pub fn variables(message: &str) -> BTreeSet<String> {
     out
 }
 
-/// A relative path with `/`: not empty, no leading `/`, no `\`, no `..`, no drive colon, no `*` or `?`. An end slash means a folder.
+/// The names Windows reserves for devices: they cannot be a file or folder name, with or without an extension (`NUL`, `nul.txt`, `Com1`).
+fn is_reserved_name(segment: &str) -> bool {
+    let stem = segment
+        .split('.')
+        .next()
+        .unwrap_or(segment)
+        .to_ascii_uppercase();
+    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ["COM", "LPT"].iter().any(|p| {
+            stem.strip_prefix(p)
+                .is_some_and(|n| n.len() == 1 && n.as_bytes()[0].is_ascii_digit() && n != "0")
+        })
+}
+
+/// One part of a path: not `.`/`..`, no character that Windows (or any shell) refuses, no end in a dot or a space (Windows drops it, so two names
+/// would be one file), no reserved device name.
+fn is_repo_segment(segment: &str) -> bool {
+    !matches!(segment, "." | "..")
+        && !segment.ends_with(['.', ' '])
+        && !segment.contains(['\\', '*', '?', ':', '"', '<', '>', '|', '\0'])
+        && !segment.chars().any(char::is_control)
+        && !is_reserved_name(segment)
+}
+
+/// A relative path with `/` that is the same file on every platform: not empty, no leading `/`, no `\`, no `..`, no drive colon or `\\?\` prefix, no `*` or `?`,
+/// no segment Windows would change or refuse (see [`is_repo_segment`]). An end slash means a folder.
 #[must_use]
 pub fn is_repo_path(p: &str) -> bool {
+    let parts: Vec<&str> = p.split('/').collect();
+    let last = parts.len() - 1;
     !p.is_empty()
         && !p.starts_with('/')
-        && !p.contains(['\\', '*', '?', ':', '\0'])
-        && !p
-            .split('/')
-            .enumerate()
-            .any(|(i, c)| c == ".." || c == "." || (c.is_empty() && i + 1 != p.split('/').count()))
+        && parts.iter().enumerate().all(|(i, c)| {
+            (c.is_empty() && i == last && i > 0) || (!c.is_empty() && is_repo_segment(c))
+        })
 }
 
 /// What is wrong with a [`Text2`]: the missing languages and whether the variables differ.

@@ -1,0 +1,169 @@
+//! The empty program the generator makes from ONE blueprint (S3): which files, what they hold, what stays out.
+mod support;
+use fs_blueprint::emit::generate;
+use fs_blueprint::{Blueprint, Class};
+use support::synth::{blueprint, COUNT};
+use support::{edit, FakeCatalog};
+
+const PROBE: &str = include_str!("data/probe.toml");
+
+fn probe() -> Vec<fs_blueprint::Artifact> {
+    generate(&Blueprint::from_toml(PROBE).unwrap(), &FakeCatalog).unwrap()
+}
+
+fn get<'a>(a: &'a [fs_blueprint::Artifact], path: &str) -> &'a str {
+    &a.iter()
+        .find(|x| x.path == path)
+        .unwrap_or_else(|| panic!("no {path}"))
+        .content
+}
+
+#[test]
+fn the_files_of_the_empty_program_are_these_with_these_classes() {
+    let got: Vec<(String, Class)> = probe().into_iter().map(|a| (a.path, a.class)).collect();
+    let g = Class::Generated;
+    let s = Class::Seed;
+    let want = [
+        (".gitattributes", g),
+        (".github/workflows/check.yml", g),
+        (".github/workflows/windows.yml", g),
+        ("Cargo.toml", g),
+        ("crates/fs-probe-bin/Cargo.toml", g),
+        ("crates/fs-probe-bin/src/main.rs", g),
+        ("crates/fs-probe-bin/tests/start.rs", g),
+        ("crates/fs-probe-client/Cargo.toml", g),
+        ("crates/fs-probe-client/src/lib.rs", g),
+        ("crates/fs-probe-core/Cargo.toml", s),
+        ("crates/fs-probe-core/src/lib.rs", s),
+        ("crates/fs-probe-server/Cargo.toml", g),
+        ("crates/fs-probe-server/src/lib.rs", g),
+        ("packaging/net.freesynergy.Probe.desktop", g),
+    ];
+    assert_eq!(got, want.map(|(p, c)| (p.to_string(), c)));
+}
+
+#[test]
+fn every_toml_file_is_toml_and_the_workspace_names_its_members_and_the_start_version() {
+    let a = probe();
+    for f in a.iter().filter(|f| {
+        std::path::Path::new(&f.path)
+            .extension()
+            .is_some_and(|x| x == "toml")
+    }) {
+        let t: toml::Table =
+            toml::from_str(&f.content).unwrap_or_else(|e| panic!("{}: {e}", f.path));
+        assert!(!t.is_empty());
+    }
+    let ws: toml::Table = toml::from_str(get(&a, "Cargo.toml")).unwrap();
+    assert_eq!(
+        ws["workspace"]["package"]["version"].as_str(),
+        Some("0.0.1")
+    );
+    let members: Vec<&str> = ws["workspace"]["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m.as_str().unwrap())
+        .collect();
+    assert_eq!(
+        members,
+        [
+            "crates/fs-probe-core",
+            "crates/fs-probe-server",
+            "crates/fs-probe-client",
+            "crates/fs-probe-bin"
+        ]
+    );
+}
+
+#[test]
+fn the_pins_come_from_the_skeleton_table() {
+    let a = probe();
+    for p in [
+        "crates/fs-probe-server/Cargo.toml",
+        "crates/fs-probe-client/Cargo.toml",
+    ] {
+        assert!(get(&a, p).contains("tag = \"v0.0.2\""), "{p}");
+    }
+    for p in [
+        ".github/workflows/check.yml",
+        ".github/workflows/windows.yml",
+    ] {
+        assert!(get(&a, p).contains("@v0.0.11"), "{p}");
+    }
+}
+
+#[test]
+fn an_unknown_skeleton_version_is_refused_by_generate() {
+    let bp =
+        Blueprint::from_toml(&edit(PROBE, "skeleton = \"0.1.0\"", "skeleton = \"9.9.9\"")).unwrap();
+    assert_eq!(
+        generate(&bp, &FakeCatalog).unwrap_err().to_string(),
+        "skeleton-unknown{found=9.9.9}"
+    );
+}
+
+#[test]
+fn the_workflow_expressions_stay_as_they_are_and_no_slot_is_left_anywhere() {
+    let a = probe();
+    assert!(
+        get(&a, ".github/workflows/check.yml").contains("${{ github.workflow }}-${{ github.ref }}")
+    );
+    assert!(get(&a, ".github/workflows/windows.yml")
+        .contains("${{ github.event_name != 'workflow_dispatch' || inputs.cache }}"));
+    for f in &a {
+        for line in f.content.lines().filter(|l| !l.contains("${{")) {
+            assert!(
+                !line.contains("{{") && !line.contains("}}"),
+                "{}: {line}",
+                f.path
+            );
+        }
+    }
+}
+
+#[test]
+fn the_bin_crate_names_the_program_crates_so_the_entry_point_does_not() {
+    let a = probe();
+    let bin = get(&a, "crates/fs-probe-bin/Cargo.toml");
+    assert!(bin.contains("program_server = { package = \"fs-probe-server\""));
+    assert!(bin.contains("program_client = { package = \"fs-probe-client\""));
+    let main = get(&a, "crates/fs-probe-bin/src/main.rs");
+    assert!(main.contains("program_server::serve") && main.contains("program_client::handshake"));
+    assert!(!main.contains("fs_probe") && !main.contains("fs-probe-"));
+}
+
+#[test]
+fn the_desktop_file_has_the_name_the_summary_in_both_languages_and_the_categories_on_one_line() {
+    let a = probe();
+    let d = get(&a, "packaging/net.freesynergy.Probe.desktop");
+    assert!(
+        d.contains("Name=Probe\n")
+            && d.contains("Exec=fs-probe\n")
+            && d.contains("Categories=Utility;\n")
+    );
+    assert!(d.contains("Comment=A probe program without any function\n"));
+    assert!(d.contains("Comment[de]=Ein Probe-Programm ohne jede Funktion\n"));
+    let odd = edit(
+        PROBE,
+        "A probe program without any function",
+        "two\\nlines\\tand   spaces",
+    );
+    let bp = Blueprint::from_toml(&odd).unwrap();
+    let out = generate(&bp, &FakeCatalog).unwrap();
+    assert!(get(&out, "packaging/net.freesynergy.Probe.desktop")
+        .contains("Comment=two lines and spaces\n"));
+}
+
+#[test]
+fn the_synthetic_blueprints_all_generate_the_same_number_of_files_under_their_own_names() {
+    for i in 0..COUNT {
+        let bp = blueprint(i);
+        let out = generate(&bp, &FakeCatalog).unwrap();
+        assert_eq!(out.len(), 14, "{}", bp.program.name);
+        let name = &bp.program.name;
+        assert!(out
+            .iter()
+            .any(|a| a.path == format!("crates/fs-{name}-bin/src/main.rs")));
+    }
+}

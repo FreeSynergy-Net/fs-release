@@ -34,7 +34,20 @@ fn generating_a_second_later_gives_the_same_bytes_no_time_stamp() {
     let second = gen(&bp);
     assert_eq!(first, second);
     for a in &first {
-        assert!(!a.content.contains("20"), "a year or time in {}", a.path);
+        let text: String = a
+            .content
+            .split(|c: char| !c.is_ascii_hexdigit())
+            .filter(|w| w.len() < 32)
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            !text.contains("2026")
+                && !text.contains("2027")
+                && !a.content.contains("T0")
+                && !a.content.contains("UTC"),
+            "a date or time in {}",
+            a.path
+        );
     }
 }
 

@@ -1,17 +1,22 @@
 //! Pattern: Template method (`generate` runs every emitter, stamps the heads, sorts by path and sets the class from the blueprint).
 
 use super::artifact::{Artifact, Class, Emitter};
-use super::{entry, header};
+use super::{files, header};
 use crate::check_exc::covers;
 use crate::error::Coded;
 use crate::form::is_repo_path;
 use crate::kit::KitCatalog;
 use crate::model::Blueprint;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// True for a `main.rs` anywhere in the repo.
+fn is_main(path: &str) -> bool {
+    path == "main.rs" || path.ends_with("/main.rs")
+}
 
 /// The finding for a generated file that an exception covers: `main-reserved` for an entry point, `path-generated` for the rest.
 fn taken(path: &str) -> Coded {
-    let code = if path == "main.rs" || path.ends_with("/main.rs") {
+    let code = if is_main(path) {
         "main-reserved"
     } else {
         "path-generated"
@@ -22,7 +27,7 @@ fn taken(path: &str) -> Coded {
 /// The emitters of the generator, in a fixed order.
 #[must_use]
 pub fn emitters() -> Vec<Box<dyn Emitter>> {
-    entry::all()
+    files::all()
 }
 
 /// Generates the whole output of a blueprint, sorted by path.
@@ -46,15 +51,30 @@ pub fn generate_with(
 ) -> Result<Vec<Artifact>, Coded> {
     let hash = header::blueprint_hash(bp)?;
     let mut sorted: BTreeMap<String, Artifact> = BTreeMap::new();
+    // Windows and macOS see `A.rs` and `a.rs` as one file
+    let mut lower: BTreeSet<String> = BTreeSet::new();
+    let mut raw: Vec<Artifact> = Vec::new();
     for e in emitters {
-        for a in e.emit(bp, catalog)? {
+        raw.extend(e.emit(bp, catalog)?);
+    }
+    // the entry point first: a folder that holds it is `main-reserved`, not the first generated file in it
+    let covered_by_exception = |path: &str| {
+        bp.exception
+            .iter()
+            .any(|x| x.paths.iter().any(|p| covers(p, path)))
+    };
+    if let Some(a) = raw
+        .iter()
+        .find(|a| a.class == Class::Generated && is_main(&a.path) && covered_by_exception(&a.path))
+    {
+        return Err(taken(&a.path));
+    }
+    {
+        for a in raw {
             if !is_repo_path(&a.path) {
                 return Err(Coded::new("path-invalid").with("path", a.path));
             }
-            let covered = bp
-                .exception
-                .iter()
-                .any(|x| x.paths.iter().any(|p| covers(p, &a.path)));
+            let covered = covered_by_exception(&a.path);
             let class = match (covered, a.class) {
                 // an exception cannot take a file of the generator: the entry point is reserved (decision 45), the rest is a generated file
                 (true, Class::Generated) => return Err(taken(&a.path)),
@@ -69,7 +89,8 @@ pub fn generate_with(
                 return Err(Coded::new("line-ending").with("path", a.path));
             }
             let art = Artifact::new(a.path.clone(), class, content);
-            if sorted.insert(a.path.clone(), art).is_some() {
+            if !lower.insert(a.path.to_lowercase()) || sorted.insert(a.path.clone(), art).is_some()
+            {
                 return Err(Coded::new("artifact-duplicate").with("path", a.path));
             }
         }

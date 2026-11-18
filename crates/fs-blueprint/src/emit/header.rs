@@ -46,12 +46,11 @@ fn wrap(form: Form, text: &str) -> String {
     }
 }
 
-/// SHA-256 of the blueprint in its canonical form (the TOML text of the parsed value: fixed field order, no comments, no white space of the author).
+/// SHA-256 of a text as 64 lower-case hexadecimal digits.
 ///
 /// # Errors
-/// `blueprint-unserializable` when the value cannot be written as TOML (does not happen for a parsed blueprint).
-pub fn blueprint_hash(bp: &Blueprint) -> Result<String, Coded> {
-    let text = toml::to_string(bp).map_err(|_| Coded::new("blueprint-unserializable"))?;
+/// `blueprint-unserializable` when a digit cannot be written (does not happen).
+pub fn sha256_hex(text: &str) -> Result<String, Coded> {
     let mut hex = String::with_capacity(64);
     for b in Sha256::digest(text.as_bytes()) {
         write!(hex, "{b:02x}").map_err(|_| Coded::new("blueprint-unserializable"))?;
@@ -59,14 +58,24 @@ pub fn blueprint_hash(bp: &Blueprint) -> Result<String, Coded> {
     Ok(hex)
 }
 
-/// The head line of a class (`Exception` has none): generated files carry the tool version and the blueprint hash, seeds only the tool version.
+/// SHA-256 of the blueprint in its canonical form (the TOML text of the parsed value: fixed field order, no comments, no white space of the author).
+///
+/// # Errors
+/// `blueprint-unserializable` when the value cannot be written as TOML (does not happen for a parsed blueprint).
+pub fn blueprint_hash(bp: &Blueprint) -> Result<String, Coded> {
+    let text = toml::to_string(bp).map_err(|_| Coded::new("blueprint-unserializable"))?;
+    sha256_hex(&text)
+}
+
+/// The head line of a class (`Exception` has none): generated files carry the tool version, the blueprint hash and the hash of their own body (so a hand
+/// change is found whatever the blueprint says); seeds only the tool version.
 #[must_use]
-pub fn head_line(class: Class, form: Form, hash: &str) -> Option<String> {
+pub fn head_line(class: Class, form: Form, hash: &str, body_hash: &str) -> Option<String> {
     let version = env!("CARGO_PKG_VERSION");
     match class {
         Class::Generated => Some(wrap(
             form,
-            &format!("{GENERATED}{version} from scaffold.toml sha256 {hash}; do not edit by hand"),
+            &format!("{GENERATED}{version} from scaffold.toml sha256 {hash}; content sha256 {body_hash}; do not edit by hand"),
         )),
         Class::Seed => Some(wrap(
             form,
@@ -84,7 +93,9 @@ pub fn stamp(path: &str, class: Class, hash: &str, body: &str) -> Result<String,
     let Some(form) = form_of(path) else {
         return Err(Coded::new("header-unsupported").with("path", path));
     };
-    Ok(head_line(class, form, hash).map_or_else(|| body.to_string(), |h| format!("{h}{body}")))
+    let body_hash = sha256_hex(body)?;
+    Ok(head_line(class, form, hash, &body_hash)
+        .map_or_else(|| body.to_string(), |h| format!("{h}{body}")))
 }
 
 /// The text of a head line without its comment marks, or `None` when the line is no comment.
@@ -113,4 +124,24 @@ pub fn class_of(content: &str) -> Option<Class> {
 #[must_use]
 pub fn first_line(content: &str) -> &str {
     content.lines().next().unwrap_or("")
+}
+
+/// True when the file is a generated file whose body still has the hash its head line names: nobody changed it by hand (the blueprint it was
+/// generated from may be an older one). A head without a content hash, or a body that does not fit its hash, is `false`.
+#[must_use]
+pub fn untouched(content: &str) -> bool {
+    let Some((head, body)) = content.split_once('\n') else {
+        return false;
+    };
+    let Some(text) = uncomment(head) else {
+        return false;
+    };
+    if !text.starts_with(GENERATED) {
+        return false;
+    }
+    let named = text
+        .split("content sha256 ")
+        .nth(1)
+        .and_then(|t| t.split(';').next());
+    named.is_some_and(|n| sha256_hex(body).is_ok_and(|h| h == n))
 }

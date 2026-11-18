@@ -1,0 +1,41 @@
+# End to end for fs-blueprint on a Linux AND a Windows runner (rule: a program must build and start on both, proven by a real run, not by a Unix test alone).
+# Job 1: the whole crate's tests on the platform (paths, links/junctions, line endings). Job 2: ONE blueprint becomes an empty program, the generated workspace is built,
+# its own tests run (version, help, wrong word, `serve` + handshake + stop) and the binary says its version and help (crates/fs-blueprint/tests/e2e.rs, `#[ignore]` in the normal gates).
+# On a push to `unreviewed/**` (next to branch-ci) and by hand. No secrets.
+name: blueprint-e2e
+on:
+  push:
+    branches: ['unreviewed/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blueprint-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@eb353790cf603a0ef119996012e01049b5d7545d
+        with:
+          toolchain: pinned
+          cache-key: blueprint-e2e-${{ matrix.os }}
+      - name: fs-blueprint tests on this platform
+        run: cargo test -p fs-blueprint --locked --no-fail-fast
+      - name: one blueprint becomes a program that builds, starts and answers
+        run: cargo test -p fs-blueprint --locked --test e2e -- --ignored --nocapture

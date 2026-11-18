@@ -1,0 +1,14 @@
+[package]
+name = "fs-{{program}}-client"
+description = "The client of fs-{{program}}: connects to the server over its local socket and checks that it is the right one (handshake of fs-rpc)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fs-rpc = { git = "https://github.com/FreeSynergy/fs-rpc", tag = "{{pin_rpc}}" }
+capnp = "0.27"
+tokio = { version = "1", features = ["rt"] }

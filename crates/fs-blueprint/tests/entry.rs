@@ -27,6 +27,9 @@ fn main_of(bp: &Blueprint) -> String {
 fn masked(bp: &Blueprint) -> String {
     let main = main_of(bp);
     let hash = blueprint_hash(bp).unwrap();
+    // the content hash of the head line names the body, which holds the program name: also a reference
+    let (head, rest) = main.split_once("content sha256 ").unwrap();
+    let main = format!("{head}content sha256 @BODY@{}", &rest[64..]);
     main.replace(&hash, "@HASH@").replace(
         &format!("const PROGRAM: &str = \"{}\";", bp.program.name),
         "const PROGRAM: &str = \"@NAME@\";",

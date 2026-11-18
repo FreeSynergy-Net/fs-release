@@ -1,0 +1,18 @@
+schema = 2
+
+[program]
+name = "probe"
+skeleton = "0.1.0"
+capability = "probing"
+summary = { en = "A probe program without any function", de = "Ein Probe-Programm ohne jede Funktion" }
+description = { en = "Exists only to prove that the generator makes a program that builds, starts and answers.", de = "Dient nur dem Beleg, dass der Erzeuger ein Programm macht, das baut, startet und antwortet." }
+categories = ["Utility"]
+
+[contract]
+version = "0.1"
+id = "0xc04d258971543499"
+
+[frontend]
+standard = "simple"
+layout = "layout/simple.toml"
+covers = "all"

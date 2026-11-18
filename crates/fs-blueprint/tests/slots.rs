@@ -9,7 +9,7 @@ use support::{edit, FakeCatalog};
 #[test]
 fn slots_are_a_closed_list_and_the_values_come_from_the_blueprint() {
     let bp = blueprint(1);
-    let v = Values::of(&bp);
+    let v = Values::of(&bp).unwrap();
     assert_eq!(v.get(Slot::Program), "beta-shelf-planner");
     assert_eq!(v.get(Slot::Kebab), "fs-beta-shelf-planner");
     assert_eq!(v.get(Slot::Snake), "fs_beta_shelf_planner");

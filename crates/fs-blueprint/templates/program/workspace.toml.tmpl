@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/fs-{{program}}-core",
+    "crates/fs-{{program}}-server",
+    "crates/fs-{{program}}-client",
+    "crates/fs-{{program}}-bin",
+]
+
+[workspace.package]
+version = "{{version}}"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["FreeSynergy <support@freesynergy.net>"]
+repository = "https://github.com/FreeSynergy/fs-{{program}}"
+rust-version = "1.89"

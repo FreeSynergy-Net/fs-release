@@ -1,0 +1,73 @@
+//! Pattern: none (generated entry point: load the blueprint and start; exchangeable, nothing program-specific lives here).
+//!
+//! ```text
+//! fs-<program>                 make sure the server runs (the shared starter opens the frontend later)
+//! fs-<program> serve [options] the server
+//! fs-<program> --version       the version, without opening anything
+//! fs-<program> --help          this help
+//! ```
+
+use std::ffi::OsString;
+use std::process::ExitCode;
+
+/// The blueprint of this program, read at build time (reference: the file `scaffold.toml` in the repo root).
+const BLUEPRINT: &str = include_str!("../../../scaffold.toml");
+/// The program name (reference into the blueprint).
+const PROGRAM: &str = "{{program}}";
+
+fn main() -> ExitCode {
+    let words: Vec<OsString> = std::env::args_os().skip(1).collect();
+    match words.first().and_then(|w| w.to_str()) {
+        Some("--version" | "-V") if words.len() == 1 => {
+            println!("fs-{PROGRAM} {}", env!("CARGO_PKG_VERSION"));
+            ExitCode::SUCCESS
+        }
+        Some("--help" | "-h") if words.len() == 1 => {
+            println!("fs-{PROGRAM} [serve [options]] | --version | --help\nWithout words: makes sure the server runs.\n{}", program_server::HELP);
+            ExitCode::SUCCESS
+        }
+        Some("serve") => serve(&words[1..]),
+        None => start(),
+        Some(other) => {
+            eprintln!("fs-{PROGRAM}: unknown word {other}\nTry `fs-{PROGRAM} --help`.");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn serve(words: &[OsString]) -> ExitCode {
+    match program_server::serve(words.iter().cloned()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(program_server::ServeError::Usage(m)) => {
+            eprintln!("fs-{PROGRAM}: {m}");
+            ExitCode::from(2)
+        }
+        Err(program_server::ServeError::Failed(m)) => {
+            eprintln!("fs-{PROGRAM}: {m}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// The start without words. Placeholder of this generator step: it makes sure the server runs and says that no frontend is opened yet; the call of the shared starter (fs-starter) replaces it.
+fn start() -> ExitCode {
+    let Some(socket) = program_client::default_socket() else {
+        eprintln!("fs-{PROGRAM}: no default socket: run `fs-{PROGRAM} serve --socket PATH`");
+        return ExitCode::FAILURE;
+    };
+    let Ok(me) = std::env::current_exe() else {
+        eprintln!("fs-{PROGRAM}: cannot find itself");
+        return ExitCode::FAILURE;
+    };
+    let server = program_client::CommandStarter::new(me, ["serve".into(), "--socket".into(), socket.clone().into_os_string()]);
+    match program_client::handshake(&socket, &server) {
+        Ok(()) => {
+            eprintln!("fs-{PROGRAM}: the server runs; no frontend yet (blueprint of {} lines loaded)", BLUEPRINT.lines().count());
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("fs-{PROGRAM}: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}

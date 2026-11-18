@@ -1,0 +1,15 @@
+name: windows
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      cache: { type: boolean, default: true, description: "Rust cache on; false = cold run" }
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    uses: FreeSynergy/fs-release/.github/workflows/_windows-check.yml@{{release_tag}}
+    with:
+      cache: ${{open}} github.event_name != 'workflow_dispatch' || inputs.cache {{close}}

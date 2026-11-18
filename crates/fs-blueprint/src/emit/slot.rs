@@ -22,10 +22,22 @@ pub enum Slot {
     ContractVersion,
     /// `0xc04d258971543476`
     ContractId,
+    /// `0.0.1`: the version a fresh program starts with
+    Version,
+    /// `v0.0.2`: the tag of fs-rpc of the skeleton version
+    PinRpc,
+    /// `v0.0.11`: the tag of fs-release of the skeleton version
+    ReleaseTag,
+    /// The summary in English, on one line
+    SummaryEn,
+    /// The summary in German, on one line
+    SummaryDe,
+    /// `Office;ProjectManagement;`
+    Categories,
 }
 
 impl Slot {
-    pub const ALL: [Slot; 8] = [
+    pub const ALL: [Slot; 14] = [
         Slot::Program,
         Slot::Kebab,
         Slot::Snake,
@@ -34,6 +46,12 @@ impl Slot {
         Slot::Capability,
         Slot::ContractVersion,
         Slot::ContractId,
+        Slot::Version,
+        Slot::PinRpc,
+        Slot::ReleaseTag,
+        Slot::SummaryEn,
+        Slot::SummaryDe,
+        Slot::Categories,
     ];
 
     /// The name in a template: `{{name}}`.
@@ -48,6 +66,12 @@ impl Slot {
             Slot::Capability => "capability",
             Slot::ContractVersion => "contract_version",
             Slot::ContractId => "contract_id",
+            Slot::Version => "version",
+            Slot::PinRpc => "pin_rpc",
+            Slot::ReleaseTag => "release_tag",
+            Slot::SummaryEn => "summary_en",
+            Slot::SummaryDe => "summary_de",
+            Slot::Categories => "categories",
         }
     }
 
@@ -76,9 +100,23 @@ pub struct Values {
     list: Vec<(Slot, String)>,
 }
 
+/// A text on one line: white space of every kind becomes one space.
+fn one_line(text: Option<&str>) -> String {
+    text.unwrap_or_default()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 impl Values {
-    #[must_use]
-    pub fn of(bp: &Blueprint) -> Self {
+    /// The values of every slot.
+    ///
+    /// # Errors
+    /// `skeleton-unknown{found}` when the skeleton version of the blueprint is not in the table of `skeleton.rs`.
+    pub fn of(bp: &Blueprint) -> Result<Self, Coded> {
+        let skeleton = super::skeleton::of(&bp.program.skeleton).ok_or_else(|| {
+            Coded::new("skeleton-unknown").with("found", bp.program.skeleton.as_str())
+        })?;
         let name = bp.program.name.as_str();
         let pascal = pascal(name);
         let value = |s: Slot| match s {
@@ -90,10 +128,16 @@ impl Values {
             Slot::Capability => bp.program.capability.clone(),
             Slot::ContractVersion => bp.contract.version.clone(),
             Slot::ContractId => bp.contract.id.clone(),
+            Slot::Version => skeleton.start_version.to_string(),
+            Slot::PinRpc => skeleton.rpc_tag.to_string(),
+            Slot::ReleaseTag => skeleton.release_tag.to_string(),
+            Slot::SummaryEn => one_line(bp.program.summary.en.as_deref()),
+            Slot::SummaryDe => one_line(bp.program.summary.de.as_deref()),
+            Slot::Categories => bp.program.categories.join(";") + ";",
         };
-        Self {
+        Ok(Self {
             list: Slot::ALL.into_iter().map(|s| (s, value(s))).collect(),
-        }
+        })
     }
 
     #[must_use]
@@ -105,10 +149,10 @@ impl Values {
     }
 }
 
-/// Fills a template. `path` names the file for the error.
+/// Fills a template. `{{name}}` is a slot; `{{open}}` and `{{close}}` are the two literal brace pairs (for `${{ ... }}` of a workflow). `path` names the file for the error.
 ///
 /// # Errors
-/// `slot-unknown{name}` for a name that is no slot; `slot-open{path}` for a `{{` without `}}` and for a `{{` that is left in the result; `line-ending{path}` for a lone CR.
+/// `slot-unknown{name}` for a name that is no slot; `slot-open{path}` for a `{{` without `}}` and for a value that holds `{{` or `}}`; `line-ending{path}` for a lone CR.
 pub fn fill(template: &str, values: &Values, path: &str) -> Result<String, Coded> {
     // a template checked out with CRLF (git autocrlf) gives the same bytes as one with LF
     let template = template.replace("\r\n", "\n");
@@ -121,14 +165,23 @@ pub fn fill(template: &str, values: &Values, path: &str) -> Result<String, Coded
             return Err(Coded::new("slot-open").with("path", path));
         };
         let key = tail[..end].trim();
-        let slot = Slot::parse(key).ok_or_else(|| Coded::new("slot-unknown").with("name", key))?;
-        out.push_str(values.get(slot));
+        match key {
+            "open" => out.push_str("{{"),
+            "close" => out.push_str("}}"),
+            _ => {
+                let slot =
+                    Slot::parse(key).ok_or_else(|| Coded::new("slot-unknown").with("name", key))?;
+                let value = values.get(slot);
+                // a value never brings a slot or a brace pair of its own
+                if value.contains("{{") || value.contains("}}") {
+                    return Err(Coded::new("slot-open").with("path", path));
+                }
+                out.push_str(value);
+            }
+        }
         rest = &tail[end + 2..];
     }
     out.push_str(rest);
-    if out.contains("{{") {
-        return Err(Coded::new("slot-open").with("path", path));
-    }
     if out.contains('\r') {
         return Err(Coded::new("line-ending").with("path", path));
     }

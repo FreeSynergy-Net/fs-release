@@ -107,14 +107,20 @@ fn write_twice_is_stable_and_never_overwrites_a_seed() {
     let arts = generate(&blueprint(1), &FakeCatalog).unwrap();
     let out = write(&arts, &mut store).unwrap();
     assert_eq!(store.files, before);
-    assert_eq!(out.kept, [SEED]);
+    assert_eq!(
+        out.kept,
+        ["crates/fs-beta-shelf-planner-core/Cargo.toml", SEED]
+    );
     assert_eq!(out.skipped, Vec::<String>::new());
     store
         .files
         .insert(SEED.to_string(), "// mine\n".to_string());
     let out = write(&arts, &mut store).unwrap();
     assert_eq!(store.files[SEED], "// mine\n");
-    assert_eq!(out.kept, [SEED]);
+    assert_eq!(
+        out.kept,
+        ["crates/fs-beta-shelf-planner-core/Cargo.toml", SEED]
+    );
 }
 
 #[test]
@@ -164,14 +170,14 @@ fn write_replaces_the_output_of_an_older_blueprint() {
 }
 
 #[test]
-fn a_failing_store_is_reported_per_file() {
+fn a_failing_store_is_reported_with_the_file_that_failed() {
     let mut store = MemStore {
         fail: true,
         ..MemStore::default()
     };
     let arts = generate(&blueprint(1), &FakeCatalog).unwrap();
     let err = write(&arts, &mut store).unwrap_err();
-    assert_eq!(err.len(), arts.len());
+    assert_eq!(err.len(), 1);
     assert!(err.iter().all(|e| e.code == "write-failed" && e.conforms()));
 }
 
