@@ -10,11 +10,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: bahnen
-  version: 0.0.10
+  version: 0.0.11
   title: "Lanes round - lead the lanes and the board in fs-tasks, spread the build slots, report to the strategy bundled per lane"
 do:
   - ids-lesen:
-      call: read-task-ids:0.0.10@fs
+      call: read-task-ids:0.0.11@fs
       with:
         ids: ${ .input.ids }
         bahnen: ${ .input.bahnen }
@@ -27,7 +27,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Script (no AI): reads the id list of the strategy (one line per card: lane, card id, run) and returns `ids` per lane; a lane without a project in the list is named, never invented. The state changes to read, whatever the list says."
   - board-lesen:
-      call: tasks-board:0.0.10@fs
+      call: tasks-board:0.0.11@fs
       with:
         bahnen: ${ .input.bahnen }
         ids: ${ $context.ids }
@@ -53,7 +53,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a hanging CLI (the `timeout 15` fired) goes to `haenger-melden`, never on and never to a server restart; a missing `board` result is a hang too (a missing result is never green)."
   - remote-lage:
-      call: ls-remote-state:0.0.10@fs
+      call: ls-remote-state:0.0.11@fs
       with:
         board: ${ $context.board }
       export:
@@ -65,7 +65,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "`git ls-remote` per repo and branch of every card in work (`unreviewed/*` branch heads, `main`, tags): the result `remote` (repo, branch, head). A claim in a handoff or a report (\"pushed\", \"head X\") counts only when `git ls-remote` shows it; a branch that is not there is said as such. No `gh` call."
   - karten-abgleichen:
-      call: sync-cards-ai:0.0.10@fs
+      call: sync-cards-ai:0.0.11@fs
       with:
         board: ${ $context.board }
         remote: ${ $context.remote }
@@ -99,7 +99,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: slot-check
-          version: 0.0.10
+          version: 0.0.11
       export:
         as: '${ $context + { slots: . } }'
       metadata:
@@ -109,7 +109,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Runs `slot-check` (holders, processes, memory from the log): the result `slots` has the number of builds that run (`pgrep -af 'build-slot.sh cargo'` without the timeout / bash -c lines) and `frei` (maximum 2 minus running). Orphans are reported, never killed by pattern."
   - slots-verteilen:
-      call: spread-slots-ai:0.0.10@fs
+      call: spread-slots-ai:0.0.11@fs
       with:
         slots: ${ $context.slots }
         karten: ${ $context.karten }
@@ -172,7 +172,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: upstream-watch
-          version: 0.0.10
+          version: 0.0.11
         input:
           repo: ${ $context.upstream.repo // "project-blinc/Blinc" }
           letzte_pruefung: ${ $context.upstream.letzte_pruefung }
@@ -189,7 +189,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Sub-workflow upstream-watch.yaml (the result is MERGED into the state, never replaces it: `gemerkt`, `letzte_pruefung`, `repo`, `eigene` stay after yellow; rule: always answer at the upstream): reads, with GET only, the comments, reviews and state of OUR open pull requests and issues at Blinc; for every new comment of another person a card in the board and a short answer draft (at most 5 sentences) for b7. Sent ONLY by the helper of b7 after the YES of the user (`freigabe-nutzer` before `senden`), never by this flow. No `gh`, no network or no answer ends YELLOW with `Upstream nicht erreichbar`, never silently green; the result `upstream` (status, letzte_pruefung, gemerkt) goes into the report."
   - meldung:
-      call: lane-report-ai:0.0.10@fs
+      call: lane-report-ai:0.0.11@fs
       with:
         karten: ${ $context.karten }
         remote: ${ $context.remote }

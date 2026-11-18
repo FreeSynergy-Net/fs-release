@@ -8,11 +8,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: repos-abgleichen
-  version: 0.0.10
+  version: 0.0.11
   title: Sync all local repos with origin - https remote, fetch, fast-forward main only, report the rest
 do:
   - remotes:
-      call: repos-remote-https:0.0.10@fs
+      call: repos-remote-https:0.0.11@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -20,7 +20,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - only for repos on main: origin on SSH (git@github.com:...) becomes https://github.com/...; repos on another branch keep their remote and are only reported."
   - fetch:
-      call: repos-fetch:0.0.10@fs
+      call: repos-fetch:0.0.11@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -28,7 +28,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - git fetch --all --tags per repo (no --prune); origin/*-refs that vanished are listed as ref-verschwunden, not deleted; a fetch error means skipped and reported.
   - check:
-      call: repos-check:0.0.10@fs
+      call: repos-check:0.0.11@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -36,7 +36,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - main checked out, clean (untracked .claude/ allowed), main is an ancestor of origin/main; anything else is skipped with its reason.
   - fast-forward:
-      call: repos-ff-main:0.0.10@fs
+      call: repos-ff-main:0.0.11@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -44,7 +44,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - git merge --ff-only origin/main, only for repos that passed check; no reset, checkout, stash, pull or push.
   - report:
-      call: repos-report:0.0.10@fs
+      call: repos-report:0.0.11@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service

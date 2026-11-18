@@ -11,11 +11,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: review
-  version: 0.0.10
+  version: 0.0.11
   title: Opus reviews one head and writes a report with JA or NEIN
 do:
   - request:
-      call: review-request:0.0.10@fs
+      call: review-request:0.0.11@fs
       with:
         head: ${ .input.head }
         delta: ${ .input.delta }
@@ -26,7 +26,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes the file Opus reads (diff, gate output) for exactly the head ${ .input.head }.
   - ci-lesen:
-      call: branch-ci:0.0.10@fs
+      call: branch-ci:0.0.11@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -38,7 +38,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The branch CI of ALL workflows for exactly this head (read only, `scripts/check_job_status.py`, also the Windows jobs) is attached to the file of the review as the finding of the branch CI (standing rule ZWEIG-CI): green, red with the failing job, or still running. Scripts and logs of this step only in the own TMPDIR under a unique name, never in the shared scratchpad ([EIGENES-SKRIPT-EIGENER-ORDNER]). The review does not run the CI again; a red or hanging CI is a finding, a JA never covers a head whose CI nobody read."
   - read:
-      call: review-ai:0.0.10@fs
+      call: review-ai:0.0.11@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -53,7 +53,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Opus only reads ([REVIEW]); it changes no code, writes only BERICHT.md and runs only the named tests, never the whole workspace while the slots are busy ([GATES]). Check list by kind - code - rules of the order, tests with a counter-test per rule, files <= 300 lines, no stray files, no orphan processes; workflow files - actor/gate/kind per step, sub-workflows exist at the version; docs - sources, DE/EN in step; icons or images - license and look. Findings as file:line, blocker versus small point, and what is not proven. Own scripts and logs only in the own TMPDIR under a unique name, never in the shared scratchpad ([EIGENES-SKRIPT-EIGENER-ORDNER]). [GATE-PIPEFAIL] - gates always with `set -o pipefail` or with the rc printed; never shortened through `tail`/`head` (a pipe into them swallows the exit code); `check_rust_rules` only filtered with `grep -E 'ERROR|errors'` AND a visible rc (the line `N errors` must be seen, green only at 0); check scripts come from the fs-release tag that the CI file of the repo pins ([GATE-GLEICH-CI]); a red branch CI beats every local green. [EFFIZIENZ] - only the delta with the file list of the order is read, not the whole repo; the gate result of exactly this head (head hash in the build report) is reused, not run again; only the files the order names and what they directly need are read; after a timeout or rc=124 the cause is checked first (lock holders, orphans, slot queue), then the review restarts with a continuation prompt, never blindly. Review template frontend - only component calls? The frontend crate holds only the plugging together of fs-components components plus theme, style, menu tree and texts; logic or an own widget is a FINDING (conversation of the user and Opus, step `frontend-nur-komponenten` of `grundfassung`, `frontend-round`, `frontend-umbau`).
   - verdict:
-      call: verdict:0.0.10@fs
+      call: verdict:0.0.11@fs
       with:
         report: BERICHT.md
       export:
@@ -65,7 +65,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Line 1 of the report is JA or NEIN ([BERICHT]) for the push of release-<version> and the tag after green CI; a JA names exactly one head and is void for any other, NEIN comes with findings. Delta mode - the report names the earlier head and the delta read, and what was NOT read again. The result of the step is `verdict` (JA | NEIN) and `runde` (the number of NEIN reports of this delta so far, counted by the verdict command in the reports of the delta); the workflow returns `verdict`, `runde` and `head` to the caller, which jumps back on NEIN and escalates from the third NEIN.
   - bind:
-      call: approval:0.0.10@fs
+      call: approval:0.0.11@fs
       with:
         head: ${ .input.head }
       metadata:

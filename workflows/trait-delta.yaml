@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: trait-delta
-  version: 0.0.10
+  version: 0.0.11
   title: Trait delta - standard research, Opus draft, compile probe, Opus review, lock by the strategy, conformance fake, docs, release only after the lock
 do:
   - name-pruefen:
-      call: name-check:0.0.10@fs
+      call: name-check:0.0.11@fs
       with:
         programm: ${ .input.programm }
         trait: ${ .input.trait }
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the program name follows the naming rule (ADR 0087, namensregel.md: programs plural, lower case, prefix fs-; a retired or forbidden old form is red) and the trait is called `<programm>_v1` / `<programm>_v2` after a capability or data, not after a kind of app. No agent renames a name \"back\" or \"simpler\"."
   - lage:
-      call: trait-lage:0.0.10@fs
+      call: trait-lage:0.0.11@fs
       with:
         programm: ${ .input.programm }
         trait: ${ .input.trait }
@@ -55,7 +55,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a locked trait goes to `v2-oder-loesen`, a free one to the research; a missing result goes to `eskalation`."
   - v2-oder-loesen:
-      call: ask:0.0.10@fs
+      call: ask:0.0.11@fs
       with:
         trait: ${ .input.trait }
         hash: ${ $context.lage.hash }
@@ -67,7 +67,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Decision of the strategy (or the user): the locked folder stays UNCHANGED. Either a NEW trait (`<x>_v2` or a part trait; before the first release replaced without further ado, rule 3) or the fixpoint is released, changed, looked at by Opus and set again with a new hash (rules.md [FIXPUNKT]; the change report names the hash before and after). Without a decision the flow stops here; nothing in the locked folder is touched. The flow ends here; after the decision a new run starts with the new `trait` (`<x>_v2`/part trait) or after the fixpoint was released."
   - standard-recherche:
-      call: standard-research-ai:0.0.10@fs
+      call: standard-research-ai:0.0.11@fs
       with:
         programm: ${ .input.programm }
         standard: ${ .input.standard }
@@ -82,7 +82,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (decision b7: not Haiku, the mapping field to standard property is draft work; reads sources, writes notes only) - WHICH standard carries the data of the program (AS2, JSCalendar, JSContact, ValueFlows, ... or `eigen`, then with the reason) and the mapping: which trait field is carried by which standard property, what is an own profile (extension), what the standard does not know. Source and version of the standard with a link; the feature list names what the trait must carry (marks today / next / later). A foreign standard text is never quoted at length. Output: a note `standard.md` next to the draft; open points become QUESTIONS (at most three in the report), not guesses."
   - entwurf:
-      call: trait-draft-opus:0.0.10@fs
+      call: trait-draft-opus:0.0.11@fs
       with:
         programm: ${ .input.programm }
         trait: ${ .input.trait }
@@ -97,7 +97,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus - the draft in `ordner`: (a) the capnp schema in `fs-interfaces/schema/<x>.capnp` (always there; append-only evolution rule in the head, the standard named in lines 7-8 as in surveys.capnp) and the line in `capabilities.txt`, (b) the Rust trait folder `<trait>_v<n>/` in `ordner` (draft place; fixed place `ziel_crate`) in the layout of the existing traits (`mod.rs` with the pattern line, `api.rs`, `errors.rs`, `shared.rs`, topic files; new files instead of growing a file over 300 lines), types shared by several programs in fs-types (stand-in module until the fs-types tag), (c) the trait documentation (what it is, which capability, which rights, which standard property carries which field), (d) a delta note `<trait>-delta.md` (what is new, why, source ADR/answer). A first version may be MINIMAL (what the first frontend needs) but never wrong; later fields come append-only. Every decision cites its source."
   - probe-bau:
-      call: probe-crate-ai:0.0.10@fs
+      call: probe-crate-ai:0.0.11@fs
       with:
         ordner: ${ .input.ordner }
         probe: ${ .input.probe }
@@ -111,7 +111,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - a throw-away probe crate under `.scratch/probe/<name>` (`#[path]` onto the draft folder, fs-types per tag, the stand-in as one module), with a null provider as `dyn` and a small FAKE plus test data that exercise the trait (the conformance rules of the draft as tests). The target lies under `.scratch/target/...`, never under /tmp. The draft itself is not changed here."
   - kompilierprobe:
-      call: compile-probe:0.0.10@fs
+      call: compile-probe:0.0.11@fs
       with:
         ordner: ${ .input.ordner }
         probe: ${ .input.probe }
@@ -143,7 +143,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red probe goes back to `entwurf` with the error lines as the order, from the third red round to `eskalation`; only `red == false` goes on to the review."
   - review:
-      call: trait-review-opus:0.0.10@fs
+      call: trait-review-opus:0.0.11@fs
       with:
         ordner: ${ .input.ordner }
         hash: ${ $context.probe.hash }
@@ -177,7 +177,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a NO goes to `auflagen-fix`, from the third NO to `eskalation`; a JA counts only for exactly the hash of the probe and goes explicitly to `hash` (never into `auflagen-fix`, which only a NO reaches); a missing verdict, a JA for another hash or any other value is NOT a JA and goes to `eskalation`."
   - auflagen-fix:
-      call: conditions-fix-ai:0.0.10@fs
+      call: conditions-fix-ai:0.0.11@fs
       with:
         ordner: ${ .input.ordner }
         auflagen: ${ $context.review.auflagen }
@@ -191,7 +191,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the conditions of the review WORD FOR WORD, nothing more and nothing less; a change in meaning goes back as a question. Changes only the draft folder and its delta note; afterwards `kompilierprobe` runs again (new hash, new review) - no review of a head without a probe for this head."
   - hash:
-      call: trait-hash:0.0.10@fs
+      call: trait-hash:0.0.11@fs
       with:
         ordner: ${ .input.ordner }
       export:
@@ -244,7 +244,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the approval counts only from an authorised sender (`source` strategy or user, `data.actor` is `human`, the subject is the hash); anything else goes to `eskalation` (the hash alone is readable by agents and proves nothing about the sender)."
   - sperrdatei:
-      call: trait-lock:0.0.10@fs
+      call: trait-lock:0.0.11@fs
       with:
         trait: ${ .input.trait }
         ordner: ${ .input.ordner }
@@ -259,7 +259,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script of the coordinator side - writes `sperren/<trait>.sha256` (hash, place, predecessor in `sperren/alt/`, content in one line, reviews, next round; `gesetzt: <date>, strategy`), outside every agent worktree; then moves the trait folder from the draft place (`draft/` of the testdata crate or `ordner`) to the FIXED place in `ziel_crate` (same hash: the hash is over the folder content) and checks that the capnp contract lies in `fs-interfaces/schema/`; the word is \"fixpoint\", never \"frozen\". The folder is then built against, not changed ([FIXPUNKT-ORDNER]: a later run that touches it reports before and after)."
   - konformitaet:
-      call: conformance-ai:0.0.10@fs
+      call: conformance-ai:0.0.11@fs
       with:
         programm: ${ .input.programm }
         trait: ${ .input.trait }
@@ -274,7 +274,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the conformance test and the fake in the program repo (test data crate or `draft/<trait>/` like `fs-calendars-testdata`), built AGAINST the locked folder: every rule of the trait documentation is a test, with mutants for the rules that matter; the folder is not changed. Local commits ([COMMIT]), report per [BERICHT]; missing data sources are reported, never greyed out silently."
   - gates:
-      call: gates:0.0.10@fs
+      call: gates:0.0.11@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -303,7 +303,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red gates go back to `konformitaet`, from the third red round to `eskalation`; a missing result goes to `eskalation`."
   - trait-unveraendert:
-      call: trait-verify:0.0.10@fs
+      call: trait-verify:0.0.11@fs
       with:
         ordner: ${ .input.ordner }
         hash: ${ $context.sperre.sha256 }
@@ -333,7 +333,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-mitziehen
-          version: 0.0.10
+          version: 0.0.11
         input:
           repo: ${ .input.repo }
           delta: ${ .input.delta }
@@ -351,7 +351,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mandatory gate (rule doku-mitziehen) - the reference in the documentation: the trait page (what it carries, which standard, which capability) in docs/de and docs/en, the user documentation of the program, the line in the capability list; where a decision changes, an ADR addendum (workflow adr-write, not invented: the existing ADRs are searched first, rules.md `ADRs zuerst prüfen`). Sub-workflow doku-mitziehen checks only places and consistency; red stops here."
   - release-tor:
-      call: trait-release-gate:0.0.10@fs
+      call: trait-release-gate:0.0.11@fs
       with:
         trait: ${ .input.trait }
         hash: ${ $context.sperre.sha256 }

@@ -30,7 +30,7 @@ fn world_with_workflows() -> World {
         "jobs:\n  c:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n",
     )
     .unwrap();
-    fs::write(wf.join("release.yml"), "jobs:\n  r:\n    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.11\n  s:\n    uses: FreeSynergy/fs-release/actions/sbom@main\n").unwrap();
+    fs::write(wf.join("release.yml"), "jobs:\n  r:\n    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.12\n  s:\n    uses: FreeSynergy/fs-release/actions/sbom@main\n").unwrap();
     git(&w.work(), &["add", "-A"]);
     git(&w.work(), &["commit", "--quiet", "-m", "workflows"]);
     w
@@ -43,9 +43,9 @@ fn pins_never_lowers_a_line_that_is_on_a_higher_tag() {
     assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
     let check = w.read(".github/workflows/check.yml");
     let release = w.read(".github/workflows/release.yml");
-    assert!(check.contains("check.yml@v0.0.10\n"), "{check}");
-    assert!(release.contains("release.yml@v0.0.11\n"), "{release}");
-    assert!(release.contains("actions/sbom@v0.0.10\n"), "{release}");
+    assert!(check.contains("check.yml@v0.0.11\n"), "{check}");
+    assert!(release.contains("release.yml@v0.0.12\n"), "{release}");
+    assert!(release.contains("actions/sbom@v0.0.11\n"), "{release}");
 }
 
 #[test]
