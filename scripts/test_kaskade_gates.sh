@@ -36,6 +36,7 @@ export FS_RELEASE_REPO="$rel" FS_GATES_BUILD_SLOT="$tmp/slot.sh" FS_GATES_FMT=tr
 # the remote base for the deadline check (ls-remote of fs-release): a local bare repo without the tag v0.0.12 (never the network)
 base="$tmp/base"; git init -q --bare -b main "$base/fs-release"; export FS_KASKADE_BASE="file://$base"
 export CI=true CARGO_TERM_COLOR=always  # a caller in CI mode must not leak into the local run
+unset CARGO_TARGET_DIR  # the real run (build slot) has it set; the cases below look at the target of the tool only
 export FS_GATES_SKIP_TEST=leaked  # nor a skip of the caller (the real flat run of fs-release has it set): only the named exception may set it
 run() { python3 -I "$here/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" "$@"; }
 
