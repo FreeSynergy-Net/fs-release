@@ -9,6 +9,8 @@ on:
       apt-packages: { type: string, default: "", description: "System packages needed to build/test" }
       runs-on: { type: string, default: ubuntu-24.04, description: "Runner label" }
       software-gpu: { type: boolean, default: false, description: "Repos with window tests: installs lavapipe (software Vulkan adapter) and the fonts the tests need; merged with apt-packages" }
+      blueprint: { type: string, default: "off", description: "Blueprint check (ADR 0099, step S5): off = not run; warn = `fs-blueprint check --drift` runs when the repo has a scaffold.toml and shows its findings (the job stays green); block = a finding fails the job" }
+      blueprint-rev: { type: string, default: "10b683ee777da80a02034eaad8c549f0229d3c52", description: "The commit of fs-release the command `fs-blueprint` is built from (a full SHA, never a branch)" }
       test-env: { type: string, default: "", description: "Environment for the test step, one KEY=VALUE per line (for tests that need a tool the runner lacks and say so)" }
 
 permissions:
@@ -58,3 +60,27 @@ jobs:
         uses: FreeSynergy/fs-release/actions/gates@eb353790cf603a0ef119996012e01049b5d7545d
         with:
           working-directory: ${{ inputs.working-directory }}
+      # Blueprint check (S5): only when asked (`blueprint` warn or block) and only when the repo has a scaffold.toml. The talk records of the exceptions are read from a
+      # flat checkout of fs-documentation main (ADR 0099 addendum). `--drift` also finds a hand change in a generated file.
+      - name: Documentation checkout for the talk records
+        if: inputs.blueprint != 'off' && hashFiles(format('{0}/scaffold.toml', inputs.working-directory)) != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: FreeSynergy/fs-documentation
+          path: .fs-documentation
+          persist-credentials: false
+      - name: Blueprint check (fs-blueprint check --drift)
+        if: inputs.blueprint != 'off' && hashFiles(format('{0}/scaffold.toml', inputs.working-directory)) != ''
+        env:
+          MODE: ${{ inputs.blueprint }}
+          REV: ${{ inputs.blueprint-rev }}
+          DOCS: ${{ github.workspace }}/.fs-documentation
+        run: |
+          case "$MODE" in warn|block) ;; *) echo "::error::input blueprint must be off, warn or block, not $MODE"; exit 2 ;; esac
+          cargo install --git https://github.com/FreeSynergy/fs-release --rev "$REV" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
+          rc=0
+          "$RUNNER_TEMP/fsbp/bin/fs-blueprint" check --repo "$PWD" --talks "$DOCS" --drift || rc=$?
+          if [ "$rc" != 0 ]; then
+            if [ "$MODE" = block ]; then exit "$rc"; fi
+            echo "::warning::fs-blueprint check found errors (mode warn: the job stays green)"
+          fi

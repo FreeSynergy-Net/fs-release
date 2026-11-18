@@ -38,7 +38,7 @@ pub(crate) struct Options {
     pub(crate) rules: Rules,
 }
 
-fn parse(words: &[String]) -> Result<Options, String> {
+pub(crate) fn parse(words: &[String]) -> Result<Options, String> {
     let mut o = Options {
         repo: PathBuf::from("."),
         positional: Vec::new(),

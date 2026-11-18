@@ -1,9 +1,9 @@
 # Slim basics for a program: scaffold, window with name, icon and `was_kommt`, package metadata, user documentation stub, callers, gates, picture OK, catalog proposal.
 # Replaces nothing: `programm-grundgeruest` (draft, not runnable) stays for the feature work; `programm-neu` stays the entry for NEW programs with an interface decision.
 # The USER creates the repository; this flow prepares the scaffold in an own worktree and creates no repository. Agents never push, tag or merge; the tag goes through the strategy's helper after the review YES.
-# Order: `Workflow grundfassung, step <id>, parameters programm, beschreibung, icon, frontend, art, repo, branch, head, delta, tag, vorbild, dossier, frontend_crate, programmseite, hilfe_marker, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
+# Order: `Workflow grundfassung, step <id>, parameters programm, bauplan, beschreibung, icon, frontend, art, repo, branch, head, delta, tag, vorbild, dossier, frontend_crate, programmseite, hilfe_marker, docs, docs_base, old, new, allow` (docs/prompt-template.md). FS profile: see README.md.
 # Help = docs after ADR 0072 [akz.] (manual in the wiki, blocks with purpose `help.<topic>`) (pflege 9, G2b): input `programmseite` (program page in fs-documentation en + de, default `programs/apps/<programm>/index.md`) and `hilfe_marker`; step `doku-hilfe` after `nutzer-doku`.
-# Inputs: programm (name after the naming rule, ADR 0087), beschreibung (one sentence), icon (path; missing: the nearest existing icon of the catalog, marked "vorläufig" and in the gap list - no PNG placeholder), frontend (frontend id, ASCII lower case, e.g. `simple`; the display name e.g. Einfach is translated; not core, server, client, app, bin, cli, engine, testserver - ADR 0094 draft, item 6), repo (name; the user creates it), art (`grundfassung` or `feature`; decides at `release-sperre` whether the trait lock is needed).
+# Inputs: programm (name after the naming rule, ADR 0087), bauplan (the path of `scaffold.toml`, ADR 0099; step `generieren` makes the program from it with `fs-blueprint new`), beschreibung (one sentence), icon (path; missing: the nearest existing icon of the catalog, marked "vorläufig" and in the gap list - no PNG placeholder), frontend (frontend id, ASCII lower case, e.g. `simple`; the display name e.g. Einfach is translated; not core, server, client, app, bin, cli, engine, testserver - ADR 0094 draft, item 6), repo (name; the user creates it), art (`grundfassung` or `feature`; decides at `release-sperre` whether the trait lock is needed).
 # Rules of 17 Nov. (b7): (a) NO PNG placeholder: a missing component is replaced by the nearest EXISTING component, honestly marked "vorläufig" (tooltip or hint) and listed in the gap list ("Lücken") of the program's DESIGN; the real component is built in the background (lane 1) and replaces it. (b) Versions may currently JUMP (e.g. the basics directly v0.0.2, even with gaps); later no longer (the user announces it); version = tag. (c) No picture OK of the user is needed: the STRATEGY looks at the pictures (step `picture-ok`); only `accepted == true` goes on to `katalog-vorschlag`, otherwise gap list or escalation, never on.
 # (d) SLOT RULE (hint): WRITE code, tests, documentation and picture sketches without a build slot; BUILD only after the release of a slot (`build-slot.sh`, at most 2 builds at the same time); waiting for a slot is no idle time.
 # (e) LOOK AT ONCE (rule [AUSSEHEN-SOFORT], b7, 17 Nov.): a basics release shows more than "what comes" - step `hauptansicht` adds the first REAL main view in the look of the model (lessons [AUSSEHEN-LEHREN]); the pictures go as a PAIR model | ours with the SAME filter and state (step `bildpaar`); NO tag without the picture OK of the strategy (b7) (`vor-tag`).
@@ -123,19 +123,19 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Contract and standard per program, at the same time as the basics and the frontend ([BRUECKE-BEIDE-SEITEN]): the trait or capnp schema in fs-interfaces and the standard it follows. If the contract is missing, the flow `trait-delta` is started (`workflows/trait-delta.yaml`, in main). The basics may start with a MINIMAL contract; the release of a feature run only when the lock file `sperren/<programm>_v1.sha256` exists (fixed point, set by the strategy, never by an agent; a lock is no feature freeze); `release-sperre` checks it (`art: feature`: a missing lock is red, never green; `art: grundfassung`: draft contract, visibly marked). `trait-delta.yaml` is in main."
-  - geruest:
-      call: scaffold-ai:0.0.12@fs
+  - generieren:
+      call: fs-blueprint:0.0.12@fs
       with:
+        bauplan: ${ .input.bauplan }
         programm: ${ .input.programm }
-        beschreibung: ${ .input.beschreibung }
         repo: ${ .input.repo }
         branch: ${ .input.branch }
       metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Sonnet, one slot - the scaffold of the program as a Rust crate or workspace; it delivers the core plus `fs-<programm> serve` (the server on the contract) plus the client crate `fs-<programm>-client`, all on the contract of `vertrag-standard` (F3 = A, ADR 0021): engine and frontend separate (ADR 0021), every source file starts with the `//! Pattern:` line and a `//!` head, no file longer than 300 lines (ADR 0043), the existing core stays as it is. MANDATORY: the binary crate knows `--version` (prints `<programm> <crate version>`, exit 0) and `--help` (exit 0); an unknown option exits 2 with a message (pattern: main.rs of fs-texts, our own code); the release smoke test calls `/usr/bin/<programm> --version` (fs-people failed on `unknown option --version`). Local commits ([COMMIT]), report per [BERICHT]."
+        freesynergy.net:summary: "The program is GENERATED from its blueprint, no agent writes scaffold code by hand (ADR 0099, S5; it replaces the AI step `scaffold-ai`, which was kept until the generator was equal: S3/S4 proved a program that builds and starts on Linux and Windows, answered by the real command). Call in the own worktree: `fs-blueprint new <bauplan> --out <worktree>` (input `bauplan` = the path of `scaffold.toml`, a folder `forms/` next to it comes along): it checks the blueprint against the catalog and the repo, generates workspace, core (seed), server, client, bin with the start tests, the CI callers (`check.yml`, `windows.yml`) and the desktop file, and writes them; on a check error NOTHING is written and the error comes as a code with a sentence (en or de): the blueprint is then repaired, not the generated code. Afterwards `fs-blueprint check --repo <worktree> --drift` must be green (no hand change to a generated file, no file under `crates/` without a head or an exception). Exceptions (hand-written code) only through `[[exception]]` with a talk record (flow `ausnahme-gespraech`). The binary knows `--version`, `--help` and an unknown option exits 2 (the generated start test checks it). Local commits ([COMMIT]), report per [BERICHT]."
   - frontend-crate:
       call: frontend-crate-ai:0.0.12@fs
       with:
@@ -323,7 +323,7 @@ do:
             then: grundfassung-eskalation
         - red:
             when: ${ $context.gates.red or $context.binary.red or $context.lehren.red }
-            then: geruest
+            then: generieren
         - green:
             then: continue
       metadata:
@@ -331,7 +331,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - red gates, a red binary test or a red `lehren` check go back to geruest, from the third red round (`runde` >= 3) to `grundfassung-eskalation` (the person decides), otherwise on to the documentation gate."
+        freesynergy.net:summary: "Control flow - red gates, a red binary test or a red `lehren` check go back to generieren, from the third red round (`runde` >= 3) to `grundfassung-eskalation` (the person decides), otherwise on to the documentation gate."
   - doku:
       run:
         workflow:
