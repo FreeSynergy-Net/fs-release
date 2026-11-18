@@ -101,7 +101,7 @@ def check_states(head, step_names):
     for src, targets in trans.items():
         if src not in names:
             problems.append(f"transition from unknown state {src!r}")
-        if not isinstance(targets, list) or any(t not in names for t in targets):
+        if not isinstance(targets, list) or any(not isinstance(t, str) or t not in names for t in targets):
             problems.append(f"transitions of {src!r}: a list of states (or `{STATIONS}`) is required")
             continue
         if "archiviert" in targets and src not in ("erledigt", "abgebrochen"):
