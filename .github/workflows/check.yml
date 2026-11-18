@@ -10,7 +10,8 @@ on:
       runs-on: { type: string, default: ubuntu-24.04, description: "Runner label" }
       software-gpu: { type: boolean, default: false, description: "Repos with window tests: installs lavapipe (software Vulkan adapter) and the fonts the tests need; merged with apt-packages" }
       blueprint: { type: string, default: "off", description: "Blueprint check (ADR 0099, step S5): off = not run; warn = `fs-blueprint check --drift` runs when the repo has a scaffold.toml and shows its findings (the job stays green); block = a finding fails the job" }
-      blueprint-rev: { type: string, default: "10b683ee777da80a02034eaad8c549f0229d3c52", description: "The commit of fs-release the command `fs-blueprint` is built from (a full SHA, never a branch)" }
+      # blueprint-rev default = the commit of the tag v0.0.12 (annotated tag, peeled 20924e553d38fb6d78aa19f1a156b69d874eb4c5); raised with every release
+      blueprint-rev: { type: string, default: "20924e553d38fb6d78aa19f1a156b69d874eb4c5", description: "The commit of fs-release the command `fs-blueprint` is built from (a full SHA, never a branch)" }
       test-env: { type: string, default: "", description: "Environment for the test step, one KEY=VALUE per line (for tests that need a tool the runner lacks and say so)" }
 
 permissions:
