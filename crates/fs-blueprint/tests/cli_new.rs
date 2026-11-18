@@ -123,7 +123,10 @@ fn new_never_overwrites_a_different_blueprint_in_the_target_and_the_default_targ
         &out_dir.to_string_lossy(),
     ]);
     assert_eq!(code, 2);
-    assert!(err.contains("exists and is not the same"), "{err}");
+    assert!(
+        err.contains("exists and is not the same") && err.contains("nothing was written"),
+        "{err}"
+    );
     assert_eq!(
         std::fs::read_to_string(out_dir.join("scaffold.toml")).unwrap(),
         "schema = 2\n# other\n"

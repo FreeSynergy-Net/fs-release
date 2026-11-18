@@ -10,42 +10,71 @@ use crate::model::Blueprint;
 use crate::repo_fs::FsRepo;
 use crate::verified::verify;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-/// Puts a file of the blueprint's folder into the program folder: made when missing, left when the same, an error when it differs (never overwritten).
-fn place(from: &Path, to: &Path) -> Result<(), String> {
-    let bytes = std::fs::read(from).map_err(|e| format!("cannot read {}: {e}", from.display()))?;
-    match std::fs::read(to) {
-        Ok(old) if old == bytes => Ok(()),
-        Ok(_) => Err(format!(
-            "{} exists and is not the same as {}: nothing was overwritten",
-            to.display(),
-            from.display()
-        )),
-        Err(_) => {
-            if let Some(dir) = to.parent() {
-                std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+/// A file of the blueprint's folder and the place it goes to in the program folder.
+type Place = (PathBuf, PathBuf);
+
+/// Every file that goes with the blueprint (the blueprint itself and the files below `forms/`), no links, in a fixed order.
+fn list_places(file: &Path, source: &Path, target: &Path) -> Vec<Place> {
+    fn tree(from: &Path, to: &Path, out: &mut Vec<Place>) {
+        let Ok(entries) = std::fs::read_dir(from) else {
+            return;
+        };
+        let mut list: Vec<_> = entries.flatten().collect();
+        list.sort_by_key(std::fs::DirEntry::file_name);
+        for e in list {
+            let Ok(meta) = std::fs::symlink_metadata(e.path()) else {
+                continue;
+            };
+            let to = to.join(e.file_name());
+            if meta.is_dir() {
+                tree(&e.path(), &to, out);
+            } else if meta.is_file() {
+                out.push((e.path(), to));
             }
-            std::fs::write(to, bytes).map_err(|e| format!("cannot write {}: {e}", to.display()))
         }
     }
+    let mut out = vec![(file.to_path_buf(), target.join("scaffold.toml"))];
+    tree(&source.join("forms"), &target.join("forms"), &mut out);
+    out
 }
 
-/// Copies the files below `from` (no links) to `to`.
-fn place_tree(from: &Path, to: &Path) -> Result<(), String> {
-    let Ok(entries) = std::fs::read_dir(from) else {
-        return Ok(());
-    };
-    let mut list: Vec<_> = entries.flatten().collect();
-    list.sort_by_key(std::fs::DirEntry::file_name);
-    for e in list {
-        let meta = std::fs::symlink_metadata(e.path()).map_err(|e| e.to_string())?;
-        let target = to.join(e.file_name());
-        if meta.is_dir() {
-            place_tree(&e.path(), &target)?;
-        } else if meta.is_file() {
-            place(&e.path(), &target)?;
+/// Before anything is written: a place that holds another content (or something that cannot be compared) is a conflict, and nothing is overwritten.
+fn conflicts(places: &[Place]) -> Result<(), String> {
+    for (from, to) in places {
+        if std::fs::symlink_metadata(to).is_err() {
+            continue;
         }
+        let same = match (std::fs::read(from), std::fs::read(to)) {
+            (Ok(a), Ok(b)) => a == b,
+            _ => false,
+        };
+        if !same {
+            return Err(format!(
+                "{} exists and is not the same as {}: nothing was written",
+                to.display(),
+                from.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Puts the files in place (made when missing, left when the same).
+fn apply(places: &[Place]) -> Result<(), String> {
+    // the same look again: nothing is ever overwritten, whatever the caller did before
+    conflicts(places)?;
+    for (from, to) in places {
+        let bytes =
+            std::fs::read(from).map_err(|e| format!("cannot read {}: {e}", from.display()))?;
+        if std::fs::read(to).is_ok_and(|old| old == bytes) {
+            continue;
+        }
+        if let Some(dir) = to.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(to, bytes).map_err(|e| format!("cannot write {}: {e}", to.display()))?;
     }
     Ok(())
 }
@@ -107,6 +136,13 @@ pub(crate) fn run_new(o: &Options, out: &mut dyn Write) -> Result<i32, String> {
         .out_dir
         .clone()
         .unwrap_or_else(|| format!("fs-{}", bp.program.name).into());
+    // everything that could conflict is looked at BEFORE the first byte is written: on an error the target is as it was
+    let places = if same_folder(source, &target) {
+        Vec::new()
+    } else {
+        list_places(file, source, &target)
+    };
+    conflicts(&places)?;
     let outcome = match write(&artifacts, &mut DirStore::new(&target)) {
         Ok(outcome) => outcome,
         Err(errors) => {
@@ -119,10 +155,7 @@ pub(crate) fn run_new(o: &Options, out: &mut dyn Write) -> Result<i32, String> {
             )
         }
     };
-    if !same_folder(source, &target) {
-        place(file, &target.join("scaffold.toml"))?;
-        place_tree(&source.join("forms"), &target.join("forms"))?;
-    }
+    apply(&places)?;
     drop(writeln!(
         out,
         "fs-blueprint: made {} (written {}, kept {}); next: cd {} && cargo build",
