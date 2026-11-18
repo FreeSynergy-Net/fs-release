@@ -29,7 +29,13 @@ echo "gate fmt: rc=0"
 # --locked: the gate builds exactly the committed Cargo.lock (a repo without a current lock is red; `cargo update` is a visible commit)
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -W clippy::pedantic
 echo "gate clippy: rc=0"
-cargo test --workspace --all-features --locked
+# FS_GATES_SKIP_TEST: set ONLY by scripts/gates-komplett for its named exception (flat clone without tags of fs-release); never in CI. Visible, never silent.
+skip=()
+if [ -n "${FS_GATES_SKIP_TEST:-}" ]; then
+  skip=(-- --skip "$FS_GATES_SKIP_TEST")
+  echo "gates: test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST, named exception of gates-komplett; not green for this test)"
+fi
+cargo test --workspace --all-features --locked "${skip[@]}"
 echo "gate test: rc=0"
 python3 -I "$rules" "$root"
 echo "gate rust-rules: rc=0"

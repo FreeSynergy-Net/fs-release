@@ -1,5 +1,7 @@
-# Known FOREIGN SOURCES of the pin cascade (`scripts/kaskade-plan`, `scripts/kaskade-fremde-pins`, `scripts/lock-gleich`): git sources that are NOT a Glied and are pinned by `rev` on purpose.
+# Known FOREIGN SOURCES of the pin cascade (`scripts/kaskade-plan`, `scripts/kaskade-fremde-pins`, `scripts/lock-gleich`): git sources that are NOT a Glied and are pinned by `rev` or `tag` on purpose.
 # They are an exception list, not findings: they are neither lifted onto a tag nor counted as a wrong source. One `OWNER/NAME` per line, `#` starts a comment.
-# Evidence: Cargo.toml of fs-calendars-app (fs-calendars main c543bcb7), read 17.11.2026.
+# Evidence: Cargo.toml of fs-calendars-app (fs-calendars main c543bcb7) and the real probe of `kaskade-plan` against the 8 real Glied repos (18.11.2026: fs-capnpc in fs-interfaces, Blinc in fs-components), read 17./18.11.2026.
 FreeSynergy/blinc-app-fix     # Blinc patch repo (blinc_app), pinned by `rev`; goes away when the Blinc pull request is merged upstream
 FreeSynergy/blinc-layout-fix  # Blinc patch repo (blinc_layout), same change as Blinc pull request 71
+FreeSynergy/fs-capnpc         # crate capnp-compiler at tag v0.0.1 (3 Cargo.toml in fs-interfaces); not a Glied, stays on its tag, the cascade does not lift it
+FreeSynergy/Blinc             # the 7 blinc_* crates in fs-components at tag fs-blinc-3.1 (pin of the wrapped upstream, rule wrapper-not-fork); not a Glied, moved only by a Blinc pin change, not by the cascade

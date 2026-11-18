@@ -21,9 +21,9 @@ wt() { git clone -q "$origin/fs-tasks" "$tmp/$1"; tasks_toml "$2" >"$tmp/$1/Carg
 # ---- kaskade-fremde-pins ----
 wt a "$rev_a"; lock_sum="$(cksum <"$tmp/a/Cargo.lock")"; toml_before="$(cksum <"$tmp/a/Cargo.toml")"
 py "$here/kaskade-fremde-pins" --glied "$glied" --dir "$tmp/a" --nur-lesen >"$tmp/o.json"; rc=$?
-chk "pins: --nur-lesen finds the rev pin and changes nothing (rc 0)" [ "$rc" -eq 0 ] && [ "$(cksum <"$tmp/a/Cargo.toml")" = "$toml_before" ] && [ "$(q "$tmp/o.json" '[p["crate"] for p in d["rev_pins"]]')" = "['fs-people-directory']" ]
+chk "pins: --nur-lesen finds the rev pin and changes nothing (rc 0)" [ "$rc" -eq 0 ] && chk "pins: --nur-lesen finds the rev pin and changes nothing (rc 0) [part 2]" [ "$(cksum <"$tmp/a/Cargo.toml")" = "$toml_before" ] && chk "pins: --nur-lesen finds the rev pin and changes nothing (rc 0) [part 3]" [ "$(q "$tmp/o.json" '[p["crate"] for p in d["rev_pins"]]')" = "['fs-people-directory']" ]
 py "$here/kaskade-fremde-pins" --glied "$glied" --dir "$tmp/a" >"$tmp/o.json"; rc=$?
-chk "pins: rc 0 and Cargo.toml changed" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" 'd["geaendert"]')" = "['Cargo.toml']" ]
+chk "pins: rc 0 and Cargo.toml changed" [ "$rc" -eq 0 ] && chk "pins: rc 0 and Cargo.toml changed [part 2]" [ "$(q "$tmp/o.json" 'd["geaendert"]')" = "['Cargo.toml']" ]
 chk "pins: the rev of fs-people-directory is now the tag v0.0.2 of fs-people" grep -q "fs-people-directory = { git = \"$GH/fs-people\", tag = \"v0.0.2\" }" "$tmp/a/Cargo.toml"
 chk "pins: Cargo.lock is NEVER touched" [ "$(cksum <"$tmp/a/Cargo.lock")" = "$lock_sum" ]
 chk "pins: the foreign source blinc-app-fix keeps its rev and is listed, not a finding" grep -q 'blinc-app-fix", rev = "5180d4eae' "$tmp/a/Cargo.toml"
@@ -33,7 +33,7 @@ py "$here/kaskade-fremde-pins" --glied "$glied" --dir "$tmp/a" >"$tmp/o.json"
 chk "pins: a second run changes nothing" [ "$(q "$tmp/o.json" 'd["geaendert"]')" = "[]" ]
 wt b "$rev_b"; b_before="$(cksum <"$tmp/b/Cargo.toml")"
 py "$here/kaskade-fremde-pins" --glied "$glied" --dir "$tmp/b" >"$tmp/o.json"; rc=$?
-chk "pins: a rev that is on NO tag (commit B after v0.0.2) is a finding, not lifted by guess (rc 1)" [ "$rc" -eq 1 ] && [ "$(cksum <"$tmp/b/Cargo.toml")" = "$b_before" ]
+chk "pins: a rev that is on NO tag (commit B after v0.0.2) is a finding, not lifted by guess (rc 1)" [ "$rc" -eq 1 ] && chk "pins: a rev that is on NO tag (commit B after v0.0.2) is a finding, not lifted by guess (rc 1) [part 2]" [ "$(cksum <"$tmp/b/Cargo.toml")" = "$b_before" ]
 py "$here/kaskade-fremde-pins" --glied '{"glied":{"repo":"fs-tasks","tags":{"fs-types":"v0.0.3"}}}' --dir "$tmp/b" >"$tmp/o.json"; rc=$?
 chk "pins: no tag known for the owner repo is a finding (rc 1)" [ "$rc" -eq 1 ]
 py "$here/kaskade-fremde-pins" --glied "$glied" --dir "$tmp/none" >"$tmp/o.json"; rc=$?
@@ -65,11 +65,11 @@ tag_push fs-tasks v0.0.9
 plan() { printf '{"erledigt":[%s]}' "$1"; }
 e_ifc='{"repo":"fs-interfaces","tag":"v0.0.2","beleg":"b"}'; e_obj='{"repo":"fs-objects","tag":"v0.0.2","beleg":"b"}'; e_tsk='{"repo":"fs-tasks","tag":"v0.0.9","beleg":"b"}'
 py "$here/lock-gleich" --plan "$(plan "$e_ifc")" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
-chk "lock-gleich: one Glied on the trigger tag from FreeSynergy/fs-types is green (rc 0)" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" 'd["glieder"][0]["fs_types_tags"]')" = "['v0.0.3']" ]
+chk "lock-gleich: one Glied on the trigger tag from FreeSynergy/fs-types is green (rc 0)" [ "$rc" -eq 0 ] && chk "lock-gleich: one Glied on the trigger tag from FreeSynergy/fs-types is green (rc 0) [part 2]" [ "$(q "$tmp/o.json" 'd["glieder"][0]["fs_types_tags"]')" = "['v0.0.3']" ]
 py "$here/lock-gleich" --plan "$(plan "$e_ifc,$e_obj")" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
-chk "lock-gleich: a Glied whose lock has another fs-types tag is red (rc 1)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" '"v0.0.2" in d["befunde"][0]')" = True ]
+chk "lock-gleich: a Glied whose lock has another fs-types tag is red (rc 1)" [ "$rc" -eq 1 ] && chk "lock-gleich: a Glied whose lock has another fs-types tag is red (rc 1) [part 2]" [ "$(q "$tmp/o.json" '"v0.0.2" in d["befunde"][0]')" = True ]
 py "$here/lock-gleich" --plan "$(plan "$e_tsk")" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
-chk "lock-gleich: a left rev pin and fs-types from the repo fs-interfaces are red" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" 'any("rev pin" in b for b in d["befunde"]) and d["glieder"][0]["lock_rc"] != 0')" = True ]
+chk "lock-gleich: a left rev pin and fs-types from the repo fs-interfaces are red" [ "$rc" -eq 1 ] && chk "lock-gleich: a left rev pin and fs-types from the repo fs-interfaces are red [part 2]" [ "$(q "$tmp/o.json" 'any("rev pin" in b for b in d["befunde"]) and d["glieder"][0]["lock_rc"] != 0')" = True ]
 py "$here/lock-gleich" --plan "$(plan "$e_ifc")" --ausloeser v0.0.3 --env "FS_LOCK_ONLY_FROM=1" >"$tmp/o.json"; rc=$?
 chk "lock-gleich: a weakened --env (no FS_LOCK_STRICT=1) is refused (rc 2)" [ "$rc" -eq 2 ]
 py "$here/lock-gleich" --plan "$(plan "$e_ifc")" --ausloeser v0.0.3 --env "FS_LOCK_STRICT=1" >"$tmp/o.json"; rc=$?
@@ -83,7 +83,7 @@ newrepo fs-nolock; printf '[package]\nname = "x"\n' >"$tmp/work/fs-nolock/Cargo.
 commit_push fs-nolock one; tag_push fs-nolock v0.0.1
 nl='{"repo":"fs-nolock","tag":"v0.0.1","beleg":"b"}'
 py "$here/lock-gleich" --plan "$(plan "$nl")" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
-chk "lock-gleich: a Glied without .fs-lock-sources.toml (strict, only_from) is red (rc 1)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" 'any("fs-lock-sources" in b for b in d["befunde"])')" = True ]
+chk "lock-gleich: a Glied without .fs-lock-sources.toml (strict, only_from) is red (rc 1)" [ "$rc" -eq 1 ] && chk "lock-gleich: a Glied without .fs-lock-sources.toml (strict, only_from) is red (rc 1) [part 2]" [ "$(q "$tmp/o.json" 'any("fs-lock-sources" in b for b in d["befunde"])')" = True ]
 cp "$here/lock-gleich" "$tmp/mut/"
 mutate "$here/lock-gleich" 'if sw.get("strict") is not True or' 'if False and' "$tmp/mut/lock-gleich" || bad "mutant lock 4 not applied"
 py "$tmp/mut/lock-gleich" --plan "$(plan "$nl")" --ausloeser v0.0.3 >/dev/null; rc=$?

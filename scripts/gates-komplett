@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""All gates of one Glied, COMPLETE (call `gates-komplett` of the workflow `pin-kaskade`, step `gates`). The ONLY thing it writes is the build output and the logs.
+"""All gates of one Glied, COMPLETE (call `gates-komplett` of the workflow `pin-kaskade`, step `gates`). It writes the build output and the logs, and `cargo fmt --all` writes into the tree (a tree that fmt changes is red, see below).
 
   python3 -I scripts/gates-komplett --repo-dir DIR [--jobs 4] [--prioritaet 0] [--log-dir DIR] [--skripte-tag vX.Y.Z] [--ohne-flachprobe]
 
@@ -7,10 +7,15 @@
 $FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The tag is the highest `FreeSynergy/fs-release/...@vX.Y.Z` of DIR/.github/workflows/*.yml, or `--skripte-tag`; without
 any (fs-release itself) the scripts of DIR are used. [GATE-VOLLSTAENDIG-LAUFEN]: `cargo fmt --all` FIRST (a tree that fmt changes is red: commit it first), then `gates.sh` COMPLETE, ONE run after the other
 (never parallel): (1) the local environment (a CI/CARGO_TERM_COLOR of the caller is dropped), (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`) with an OWN
-target (`.scratch/target/<repo>/flach`, [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
+target (`.scratch/target/<repo>/flach`, <repo> = the repo name of the `origin` URL, the folder name only without an `origin`; [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
 CARGO_BUILD_JOBS=<jobs> and BUILD_PRIORITY=<prioritaet>. [GATE-PIPEFAIL], [GATE-AUSGABE-NIE-KUERZEN]: the output goes to a log file whole; the result lists every `gate <name>: rc=` line and every line with FAILED, ERROR
 or errors, and the rc of every run; a red run stops the rest (`nicht gelaufen`). The head and the working tree must be the same before and after (a change while the gates run is red).
-Result JSON: {status, red, kopf, skripte:{tag, quelle}, fmt, laeufe:[{name, rc, log, gates, fehler}], befunde}. rc 0 green / 1 red / 2 bad input.
+NAMED EXCEPTION (c0 18.11.2026, rule [GATE-FLACHER-KLON-OHNE-TAGS]; the ONLY one, the list `AUSNAHMEN` below): in the repo fs-release itself the flat clone has no tags, and its test
+`released_changelog_sections_equal_their_tags` demands tags on purpose, so the flat run of fs-release is red there by design. Only in the run `flach-ohne-tags`, only for the repo `fs-release`, only for that one test
+the run gets `FS_GATES_SKIP_TEST=<test>` (scripts/gates.sh then runs `cargo test ... -- --skip <test>` and says so). It is never silent: every run prints `SKIPPED test ... by named exception ...` on stderr, the result lists it
+under `ausnahmen` (`angewendet`, `gruen_fuer_test: false`: the test counts as SKIPPED, never as green) and the flat run of fs-release is only green WITHOUT that test. The test runs in the real CI (with tags), which stays decisive.
+Any other repo, run or test: no exception. A flat run of fs-release is therefore meant to be red without the exception (that is the known state, not a bug of the cascade).
+Result JSON: {status, red, kopf, skripte:{tag, quelle}, fmt, laeufe:[{name, rc, log, gates, fehler}], ausnahmen:[{name, repo, lauf, test, grund, angewendet, gruen_fuer_test}], befunde}. rc 0 green / 1 red / 2 bad input.
 """
 import argparse
 import glob
@@ -27,6 +32,9 @@ import kgit  # noqa: E402
 import kio  # noqa: E402
 
 PIN = re.compile(r"FreeSynergy/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+)\b")
+# The ONE list of named exceptions (never scattered in the code): repo + run + test. `grund` is printed on every run.
+AUSNAHMEN = [{"name": "flach-changelog-tags", "repo": "fs-release", "lauf": "flach-ohne-tags", "test": "released_changelog_sections_equal_their_tags",
+              "grund": "the test demands v* tags and a flat clone without tags (rule [GATE-FLACHER-KLON-OHNE-TAGS]) has none: red by design; the real CI (with tags) runs it"}]
 SHOW = re.compile(r"rc=|FAILED|ERROR|errors|^error")
 
 
@@ -36,6 +44,18 @@ def pinned_tag(d):
         with open(f, encoding="utf-8") as fh:
             tags.update(PIN.findall(fh.read()))
     return max(tags, key=kgit.version_key) if tags else None
+
+
+def repo_name(d):
+    """The repo name of the `origin` URL of DIR (the folder name only without an origin): not the name of a worktree like pk-fs-tasks."""
+    rc, out = kgit.run(["remote", "get-url", "origin"], cwd=d)
+    m = re.search(r"([^/:]+?)(?:\.git)?/?$", out.strip()) if rc == 0 and out.strip() else None
+    return m.group(1) if m else os.path.basename(d.rstrip("/"))
+
+
+def ausnahme_for(repo, lauf):
+    hits = [x for x in AUSNAHMEN if x["repo"] == repo and x["lauf"] == lauf]
+    return hits[0] if hits else None
 
 
 def state(d):
@@ -68,12 +88,12 @@ def main(argv):
         return kio.skipped(f"{a.repo_dir} is no git checkout")
     if not 1 <= a.jobs <= 64 or not 0 <= a.prioritaet <= 9 or (a.skripte_tag and not kio.TAG.match(a.skripte_tag)):
         return kio.skipped("jobs 1..64, prioritaet 0..9, skripte-tag vX.Y.Z")
-    repo = os.path.basename(d.rstrip("/"))
+    repo = repo_name(d)
     scratch = os.environ.get("FS_GATES_SCRATCH", "/srv/FreeSynergy/.scratch")
     log_dir = a.log_dir or os.path.join(scratch, "api-runner", "gates-logs")
     os.makedirs(log_dir, exist_ok=True)
     tag = a.skripte_tag or pinned_tag(d)
-    befunde, laeufe = [], []
+    befunde, laeufe, ausnahmen = [], [], []
     with tempfile.TemporaryDirectory(prefix="gates-komplett-", dir=os.environ.get("TMPDIR")) as tmp:
         if tag:
             src = os.environ.get("FS_RELEASE_REPO", "/srv/FreeSynergy/fs-release")
@@ -109,12 +129,17 @@ def main(argv):
                 rc, out = kgit.run(["clone", "-q", "--depth", "1", "--no-tags", "file://" + d, flach])
                 if rc != 0:
                     return kio.skipped(f"flat clone failed: {out.strip()}")
+            ex = ausnahme_for(repo, name)
+            if ex:
+                e = {**e, "FS_GATES_SKIP_TEST": ex["test"]}
+                ausnahmen.append({**ex, "angewendet": True, "gruen_fuer_test": False})
+                print(f"gates-komplett: run {name} of {repo}: SKIPPED test {ex['test']} by named exception {ex['name']}, reason: {ex['grund']} (not green for this test)", file=sys.stderr)
             laeufe.append(run_gates(name, gates, wd, e, log_dir, repo))
             if laeufe[-1]["rc"] != 0:
                 befunde.append(f"gates.sh red in the run `{name}` (rc {laeufe[-1]['rc']}), log {laeufe[-1]['log']}")
         if not befunde and state(d) != before:
             befunde.append("head or working tree changed while the gates ran: the result is void")
-    kio.emit({"status": "ok", "red": bool(befunde), "kopf": before[0], "skripte": {"tag": tag, "quelle": quelle}, "fmt": fmt_res, "laeufe": laeufe, "befunde": befunde})
+    kio.emit({"status": "ok", "red": bool(befunde), "kopf": before[0], "skripte": {"tag": tag, "quelle": quelle}, "fmt": fmt_res, "laeufe": laeufe, "ausnahmen": ausnahmen, "befunde": befunde})
     return 1 if befunde else 0
 
 
