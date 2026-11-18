@@ -1,0 +1,127 @@
+//! Pattern: Value object checks (the forms of names, versions, ids, texts; pure functions, no catalog needed).
+
+use crate::model::Text2;
+use std::collections::BTreeSet;
+
+fn starts_lower(s: &str) -> bool {
+    s.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+}
+
+/// `^[a-z][a-z0-9-]*$`
+#[must_use]
+pub fn is_kebab(s: &str) -> bool {
+    starts_lower(s)
+        && s.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// `PascalCase`: starts upper case, letters and digits only.
+#[must_use]
+pub fn is_pascal(s: &str) -> bool {
+    s.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+        && s.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+/// `camelCase`: starts lower case, letters and digits only.
+#[must_use]
+pub fn is_camel(s: &str) -> bool {
+    starts_lower(s) && s.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+fn number(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()) && (s == "0" || !s.starts_with('0'))
+}
+
+/// `major.minor.patch`, plain numbers (no pre-release: a version is a tag of a repo that follows the version = tag rule).
+#[must_use]
+pub fn is_semver(s: &str) -> bool {
+    let parts: Vec<&str> = s.split('.').collect();
+    parts.len() == 3 && parts.iter().all(|p| number(p))
+}
+
+/// `major.minor`
+#[must_use]
+pub fn is_major_minor(s: &str) -> bool {
+    let parts: Vec<&str> = s.split('.').collect();
+    parts.len() == 2 && parts.iter().all(|p| number(p))
+}
+
+/// `0x` and 16 hexadecimal digits (a Cap'n Proto file id).
+#[must_use]
+pub fn is_file_id(s: &str) -> bool {
+    s.strip_prefix("0x")
+        .is_some_and(|h| h.len() == 16 && h.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+/// `type/subtype` after RFC 6838, as far as the form goes (no parameters).
+#[must_use]
+pub fn is_media_type(s: &str) -> bool {
+    let token = |t: &str| {
+        !t.is_empty()
+            && t.chars()
+                .all(|c| c.is_ascii_alphanumeric() || "!#$&-^_.+".contains(c))
+    };
+    s.split_once('/')
+        .is_some_and(|(a, b)| token(a) && token(b) && !b.contains('/'))
+}
+
+/// A URI of a standard with a section: `https://...#section`.
+#[must_use]
+pub fn is_standard_uri(s: &str) -> bool {
+    (s.starts_with("https://") || s.starts_with("http://"))
+        && s.split_once('#')
+            .is_some_and(|(h, f)| h.len() > 8 && !f.is_empty())
+}
+
+/// The variables `{$name}` of an MF2 message.
+#[must_use]
+pub fn variables(message: &str) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    let mut rest = message;
+    while let Some(i) = rest.find("{$") {
+        let tail = &rest[i + 2..];
+        let end = tail
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'))
+            .unwrap_or(tail.len());
+        out.insert(tail[..end].to_string());
+        rest = &tail[end..];
+    }
+    out
+}
+
+/// A relative path with `/`: not empty, no leading `/`, no `\`, no `..`, no drive colon, no `*` or `?`. An end slash means a folder.
+#[must_use]
+pub fn is_repo_path(p: &str) -> bool {
+    !p.is_empty()
+        && !p.starts_with('/')
+        && !p.contains(['\\', '*', '?', ':', '\0'])
+        && !p
+            .split('/')
+            .enumerate()
+            .any(|(i, c)| c == ".." || c == "." || (c.is_empty() && i + 1 != p.split('/').count()))
+}
+
+/// What is wrong with a [`Text2`]: the missing languages and whether the variables differ.
+#[derive(Debug, PartialEq, Eq)]
+pub enum TextFault {
+    Missing(&'static str),
+    Vars,
+}
+
+/// The faults of a pair of texts (`de` and `en` both there, the same variables in both).
+#[must_use]
+pub fn text_faults(t: &Text2) -> Vec<TextFault> {
+    let mut out = Vec::new();
+    if t.en.as_deref().is_none_or(str::is_empty) {
+        out.push(TextFault::Missing("en"));
+    }
+    if t.de.as_deref().is_none_or(str::is_empty) {
+        out.push(TextFault::Missing("de"));
+    }
+    if let (Some(en), Some(de)) = (&t.en, &t.de) {
+        if !en.is_empty() && !de.is_empty() && variables(en) != variables(de) {
+            out.push(TextFault::Vars);
+        }
+    }
+    out
+}

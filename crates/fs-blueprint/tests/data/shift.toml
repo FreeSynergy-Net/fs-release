@@ -1,0 +1,38 @@
+schema = 2
+
+[program]
+name = "schedules"
+skeleton = "0.1.0"
+capability = "shifts"
+summary = { en = "Shift plans", de = "Schichtpläne" }
+description = { en = "Plan shifts and assign people.", de = "Schichten planen und Menschen einteilen." }
+categories = ["Office"]
+
+[contract]
+version = "0.1"
+id = "0xc04d258971543477"
+
+[[type]]
+name = "Shift"
+standard = "https://www.rfc-editor.org/rfc/rfc8984#section-2.1"
+envelope = "Event"
+media_type = "application/vnd.freesynergy.shift"
+label = { en = "Shift", de = "Schicht" }
+
+[[type.field]]
+name = "span"
+kit = "timeSpan"
+standard = "https://www.rfc-editor.org/rfc/rfc8984#section-5.1"
+label = { en = "Time", de = "Zeit" }
+
+[[type.field]]
+name = "assignee"
+kit = "personRef"
+multiple = true
+standard = "https://www.rfc-editor.org/rfc/rfc8984#section-4.4.6"
+label = { en = "Assigned to", de = "Eingeteilt" }
+
+[frontend]
+standard = "list"
+layout = "layout/list.toml"
+covers = "all"

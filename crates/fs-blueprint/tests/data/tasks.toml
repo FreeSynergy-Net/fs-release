@@ -1,0 +1,59 @@
+schema = 2
+
+[program]
+name = "tasks"
+skeleton = "0.1.0"
+capability = "tasks"
+summary = { en = "Tasks, dependencies and boards", de = "Aufgaben, Abhängigkeiten und Boards" }
+description = { en = "Plan and track tasks as JSCalendar tasks, with dependencies and boards.", de = "Aufgaben als JSCalendar-Aufgaben planen und verfolgen, mit Abhängigkeiten und Boards." }
+categories = ["Office", "ProjectManagement"]
+
+[contract]
+version = "0.1"
+id = "0xc04d258971543476"
+provides = ["dependency.evaluate", "dependency.cycle-check"]
+
+[[module]]
+name = "fs-todo"
+kind = "standard"
+version = "0.0.1"
+
+[[module]]
+name = "board"
+kind = "component"
+version = "0.0.29"
+
+[[module]]
+name = "task-card"
+kind = "component"
+version = "0.0.29"
+
+[[bundle]]
+name = "fs-planning"
+version = "0.0.1"
+parts = ["readiness", "schedule", "progress", "rank", "checklist", "claim"]
+item = "Task"
+
+[[type]]
+name = "Task"
+module = "fs-todo"
+
+[[ruleset]]
+name = "progress"
+type = "Task"
+from = "fs-planning"
+presets = ["rfc8984", "freesynergy"]
+default = "freesynergy"
+
+[frontend]
+standard = "board"
+layout = "layout/board.toml"
+covers = ["Items.list", "Items.query", "Items.create", "Items.editIf", "Items.readiness"]
+
+[[exception]]
+what = "Sperrt Titel, Notiz und Befehl mit erkennbaren Schlüsselmustern"
+why = "kein Modul und kein Standard beschreibt eine Geheimnis-Sperre für Aufgabentexte"
+checked = ["fs-todo", "fs-planning"]
+alternatives = ["Prüfregel als Regelwerk in fs-todo"]
+talk = "conventions/talks/2026-11-xx-tasks-secret-guard.md"
+paths = ["crates/fs-tasks-core/src/secret_guard.rs"]
