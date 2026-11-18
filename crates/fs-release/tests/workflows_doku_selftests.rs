@@ -16,6 +16,16 @@ fn released_changelog_sections_equal_their_tags() {
 }
 
 #[test]
+fn internal_pins_are_one_sha_and_no_main() {
+    run_self_test("test_pins_consistent.sh");
+}
+
+#[test]
+fn the_topmost_changelog_section_is_unreleased_or_the_crate_version() {
+    run_self_test("test_changelog_top.sh");
+}
+
+#[test]
 fn the_rename_script_passes_its_self_test() {
     run_self_test("test_umbenennen.sh");
 }

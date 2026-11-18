@@ -43,7 +43,8 @@ mutant() { # <name> <sed expression> <wf|ex|sa>: the mutated file must break a r
   if rules_ok "$wf" "$ex" "$sa"; then fail "windows_check: mutant '$1' stays green"; else pass "windows_check: mutant '$1' is red"; fi
 }
 mutant runner-latest 's/windows-2022/windows-latest/' wf
-mutant moving-ref 's#setup-rust@ceddb45[0-9a-f]+#setup-rust@main#' wf
+# any pinned SHA (a pin round moves it; a fixed SHA here made the mutant a no-op after every round)
+mutant moving-ref 's#setup-rust@[0-9a-f]{7,40}#setup-rust@main#' wf
 mutant no-locked 's/ --locked//g' wf
 mutant caller-main 's#@v0\.0\.11#@main#' ex
 mutant caller-secrets 's#^permissions:#secrets: inherit\npermissions:#' ex
