@@ -36,7 +36,8 @@ counter_good() { # <helpers> <endline>: all checks that the real mechanism must 
   [ "$rc" -eq 0 ]
 }
 counter_selftest() { # <script>
-  local s="$1" h e mh me d
+  local s="$1" h e mh me d n0
+  n0="$(wc -l <"$tmp/.fails")"  # the failures BEFORE this self test: the file must not become shorter (N6: nothing may empty it)
   h="$(counter_pick "$s" helpers)"; e="$(counter_pick "$s" end)"
   mkdir -p "$tmp/ctr"
   chk "counter ($(basename "$s")): the helper lines and the end line are byte-identical in the three test scripts" \
@@ -55,4 +56,5 @@ counter_selftest() { # <script>
   chk "counter ($(basename "$s")) mutant M5 (no wait before the file is read) is caught" [ "$me" != "$e" ] && chk "counter ($(basename "$s")) mutant M5 (no wait) is caught [part 2]" [ "$(counter_good "$h" "$me" && echo green || echo red)" = red ]
   me="$(printf '%s\n' "$e" | sed 's/\[ "\$nfail" -eq 0 \] && \[ "\$fails" -eq 0 \]/[ "$fails" -eq 0 ]/')"
   chk "counter ($(basename "$s")) mutant M6 (the end line uses only the variable) is caught" [ "$me" != "$e" ] && chk "counter ($(basename "$s")) mutant M6 (only the variable) is caught [part 2]" [ "$(counter_good "$h" "$me" && echo green || echo red)" = red ]
+  chk "counter ($(basename "$s")): the failure file did not become shorter during the self test (an earlier failure cannot be lost)" [ "$(wc -l <"$tmp/.fails")" -ge "$n0" ]
 }
