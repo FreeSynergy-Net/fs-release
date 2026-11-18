@@ -88,6 +88,9 @@ def check_states(head, step_names):
     for s in states:
         if s not in STATES:
             problems.append(f"unknown state {s!r} in {META_STATES} (allowed: {', '.join(STATES)})")
+    for s in STATES:
+        if states.count(s) > 1:
+            problems.append(f"state {s!r} is listed more than once in {META_STATES} (exactly the eight states, each once)")
     for n in step_names:
         if n in STATES or n == STATIONS:
             problems.append(f"step {n!r} carries the name of a state (own steps are the swimlanes between the states)")

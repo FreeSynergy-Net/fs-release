@@ -97,3 +97,55 @@ fn mutation_every_state_name_and_stationen_as_a_step_name_is_red() {
         });
     }
 }
+
+#[test]
+fn mutation_every_rule_line_removed_completely_is_red() {
+    let text = read("bugfix");
+    for (src, _) in rules(&text) {
+        assert_red(
+            "bugfix",
+            &format!("transition rule of '{src}' is missing"),
+            |t| {
+                let prefix = format!("      {src}: [");
+                t.lines()
+                    .filter(|l| !l.starts_with(&prefix))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+                    + "\n"
+            },
+        );
+    }
+}
+
+#[test]
+fn mutation_a_rule_as_string_instead_of_a_list_is_red() {
+    assert_red(
+        "bugfix",
+        "transitions of 'pausiert': a list of states",
+        |t| {
+            t.replacen(
+            "      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]",
+            "      pausiert: abgebrochen",
+            1,
+        )
+        },
+    );
+}
+
+#[test]
+fn mutation_state_names_are_exact_lowercase() {
+    assert_red("bugfix", "unknown state 'Pausiert'", |t| {
+        t.replacen(
+            "in-prüfung, pausiert, abgebrochen",
+            "in-prüfung, Pausiert, abgebrochen",
+            1,
+        )
+    });
+}
+
+#[test]
+fn mutation_a_duplicate_state_is_red() {
+    assert_red("bugfix", "state 'offen' is listed more than once", |t| {
+        t.replacen("states: [offen, ", "states: [offen, offen, ", 1)
+    });
+}
