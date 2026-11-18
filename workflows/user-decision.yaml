@@ -5,18 +5,6 @@ document:
   name: user-decision
   version: 0.0.13
   title: Ask the user, record the answer, turn it into an order
-  metadata:
-    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
-    freesynergy.net:transitions:
-      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
-      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
-      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
-      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
-      abgebrochen: [offen, archiviert]
-      erledigt: [offen, archiviert]
-      archiviert: []
 do:
   - adr-search:
       call: adr-search:0.0.13@fs

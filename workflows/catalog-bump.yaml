@@ -5,18 +5,6 @@ document:
   name: catalog-bump
   version: 0.0.13
   title: Raise a program in the catalog, sign the catalog, test it
-  metadata:
-    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
-    freesynergy.net:transitions:
-      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
-      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
-      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
-      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
-      abgebrochen: [offen, archiviert]
-      erledigt: [offen, archiviert]
-      archiviert: []
 # Start by event (net.freesynergy.release.published, see README.md), nothing is sent across repos and no token is needed: fs-catalog
 # pulls. The 15-minute schedule of bump.yml (7,22,37,52 * * * *) stays as the safety net and is NOT changed; whether `every` and
 # `on` may stand together in SW 1.0.3 is not proven, so the net is described here and not as a second trigger.

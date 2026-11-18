@@ -1,0 +1,21 @@
+# The ONE rule set of the states of a run (a Lauf). It belongs to the run, not to a single workflow file (ADR 0097 E4: no states wired
+# into every file). The standard text is workflows/STATES.md; scripts/check_run_rules.py checks this file, the tests compare STATES.md with it.
+# `stationen` is NOT a state: it stands for "the run is on one of the own steps (stations) of its workflow".
+version: 1
+start: offen
+states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, fehlgeschlagen, abgebrochen, erledigt, archiviert]
+wait-reasons:
+  wartet-auf-entscheidung: entscheidung
+  auf-anfrage: anfrage
+  in-prüfung: prüfung
+transitions:
+  offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
+  stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, fehlgeschlagen, abgebrochen, erledigt]
+  wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+  auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+  in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
+  pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
+  fehlgeschlagen: [stationen, abgebrochen, archiviert]
+  abgebrochen: [offen, archiviert]
+  erledigt: [offen, archiviert]
+  archiviert: []
