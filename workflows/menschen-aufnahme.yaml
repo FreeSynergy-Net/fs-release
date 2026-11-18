@@ -8,11 +8,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: menschen-aufnahme
-  version: 0.0.11
+  version: 0.0.12
   title: "Take a new person into the project - self-given data, consent only by the person, way in by the rules of the group"
 do:
   - angaben-aufnehmen:
-      call: take-details:0.0.11@fs
+      call: take-details:0.0.12@fs
       with:
         person: ${ .input.person }
         rolle: ${ .input.rolle }
@@ -26,7 +26,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The person (or the inviting person on their word) gives the data themselves: the name they want to be called, the way they want to be reached, the wished role. Only what is given; nothing is looked up about the person elsewhere, nothing is guessed, no field about other people. Result `angaben` carrying `runde` (+1 for each jump back from `angaben-weiche`)."
   - einwilligung-daten:
-      call: data-consent:0.0.11@fs
+      call: data-consent:0.0.12@fs
       with:
         angaben: ${ $context.angaben }
       export:
@@ -51,7 +51,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Control flow - without the explicit consent of the person (or a missing result) nothing is stored and no account is made: `ohne-einwilligung`; only `gegeben == true` goes on."
   - daten-pruefen:
-      call: check-details:0.0.11@fs
+      call: check-details:0.0.12@fs
       with:
         angaben: ${ $context.angaben }
       export:
@@ -79,7 +79,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red or missing `daten` result goes back to `angaben-aufnehmen` (the person is asked about the named fields), from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the role."
   - rolle-klaeren:
-      call: settle-role:0.0.11@fs
+      call: settle-role:0.0.12@fs
       with:
         gruppe: ${ .input.gruppe }
         rolle: ${ .input.rolle }
@@ -92,7 +92,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The role is settled by the rule of the group (self-administration): the person names the wish, the group or its admin decides by its own rule; the agent decides nothing. Result `rolle`."
   - zugang-lesen:
-      call: read-access-rules:0.0.11@fs
+      call: read-access-rules:0.0.12@fs
       with:
         gruppe: ${ .input.gruppe }
         zugang: ${ .input.zugang }
@@ -118,7 +118,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - an unknown way in (or a missing result) goes to `eskalation`; only `red == false` goes on to the way of the group."
   - tuersteher:
-      call: gatekeeper-bot:0.0.11@fs
+      call: gatekeeper-bot:0.0.12@fs
       with:
         gruppe: ${ .input.gruppe }
       export:
@@ -131,7 +131,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the gatekeeper bot (no AI, never an account of a person) checks the invitation link, the min/max of the group and the valid time; it decides nothing about the person beyond the rule and writes the entry to the log of the group. Result `eintritt` with `frei` (true only when the way lets the person in)."
   - abstimmung:
-      call: group-vote:0.0.11@fs
+      call: group-vote:0.0.12@fs
       with:
         gruppe: ${ .input.gruppe }
       export:
@@ -144,7 +144,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The members of the group vote by their own rule; the result of the vote is the vote of the people, never of an agent. Only for the way `vote`. Result `eintritt` with `frei` (true only when the way lets the person in)."
   - admin-freigabe:
-      call: admin-release:0.0.11@fs
+      call: admin-release:0.0.12@fs
       with:
         gruppe: ${ .input.gruppe }
       export:
@@ -170,7 +170,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a refused entry (the gatekeeper bot says no, the vote says no, the admin refuses) or a missing result of the way goes to `ohne-zugang`; only `frei == true` (or the way `open`) goes on to the welcome material."
   - willkommen-vorbereiten:
-      call: welcome-ai:0.0.11@fs
+      call: welcome-ai:0.0.12@fs
       with:
         angaben: ${ $context.angaben }
         rolle: ${ $context.rolle }
@@ -183,7 +183,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The agent PREPARES the invitation text, the welcome material (what the project is, how to reach help, how to leave, who sees what) and the privacy note, from the self-given data only; it sends nothing, stores nothing, starts no account and never agrees to anything in the name of the person ([KEINE-ZUSTIMMUNG-IM-NAMEN-DES-NUTZERS]). An AI of the project is named only as invitation with STOP-AI, never as given. Result `willkommen`."
   - zustimmung-pruefen:
-      call: check-consents:0.0.11@fs
+      call: check-consents:0.0.12@fs
       with:
         willkommen: ${ $context.willkommen }
       export:
@@ -211,7 +211,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red or missing consent check goes back to `willkommen-vorbereiten`, from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the privacy note."
   - datenschutz-hinweis:
-      call: privacy-note:0.0.11@fs
+      call: privacy-note:0.0.12@fs
       with:
         willkommen: ${ $context.willkommen }
       export:
@@ -236,7 +236,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Control flow - a privacy note that the person did not confirm themselves (or a missing result) ends the run at `ohne-einwilligung`; only `gesehen == true` goes on to the invitation."
   - einladung-senden:
-      call: send-invitation:0.0.11@fs
+      call: send-invitation:0.0.12@fs
       with:
         willkommen: ${ $context.willkommen }
         kanal: ${ .input.kanal }
@@ -247,7 +247,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "A human (the inviting person, an admin, or the gatekeeper bot by the rule of the group) sends the invitation to the way the person chose; the agent sends nothing."
   - aufnahme-beleg:
-      call: record-ai:0.0.11@fs
+      call: record-ai:0.0.12@fs
       with:
         angaben: ${ $context.angaben }
         rolle: ${ $context.rolle }

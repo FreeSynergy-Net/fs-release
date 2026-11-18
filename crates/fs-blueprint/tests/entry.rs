@@ -51,6 +51,8 @@ fn the_generated_main_is_byte_equal_in_all_example_blueprints_except_the_referen
 fn the_main_names_nothing_of_the_program_but_its_name() {
     for bp in blueprints() {
         let main = main_of(&bp);
+        // the head line names the version of the tool (`0.0.12`), which may look like a contract version (`0.12`): only the body is searched
+        let body = main.split_once('\n').map_or("", |(_, b)| b);
         let mut specific = vec![
             bp.contract.id.clone(),
             bp.contract.version.clone(),
@@ -65,7 +67,7 @@ fn the_main_names_nothing_of_the_program_but_its_name() {
             .filter(|w| w.len() > 3 && *w != bp.program.name)
         {
             assert!(
-                !main.contains(&word),
+                !body.contains(&word),
                 "{}: main contains {word}",
                 bp.program.name
             );

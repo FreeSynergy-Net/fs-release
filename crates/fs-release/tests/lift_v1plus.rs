@@ -43,9 +43,9 @@ fn pins_never_lowers_a_line_that_is_on_a_higher_tag() {
     assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
     let check = w.read(".github/workflows/check.yml");
     let release = w.read(".github/workflows/release.yml");
-    assert!(check.contains("check.yml@v0.0.11\n"), "{check}");
+    assert!(check.contains("check.yml@v0.0.12\n"), "{check}");
     assert!(release.contains("release.yml@v0.0.12\n"), "{release}");
-    assert!(release.contains("actions/sbom@v0.0.11\n"), "{release}");
+    assert!(release.contains("actions/sbom@v0.0.12\n"), "{release}");
 }
 
 #[test]

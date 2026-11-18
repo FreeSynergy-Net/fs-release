@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: geruest-heben
-  version: 0.0.11
+  version: 0.0.12
   title: Lift code from the programs into scaffold crates - trait draft, trait review, crate scaffold, sort in WITHOUT build, unclear list, talk, bundled build
 do:
   - vorhanden-pruefen:
-      call: vorhanden-pruefen-ai:0.0.11@fs
+      call: vorhanden-pruefen-ai:0.0.12@fs
       with:
         suche: ${ .input }
       export:
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
   - vorhanden-pruefen-check:
-      call: befund-beleg:0.0.11@fs
+      call: befund-beleg:0.0.12@fs
       with:
         befund: ${ $context.befund }
       export:
@@ -56,7 +56,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - karte:
-      call: board-card:0.0.11@fs
+      call: board-card:0.0.12@fs
       with:
         workflow: geruest-heben
         crate: ${ .input.crate }
@@ -67,7 +67,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
   - lage:
-      call: geruest-lage:0.0.11@fs
+      call: geruest-lage:0.0.12@fs
       with:
         crate: ${ .input.crate }
         quellen: ${ .input.quellen }
@@ -81,7 +81,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script, read only - the heads of all sources are proven by `git ls-remote` (never from an old clone), and the inventory lines of the sources are fetched (`INVENTUR-programme.md`, key of the target crate). Result `lage.md` with `{ quellen, ziel }`."
   - lage-check:
-      call: geruest-lage-regeln:0.0.11@fs
+      call: geruest-lage-regeln:0.0.12@fs
       with:
         lage: ${ $context.lage }
       export:
@@ -112,7 +112,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `lage` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - trait-entwurf:
-      call: trait-draft-ai:0.0.11@fs
+      call: trait-draft-ai:0.0.12@fs
       with:
         crate: ${ .input.crate }
         trait_datei: ${ .input.trait_datei }
@@ -124,7 +124,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus reads the trait draft of the crate and completes it: traits, types, errors, standard per method. Output `traits.md`. Only an own rule or a standard may stand behind a method; no dependency upward (plan section b0)."
   - trait-entwurf-check:
-      call: trait-regeln:0.0.11@fs
+      call: trait-regeln:0.0.12@fs
       with:
         crate: ${ .input.crate }
       export:
@@ -155,7 +155,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `trait-entwurf` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - trait-review:
-      call: trait-review-opus:0.0.11@fs
+      call: trait-review-opus:0.0.12@fs
       with:
         crate: ${ .input.crate }
         trait_datei: ${ .input.trait_datei }
@@ -187,7 +187,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a NO goes back to `trait-entwurf` (at most two repeats), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
   - crate-geruest:
-      call: crate-geruest-ai:0.0.11@fs
+      call: crate-geruest-ai:0.0.12@fs
       with:
         crate: ${ .input.crate }
         schicht: ${ .input.schicht }
@@ -199,7 +199,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet creates the crate in the layer repo (plan section b0) on the branch `unreviewed/geruest-<crate>`: `Cargo.toml` (licence MIT OR Apache-2.0, Claude named), `lib.rs` with the traits of `traits.md`, README, CHANGELOG. Local commit, no push."
   - crate-geruest-check:
-      call: geruest-regeln:0.0.11@fs
+      call: geruest-regeln:0.0.12@fs
       with:
         crate: ${ .input.crate }
       export:
@@ -230,7 +230,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `crate-geruest` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - doku-hilfe:
-      call: doku-hilfe-ai:0.0.11@fs
+      call: doku-hilfe-ai:0.0.12@fs
       with:
         programmseite: ${ .input.programmseite // ("programs/apps/" + (.input.programm // .input.name) + "/index.md") }
         hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
@@ -241,7 +241,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`, default `programs/apps/<programm>/index.md`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
   - doku-hilfe-check:
-      call: doku-hilfe-regel:0.0.11@fs
+      call: doku-hilfe-regel:0.0.12@fs
       with:
         programmseite: ${ .input.programmseite // ("programs/apps/" + (.input.programm // .input.name) + "/index.md") }
       export:
@@ -272,7 +272,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `doku-hilfe` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never to green."
   - einsortieren:
-      call: einsortieren-ai:0.0.11@fs
+      call: einsortieren-ai:0.0.12@fs
       with:
         crate: ${ .input.crate }
         lage: ${ $context.lage }
@@ -283,7 +283,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet copies the modules of the sources named by the inventory key and sorts them behind the traits. Zunächst NICHT kompilieren (spart Slots): no compile, no test, no build call in this step; the build comes only in `bau-buendel`. Every copied file starts with `//! Herkunft: <repo>@<kopf>:<pfad>`; the source repos stay unchanged."
   - einsortieren-check:
-      call: herkunft-regel:0.0.11@fs
+      call: herkunft-regel:0.0.12@fs
       with:
         crate: ${ .input.crate }
         quellen: ${ .input.quellen }
@@ -315,7 +315,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `einsortieren` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - unklar-liste:
-      call: unklar-ai:0.0.11@fs
+      call: unklar-ai:0.0.12@fs
       with:
         crate: ${ .input.crate }
         lage: ${ $context.lage }
@@ -326,7 +326,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet writes `UNKLAR-<crate>.md`: every part that does not fit behind a trait, with reason and proposal (module / specialist module / delete / \"Schrott?\"). Nothing is dropped silently."
   - unklar-liste-check:
-      call: unklar-regel:0.0.11@fs
+      call: unklar-regel:0.0.12@fs
       with:
         crate: ${ .input.crate }
       export:
@@ -357,7 +357,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `unklar-liste` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - talk-vorbereiten:
-      call: talk-vorbereiten-ai:0.0.11@fs
+      call: talk-vorbereiten-ai:0.0.12@fs
       with:
         crate: ${ .input.crate }
         liste: UNKLAR-${ .input.crate }.md
@@ -370,7 +370,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Per unclear case: alternatives and \"to what does it fit?\"; output `talk-vorlage-<crate>.md`. The conversation reads this template."
   - talk-vorbereiten-check:
-      call: vorlage-regel:0.0.11@fs
+      call: vorlage-regel:0.0.12@fs
       with:
         vorlage: ${ $context.vorlage }
       export:
@@ -401,7 +401,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `talk-vorbereiten` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - talk:
-      call: talk:0.0.11@fs
+      call: talk:0.0.12@fs
       with:
         crate: ${ .input.crate }
         liste: UNKLAR-${ .input.crate }.md
@@ -449,7 +449,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the bundled build runs only when ALL crates of the layer are sorted in; otherwise the run reports without a build."
   - bau-buendel:
-      call: gates-buendel:0.0.11@fs
+      call: gates-buendel:0.0.12@fs
       with:
         crate: ${ .input.crate }
         schicht: ${ .input.schicht }
@@ -481,7 +481,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes to `bau-fix` and back to the build (at most two repeats), from the third red round to `eskalation`; only `red == false` goes to the report; a missing result goes to `eskalation`."
   - bau-fix:
-      call: bau-fix-ai:0.0.11@fs
+      call: bau-fix-ai:0.0.12@fs
       with:
         bau: ${ $context.bau }
       then: bau-buendel
@@ -492,7 +492,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet fixes ALL errors of the bundled build in one pass (local commit, no push), then the bundle runs again."
   - bericht:
-      call: report-write:0.0.11@fs
+      call: report-write:0.0.12@fs
       with:
         crate: ${ .input.crate }
         zahlen: inventur-classify.py

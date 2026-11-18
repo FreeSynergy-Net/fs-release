@@ -7,11 +7,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: upstream-update
-  version: 0.0.11
+  version: 0.0.12
   title: Take over a new upstream release into the mirror and the catalog, security fixes first
 do:
   - check-upstream:
-      call: check-upstream:0.0.11@fs
+      call: check-upstream:0.0.12@fs
       with:
         upstream: ${ .input.upstream }
         repo: ${ .input.repo }
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Is there a new upstream tag? Read the release text and the security advisories (gh api, read only), rate the severity (critical, high, medium, low, none), resolve tag to commit (gh api, the commit the tag points to, not the tag object), look at the signature state of tag and commit (unsigned stays unsigned, a change is reported). Output - tag, commit, date, severity, advisory ids, signature state. High or critical severity goes first.
   - compare:
-      call: compare-versions:0.0.11@fs
+      call: compare-versions:0.0.12@fs
       with:
         from: ${ .input.from }
         to: ${ $context.upstream.tag }
@@ -35,7 +35,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: gh api compare from...to (read only) - do the build toolchain (rust-toolchain, MSRV), the dependencies (Cargo.lock) or the build profile change? The answer goes into the report and decides whether mirror.yml needs a change.
   - pin:
-      call: pin-mirror:0.0.11@fs
+      call: pin-mirror:0.0.12@fs
       with:
         tag: ${ $context.upstream.tag }
         commit: ${ $context.upstream.commit }
@@ -47,7 +47,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sets mirror.toml (version, released, tag, commit, artefact names, container note), the capabilities.toml sources and version, scripts and tests that carry the old version, and the README; adds the security note (severity, advisory, fixed in). Only the pinned commit counts; never an unresolved tag.
   - capabilities-check:
-      call: capabilities-check:0.0.11@fs
+      call: capabilities-check:0.0.12@fs
       with:
         book: ${ .input.book }
         tag: ${ $context.upstream.tag }
@@ -60,7 +60,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Every capability line is checked against the book of the NEW version (page and sentence quoted in the report); a line the book does not show is marked 'not proven', never guessed; a changed support value (yes, no, unstable) is reported and decided in the review.
   - docs:
-      call: docs-sync:0.0.11@fs
+      call: docs-sync:0.0.12@fs
       with:
         languages: [de, en]
       metadata:
@@ -70,7 +70,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: docs/de and docs/en are generated and adapted together (mirror.md, capabilities.md, date of the check); both languages say the same.
   - local-gates:
-      call: repo-gates:0.0.11@fs
+      call: repo-gates:0.0.12@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -100,7 +100,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-mitziehen
-          version: 0.0.11
+          version: 0.0.12
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -132,7 +132,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review. Only green goes on."
   - head:
-      call: resolve-head:0.0.11@fs
+      call: resolve-head:0.0.12@fs
       with:
         branch: ${ .input.branch }
       export:
@@ -148,7 +148,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.11
+          version: 0.0.12
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -180,7 +180,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a NO goes back to pin with the findings of BERICHT.md as the order; from the third NO (`runde`) the flow ends in `upstream-eskalation`; a YES goes on to the tag.
   - tag:
-      call: tag:0.0.11@fs
+      call: tag:0.0.12@fs
       with:
         head: ${ $context.kopf.head }
       metadata:
@@ -190,7 +190,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Annotated tag v<version> of the mirror on the approved head hash (the approval file of exactly this hash must exist, as in release-flow), locally.
   - push:
-      call: push:0.0.11@fs
+      call: push:0.0.12@fs
       with:
         head: ${ $context.kopf.head }
       metadata:
@@ -200,7 +200,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Branch release-<version> and tag, never forced; the repo must be on the pre-approved list (as in release-flow); agents never push, the coordinator does.
   - start-build:
-      call: dispatch-workflow:0.0.11@fs
+      call: dispatch-workflow:0.0.12@fs
       with:
         workflow: mirror.yml
         inputs:
@@ -253,7 +253,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - no green CI event of this head within 2 hours means `upstream-eskalation` (the person decides); a green event goes on to the Pre-release.
   - publish:
-      call: publish-release:0.0.11@fs
+      call: publish-release:0.0.12@fs
       with:
         from: draft
         to: pre-release
@@ -268,7 +268,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: publish-doc
-          version: 0.0.11
+          version: 0.0.12
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -276,7 +276,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, only AFTER the review (opus-ja) and the approval of the code, together with its merge; never before, never forced; the agent never pushes."
   - catalog-entry:
-      call: catalog-entry:0.0.11@fs
+      call: catalog-entry:0.0.12@fs
       with:
         program: ${ .input.upstream }
       metadata:
@@ -290,7 +290,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: catalog-bump
-          version: 0.0.11
+          version: 0.0.12
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -298,7 +298,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow catalog-bump after the Pre-release is published, behind the approval, public reach only (as in release-flow).
   - catalog-check:
-      call: check:0.0.11@fs
+      call: check:0.0.12@fs
       then: end
       metadata:
         freesynergy.net:actor: machine

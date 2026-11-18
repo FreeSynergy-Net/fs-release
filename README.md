@@ -21,6 +21,12 @@ No release tag yet. The workflows are used by the repos through a caller file.
 
 Tests and spikes that drive a desktop (typing test, KWin scripts, fake input) run in a virtual session with its own runtime directory and private D-Bus, never in the real one. Source `scripts/virtual-session.sh`, start with `scripts/typing-test.sh` or the pattern in DESIGN.md, and call tools only through `vs_run`/`vs_dbus`/`vs_qdbus`/`vs_gdbus`: they refuse to run against the real session.
 
+## Make a new program (`fs-blueprint new`)
+
+1. Install the command: `cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.12 fs-blueprint`.
+2. Write the blueprint `scaffold.toml` (schema 2; `[program] version` is mandatory).
+3. Run `fs-blueprint new scaffold.toml --out fs-<name>`: it checks the blueprint first and writes the program only when it is clean (`fs-blueprint --help` lists all words; `fs-blueprint check` checks an existing program).
+
 ## What is not there yet
 
 - Signing has not been shown in a real release run yet. AppImage, exe, dmg, Flatpak and containers have not been exercised either.

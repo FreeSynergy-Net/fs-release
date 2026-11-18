@@ -14,7 +14,7 @@ pub struct Skeleton {
 const TABLE: &[Skeleton] = &[Skeleton {
     id: "0.1.0",
     rpc_tag: "v0.0.2",
-    release_tag: "v0.0.11",
+    release_tag: "v0.0.12",
 }];
 
 /// The skeleton of a version, or `None` when there is no such version.
