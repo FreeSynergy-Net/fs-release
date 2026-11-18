@@ -152,6 +152,7 @@ pub fn run(src: &str, talk: bool) -> Report {
     )
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn run_with(src: &str, view: FakeView, rules: &Rules) -> Report {
     check_source(src, &FakeCatalog, &view, rules)
 }

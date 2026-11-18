@@ -222,13 +222,15 @@ pub fn frontend(s: &mut Sink, bp: &Blueprint) {
     }
     match &f.covers {
         Covers::Word(w) if w != "all" => {
-            s.err(Coded::new("covers-invalid").with("found", w.as_str()))
+            s.err(Coded::new("covers-invalid").with("found", w.as_str()));
         }
-        Covers::List(l) if l.is_empty() => s.err(
-            Coded::new("field-empty")
-                .with("table", "frontend")
-                .with("field", "covers"),
-        ),
+        Covers::List(l) if l.is_empty() => {
+            s.err(
+                Coded::new("field-empty")
+                    .with("table", "frontend")
+                    .with("field", "covers"),
+            );
+        }
         _ => {}
     }
 }
