@@ -32,6 +32,11 @@ echo "gate clippy: rc=0"
 # FS_GATES_SKIP_TEST: set ONLY by scripts/gates-komplett for its named exception (flat clone without tags of fs-release); never in CI. Visible, never silent.
 skip=()
 if [ -n "${FS_GATES_SKIP_TEST:-}" ]; then
+  # only the ONE named exception (the entry of AUSNAHMEN in scripts/gates-komplett); any other value is refused, never skipped
+  if [ "$FS_GATES_SKIP_TEST" != released_changelog_sections_equal_their_tags ]; then
+    echo "gates FAILED: FS_GATES_SKIP_TEST=$FS_GATES_SKIP_TEST has no exception entry" >&2
+    exit 2
+  fi
   skip=(-- --skip "$FS_GATES_SKIP_TEST")
   echo "gates: test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST, named exception of gates-komplett; not green for this test)"
 fi
