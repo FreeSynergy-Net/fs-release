@@ -149,3 +149,61 @@ fn mutation_a_duplicate_state_is_red() {
         t.replacen("states: [offen, ", "states: [offen, offen, ", 1)
     });
 }
+
+#[test]
+fn mutation_a_rule_target_that_is_a_dict_or_a_list_is_red_without_a_crash() {
+    let rule = "offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]";
+    for bad in ["{a: b}", "[x]"] {
+        assert_red("bugfix", "transitions of 'offen': a list of states", |t| {
+            t.replacen(
+                rule,
+                &format!("offen: [stationen, {bad}, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]"),
+                1,
+            )
+        });
+    }
+}
+
+/// The transition table of STATES.md as pairs `source -> target` (`stationen` stays a word, `(reopen)` is a remark).
+fn table_pairs(doc: &str) -> Vec<String> {
+    let mut pairs = Vec::new();
+    for l in doc
+        .lines()
+        .skip_while(|l| !l.starts_with("| From / Von"))
+        .skip(2)
+        .take_while(|l| l.starts_with('|'))
+    {
+        let cells: Vec<&str> = l.trim_matches('|').split('|').map(str::trim).collect();
+        let name = |x: &str| x.replace('`', "").trim().to_string();
+        let sources: Vec<String> = cells[0].split(", ").map(name).collect();
+        let targets: Vec<String> = cells[1]
+            .split(", ")
+            .map(|x| name(x.trim_end_matches("(reopen)")))
+            .filter(|x| !x.starts_with("none"))
+            .collect();
+        for s in &sources {
+            for t in &targets {
+                pairs.push(format!("{s} -> {t}"));
+            }
+        }
+    }
+    pairs.sort();
+    pairs
+}
+
+#[test]
+fn the_transition_table_of_the_standard_equals_the_rules_pair_by_pair() {
+    let doc =
+        std::fs::read_to_string(support::workflows::root().join("workflows/STATES.md")).unwrap();
+    let mut want: Vec<String> = rules(&read("bugfix"))
+        .iter()
+        .flat_map(|(s, ts)| ts.iter().map(move |t| format!("{s} -> {t}")))
+        .collect();
+    want.sort();
+    assert_eq!(want.len(), 38);
+    assert_eq!(
+        table_pairs(&doc),
+        want,
+        "STATES.md transition table = the 38 rules"
+    );
+}
