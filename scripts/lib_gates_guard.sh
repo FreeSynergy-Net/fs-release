@@ -13,7 +13,7 @@ GATES_GUARD_TEXT="Arbeitsbaum während der Prüfung geändert"
 # gates_guard_is_gates <pid>: rc 0 unless /proc shows a process that is not a gates.sh
 gates_guard_is_gates() {
   [ -r "/proc/$1/cmdline" ] || return 0
-  tr '\0' ' ' < "/proc/$1/cmdline" | grep -q 'gates\.sh'
+  grep -qa 'gates\.sh' "/proc/$1/cmdline"
 }
 
 # gates_guard_snapdir <root>: prints (and creates) the snapshot folder <git dir>/gates-guard
@@ -25,10 +25,11 @@ gates_guard_snapdir() {
 
 # gates_guard_sweep <snapshot folder>: removes snapshots (snap.<pid>[.end]) of dead PIDs; only in that folder, only that name form
 gates_guard_sweep() {
-  local f pid
+  local f name pid
   for f in "$1"/snap.*; do
     [ -f "$f" ] || continue
-    pid="${f##*/snap.}"; pid="${pid%.end}"
+    name="${f##*/}"
+    pid="${name#snap.}"; pid="${pid%.end}"
     case "$pid" in ''|*[!0-9]*) continue ;; esac
     kill -0 "$pid" 2>/dev/null || rm -f -- "$f"
   done

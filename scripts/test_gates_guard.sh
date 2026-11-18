@@ -96,6 +96,17 @@ kill "$live" 2>/dev/null; wait "$live" 2>/dev/null
 rm -f "$R/.git/gates-guard/snap.$live"
 [ -z "$(ls -A "$R/.git/gates-guard")" ] && ok "no snapshot left after the run" || bad "snapshot left after the run"
 
+# 4d the sweep deletes only snap.<number>[.end]: foreign names stay
+sweepcase() { # <scripts dir> -> prints rc; leaves $R/.git/gates-guard populated by the caller
+  run "$1" "$R" "true"
+}
+mkforeign() { mkdir -p "$R/.git/gates-guard"; for n in snap.abc snap.12.x notiz snap. snap.1a 4999999 4999999.end; do echo f > "$R/.git/gates-guard/$n"; done; }
+mkforeign
+sweepcase "$tmp/real"; rc=$?
+left=0; for n in snap.abc snap.12.x notiz snap. snap.1a 4999999 4999999.end; do [ -e "$R/.git/gates-guard/$n" ] || left=1; done
+{ [ "$rc" -eq 0 ] && [ "$left" -eq 0 ]; } && ok "sweep keeps foreign files (snap.abc, snap.12.x, notiz, snap., snap.1a, bare number)" || bad "sweep removed a foreign file (rc $rc)"
+for n in snap.abc snap.12.x notiz snap. snap.1a 4999999 4999999.end; do rm -f "$R/.git/gates-guard/$n"; done
+
 # 5 mutants: each must turn a case red
 mutant() { # <label> <sed expr> <case: change|content|parallel|orphan> [file in scripts/, default lib_gates_guard.sh]
   local mf="${4:-lib_gates_guard.sh}"
@@ -134,13 +145,27 @@ mutant "gates.sh: end compare removed" '/^gates_guard_compare "\$guard_snap" "\$
 mutant "gates.sh: end compare || true" 's/^gates_guard_compare "\$guard_snap" "\$guard_snap.end"$/& || true/' change gates.sh
 mutant "gates.sh: snapshot in /tmp" 's|^guard_dir=.*|guard_dir="/tmp"|' orphan gates.sh
 mutant "sweep removed" 's/kill -0 "\$pid" 2>\/dev\/null || rm -f -- "\$f"/true/' orphan
-# mutant: the PID check does not look at gates.sh -> a lock with a live foreign PID blocks the run (the case of 4b turns red)
-mkscripts "$tmp/m"; sed -i 's/grep -q .gates\\.sh./true/' "$tmp/m/s/scripts/lib_gates_guard.sh"
+# mutant: the PID check does not look at gates.sh (return 0 at the start of gates_guard_is_gates) -> a lock with a live foreign PID
+# blocks the run (the case of 4b turns red)
+mkscripts "$tmp/m"; sed -i 's/^gates_guard_is_gates() {$/&\n  return 0/' "$tmp/m/s/scripts/lib_gates_guard.sh"
 if cmp -s "$tmp/m/s/scripts/lib_gates_guard.sh" "$here/lib_gates_guard.sh"; then bad "mutant pid check: sed changed nothing"; else
   sleep 5 & other=$!; echo "$other" > "$R/.gates.lock"
   run "$tmp/m" "$R" "true"; rc=$?; kill "$other" 2>/dev/null; wait "$other" 2>/dev/null; rm -f "$R/.gates.lock"
   [ "$rc" -ne 0 ] && ok "mutant pid check ignores gates.sh: reused-PID case goes red (rc $rc)" || bad "mutant pid check not caught"
 fi
+
+# sweep mutants: number check removed; glob `*` instead of `snap.*`: the foreign files are deleted (the case of 4d turns red)
+foreign_mutant() { # <label> <sed expr>
+  mkscripts "$tmp/m"; sed -i "$2" "$tmp/m/s/scripts/lib_gates_guard.sh"
+  if cmp -s "$tmp/m/s/scripts/lib_gates_guard.sh" "$here/lib_gates_guard.sh"; then bad "mutant $1: sed changed nothing"; return; fi
+  mkforeign; sweepcase "$tmp/m"
+  gone=0; for n in snap.abc snap.12.x notiz snap. snap.1a 4999999 4999999.end; do [ -e "$R/.git/gates-guard/$n" ] || gone=1; done
+  [ "$gone" -eq 1 ] && ok "mutant $1: a foreign file is deleted (case 4d turns red)" || bad "mutant $1 not caught"
+  for n in snap.abc snap.12.x notiz snap. snap.1a 4999999 4999999.end; do rm -f "$R/.git/gates-guard/$n"; done
+}
+foreign_mutant "sweep without number check" 's/case "\$pid" in .*esac//'
+foreign_mutant "sweep glob * instead of snap.*" 's|for f in "\$1"/snap\.\*; do|for f in "$1"/*; do|'
+foreign_mutant "sweep strips only .end, no name form" 's/pid="\${name#snap\.}"; pid="\${pid%\.end}"/pid="4999998"/'
 
 # 6 gates.sh really uses the guard (the wiring)
 grep -q 'gates_guard_lock' "$here/gates.sh" && grep -q 'gates_guard_compare' "$here/gates.sh" && ok "gates.sh calls lock and compare" || bad "gates.sh has no guard"

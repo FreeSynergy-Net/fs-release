@@ -56,6 +56,8 @@ jobs:
         run: bash scripts/test_check_lock_sources.sh
       - name: set_components_tag self test (fs-types stays out of the fs-interfaces lift, --move, mutants)
         run: bash scripts/test_set_components_tag.sh
+      - name: gates guard self test (lock, snapshot compare, sweep, mutants)
+        run: bash scripts/test_gates_guard.sh
       - name: packaging tests (plan, package groups, fs-capnpc compatibility)
         run: scripts/test-packaging.sh
       - name: typing test, caret and field detection on synthetic pictures
