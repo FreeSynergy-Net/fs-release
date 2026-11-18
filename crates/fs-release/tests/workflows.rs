@@ -385,8 +385,12 @@ fn mutation_transition_rule_missing_or_incomplete_is_red() {
             )
         },
     );
-    assert_red("bugfix", "document.metadata", |t| {
-        drop_line(&t, "    freesynergy.net:transitions:")
+    assert_red("bugfix", "freesynergy.net:transitions is missing", |t| {
+        t.replacen(
+            "freesynergy.net:transitions:",
+            "freesynergy.net:uebergaenge:",
+            1,
+        )
     });
 }
 
