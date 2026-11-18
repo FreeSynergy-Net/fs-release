@@ -110,3 +110,42 @@ fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_
     let (code, out) = check(&dir);
     assert_eq!(code, 0, "{out}");
 }
+
+#[test]
+fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_record() {
+    let dir = made("together");
+    let main = dir
+        .join("crates")
+        .join("fs-demo-bin")
+        .join("src")
+        .join("main.rs");
+    let text = std::fs::read_to_string(&main).unwrap();
+    std::fs::write(&main, format!("{text}// hand\n")).unwrap();
+    std::fs::write(
+        dir.join("crates")
+            .join("fs-demo-core")
+            .join("src")
+            .join("extra.rs"),
+        "pub fn x() {}\n",
+    )
+    .unwrap();
+    let bp = dir.join("scaffold.toml");
+    let exception = "\n[[exception]]\nwhat = \"w\"\nwhy = \"y\"\nchecked = [\"x\"]\nalternatives = []\ntalk = \"conventions/talks/none.md\"\npaths = [\"crates/fs-demo-core/src/extra.rs\"]\n";
+    let with = format!("{}{exception}", std::fs::read_to_string(&bp).unwrap());
+    std::fs::write(&bp, with).unwrap();
+    let (code, out) = check(&dir);
+    assert_eq!(code, 1, "{out}");
+    // the drift of the generated file shows although the talk record is missing; the scaffold.toml of the repo is no longer the one the files were made from
+    assert!(
+        out.contains("generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
+        "{out}"
+    );
+    assert!(
+        out.contains("talk-not-found{path=conventions/talks/none.md}"),
+        "{out}"
+    );
+    assert!(
+        !out.contains("file-unowned"),
+        "the hand-written file is covered by the exception: {out}"
+    );
+}

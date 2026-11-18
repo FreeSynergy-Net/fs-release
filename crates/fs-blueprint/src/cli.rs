@@ -5,10 +5,11 @@ use crate::emit::check as drift;
 use crate::emit::generate::planned_paths;
 use crate::error::Report;
 use crate::kit::KitCatalog;
+use crate::kit::RepoView;
 use crate::messages::render;
 use crate::model::Blueprint;
 use crate::repo_fs::FsRepo;
-use crate::rules::Rules;
+use crate::rules::{Mode, Rule, Rules};
 use crate::verified::verify;
 use std::io::Write;
 use std::path::PathBuf;
@@ -138,8 +139,13 @@ fn run_check(o: &Options, out: &mut dyn Write) -> Result<i32, String> {
         o.talks.clone(),
     );
     let mut report = crate::check::check(&bp, &catalog, &view, &o.rules);
-    if o.drift && report.is_ok() {
-        if let Ok(v) = verify(&bp, &catalog, &view, &o.rules) {
+    if o.drift {
+        // The drift needs a blueprint that is sound in its structure, not one that has no finding at all: a repo with hand-written files or a missing talk
+        // record still shows its drift. So the gate here is the structure only (every rule off, the hand-written files not counted).
+        let rules = Rule::ALL
+            .into_iter()
+            .fold(o.rules.clone(), |r, rule| r.with(rule, Mode::Off));
+        if let Ok(v) = verify(&bp, &catalog, &WithoutUnowned(&view), &rules) {
             let d = drift::check(&v, &catalog, &view);
             report.errors.extend(d.errors);
             report.warnings.extend(d.warnings);
@@ -189,5 +195,29 @@ pub fn run(words: &[String], out: &mut dyn Write, err: &mut dyn Write) -> i32 {
             ));
             2
         }
+    }
+}
+
+/// The repo as it is, but with no hand-written file counted: the view for the structure gate of the drift.
+struct WithoutUnowned<'a>(&'a FsRepo);
+
+impl RepoView for WithoutUnowned<'_> {
+    fn exists(&self, path: &str) -> bool {
+        self.0.exists(path)
+    }
+    fn covers_generated(&self, path: &str) -> bool {
+        self.0.covers_generated(path)
+    }
+    fn unowned_files(&self) -> Vec<String> {
+        Vec::new()
+    }
+    fn main_files(&self) -> Vec<String> {
+        self.0.main_files()
+    }
+    fn read(&self, path: &str) -> Option<String> {
+        self.0.read(path)
+    }
+    fn talk_exists(&self, path: &str) -> bool {
+        self.0.talk_exists(path)
     }
 }
