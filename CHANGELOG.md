@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (draft, no version, no tag)
+
+- Workflow states (workflows = swimlanes, decision of the user): every `workflows/*.yaml` (58 files) now carries in `document.metadata` the eight mandatory states `offen`, `wartet-auf-entscheidung`, `auf-anfrage`, `in-prüfung`, `pausiert`, `abgebrochen`, `erledigt`, `archiviert` (`freesynergy.net:states`) and the transition rules (`freesynergy.net:transitions`, the word `stationen` = the own steps of the flow; `pausiert` and `abgebrochen` from every live state, `archiviert` only from `erledigt` / `abgebrochen` and without way out); no step may carry a state name. New standard `workflows/ZUESTAENDE.md`; `scripts/check_workflows.py` is red for a missing or renamed state, a missing transition rule, a forbidden `archiviert` transition or a step named like a state; tests in `crates/fs-release/tests/workflows.rs` (mutants: state deleted in every file, block removed in every file, state renamed, rule missing/incomplete, archiviert rules, step named like a state). No build logic changed (building belongs to the construction kit, not fs-tasks). DE: Workflow-Zustände (Workflows = Swimlanes): jede `workflows/*.yaml` trägt die acht Pflichtzustände und die Übergangsregeln (`pausiert`/`abgebrochen` von jedem lebenden Zustand, `archiviert` nur von `erledigt`/`abgebrochen`, ohne Ausgang); Standard `workflows/ZUESTAENDE.md`; Prüfskript und Test rot ohne Zustand, bei umbenanntem Zustand oder fehlender Übergangsregel; keine Bau-Logik geändert.
+
 ## 0.0.11
 
 Released 2026-11-18 (UTC; the date of the version commit, the tag follows after the pin rounds). / Veröffentlicht am 2026-11-18 (UTC; Datum des Version-Commits, der Tag folgt nach den Pin-Runden).

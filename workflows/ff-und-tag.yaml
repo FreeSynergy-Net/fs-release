@@ -11,6 +11,18 @@ document:
   name: ff-und-tag
   version: 0.0.11
   title: Fast-forward a reviewed head to main and tag it - checklist, proofs, release watch
+  metadata:
+    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
+    freesynergy.net:transitions:
+      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
+      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
+      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
+      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
+      abgebrochen: [offen, archiviert]
+      erledigt: [offen, archiviert]
+      archiviert: []
 do:
   - zweig-ci:
       call: branch-ci:0.0.11@fs

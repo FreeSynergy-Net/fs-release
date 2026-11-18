@@ -11,6 +11,18 @@ document:
   name: lift-v1plus
   version: 0.0.11
   title: Lift a program to the V1+ libraries - API switch (rpc -> fs-rpc) first, then lift
+  metadata:
+    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
+    freesynergy.net:transitions:
+      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
+      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
+      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
+      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
+      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
+      abgebrochen: [offen, archiviert]
+      erledigt: [offen, archiviert]
+      archiviert: []
 do:
   - api-umstellung:
       call: api-umstellung:0.0.11@fs

@@ -11,6 +11,8 @@ werden nur geprüft (`scripts/check_workflows.py`, Test `crates/fs-release/tests
 `flow` müssen mit dem Code übereinstimmen). In einem zweiten Schritt liest `fs-release flow` diese Dateien und führt den
 Ablauf daraus aus. Keine Geheimnisse in diese Dateien.
 
+**Zustände (Swimlanes).** Jede Datei trägt in `document.metadata` die acht Pflichtzustände und die Übergangsregeln (`ZUESTAENDE.md`, Prüfung `scripts/check_workflows.py`); die Spalten in fs-tasks sind diese Zustände plus die Schritte (`do`) des Workflows.
+
 **Regel: alle Arbeitsschritte laufen über einen Workflow.** Gibt es für einen Schritt keinen, ist der erste Schritt, den
 Workflow zu schreiben oder zu erweitern (`workflow-pflege`). Ein Agentenauftrag verweist auf den Flow so:
 `Workflow <name>, Schritt <schritt>, Parameter <schlüssel=wert, ...>`, z. B. `Workflow bugfix, Schritt reproduce, Parameter
