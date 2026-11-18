@@ -1,10 +1,9 @@
 //! Decision 45: the generated `main` is purely generated and exchangeable; it is byte-equal in every blueprint except for the references into the blueprint.
 mod support;
-use fs_blueprint::emit::generate;
 use fs_blueprint::emit::header::blueprint_hash;
 use fs_blueprint::Blueprint;
 use support::synth::{blueprint, COUNT};
-use support::{FakeCatalog, SHIFT, TASKS};
+use support::{generate, FakeCatalog, SHIFT, TASKS};
 
 fn blueprints() -> Vec<Blueprint> {
     let mut v: Vec<Blueprint> = (0..COUNT).map(blueprint).collect();

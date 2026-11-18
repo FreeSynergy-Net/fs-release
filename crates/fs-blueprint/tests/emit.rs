@@ -1,10 +1,10 @@
 //! The generator core: determinism, order, paths, head lines, classes, slots (S2 of the plan).
 mod support;
 use fs_blueprint::emit::header::{blueprint_hash, class_of, form_of, stamp, Form};
-use fs_blueprint::emit::{generate, generate_with, join, Artifact, Class, Emitter};
+use fs_blueprint::emit::{join, Artifact, Class, Emitter};
 use fs_blueprint::{Blueprint, Coded, KitCatalog};
 use support::synth::{blueprint, COUNT};
-use support::{edit, FakeCatalog, TASKS};
+use support::{edit, generate, generate_with, FakeCatalog, TASKS};
 
 fn all() -> Vec<Blueprint> {
     let mut v: Vec<Blueprint> = (0..COUNT).map(blueprint).collect();

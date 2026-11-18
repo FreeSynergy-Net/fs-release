@@ -6,7 +6,11 @@ use std::path::{Path, PathBuf};
 /// A directory on disk; repo paths with `/` are put below it.
 pub struct DirStore {
     root: PathBuf,
+    rename: Rename,
 }
+
+/// How a temporary file is moved into place. The standard is `std::fs::rename`; a test puts in one that fails (the seam for a failure in the second step).
+pub type Rename = fn(&Path, &Path) -> std::io::Result<()>;
 
 /// `<dir>/.<name>.fs-blueprint-tmp`: next to its place, so the rename stays on one volume.
 fn temp_of(file: &Path) -> PathBuf {
@@ -27,7 +31,16 @@ fn remove_all<'a>(files: impl Iterator<Item = &'a PathBuf>) {
 impl DirStore {
     #[must_use]
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self::with_rename(root, |from, to| std::fs::rename(from, to))
+    }
+
+    /// A store whose second step uses `rename` (a test injects a failure here).
+    #[must_use]
+    pub fn with_rename(root: impl Into<PathBuf>, rename: Rename) -> Self {
+        Self {
+            root: root.into(),
+            rename,
+        }
     }
 
     fn native(&self, path: &str) -> PathBuf {
@@ -93,7 +106,7 @@ impl Store for DirStore {
             }
         }
         for (i, (temp, file, path)) in staged.iter().enumerate() {
-            if std::fs::rename(temp, file).is_err() {
+            if (self.rename)(temp, file).is_err() {
                 staged[i..]
                     .iter()
                     .for_each(|(t, _, _)| drop(std::fs::remove_file(t)));

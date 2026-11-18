@@ -71,6 +71,13 @@ fn program(s: &mut Sink, p: &Program) {
             Coded::new("name-rule").with("name", p.name.as_str()),
         );
     }
+    if !is_semver(&p.version) {
+        s.err(
+            Coded::new("semver-invalid")
+                .with("key", "program.version")
+                .with("found", p.version.as_str()),
+        );
+    }
     if !is_semver(&p.skeleton) {
         s.err(
             Coded::new("semver-invalid")

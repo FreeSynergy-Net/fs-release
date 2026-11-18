@@ -179,3 +179,55 @@ fn a_frontend_never_names_a_crate() {
     ))
     .is_err());
 }
+
+#[test]
+fn the_version_of_the_program_is_mandatory_and_a_plain_three_part_version() {
+    let missing = edit(TASKS, "version = \"0.0.1\"\nskeleton", "skeleton");
+    assert!(
+        run(&missing, true).has("field-missing")
+            || fs_blueprint::Blueprint::from_toml(&missing)
+                .unwrap_err()
+                .to_string()
+                == "field-missing{table=program, field=version}"
+    );
+    assert_eq!(
+        fs_blueprint::Blueprint::from_toml(&missing)
+            .unwrap_err()
+            .to_string(),
+        "field-missing{table=program, field=version}"
+    );
+    for bad in [
+        "1.2",
+        "1",
+        "1.2.3.4",
+        "01.2.3",
+        "v1.2.3",
+        "1.2.x",
+        "1.2.3-rc1",
+        "",
+    ] {
+        let src = edit(
+            TASKS,
+            "version = \"0.0.1\"\nskeleton",
+            &format!("version = \"{bad}\"\nskeleton"),
+        );
+        let r = run(&src, true);
+        assert!(
+            r.errors
+                .iter()
+                .any(|e| e.to_string()
+                    == format!("semver-invalid{{key=program.version, found={bad}}}")),
+            "{bad}: {:?}",
+            r.errors
+        );
+    }
+    assert!(!run(
+        &edit(
+            TASKS,
+            "version = \"0.0.1\"\nskeleton",
+            "version = \"12.0.345\"\nskeleton"
+        ),
+        true
+    )
+    .has("semver-invalid"));
+}

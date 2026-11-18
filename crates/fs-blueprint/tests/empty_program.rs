@@ -1,11 +1,10 @@
 //! The empty program the generator makes from ONE blueprint (S3): which files, what they hold, what stays out.
 mod support;
-use fs_blueprint::emit::generate;
 use fs_blueprint::{Blueprint, Class};
 use support::synth::{blueprint, COUNT};
-use support::{edit, FakeCatalog};
+use support::{edit, generate, FakeCatalog};
 
-const PROBE: &str = include_str!("data/probe.toml");
+const PROBE: &str = include_str!("data/probe/scaffold.toml");
 
 fn probe() -> Vec<fs_blueprint::Artifact> {
     generate(&Blueprint::from_toml(PROBE).unwrap(), &FakeCatalog).unwrap()
@@ -165,5 +164,16 @@ fn the_synthetic_blueprints_all_generate_the_same_number_of_files_under_their_ow
         assert!(out
             .iter()
             .any(|a| a.path == format!("crates/fs-{name}-bin/src/main.rs")));
+    }
+}
+
+#[test]
+fn the_version_of_the_blueprint_is_the_version_of_the_workspace() {
+    for (i, want) in [(0, "0.0.1"), (1, "0.1.1"), (2, "0.2.1"), (3, "0.3.1")] {
+        let out = generate(&blueprint(i), &FakeCatalog).unwrap();
+        assert!(
+            get(&out, "Cargo.toml").contains(&format!("version = \"{want}\"")),
+            "{i}"
+        );
     }
 }

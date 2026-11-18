@@ -36,6 +36,8 @@ pub struct Blueprint {
 #[serde(deny_unknown_fields)]
 pub struct Program {
     pub name: String,
+    /// The version of the program, `major.minor.patch` (version = tag rule: the release workflow raises it).
+    pub version: String,
     pub skeleton: String,
     pub capability: String,
     pub summary: Text2,

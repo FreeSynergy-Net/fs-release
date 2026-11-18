@@ -22,7 +22,7 @@ pub enum Slot {
     ContractVersion,
     /// `0xc04d258971543476`
     ContractId,
-    /// `0.0.1`: the version a fresh program starts with
+    /// `0.0.1`: the version of the program (`[program] version`)
     Version,
     /// `v0.0.2`: the tag of fs-rpc of the skeleton version
     PinRpc,
@@ -128,7 +128,7 @@ impl Values {
             Slot::Capability => bp.program.capability.clone(),
             Slot::ContractVersion => bp.contract.version.clone(),
             Slot::ContractId => bp.contract.id.clone(),
-            Slot::Version => skeleton.start_version.to_string(),
+            Slot::Version => bp.program.version.clone(),
             Slot::PinRpc => skeleton.rpc_tag.to_string(),
             Slot::ReleaseTag => skeleton.release_tag.to_string(),
             Slot::SummaryEn => one_line(bp.program.summary.en.as_deref()),

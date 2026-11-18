@@ -4,12 +4,12 @@ use super::artifact::Class;
 use super::generate::generate;
 use crate::error::{Coded, Report};
 use crate::kit::{KitCatalog, RepoView};
-use crate::model::Blueprint;
+use crate::verified::Verified;
 
 /// Compares the repo with what `generate` gives, in memory. A seed is only looked for, never compared (it belongs to the program); an exception is not looked at.
 /// Drift is an error with the path: `generated-missing`, `generated-changed`, `seed-missing`. The structure of the blueprint itself is `crate::check`.
 #[must_use]
-pub fn check(bp: &Blueprint, catalog: &dyn KitCatalog, view: &dyn RepoView) -> Report {
+pub fn check(bp: &Verified, catalog: &dyn KitCatalog, view: &dyn RepoView) -> Report {
     let artifacts = match generate(bp, catalog) {
         Ok(a) => a,
         Err(code) => {

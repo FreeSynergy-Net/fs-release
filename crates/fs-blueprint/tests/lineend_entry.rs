@@ -1,12 +1,10 @@
 //! Line endings in the output and decision 45 in `generate`: no carriage return, an exception never takes the entry point or another generated file.
 mod support;
-use fs_blueprint::emit::generate;
-use fs_blueprint::emit::generate::generate_with;
 use fs_blueprint::emit::slot::{fill, Values};
 use fs_blueprint::emit::Emitter;
 use fs_blueprint::{Artifact, Blueprint, Class, Coded, KitCatalog};
 use support::synth::{blueprint, text};
-use support::{edit, FakeCatalog, TASKS};
+use support::{edit, generate, generate_with, FakeCatalog, TASKS};
 
 #[test]
 fn a_template_with_crlf_gives_the_same_bytes_as_one_with_lf_and_a_lone_cr_is_refused() {

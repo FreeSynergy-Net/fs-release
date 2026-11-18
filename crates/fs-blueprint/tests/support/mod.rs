@@ -1,8 +1,11 @@
 //! Test doubles for the catalog and the repo view (only here, never in the library), and helpers to edit a blueprint text.
 #![allow(dead_code)]
 
+use fs_blueprint::emit::Emitter;
+use fs_blueprint::Blueprint;
 use fs_blueprint::{
-    check_source, BundleInfo, Kind, KitCatalog, ModuleInfo, RepoView, Report, Rules,
+    check_source, Artifact, BundleInfo, Coded, Kind, KitCatalog, ModuleInfo, RepoView, Report,
+    Rules, Verified,
 };
 use std::collections::BTreeSet;
 
@@ -192,4 +195,100 @@ impl FakeView {
             ..FakeView::default()
         }
     }
+}
+
+/// A catalog that knows nothing (with the rules off nothing is asked of it) and a view where every file is there: the check that lets a test blueprint pass to the generator.
+pub struct Lenient;
+
+impl KitCatalog for Lenient {
+    fn skeleton_known(&self, _: &str) -> bool {
+        true
+    }
+    fn skeleton_pending(&self, _: &str) -> Vec<String> {
+        Vec::new()
+    }
+    fn capability_known(&self, _: &str) -> bool {
+        true
+    }
+    fn module(&self, _: &str) -> Option<ModuleInfo> {
+        None
+    }
+    fn bundle(&self, _: &str) -> Option<BundleInfo> {
+        None
+    }
+    fn kit_known(&self, _: &str) -> bool {
+        false
+    }
+    fn basic_known(&self, _: &str) -> bool {
+        false
+    }
+}
+
+pub struct AllView;
+
+impl RepoView for AllView {
+    fn exists(&self, _: &str) -> bool {
+        true
+    }
+    fn covers_generated(&self, _: &str) -> bool {
+        false
+    }
+    fn unowned_files(&self) -> Vec<String> {
+        Vec::new()
+    }
+    fn main_files(&self) -> Vec<String> {
+        Vec::new()
+    }
+    fn read(&self, _: &str) -> Option<String> {
+        None
+    }
+    fn talk_exists(&self, _: &str) -> bool {
+        true
+    }
+}
+
+/// The rule set `projekt` with every rule off: only the structure is checked.
+pub fn rules_off() -> Rules {
+    fs_blueprint::Rule::ALL
+        .into_iter()
+        .fold(Rules::projekt(), |r, rule| {
+            r.with(rule, fs_blueprint::Mode::Off)
+        })
+}
+
+/// Verifies a test blueprint (structure only) and hands it to `f`; a structure error is the first code.
+pub fn with_verified<T>(
+    bp: &Blueprint,
+    f: impl FnOnce(&Verified) -> Result<T, Coded>,
+) -> Result<T, Coded> {
+    match fs_blueprint::verify(bp, &Lenient, &AllView, &rules_off()) {
+        Ok(v) => f(&v),
+        Err(report) => Err(report.errors[0].clone()),
+    }
+}
+
+/// `generate` as the tests call it: after the check of the structure (the generator takes nothing else).
+pub fn generate(bp: &Blueprint, catalog: &dyn KitCatalog) -> Result<Vec<Artifact>, Coded> {
+    with_verified(bp, |v| fs_blueprint::emit::generate(v, catalog))
+}
+
+pub fn generate_with(
+    bp: &Blueprint,
+    catalog: &dyn KitCatalog,
+    emitters: &[&dyn Emitter],
+) -> Result<Vec<Artifact>, Coded> {
+    with_verified(bp, |v| {
+        fs_blueprint::emit::generate::generate_with(v, catalog, emitters)
+    })
+}
+
+/// The drift check of a test blueprint.
+pub fn drift(bp: &Blueprint, catalog: &dyn KitCatalog, view: &dyn RepoView) -> Report {
+    with_verified(bp, |v| {
+        Ok(fs_blueprint::emit::check::check(v, catalog, view))
+    })
+    .unwrap_or_else(|c| Report {
+        errors: vec![c],
+        warnings: Vec::new(),
+    })
 }

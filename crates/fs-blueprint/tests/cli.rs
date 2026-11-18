@@ -192,3 +192,43 @@ fn the_real_binary_gives_the_same_answers_and_exit_codes() {
     let wrong = Command::new(exe).arg("nonsense").output().unwrap();
     assert_eq!(wrong.status.code(), Some(2));
 }
+
+#[test]
+fn an_exception_over_a_file_the_generator_makes_is_found_on_disk_and_so_is_an_entry_point() {
+    let root =
+        Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("cli-gen-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("forms")).unwrap();
+    std::fs::create_dir_all(root.join("crates").join("fs-demo-bin").join("src")).unwrap();
+    std::fs::write(root.join("forms").join("demo.toml"), "#\n").unwrap();
+    std::fs::write(root.join(".gitattributes"), "* text=auto\n").unwrap();
+    std::fs::write(
+        root.join("crates")
+            .join("fs-demo-bin")
+            .join("src")
+            .join("main.rs"),
+        "fn main() {}\n",
+    )
+    .unwrap();
+    let ok = std::fs::read_to_string(fixture("ok").join("scaffold.toml")).unwrap();
+    let exception = "\n[[exception]]\nwhat = \"w\"\nwhy = \"y\"\nchecked = [\"x\"]\nalternatives = []\ntalk = \"t.md\"\n";
+    for (paths, want) in [
+        (
+            ".gitattributes",
+            "error: path-generated{path=.gitattributes}",
+        ),
+        (
+            "crates/fs-demo-bin/src/main.rs",
+            "error: main-reserved{path=crates/fs-demo-bin/src/main.rs}",
+        ),
+    ] {
+        std::fs::write(
+            root.join("scaffold.toml"),
+            format!("{ok}{exception}paths = [\"{paths}\"]\n"),
+        )
+        .unwrap();
+        let (code, out, _) = cli(&["check", "--repo", &root.to_string_lossy()]);
+        assert_eq!(code, 1);
+        assert!(out.contains(want), "{want}\n{out}");
+    }
+}

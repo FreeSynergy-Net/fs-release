@@ -1,10 +1,9 @@
 //! The head line of a generated file names the hash of its own body: a hand change is found whatever the blueprint says (K3 of the S2 review).
 mod support;
-use fs_blueprint::emit::generate;
 use fs_blueprint::emit::header::{sha256_hex, untouched};
 use fs_blueprint::emit::write::{write, Store};
 use support::synth::{blueprint, MemStore};
-use support::FakeCatalog;
+use support::{generate, FakeCatalog};
 
 const MAIN: &str = "crates/fs-beta-shelf-planner-bin/src/main.rs";
 

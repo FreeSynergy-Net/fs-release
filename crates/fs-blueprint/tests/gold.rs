@@ -2,13 +2,12 @@
 //! blueprint hash. A change of the head line (process id, time), of a template (line endings, text) or of the canonical form of the blueprint (a new
 //! version of the toml crate) turns this test red on purpose. After a change on purpose, the gold files are written again from the new output (and read by a person).
 mod support;
-use fs_blueprint::emit::generate;
 use fs_blueprint::emit::header::blueprint_hash;
 use fs_blueprint::Blueprint;
 use std::path::Path;
-use support::{FakeCatalog, TASKS};
+use support::{generate, FakeCatalog, TASKS};
 
-const HASH: &str = "835df0cc43b36dfe0dab6d9c5d586b6c36e6f883ff1b16f9f211cec4490c8f32";
+const HASH: &str = "167a6276086b90300ab857249fa1a2381991e2a6ab23b8115f9e4dcea298f0f4";
 
 fn gold_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/gold/tasks")

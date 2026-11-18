@@ -1,10 +1,9 @@
 //! The slots of the templates: a closed list, values from the blueprint, unknown and open slots refused.
 mod support;
-use fs_blueprint::emit::generate;
 use fs_blueprint::emit::slot::{fill, Slot, Values};
 use fs_blueprint::Blueprint;
 use support::synth::blueprint;
-use support::{edit, FakeCatalog};
+use support::{edit, generate, FakeCatalog};
 
 #[test]
 fn slots_are_a_closed_list_and_the_values_come_from_the_blueprint() {

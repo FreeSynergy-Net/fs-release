@@ -170,18 +170,22 @@ pub fn variables(message: &str) -> BTreeSet<String> {
     out
 }
 
-/// The names Windows reserves for devices: they cannot be a file or folder name, with or without an extension (`NUL`, `nul.txt`, `Com1`).
+/// The names Windows reserves for devices: they cannot be a file or folder name, with or without an extension (`NUL`, `nul.txt`, `Com1`, `CONIN$`, `COM¹`).
 fn is_reserved_name(segment: &str) -> bool {
-    let stem = segment
-        .split('.')
-        .next()
-        .unwrap_or(segment)
-        .to_ascii_uppercase();
-    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || ["COM", "LPT"].iter().any(|p| {
-            stem.strip_prefix(p)
-                .is_some_and(|n| n.len() == 1 && n.as_bytes()[0].is_ascii_digit() && n != "0")
+    let stem = segment.split('.').next().unwrap_or(segment).to_uppercase();
+    matches!(
+        stem.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) || ["COM", "LPT"].iter().any(|p| {
+        // COM1..COM9 and LPT1..LPT9, also with the superscript digits 1 2 3 that Windows reserves too
+        stem.strip_prefix(p).is_some_and(|n| {
+            let mut c = n.chars();
+            matches!(
+                (c.next(), c.next()),
+                (Some('1'..='9' | '¹' | '²' | '³'), None)
+            )
         })
+    })
 }
 
 /// One part of a path: not `.`/`..`, no character that Windows (or any shell) refuses, no end in a dot or a space (Windows drops it, so two names

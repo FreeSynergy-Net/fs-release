@@ -1,11 +1,9 @@
 //! `check` (is the repo the product of the blueprint?) and `write` (only generated files, never a seed over a seed, never an exception).
 mod support;
-use fs_blueprint::emit::check::check;
-use fs_blueprint::emit::generate;
 use fs_blueprint::emit::write::{write, DirStore, Found, Store};
 use fs_blueprint::Report;
 use support::synth::{blueprint, MemStore};
-use support::{FakeCatalog, FakeView};
+use support::{drift as check, generate, FakeCatalog, FakeView};
 
 const MAIN: &str = "crates/fs-beta-shelf-planner-bin/src/main.rs";
 const SEED: &str = "crates/fs-beta-shelf-planner-core/src/lib.rs";

@@ -7,6 +7,7 @@ use crate::error::Coded;
 use crate::form::is_repo_path;
 use crate::kit::KitCatalog;
 use crate::model::Blueprint;
+use crate::verified::Verified;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// True for a `main.rs` anywhere in the repo.
@@ -34,17 +35,39 @@ pub fn emitters() -> Vec<Box<dyn Emitter>> {
 ///
 /// # Errors
 /// The first code of a failing emitter, `main-reserved{path}` or `path-generated{path}` (an exception covers a generated file), `line-ending{path}`, `path-invalid`, `artifact-duplicate{path}`, `header-unsupported{path}` or `exception-undeclared{path}`.
-pub fn generate(bp: &Blueprint, catalog: &dyn KitCatalog) -> Result<Vec<Artifact>, Coded> {
+pub fn generate(bp: &Verified, catalog: &dyn KitCatalog) -> Result<Vec<Artifact>, Coded> {
     let list = emitters();
     let refs: Vec<&dyn Emitter> = list.iter().map(AsRef::as_ref).collect();
     generate_with(bp, catalog, &refs)
 }
 
-/// [`generate`] with the emitters given (tests put their own in).
+/// The paths the generator makes for a blueprint, whether or not it is checked yet (the check needs them to tell an exception over a generated file).
+/// Empty when an emitter refuses the blueprint; an exception of the blueprint does not change it (that is what the check looks at).
+#[must_use]
+pub fn planned_paths(bp: &Blueprint, catalog: &dyn KitCatalog) -> Vec<String> {
+    let mut paths: Vec<String> = emitters()
+        .iter()
+        .filter_map(|e| e.emit(bp, catalog).ok())
+        .flatten()
+        .map(|a| a.path)
+        .collect();
+    paths.sort();
+    paths
+}
+
+/// [`generate`] with the emitters given (tests put their own in). Only a blueprint that passed the check ([`Verified`]) is taken.
 ///
 /// # Errors
 /// As [`generate`].
 pub fn generate_with(
+    bp: &Verified,
+    catalog: &dyn KitCatalog,
+    emitters: &[&dyn Emitter],
+) -> Result<Vec<Artifact>, Coded> {
+    build(bp.blueprint(), catalog, emitters)
+}
+
+fn build(
     bp: &Blueprint,
     catalog: &dyn KitCatalog,
     emitters: &[&dyn Emitter],

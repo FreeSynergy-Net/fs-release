@@ -1,13 +1,12 @@
 //! `write` and the generator against data loss and escape: unreadable files, links, paths out of the repo,
 mod support;
-use fs_blueprint::emit::generate;
 use fs_blueprint::emit::write::{write, DirStore, Found, Store};
 use fs_blueprint::{Artifact, Class, Coded};
 use std::path::{Path, PathBuf};
 #[cfg(windows)]
 use std::process::{Command, Stdio};
 use support::synth::{blueprint, MemStore};
-use support::FakeCatalog;
+use support::{generate, FakeCatalog};
 
 const MAIN: &str = "crates/fs-beta-shelf-planner-bin/src/main.rs";
 const BIN_FILES: [&str; 3] = ["Cargo.toml", "src/main.rs", "tests/start.rs"];

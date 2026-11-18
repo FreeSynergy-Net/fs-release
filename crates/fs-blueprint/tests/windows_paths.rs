@@ -1,12 +1,11 @@
 //! Paths that are the same file on every platform: what Windows refuses or changes is refused everywhere (reserved device names, a name that ends in a dot or a
 //! space, `\\?\`, a drive, alternate data streams), and two paths that differ only in case are one file.
 mod support;
-use fs_blueprint::emit::generate::generate_with;
 use fs_blueprint::emit::write::{write, DirStore};
 use fs_blueprint::emit::Emitter;
 use fs_blueprint::{Artifact, Blueprint, Class, Coded, KitCatalog};
 use support::synth::blueprint;
-use support::FakeCatalog;
+use support::{generate_with, FakeCatalog};
 
 fn valid(p: &str) -> bool {
     fs_blueprint::form::is_repo_path(p)
