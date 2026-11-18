@@ -3,8 +3,8 @@
 //! The entry point is purely generated and exchangeable (user decision 45): its template has one slot, the program name, which is a reference into
 //! the blueprint. Nothing else of the program may stand in it; the test compares it across many blueprints.
 
+use super::artifact::{join, Artifact, Class, Emitter};
 use super::slot::{fill, Values};
-use super::{join, Artifact, Class, Emitter};
 use crate::error::Coded;
 use crate::kit::KitCatalog;
 use crate::model::Blueprint;

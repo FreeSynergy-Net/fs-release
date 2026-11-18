@@ -3,7 +3,8 @@
 //! Only `Generated` is written, and not over a hand-written or hand-changed file. A `Seed` is created when it is missing and never touched again.
 //! An `Exception` is never written. Paths have `/` and are turned into native paths only here.
 
-use super::{header, Artifact, Class};
+use super::artifact::{Artifact, Class};
+use super::header;
 use crate::error::Coded;
 use std::path::PathBuf;
 

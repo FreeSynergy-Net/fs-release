@@ -1,6 +1,6 @@
 //! Pattern: Decorator (the head line of a generated or seeded file in the comment form of its kind; no time stamp, no path of the machine).
 
-use super::Class;
+use super::artifact::Class;
 use crate::error::Coded;
 use crate::model::Blueprint;
 use sha2::{Digest, Sha256};

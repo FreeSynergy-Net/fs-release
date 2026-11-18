@@ -1,6 +1,7 @@
 //! Pattern: Template method (is the repo the product of the blueprint? every generated file byte-equal, every seed there, exceptions left alone).
 
-use super::{generate, Class};
+use super::artifact::Class;
+use super::generate::generate;
 use crate::error::{Coded, Report};
 use crate::kit::{KitCatalog, RepoView};
 use crate::model::Blueprint;
