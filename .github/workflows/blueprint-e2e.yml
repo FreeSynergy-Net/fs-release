@@ -62,6 +62,9 @@ jobs:
           "$bin" new crates/fs-blueprint/tests/data/repos/bad/scaffold.toml --out "$RUNNER_TEMP/not-made" > /dev/null || rc=$?
           test "$rc" = 1
           test ! -e "$RUNNER_TEMP/not-made"
+          # the example of the README (examples/leer) with the binary of THIS branch (the README itself runs the installed tag)
+          "$bin" new examples/leer/scaffold.toml --out "$RUNNER_TEMP/leer"
+          "$bin" check --repo "$RUNNER_TEMP/leer"
           echo "$bin" > .fs-blueprint-bin
       # Acceptance on the two real blueprints (informational: the branches may move; the expected red reasons are in the CHANGELOG and the report of the step S4).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -8,7 +8,7 @@ What is different here: everything is free of charge for you and for us. A relea
 
 ## What it can do today
 
-No release tag yet. The workflows are used by the repos through a caller file.
+Releases are tagged (see the tags of this repo). The workflows are used by the repos through a caller file.
 
 - CI: formatting, lints, tests, our own code-rules checker and a licence policy check.
 - Windows gate: one reusable workflow (`_windows-check.yml`: fmt, clippy pedantic, tests on `windows-2022`) with a small caller file.
@@ -23,7 +23,7 @@ Tests and spikes that drive a desktop (typing test, KWin scripts, fake input) ru
 
 ## Make a new program (`fs-blueprint new`)
 
-Install the command, copy the example blueprint, make the program (the commands below are run word for word by CI, `scripts/readme-run.sh`):
+Install the command, copy the example blueprint, make the program. Start in a checkout of this repo (`git clone https://github.com/FreeSynergy/fs-release && cd fs-release`; the example is in the checkout, the installed command does not carry it). CI runs the commands below word for word (`scripts/readme-run.sh`; it also checks that the install tag is the version of `crates/fs-blueprint`):
 
 <!-- readme-run -->
 ```sh
@@ -36,7 +36,7 @@ fs-blueprint check --repo fs-leer
 
 1. `cargo install` builds the command from the tag (`--locked` keeps the versions of the tag; the Rust toolchain of `RUST_VERSION`).
 2. `examples/leer/` (in this repo: `scaffold.toml` and the folder `forms/`) is the smallest valid blueprint, an empty program. Copy it and change it; the `capability` must be a key of the catalog that comes with the command.
-3. `fs-blueprint new scaffold.toml --out fs-<name>` checks the blueprint first and writes the program only when it is clean; the catalog of the command is enough. `--catalog FILE` is only for your OWN capabilities (your own catalog file); without it a blueprint that names an unknown capability is refused and nothing is written.
+3. `fs-blueprint new scaffold.toml --out fs-<name>` checks the blueprint first and writes the program only when it is clean; the catalog of the command is enough. The line `made leer (written 14, ...)` counts the files that the generator made; the blueprint itself and its `forms/` folder are copied into the new repo in addition (the tree holds two files more than the count). `--catalog FILE` is only for your OWN capabilities (your own catalog file); without it a blueprint that names an unknown capability is refused and nothing is written.
 4. `fs-blueprint check --repo fs-<name>` checks the made program (`--repo` names the folder; the three warnings `skeleton-part-pending` for session, update and mcp-switch are expected). `fs-blueprint --help` lists all words.
 
 ## What is not there yet

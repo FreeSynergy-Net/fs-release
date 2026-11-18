@@ -52,6 +52,8 @@ jobs:
           bash scripts/test_check_job_status.sh
       - name: pin consistency (one SHA in all internal uses, no @main) and its mutants
         run: bash scripts/test_pins_consistent.sh
+      - name: README runner self test (stub cargo; refused and failing READMEs, CRLF, stdin, hidden failures)
+        run: bash scripts/test_readme_run.sh
       - name: topmost CHANGELOG section (Unreleased or the crate version, no date, not empty) and its mutants
         run: bash scripts/test_changelog_top.sh
       - name: signing setup script self test (mock gh, mutants)
