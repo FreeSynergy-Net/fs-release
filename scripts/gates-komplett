@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pattern: none (script of the pin cascade).
 """All gates of one Glied, COMPLETE (call `gates-komplett` of the workflow `pin-kaskade`, step `gates`). It writes the build output and the logs, and `cargo fmt --all` writes into the tree (a tree that fmt changes is red, see below).
 
   python3 -I scripts/gates-komplett --repo-dir DIR [--jobs 4] [--prioritaet 0] [--log-dir DIR] [--skripte-tag vX.Y.Z] [--ohne-flachprobe]
@@ -7,7 +8,7 @@
 $FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The tag is the highest `FreeSynergy/fs-release/...@vX.Y.Z` of DIR/.github/workflows/*.yml, or `--skripte-tag`; without
 any (fs-release itself) the scripts of DIR are used. [GATE-VOLLSTAENDIG-LAUFEN]: `cargo fmt --all` FIRST (a tree that fmt changes is red: commit it first), then `gates.sh` COMPLETE, ONE run after the other
 (never parallel): (1) the local environment (a CI/CARGO_TERM_COLOR of the caller is dropped), (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`) with an OWN
-target (`.scratch/target/<repo>/flach`, <repo> = the repo name of the `origin` URL, the folder name only without an `origin`; [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
+target (`.scratch/target/<repo>/<folder>-flach`: <repo> = the repo name of the `origin` URL (the folder name only without an `origin`), <folder> = the folder of the checkout, so every clone has ITS OWN flat target; [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
 CARGO_BUILD_JOBS=<jobs> and BUILD_PRIORITY=<prioritaet>. [GATE-PIPEFAIL], [GATE-AUSGABE-NIE-KUERZEN]: the output goes to a log file whole; the result lists every `gate <name>: rc=` line and every line with FAILED, ERROR
 or errors, and the rc of every run; a red run stops the rest (`nicht gelaufen`). The head and the working tree must be the same before and after (a change while the gates run is red).
 NAMED EXCEPTION (c0 18.11.2026, rule [GATE-FLACHER-KLON-OHNE-TAGS]; the ONLY one, the list `AUSNAHMEN` below): in the repo fs-release itself the flat clone has no tags, and its test
@@ -143,7 +144,7 @@ def main(argv):
         if not a.ohne_flachprobe:
             flach = os.path.join(tmp, "flach")
             plan.append(("flach-ohne-tags", flach, {**env, "CARGO_TERM_COLOR": "always", "CI": "true", "BUILD_NO_SHARED_TARGET": "1",
-                                                    "CARGO_TARGET_DIR": os.path.join(scratch, "target", repo, "flach")}))
+                                                    "CARGO_TARGET_DIR": os.path.join(scratch, "target", repo, os.path.basename(d.rstrip("/")) + "-flach")}))
         for name, wd, e in plan:
             if befunde:
                 laeufe.append({"name": name, "rc": None, "log": None, "gates": [], "fehler": ["nicht gelaufen (an earlier step is red)"]})

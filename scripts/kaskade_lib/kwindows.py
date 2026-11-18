@@ -1,3 +1,4 @@
+# Pattern: none (script of the pin cascade).
 """Windows state of a Glied repo (rule B4: every Glied gets the caller of `_windows-check.yml` before its tag). Read only: `git show` of
 the workflow file, and the PUBLIC REST API (GET, no login, no `gh`; `FS_KASKADE_API`, default https://api.github.com) for the runs of one head."""
 import json

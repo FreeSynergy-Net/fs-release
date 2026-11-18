@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pattern: none (script of the pin cascade).
 """End check of the pin cascade (call `lock-gleich` of the workflow `pin-kaskade`, step `lock-ende`). READ ONLY: a blobless clone of every done Glied at its TAG into an own temp folder.
 
   python3 -I scripts/lock-gleich --plan JSON|FILE|- --ausloeser vX.Y.Z [--env "FS_LOCK_STRICT=1 FS_LOCK_ONLY_FROM=1"]

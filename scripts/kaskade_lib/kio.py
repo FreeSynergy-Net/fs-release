@@ -1,3 +1,4 @@
+# Pattern: none (script of the pin cascade).
 """Input and output of the pin-kaskade scripts: JSON in (a literal, a file, or `-` = stdin), JSON out on stdout, rc 0 green / 1 red / 2 bad input."""
 import json
 import re

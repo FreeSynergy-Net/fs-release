@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Pattern: none (test).
 # Self test of scripts/kaskade-fremde-pins and scripts/lock-gleich (workflow pin-kaskade) on local bare repos (scripts/kaskade_fixture.sh), no network:
 # a `rev` pin is put on the owner tag only when its commit is on that tag, only Cargo.toml changes (never Cargo.lock), a known foreign source is left alone and listed;
 # the end check is red for a second fs-types version, a left rev pin and a source from the wrong repo, and refuses a weakened --env. One or two mutants per script.

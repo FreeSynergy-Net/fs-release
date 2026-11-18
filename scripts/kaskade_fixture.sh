@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Pattern: none (script of the pin cascade).
 # shellcheck disable=SC2154,SC2034  # $tmp and $here come from the sourcing test; ifc_head, rev_a, rev_b are read by it
 # Shared fixture of the self tests of the pin-kaskade scripts (source it, do not run it): local bare repos as the "remote" (FS_KASKADE_BASE=file://...),
 # so no test touches the network. Expects: $here (scripts dir), $tmp (a temp dir), the helpers ok/bad/chk of the caller.

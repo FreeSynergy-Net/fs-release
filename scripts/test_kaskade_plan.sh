@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Pattern: none (test).
 # Self test of scripts/kaskade-lage, kaskade-plan, kaskade-glied and kaskade-glied-fertig (workflow pin-kaskade) on local bare repos (scripts/kaskade_fixture.sh), no network:
 # lage proves trigger and fs-release tag and the Windows caller per Glied, plan derives the order from the REAL pins (input order wrong on purpose), finds rev pins, wrong
 # sources, known foreign sources and a cycle, glied takes the libs, glied-fertig needs the tag on the remote. One mutant per script must turn a case red.
@@ -82,9 +83,9 @@ commit_push ext-a one; tag_push ext-a v0.0.1
 printf '[{"repo":"ext-a","art":"bibliothek","tag":"v0.0.1","allow":"x"}]' >"$tmp/g4.json"
 py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g4.json" --ohne-ci >"$tmp/lage4.json"
 py "$here/kaskade-plan" --lage "$tmp/lage4.json" >"$tmp/o.json"; rc=$?
-chk "plan: Blinc and fs-capnpc pinned by tag are known foreign sources, not findings (rc 0)" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" 'd["offen"][0]["fremdquellen"]')" = "['FreeSynergy/Blinc', 'FreeSynergy/fs-capnpc']" ]
+chk "plan: Blinc and fs-capnpc pinned by tag are known foreign sources, not findings (rc 0)" [ "$rc" -eq 0 ] && chk "plan: Blinc and fs-capnpc pinned by tag are known foreign sources, not findings (rc 0) [part 2]" [ "$(q "$tmp/o.json" 'd["offen"][0]["fremdquellen"]')" = "['FreeSynergy/Blinc', 'FreeSynergy/fs-capnpc']" ]
 printf '' >"$tmp/leer0.txt"; py "$here/kaskade-plan" --lage "$tmp/lage4.json" --fremdquellen "$tmp/leer0.txt" >"$tmp/o.json"; rc=$?
-chk "plan: without the foreign-source list the same pins are findings (rc 1)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" 'len(d["befunde"])')" = 2 ]
+chk "plan: without the foreign-source list the same pins are findings (rc 1)" [ "$rc" -eq 1 ] && chk "plan: without the foreign-source list the same pins are findings (rc 1) [part 2]" [ "$(q "$tmp/o.json" 'len(d["befunde"])')" = 2 ]
 chk "the shipped foreign-source list names fs-capnpc and Blinc" grep -q '^FreeSynergy/fs-capnpc' "$here/../workflows/kaskade-fremdquellen.txt" && chk "the shipped foreign-source list names Blinc" grep -q '^FreeSynergy/Blinc' "$here/../workflows/kaskade-fremdquellen.txt"
 # K3: a Windows caller that is too old (@v0.0.10 < v0.0.11) or floats (@main) is no caller in order (rule B4: a tag >= the fs-release tag)
 for w in win-old:v0.0.10 win-main:main win-new:v0.0.12 win-eq:v0.0.11; do
@@ -94,7 +95,7 @@ for w in win-old:v0.0.10 win-main:main win-new:v0.0.12 win-eq:v0.0.11; do
 done
 printf '[{"repo":"win-old","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-main","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-new","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-eq","art":"bibliothek","tag":"v0.0.1","allow":"x"}]' >"$tmp/g5.json"
 py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g5.json" --ohne-ci >"$tmp/lage5.json"
-chk "lage: a Windows caller at v0.0.10 (< v0.0.11) and at @main are pin_ok false and in ohne_aufrufer" [ "$(q "$tmp/lage5.json" 'sorted(d["ohne_aufrufer"])')" = "['win-main', 'win-old']" ] && [ "$(q "$tmp/lage5.json" '[(w["repo"], w["aufrufer"], w["pin_ok"]) for w in d["windows"]]')" = "[('win-old', True, False), ('win-main', True, False), ('win-new', True, True), ('win-eq', True, True)]" ]
+chk "lage: a Windows caller at v0.0.10 (< v0.0.11) and at @main are pin_ok false and in ohne_aufrufer" [ "$(q "$tmp/lage5.json" 'sorted(d["ohne_aufrufer"])')" = "['win-main', 'win-old']" ] && chk "lage: a Windows caller at v0.0.10 (< v0.0.11) and at @main are pin_ok false and in ohne_aufrufer [part 2]" [ "$(q "$tmp/lage5.json" '[(w["repo"], w["aufrufer"], w["pin_ok"]) for w in d["windows"]]')" = "[('win-old', True, False), ('win-main', True, False), ('win-new', True, True), ('win-eq', True, True)]" ]
 
 # ---- kaskade-glied ----
 py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
@@ -161,4 +162,9 @@ mutate "$here/kaskade_lib/kwindows.py" 'return True, ref, bool(k and lo and k >=
 py "$tmp/mut/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g5.json" --ohne-ci >"$tmp/o.json"
 chk "mutant lage (every Windows pin accepted, MD) is caught by the too-old and @main case" [ "$(q "$tmp/o.json" 'sorted(d["ohne_aufrufer"])')" != "['win-main', 'win-old']" ]
 cp "$here"/kaskade_lib/kwindows.py "$tmp/mut/kaskade_lib/"
+# ---- self check against a relapse (Opus N1): no `chk ... A && B` line may stay in the test scripts (chk would check only A) ----
+unchecked() { grep -nP '^chk .*&& (?!chk )' "$@"; }  # lines whose `&&` part is not a chk of its own
+printf 'chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]\nchk "y" [ 1 -eq 1 ] && chk "y [part 2]" [ 2 -eq 2 ]\n' >"$tmp/shape.sh"
+chk "self check: a chk line with an unchecked second part is found in a bad sample (and a split chk is not)" [ "$(unchecked "$tmp/shape.sh" | wc -l)" = 1 ]
+chk "self check: no chk line of the test scripts has an unchecked second part (relapse of K2)" [ "$(unchecked "$here"/test_kaskade_plan.sh "$here"/test_kaskade_pins.sh "$here"/test_kaskade_gates.sh | wc -l)" = 0 ]
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

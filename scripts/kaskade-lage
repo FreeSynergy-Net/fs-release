@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pattern: none (script of the pin cascade).
 """Lage of the pin cascade (call `kaskade-lage` of the workflow `pin-kaskade`, step `lage`). READ ONLY: `git ls-remote`, blobless clones into an own temp folder, GET of the public REST API.
 
   python3 -I scripts/kaskade-lage --ausloeser vX.Y.Z --glieder JSON|FILE|- [--ab NAME] [--fs-release-tag v0.0.11] [--ohne-ci]

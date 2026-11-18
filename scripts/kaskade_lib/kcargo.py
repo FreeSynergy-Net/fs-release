@@ -1,3 +1,4 @@
+# Pattern: none (script of the pin cascade).
 """Cargo.toml reading and editing of the pin-kaskade scripts: which dependencies come from a FreeSynergy git repo, with `tag` or `rev`.
 Cargo.lock is NEVER edited here (the lift makes it, by cargo)."""
 import os

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pattern: none (script of the pin cascade).
 """The current Glied of the pin cascade (call `kaskade-glied` of the workflow `pin-kaskade`, step `glied-start`). No network, writes nothing.
 
   python3 -I scripts/kaskade-glied --plan JSON|FILE|- --ausloeser vX.Y.Z [--dir <worktree of the Glied>]

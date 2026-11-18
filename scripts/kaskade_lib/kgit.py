@@ -1,3 +1,4 @@
+# Pattern: none (script of the pin cascade).
 """Read-only git helpers of the pin-kaskade scripts. The remote base is `FS_KASKADE_BASE` (default https://github.com/FreeSynergy),
 so a test can point it at local bare repos. Nothing here pushes, tags or deletes; every call is `ls-remote`, `clone` into an OWN folder or `show`."""
 import os

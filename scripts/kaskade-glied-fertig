@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pattern: none (script of the pin cascade).
 """Closes one Glied of the pin cascade (call `kaskade-glied-fertig` of the workflow `pin-kaskade`, step `naechstes`).
 
   python3 -I scripts/kaskade-glied-fertig --plan JSON|FILE|- --glied JSON|FILE --beleg TEXT [--karte ID] [--als NAME]

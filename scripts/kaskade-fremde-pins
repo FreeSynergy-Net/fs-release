@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pattern: none (script of the pin cascade).
 """`rev` pins and wrong sources of one Glied (call `kaskade-fremde-pins` of the workflow `pin-kaskade`, step `rev-pins`; it runs BEFORE the lift).
 
   python3 -I scripts/kaskade-fremde-pins --glied JSON|FILE|- --dir <worktree of the Glied> [--fremdquellen FILE] [--nur-lesen]
