@@ -43,7 +43,9 @@ jobs:
         shell: bash
         run: |
           cargo build -p fs-blueprint --locked --bin fs-blueprint
-          bin="target/debug/fs-blueprint$([ "$RUNNER_OS" = Windows ] && echo .exe)"
+          suffix=""
+          if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; fi
+          bin="target/debug/fs-blueprint$suffix"
           "$bin" --version
           "$bin" check --repo crates/fs-blueprint/tests/data/repos/ok
           rc=0
