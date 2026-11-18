@@ -162,9 +162,81 @@ mutate "$here/kaskade_lib/kwindows.py" 'return True, ref, bool(k and lo and k >=
 py "$tmp/mut/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g5.json" --ohne-ci >"$tmp/o.json"
 chk "mutant lage (every Windows pin accepted, MD) is caught by the too-old and @main case" [ "$(q "$tmp/o.json" 'sorted(d["ohne_aufrufer"])')" != "['win-main', 'win-old']" ]
 cp "$here"/kaskade_lib/kwindows.py "$tmp/mut/kaskade_lib/"
-# ---- self check against a relapse (Opus N1): no `chk ... A && B` line may stay in the test scripts (chk would check only A) ----
-unchecked() { grep -nP '^chk .*&& (?!chk )' "$@"; }  # lines whose `&&` part is not a chk of its own
-printf 'chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]\nchk "y" [ 1 -eq 1 ] && chk "y [part 2]" [ 2 -eq 2 ]\n' >"$tmp/shape.sh"
-chk "self check: a chk line with an unchecked second part is found in a bad sample (and a split chk is not)" [ "$(unchecked "$tmp/shape.sh" | wc -l)" = 1 ]
-chk "self check: no chk line of the test scripts has an unchecked second part (relapse of K2)" [ "$(unchecked "$here"/test_kaskade_plan.sh "$here"/test_kaskade_pins.sh "$here"/test_kaskade_gates.sh | wc -l)" = 0 ]
+# ---- shape gate against a relapse of K2 (Opus N1/N3): in `chk "name" cmd` only cmd is checked, so nothing unchecked may be chained to a chk (&&, ||, ;, indented, continued line) ----
+shape="$here/check_chk_shape.py"; mkdir -p "$tmp/shape"
+cat >"$tmp/shape/bad1" <<'EOF'
+chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad2" <<'EOF'
+for r in a b; do
+  chk "x $r" [ 1 -eq 1 ] && [ 1 -eq 2 ]
+done
+EOF
+cat >"$tmp/shape/bad3" <<'EOF'
+chk "x" [ 1 -eq 1 ]; [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad4" <<'EOF'
+chk "x" [ 1 -eq 1 ] \
+  && [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad5" <<'EOF'
+chk "x" [ 1 -eq 1 ] || [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/bad6" <<'EOF'
+chk "x" [ 1 -eq 1 ] && chk "y" [ 1 -eq 1 ] && [ 1 -eq 2 ]
+EOF
+cat >"$tmp/shape/good1" <<'EOF'
+chk "x" [ 1 -eq 1 ] && chk "x [part 2]" [ 2 -eq 2 ]
+EOF
+cat >"$tmp/shape/good2" <<'EOF'
+chk "x" grep -q 'a && b; c || d' file
+EOF
+cat >"$tmp/shape/good3" <<'EOF'
+for r in a b; do chk "$r" [ 1 -eq 1 ]; done
+EOF
+cat >"$tmp/shape/good4" <<'EOF'
+chk "x" [ "$(echo 'a;b')" = 'a;b' ]  # a && b in a comment
+EOF
+cat >"$tmp/shape/good6" <<'EOF'
+cat >"$tmp/x" <<'IN'
+chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]
+IN
+chk "y" [ 1 -eq 1 ]
+EOF
+cat >"$tmp/shape/good5" <<'EOF'
+chk() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
+EOF
+# shape_ok <checker>: every bad sample is found (rc 1), every good sample is not (rc 0)
+shape_ok() {
+  local f rc
+  for f in "$tmp"/shape/bad*; do rc=0; python3 -I "$1" "$f" >/dev/null 2>&1 || rc=$?; [ "$rc" -eq 1 ] || return 1; done
+  for f in "$tmp"/shape/good*; do rc=0; python3 -I "$1" "$f" >/dev/null 2>&1 || rc=$?; [ "$rc" -eq 0 ] || return 1; done
+}
+chk "shape gate: finds && , indented, ; , continuation line, || and a mixed chain, and passes the good forms" shape_ok "$shape"
+chk "shape gate: no chk line of the test scripts has an unchecked part (relapse of K2)" python3 -I "$shape" "$here"/test_kaskade_plan.sh "$here"/test_kaskade_pins.sh "$here"/test_kaskade_gates.sh
+# the five forbidden forms put INTO a copy of a real test script (G1 &&, G3 indented, G4 ;, G5 continuation, ||) turn the gate red
+inj() { # <label> <text>
+  cp "$here/test_kaskade_gates.sh" "$tmp/inj.sh"; printf '%s\n' "$2" >>"$tmp/inj.sh"
+  chk "shape gate: the form '$1' put into a copy of test_kaskade_gates.sh is found (rc 1)" [ "$(python3 -I "$shape" "$tmp/inj.sh" >/dev/null; echo $?)" = 1 ]
+}
+inj "&&" 'chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]'
+inj "indented" '  chk "x" [ 1 -eq 1 ] && [ 1 -eq 2 ]'
+inj ";" 'chk "x" [ 1 -eq 1 ]; [ 1 -eq 2 ]'
+inj "continuation" 'chk "x" [ 1 -eq 1 ] \
+  && [ 1 -eq 2 ]'
+inj "||" 'chk "x" [ 1 -eq 1 ] || [ 1 -eq 2 ]'
+# mutants of the gate: each blind spot (G1 &&, G3 indent, G4 ;, G5 continuation, || , quotes) must turn the sample case red
+shape_mut() { # <old> <new> <label>
+  mutate "$shape" "$1" "$2" "$tmp/mut/check_chk_shape.py" || bad "shape mutant $3 not applied"
+  chk "mutant shape gate ($3) is caught by the sample case" [ "$(shape_ok "$tmp/mut/check_chk_shape.py" && echo green || echo red)" = red ]
+}
+shape_mut 's.startswith("&&", i) or' 'False and' "&& ignored"
+shape_mut 'parts = [p.strip() for p in split_top(line)]' 'parts = list(split_top(line))' "indent ignored (G3)"
+shape_mut 'logical_lines(strip_heredocs(text))' 'logical_lines(text)' "heredoc bodies not skipped"
+shape_mut 'elif top is None and c == ";":' 'elif top is None and c == "\x00":' "; ignored (G4)"
+shape_mut 'if raw.endswith("\\"):' 'if raw.endswith("\x00"):' "continuation ignored (G5)"
+shape_mut 'or s.startswith("||", i)' 'or s.startswith("\x00\x00", i)' "|| ignored"
+shape_mut 'elif c == "'"'"'":
+                st.append("s")' 'elif c == "\x00":
+                st.append("s")' "quotes ignored"
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
