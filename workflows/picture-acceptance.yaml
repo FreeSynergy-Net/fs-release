@@ -8,18 +8,6 @@ document:
   name: picture-acceptance
   version: 0.0.12
   title: Show model and our pictures, take the strategy's and the user's verdict
-  metadata:
-    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
-    freesynergy.net:transitions:
-      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
-      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
-      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
-      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
-      abgebrochen: [offen, archiviert]
-      erledigt: [offen, archiviert]
-      archiviert: []
 do:
   - menue-bilder:
       call: menu-images:0.0.12@fs
