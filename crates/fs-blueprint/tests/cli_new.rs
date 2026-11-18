@@ -185,3 +185,10 @@ fn new_without_out_makes_the_folder_fs_name_in_the_current_folder() {
             && work.join("fs-demo").join("scaffold.toml").is_file()
     );
 }
+
+#[test]
+fn a_stray_word_after_check_is_refused_also_with_a_good_repo() {
+    let (code, out, err) = cli(&["check", "stray", "--repo", &fixture("ok").to_string_lossy()]);
+    assert_eq!(code, 2, "{out}");
+    assert!(err.contains("unknown word stray") && out.is_empty());
+}

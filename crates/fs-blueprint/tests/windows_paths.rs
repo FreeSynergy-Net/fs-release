@@ -129,3 +129,33 @@ fn write_refuses_every_path_the_check_refuses() {
     }
     assert!(!root.exists());
 }
+
+#[test]
+fn the_console_devices_and_the_superscript_com_and_lpt_names_are_refused() {
+    for p in [
+        "CONIN$",
+        "conin$",
+        "CONOUT$",
+        "conout$.txt",
+        "a/ConIn$",
+        "com\u{b9}",
+        "COM\u{b2}.txt",
+        "LPT\u{b3}",
+        "x/lpt\u{b9}.rs",
+        "COM1",
+        "lpt9",
+    ] {
+        assert!(!valid(p), "{p}");
+    }
+    for p in [
+        "conin",
+        "conout.rs",
+        "cost$.rs",
+        "com\u{2074}.rs",
+        "com10",
+        "lpt0",
+        "console$",
+    ] {
+        assert!(valid(p), "{p}");
+    }
+}

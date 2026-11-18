@@ -164,3 +164,16 @@ fn a_link_is_never_followed_neither_as_a_file_nor_as_a_folder() {
     assert_eq!(r.unowned_files(), ["crates/a/src/lib.rs"]);
     assert_eq!(r.main_files(), Vec::<String>::new());
 }
+
+#[test]
+fn a_talk_path_that_leaves_the_checkout_is_never_a_record_even_when_the_file_is_there() {
+    let docs = tree("talk-escape", &[("conventions/talks/t.md", "x")]);
+    let beside = docs.parent().unwrap().join("beside-the-checkout.md");
+    std::fs::write(&beside, "x").unwrap();
+    let r = FsRepo::new("x", vec![], Some(docs));
+    assert!(r.talk_exists("conventions/talks/t.md"));
+    assert!(
+        !r.talk_exists("../beside-the-checkout.md")
+            && !r.talk_exists("conventions/../../beside-the-checkout.md")
+    );
+}
