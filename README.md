@@ -23,9 +23,21 @@ Tests and spikes that drive a desktop (typing test, KWin scripts, fake input) ru
 
 ## Make a new program (`fs-blueprint new`)
 
-1. Install the command: `cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.12 fs-blueprint`.
-2. Write the blueprint `scaffold.toml` (schema 2; `[program] version` is mandatory).
-3. Run `fs-blueprint new scaffold.toml --out fs-<name>`: it checks the blueprint first and writes the program only when it is clean (`fs-blueprint --help` lists all words; `fs-blueprint check` checks an existing program).
+Install the command, copy the example blueprint, make the program (the commands below are run word for word by CI, `scripts/readme-run.sh`):
+
+<!-- readme-run -->
+```sh
+cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.12 --locked fs-blueprint
+cp -r examples/leer mein-plan
+cd mein-plan
+fs-blueprint new scaffold.toml --out fs-leer
+fs-blueprint check --repo fs-leer
+```
+
+1. `cargo install` builds the command from the tag (`--locked` keeps the versions of the tag; the Rust toolchain of `RUST_VERSION`).
+2. `examples/leer/` (in this repo: `scaffold.toml` and the folder `forms/`) is the smallest valid blueprint, an empty program. Copy it and change it; the `capability` must be a key of the catalog that comes with the command.
+3. `fs-blueprint new scaffold.toml --out fs-<name>` checks the blueprint first and writes the program only when it is clean; the catalog of the command is enough. `--catalog FILE` is only for your OWN capabilities (your own catalog file); without it a blueprint that names an unknown capability is refused and nothing is written.
+4. `fs-blueprint check --repo fs-<name>` checks the made program (`--repo` names the folder; the three warnings `skeleton-part-pending` for session, update and mcp-switch are expected). `fs-blueprint --help` lists all words.
 
 ## What is not there yet
 

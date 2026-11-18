@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Empty program with ONE command (README, example, CI; no change of the binary): `examples/leer/scaffold.toml` (+ `forms/simple.toml`) is the smallest valid blueprint (schema 2, no types, no modules, capability `tasks` of the shipped catalog) and runs through `fs-blueprint new` WITHOUT `--catalog` and `fs-blueprint check --repo` (3 expected warnings `skeleton-part-pending`); the README section "Make a new program" now has `--locked` in the install line, copies the example, names `--catalog` only as the way to your own capabilities and `check --repo`; the new job `readme` of `blueprint-e2e.yml` (Linux and Windows) runs the commands of the block after `<!-- readme-run -->` WORD FOR WORD (`scripts/readme-run.sh`: install from the tag into a work folder, no global install), so the instructions cannot differ from the tool again (a wrong README line or an invalid example is red). / Leeres Programm mit EINEM Befehl (README, Beispiel, CI; Binary unverändert): `examples/leer/scaffold.toml` ist der kleinste gültige Bauplan und läuft mit dem mitgelieferten Katalog OHNE `--catalog` durch `fs-blueprint new` und `fs-blueprint check --repo` (3 erwartete Warnungen); die README hat `--locked`, kopiert das Beispiel, nennt `--catalog` nur als Weg zu eigenen Fähigkeiten und `check --repo`; der neue Job `readme` in `blueprint-e2e.yml` (Linux und Windows) führt die Befehle des Blocks nach `<!-- readme-run -->` WÖRTLICH aus (`scripts/readme-run.sh`), die Anleitung kann nicht mehr vom Werkzeug abweichen.
+
 ## 0.0.12
 
 Released 2026-11-18 (UTC; the date of the version commit, the tag follows after the pin rounds). / Veröffentlicht am 2026-11-18 (UTC; Datum des Version-Commits, der Tag folgt nach den Pin-Runden).

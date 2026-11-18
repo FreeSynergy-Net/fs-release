@@ -1,0 +1,24 @@
+# The smallest valid blueprint: an EMPTY program (no types, no modules, no functions).
+# It runs with the catalog that comes with fs-blueprint, without `--catalog`:
+#   fs-blueprint new scaffold.toml --out fs-leer
+# Copy this file AND the folder `forms/` next to it, then change `name`, `summary`, `description`, `categories`.
+# `capability` must be a key of the catalog (crates/fs-blueprint/catalog/fs.toml); a new key needs your own catalog (`--catalog FILE`).
+schema = 2
+
+[program]
+name = "leer"
+version = "0.0.1"
+skeleton = "0.1.0"
+capability = "tasks"
+summary = { en = "An empty program", de = "Ein leeres Programm" }
+description = { en = "A program without any function, made by one command; the starting point of your own program.", de = "Ein Programm ohne jede Funktion, mit einem Befehl gemacht; der Ausgangspunkt für dein eigenes Programm." }
+categories = ["Utility"]
+
+[contract]
+version = "0.1"
+id = "0xc04d258971543501"
+
+[frontend]
+standard = "simple"
+layout = "forms/simple.toml"
+covers = "all"

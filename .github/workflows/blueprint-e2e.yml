@@ -87,3 +87,23 @@ jobs:
             echo "== $p"
             "$bin" check --repo "acceptance/$p" | sed -e 's/  .*//' -e 's/{.*//' | sort | uniq -c | sort -rn || true
           done
+  # The commands of the README run WORD FOR WORD (scripts/readme-run.sh reads the block after `<!-- readme-run -->`): install from the tag into a work
+  # folder, copy examples/leer, `new` with the catalog that comes with the command (no --catalog), `check --repo`. A wrong README line or an invalid example is red.
+  readme:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@eb353790cf603a0ef119996012e01049b5d7545d
+        with:
+          toolchain: pinned
+          cache-key: blueprint-readme-${{ matrix.os }}
+      - name: the README commands, word for word
+        shell: bash
+        run: bash scripts/readme-run.sh README.md
