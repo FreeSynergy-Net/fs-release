@@ -100,7 +100,7 @@ fn mutation_stationen_is_not_a_state() {
 
 #[test]
 fn the_state_table_of_the_standard_is_exactly_the_set_of_states() {
-    let doc = fs::read_to_string(root().join("workflows/ZUESTAENDE.md")).unwrap();
+    let doc = fs::read_to_string(root().join("workflows/STATES.md")).unwrap();
     let mut rows: Vec<String> = Vec::new();
     let mut in_table = false;
     for l in doc.lines() {
@@ -122,8 +122,5 @@ fn the_state_table_of_the_standard_is_exactly_the_set_of_states() {
         .map(str::to_string)
         .collect();
     want.sort();
-    assert_eq!(
-        rows, want,
-        "ZUESTAENDE.md: one table row per state, no more"
-    );
+    assert_eq!(rows, want, "STATES.md: one table row per state, no more");
 }

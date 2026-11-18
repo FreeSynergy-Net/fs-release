@@ -10,7 +10,7 @@ Per file: parses; `document` has dsl (1.0.x), namespace, name, version; `do` is 
 state whatever the result, e.g. show images, ask for a verdict). A `then` (task or `switch` case) is continue, exit, end
 or the name of a step of the same flow.
 
-States (standard `workflows/ZUESTAENDE.md`): `document.metadata` of EVERY flow carries `freesynergy.net:states` (exactly the eight
+States (standard `workflows/STATES.md`): `document.metadata` of EVERY flow carries `freesynergy.net:states` (exactly the eight
 mandatory states) and `freesynergy.net:transitions` (state -> targets; the word `stationen` stands for the own steps of the flow, which are
 the swimlanes in between). The transitions must contain every rule of the standard (TRANSITIONS below); `archiviert` is reached only from
 `erledigt` / `abgebrochen` and has no way out; no step may carry the name of a state.
@@ -27,7 +27,7 @@ FLOW_WORDS = {"continue", "exit", "end"}
 STATES = ("offen", "wartet-auf-entscheidung", "auf-anfrage", "in-prüfung", "pausiert", "abgebrochen", "erledigt", "archiviert")
 STATIONS = "stationen"  # the own steps of a flow (work in progress), the swimlanes between the mandatory states
 _WORK = ["wartet-auf-entscheidung", "auf-anfrage", "in-prüfung", "pausiert", "abgebrochen"]
-# The standard transition rules (the ONE place; workflows/ZUESTAENDE.md says the same). pausiert + abgebrochen from every live state.
+# The standard transition rules (the ONE place; workflows/STATES.md says the same). pausiert + abgebrochen from every live state.
 TRANSITIONS = {
     "offen": [STATIONS, "wartet-auf-entscheidung", "auf-anfrage", "pausiert", "abgebrochen"],
     STATIONS: [STATIONS, *_WORK, "erledigt"],
@@ -76,7 +76,7 @@ def check_states(head, step_names):
     """The state standard: the eight mandatory states, the transition rules, no step named like a state."""
     meta = head.get("metadata") if isinstance(head, dict) else None
     if not isinstance(meta, dict):
-        return ["document.metadata is missing (states and transitions are required, see ZUESTAENDE.md)"]
+        return ["document.metadata is missing (states and transitions are required, see STATES.md)"]
     problems = []
     states = meta.get(META_STATES)
     if not isinstance(states, list):
