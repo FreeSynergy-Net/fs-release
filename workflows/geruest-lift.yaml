@@ -11,18 +11,6 @@ document:
   name: geruest-lift
   version: 0.0.13
   title: Lift the scaffold version of a program - INACTIVE, only created; active from fs-blueprint on (plan baukasten section c2)
-  metadata:
-    freesynergy.net:states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt, archiviert]
-    freesynergy.net:transitions:
-      offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
-      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]
-      wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-      in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
-      pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
-      abgebrochen: [offen, archiviert]
-      erledigt: [offen, archiviert]
-      archiviert: []
 do:
   - bauplan-anheben:
       call: bauplan-anheben-ai:0.0.13@fs

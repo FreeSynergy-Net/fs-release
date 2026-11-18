@@ -93,26 +93,59 @@ pub fn step_body(text: &str, step: &str) -> String {
     body.split("\n  - ").next().unwrap().to_string()
 }
 
-/// A copy of `workflows/` in a temp folder with `file` changed by `edit`; returns exit code and output of the check.
-pub fn mutated(file: &str, edit: impl Fn(String) -> String) -> (i32, String) {
+/// The run rule set `workflows/run/rules.yaml` (the ONE place of the states of a run).
+pub fn rules() -> String {
+    fs::read_to_string(root().join("workflows/run/rules.yaml")).unwrap()
+}
+
+/// A copy of `workflows/` in a temp folder with `file` changed by `edit` and the rule set changed by `edit_rules`; returns exit code and
+/// output of the check.
+pub fn mutated_both(
+    file: &str,
+    edit: impl Fn(String) -> String,
+    edit_rules: impl Fn(String) -> String,
+) -> (i32, String) {
     let tmp = tempfile::tempdir().unwrap();
     for f in FILES {
         let text = read(f);
         let text = if f == file { edit(text) } else { text };
         fs::write(tmp.path().join(format!("{f}.yaml")), text).unwrap();
     }
+    fs::create_dir(tmp.path().join("run")).unwrap();
+    fs::write(tmp.path().join("run/rules.yaml"), edit_rules(rules())).unwrap();
     python(&script(), &[tmp.path()])
 }
 
-/// A mutation must turn the check red and say `needle`; without `PyYAML` the check says `skipped` (exit 2) instead.
-pub fn assert_red(file: &str, needle: &str, edit: impl Fn(String) -> String) {
+/// A copy of `workflows/` in a temp folder with `file` changed by `edit`; returns exit code and output of the check.
+pub fn mutated(file: &str, edit: impl Fn(String) -> String) -> (i32, String) {
+    mutated_both(file, edit, |r| r)
+}
+
+/// The rule set changed by `edit`, the flows as they are.
+pub fn assert_rules_red(needle: &str, edit: impl Fn(String) -> String) {
+    let (code, out) = mutated_both("", |t| t, edit);
+    check_red(code, &out, needle);
+}
+
+/// A change that must stay green (a valid use of the profile).
+pub fn assert_green(file: &str, edit: impl Fn(String) -> String) {
     let (code, out) = mutated(file, edit);
+    assert_eq!(code, if have_yaml() { 0 } else { 2 }, "{out}");
+}
+
+fn check_red(code: i32, out: &str, needle: &str) {
     if have_yaml() {
         assert_eq!(code, 1, "{out}");
         assert!(out.contains(needle), "wanted {needle:?} in:\n{out}");
     } else {
         assert_eq!(code, 2, "{out}");
     }
+}
+
+/// A mutation must turn the check red and say `needle`; without `PyYAML` the check says `skipped` (exit 2) instead.
+pub fn assert_red(file: &str, needle: &str, edit: impl Fn(String) -> String) {
+    let (code, out) = mutated(file, edit);
+    check_red(code, &out, needle);
 }
 
 pub fn pos(text: &str, step: &str) -> usize {
