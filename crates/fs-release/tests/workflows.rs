@@ -416,3 +416,40 @@ fn mutation_a_step_named_like_a_state_is_red() {
         t.replacen("  - lock:\n", "  - pausiert:\n", 1)
     });
 }
+
+#[test]
+fn mutation_pausiert_and_abgebrochen_must_be_reachable_from_every_live_state() {
+    let stationen = "      stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, abgebrochen, erledigt]";
+    assert_red(
+        "bugfix",
+        "transition 'stationen' -> 'pausiert' is missing",
+        |t| t.replacen(stationen, &stationen.replace("pausiert, ", ""), 1),
+    );
+    assert_red(
+        "bugfix",
+        "transition 'stationen' -> 'abgebrochen' is missing",
+        |t| t.replacen(stationen, &stationen.replace("abgebrochen, ", ""), 1),
+    );
+    assert_red(
+        "bugfix",
+        "transition 'offen' -> 'abgebrochen' is missing",
+        |t| {
+            t.replacen(
+                "offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]",
+                "offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert]",
+                1,
+            )
+        },
+    );
+    assert_red(
+        "bugfix",
+        "transition 'in-prüfung' -> 'pausiert' is missing",
+        |t| {
+            t.replacen(
+                "auf-anfrage, pausiert, abgebrochen, erledigt]\n      pausiert",
+                "auf-anfrage, abgebrochen, erledigt]\n      pausiert",
+                1,
+            )
+        },
+    );
+}
