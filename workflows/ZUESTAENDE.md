@@ -13,7 +13,7 @@ dieselben acht Pflichtzustände plus ihre eigenen Schritte (die Arbeitsstationen
 
 | State / Zustand | Meaning / Bedeutung |
 |---|---|
-| `offen` | created, not started (start state) / angelegt, nicht begonnen (Startzustand) |
+| `offen` | created, not started (start state). ASSUMPTION, confirmation open: not in the order (seven states named), added as the board column / Annahme, Bestätigung offen: nicht beauftragt (sieben Zustände genannt), als Board-Spalte ergänzt |
 | `wartet-auf-entscheidung` | a person must decide (gate) / ein Mensch muss entscheiden |
 | `auf-anfrage` | waits for an answer from outside (request sent) / wartet auf eine Antwort von außen |
 | `in-prüfung` | a review or check is running / Prüfung oder Review läuft |
