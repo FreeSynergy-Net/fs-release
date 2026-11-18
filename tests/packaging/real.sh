@@ -12,7 +12,7 @@ plan=$(make_plan "$R" BINARIES=fs-tasks-app,fs-tasks-server KIND=app NAME=fs-tas
 formats=tar.gz,rpm; command -v cargo-deb >/dev/null && formats=tar.gz,deb,rpm
 plan=$(jq -c --arg f "$formats" '.linux_formats = $f' <<<"$plan")
 mkdir -p "$R/stage"
-(cd "$R" && PLAN="$plan" ARCH=x86_64 TRIPLE="$host" RUNNER_TEMP="$R/stage" GITHUB_WORKSPACE="$R" \
+(cd "$R" && env -u CARGO_TARGET_DIR PLAN="$plan" ARCH=x86_64 TRIPLE="$host" RUNNER_TEMP="$R/stage" GITHUB_WORKSPACE="$R" \
   bash "$ROOT/actions/package-linux/package.sh" >/dev/null)
 rpms=$(cd "$R/dist" && ls ./*.rpm | sed 's#^\./##' | sort | tr '\n' ' ')
 check_has "real: one rpm per package" "$rpms" "tasks-app-0.1.1-1.x86_64.rpm tasks-server-0.1.1-1.x86_64.rpm "

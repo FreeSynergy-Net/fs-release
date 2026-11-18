@@ -10,6 +10,10 @@ T=${TEST_TMP:-${RUNNER_TEMP:-/srv/FreeSynergy/.scratch/t4-relrpm}}/run.$$
 REAL_CARGO=$(command -v cargo)
 FAILS=0
 mkdir -p "$T/bin"
+# A caller (e.g. a build wrapper) may set CARGO_TARGET_DIR. The stub cargo and package-linux must agree on where the binaries
+# live and the caller's real target dir must never get stub files: when it is set, use a throw-away dir inside $T instead
+# (run_linux clears it per run and prints it as @R@/target, so the golden files stay valid).
+if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then export CARGO_TARGET_DIR="$T/cargo-target"; fi
 trap 'rm -rf "$T"' EXIT
 
 cat > "$T/bin/cargo" <<STUB
@@ -33,7 +37,7 @@ if [[ "\$1" == build ]]; then
     case "\$1" in --target) t=\$2; shift ;; --bin) bins+=("\$2"); shift ;; esac
     shift
   done
-  for b in "\${bins[@]}"; do mkdir -p "target/\$t/release"; : > "target/\$t/release/\$b"; : > "target/\$t/release/\$b.exe"; done
+  for b in "\${bins[@]}"; do td=\${CARGO_TARGET_DIR:-target}; mkdir -p "\$td/\$t/release"; : > "\$td/\$t/release/\$b"; : > "\$td/\$t/release/\$b.exe"; done
 fi
 STUB
 printf '#!/usr/bin/env bash\nexit 0\n' > "$T/bin/strip"
@@ -75,11 +79,11 @@ make_plan() {
 }
 
 # run_linux DIR PLAN FORMATS -> run package-linux/package.sh with stubs; prints normalised log, dist listing, rpm tail.
-run_linux() { _run_linux "$@" | sed "s#$1#@R@#g"; }
+run_linux() { _run_linux "$@" | sed "s#$1#@R@#g; s#$T/cargo-target#@R@/target#g"; }
 _run_linux() {
   local d=$1 plan=$2 formats=$3
   plan=$(jq -c --arg f "$formats" '.linux_formats = $f' <<<"$plan")
-  rm -rf "$d/dist" "$d/target" "$T/stage"; mkdir -p "$T/stage"; : > "$T/log"
+  rm -rf "$d/dist" "$d/target" "${T:?}/cargo-target" "$T/stage"; mkdir -p "$T/stage"; : > "$T/log"
   (cd "$d" && PATH="$T/bin:$PATH" PLAN="$plan" ARCH=x86_64 TRIPLE=x86_64-unknown-linux-gnu RUNNER_TEMP="$T" \
     GITHUB_WORKSPACE="$d" STUB_LOG="$T/log" bash "$ROOT/actions/package-linux/package.sh" >/dev/null)
   while IFS= read -r l; do echo "$l"; done < "$T/log"
