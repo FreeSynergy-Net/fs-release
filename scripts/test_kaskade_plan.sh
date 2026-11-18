@@ -40,7 +40,7 @@ py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/ab.json" --ab fs-peop
 chk "lage: with --ab a done-looking Glied without remote tag is red (fs-objects has no v0.0.2)" [ "$rc" -eq 1 ]
 tag_push fs-objects v0.0.2
 py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/ab.json" --ab fs-people --ohne-ci >"$tmp/lage-ab.json"; rc=$?
-chk "lage: with --ab and both tags on the remote: rc 0, two done with proof" [ "$rc" -eq 0 ] && [ "$(q "$tmp/lage-ab.json" '[e["repo"] for e in d["erledigt"]]')" = "['fs-interfaces', 'fs-objects']" ]
+chk "lage: with --ab and both tags on the remote: rc 0, two done with proof" [ "$rc" -eq 0 ] && chk "lage: with --ab and both tags on the remote: rc 0, two done with proof [part 2]" [ "$(q "$tmp/lage-ab.json" '[e["repo"] for e in d["erledigt"]]')" = "['fs-interfaces', 'fs-objects']" ]
 # the CI state of exactly this head, from a local stand-in of the public REST API (GET only)
 mkdir -p "$tmp/api/repos/FreeSynergy/fs-interfaces/actions"
 printf '{"workflow_runs":[{"name":"windows","head_sha":"%s","status":"completed","conclusion":"success"},{"name":"windows","head_sha":"0000","status":"completed","conclusion":"failure"}]}' "$ifc_head" >"$tmp/api/repos/FreeSynergy/fs-interfaces/actions/runs"
@@ -74,11 +74,31 @@ done
 printf '[{"repo":"cyc-a","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"cyc-b","art":"bibliothek","tag":"v0.0.1","allow":"x"}]' >"$tmp/g3.json"
 py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g3.json" --ohne-ci >"$tmp/lage3.json"
 py "$here/kaskade-plan" --lage "$tmp/lage3.json" >"$tmp/o.json"; rc=$?
-chk "plan: a cycle is a finding (rc 1)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" '"cycle" in d["befunde"][0]')" = True ]
+chk "plan: a cycle is a finding (rc 1)" [ "$rc" -eq 1 ] && chk "plan: a cycle is a finding (rc 1) [part 2]" [ "$(q "$tmp/o.json" '"cycle" in d["befunde"][0]')" = True ]
+
+# known foreign sources by TAG (K1: the real Glieder pin FreeSynergy/Blinc and FreeSynergy/fs-capnpc by tag): no finding, listed; without the list they are findings
+newrepo ext-a; printf '[dependencies]\nblinc_app = { git = "%s/Blinc", tag = "fs-blinc-3.1" }\ncapnp-compiler = { git = "%s/fs-capnpc", tag = "v0.0.1" }\n' "$GH" "$GH" >"$tmp/work/ext-a/Cargo.toml"
+commit_push ext-a one; tag_push ext-a v0.0.1
+printf '[{"repo":"ext-a","art":"bibliothek","tag":"v0.0.1","allow":"x"}]' >"$tmp/g4.json"
+py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g4.json" --ohne-ci >"$tmp/lage4.json"
+py "$here/kaskade-plan" --lage "$tmp/lage4.json" >"$tmp/o.json"; rc=$?
+chk "plan: Blinc and fs-capnpc pinned by tag are known foreign sources, not findings (rc 0)" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" 'd["offen"][0]["fremdquellen"]')" = "['FreeSynergy/Blinc', 'FreeSynergy/fs-capnpc']" ]
+printf '' >"$tmp/leer0.txt"; py "$here/kaskade-plan" --lage "$tmp/lage4.json" --fremdquellen "$tmp/leer0.txt" >"$tmp/o.json"; rc=$?
+chk "plan: without the foreign-source list the same pins are findings (rc 1)" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" 'len(d["befunde"])')" = 2 ]
+chk "the shipped foreign-source list names fs-capnpc and Blinc" grep -q '^FreeSynergy/fs-capnpc' "$here/../workflows/kaskade-fremdquellen.txt" && chk "the shipped foreign-source list names Blinc" grep -q '^FreeSynergy/Blinc' "$here/../workflows/kaskade-fremdquellen.txt"
+# K3: a Windows caller that is too old (@v0.0.10 < v0.0.11) or floats (@main) is no caller in order (rule B4: a tag >= the fs-release tag)
+for w in win-old:v0.0.10 win-main:main win-new:v0.0.12 win-eq:v0.0.11; do
+  newrepo "${w%%:*}"; mkdir -p "$tmp/work/${w%%:*}/.github/workflows"
+  printf 'name: windows\njobs:\n  windows:\n    uses: FreeSynergy/fs-release/.github/workflows/_windows-check.yml@%s\n' "${w##*:}" >"$tmp/work/${w%%:*}/.github/workflows/windows.yml"
+  printf '[package]\nname = "x"\n' >"$tmp/work/${w%%:*}/Cargo.toml"; commit_push "${w%%:*}" one; tag_push "${w%%:*}" v0.0.1
+done
+printf '[{"repo":"win-old","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-main","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-new","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-eq","art":"bibliothek","tag":"v0.0.1","allow":"x"}]' >"$tmp/g5.json"
+py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g5.json" --ohne-ci >"$tmp/lage5.json"
+chk "lage: a Windows caller at v0.0.10 (< v0.0.11) and at @main are pin_ok false and in ohne_aufrufer" [ "$(q "$tmp/lage5.json" 'sorted(d["ohne_aufrufer"])')" = "['win-main', 'win-old']" ] && [ "$(q "$tmp/lage5.json" '[(w["repo"], w["aufrufer"], w["pin_ok"]) for w in d["windows"]]')" = "[('win-old', True, False), ('win-main', True, False), ('win-new', True, True), ('win-eq', True, True)]" ]
 
 # ---- kaskade-glied ----
 py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
-chk "glied: takes offen[0] (fs-interfaces) with the trigger as lib" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" '(d["repo"], d["libs"], d["prioritaet"])')" = "('fs-interfaces', ['fs-types=v0.0.3'], 0)" ]
+chk "glied: takes offen[0] (fs-interfaces) with the trigger as lib" [ "$rc" -eq 0 ] && chk "glied: takes offen[0] (fs-interfaces) with the trigger as lib [part 2]" [ "$(q "$tmp/o.json" '(d["repo"], d["libs"], d["prioritaet"])')" = "('fs-interfaces', ['fs-types=v0.0.3'], 0)" ]
 printf '{"offen":[{"repo":"fs-tasks","art":"programm","tag":"v0.0.2","allow":"x","abhaengig":["fs-types","fs-interfaces","fs-people"]}],"erledigt":[{"repo":"fs-interfaces","tag":"v0.0.2","beleg":"b"},{"repo":"fs-people","tag":"v0.0.5","beleg":"b"}]}' >"$tmp/p3.json"
 py "$here/kaskade-glied" --plan "$tmp/p3.json" --ausloeser v0.0.3 >"$tmp/o.json"
 chk "glied: libs = trigger + tags of the done Glieder the lift knows; fs-people only in tags" [ "$(q "$tmp/o.json" '(d["libs"], d["tags"]["fs-people"])')" = "(['fs-interfaces=v0.0.2', 'fs-types=v0.0.3'], 'v0.0.5')" ]
@@ -88,10 +108,10 @@ chk "glied: a dependency that is not done is red (rc 1)" [ "$rc" -eq 1 ]
 # the tool file .fs-lock-sources.toml of the Glied worktree: created, raised from strict = false (reported), kept
 mkdir -p "$tmp/wt1" "$tmp/wt2" "$tmp/wt3"
 py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 --dir "$tmp/wt1" >"$tmp/o.json"
-chk "glied --dir: a missing .fs-lock-sources.toml is created strict" [ "$(q "$tmp/o.json" 'd["lock_datei"]')" = angelegt ] && grep -q '^strict = true' "$tmp/wt1/.fs-lock-sources.toml" && grep -q '^only_from_enabled = true' "$tmp/wt1/.fs-lock-sources.toml"
+chk "glied --dir: a missing .fs-lock-sources.toml is created strict" [ "$(q "$tmp/o.json" 'd["lock_datei"]')" = angelegt ] && chk "glied --dir: a missing .fs-lock-sources.toml is created strict [part 2]" grep -q '^strict = true' "$tmp/wt1/.fs-lock-sources.toml" && chk "glied --dir: a missing .fs-lock-sources.toml is created strict [part 3]" grep -q '^only_from_enabled = true' "$tmp/wt1/.fs-lock-sources.toml"
 printf 'strict = false\nonly_from_enabled = true\n' >"$tmp/wt2/.fs-lock-sources.toml"
 py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 --dir "$tmp/wt2" >"$tmp/o.json"
-chk "glied --dir: strict = false is raised to true and reported" [ "$(q "$tmp/o.json" '(d["lock_datei"], len(d["hinweise"]))')" = "('gehoben', 1)" ] && grep -q '^strict = true' "$tmp/wt2/.fs-lock-sources.toml"
+chk "glied --dir: strict = false is raised to true and reported" [ "$(q "$tmp/o.json" '(d["lock_datei"], len(d["hinweise"]))')" = "('gehoben', 1)" ] && chk "glied --dir: strict = false is raised to true and reported [part 2]" grep -q '^strict = true' "$tmp/wt2/.fs-lock-sources.toml"
 printf 'strict = true\nonly_from_enabled = true\n' >"$tmp/wt3/.fs-lock-sources.toml"
 py "$here/kaskade-glied" --plan "$tmp/plan.json" --ausloeser v0.0.3 --dir "$tmp/wt3" >"$tmp/o.json"
 chk "glied --dir: a strict file stays (vorhanden)" [ "$(q "$tmp/o.json" 'd["lock_datei"]')" = vorhanden ]
@@ -100,7 +120,7 @@ chk "glied: an empty offen is bad input (rc 2)" [ "$rc" -eq 2 ]
 
 # ---- kaskade-glied-fertig ----
 py "$here/kaskade-glied-fertig" --plan "$tmp/plan.json" --glied '{"repo":"fs-interfaces","tag":"v0.0.2"}' --beleg "ff proof" >"$tmp/o.json"; rc=$?
-chk "glied-fertig: rc 0, offen shorter by one" [ "$rc" -eq 0 ] && [ "$(q "$tmp/o.json" 'len(d["offen"])')" = 3 ]
+chk "glied-fertig: rc 0, offen shorter by one" [ "$rc" -eq 0 ] && chk "glied-fertig: rc 0, offen shorter by one [part 2]" [ "$(q "$tmp/o.json" 'len(d["offen"])')" = 3 ]
 chk "glied-fertig: offen_vorher is the OLD length (loop guard)" [ "$(q "$tmp/o.json" 'd["offen_vorher"]')" = 4 ]
 chk "glied-fertig: erledigt carries tag and the ls-remote proof" [ "$(q "$tmp/o.json" '(d["erledigt"][-1]["tag"], "refs/tags/v0.0.2 = " + "%s" in d["erledigt"][-1]["beleg"] or "refs/tags/v0.0.2" in d["erledigt"][-1]["beleg"])')" = "('v0.0.2', True)" ]
 chk "glied-fertig: a board note text is returned" [ "$(q "$tmp/o.json" '"fs-interfaces v0.0.2 done" in d["karte_notiz"]')" = True ]
@@ -111,7 +131,7 @@ py "$here/kaskade-glied-fertig" --plan "$tmp/plan.json" --glied '{"repo":"fs-tas
 chk "glied-fertig: only offen[0] can be closed (rc 2)" [ "$rc" -eq 2 ]
 python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); d["offen"]=d["offen"][1:]; json.dump(d,open(sys.argv[2],"w"))' "$tmp/plan.json" "$tmp/p6.json"
 py "$here/kaskade-glied-fertig" --plan "$tmp/p6.json" --glied '{"repo":"fs-people","tag":"v0.0.77"}' >"$tmp/o.json"; rc=$?
-chk "glied-fertig: a tag that is not on the remote is red, the plan stays" [ "$rc" -eq 1 ] && [ "$(q "$tmp/o.json" 'len(d["offen"])')" = 3 ]
+chk "glied-fertig: a tag that is not on the remote is red, the plan stays" [ "$rc" -eq 1 ] && chk "glied-fertig: a tag that is not on the remote is red, the plan stays [part 2]" [ "$(q "$tmp/o.json" 'len(d["offen"])')" = 3 ]
 
 # ---- mutants: one per script, each must turn one of the cases above red ----
 cp "$here"/kaskade-lage "$here"/kaskade-plan "$here"/kaskade-glied "$here"/kaskade-glied-fertig "$tmp/mut/"
@@ -131,4 +151,14 @@ chk "mutant glied (a false switch is kept) is caught by the strict = false case"
 mutate "$here/kaskade-glied-fertig" 'new["offen_vorher"] = len(offen)' 'new["offen_vorher"] = 0' "$tmp/mut/kaskade-glied-fertig" || bad "mutant fertig not applied"
 py "$tmp/mut/kaskade-glied-fertig" --plan "$tmp/plan.json" --glied '{"repo":"fs-interfaces","tag":"v0.0.2"}' >"$tmp/o.json"
 chk "mutant glied-fertig (loop guard value lost) is caught by the offen_vorher case" [ "$(q "$tmp/o.json" 'd["offen_vorher"]')" != 4 ]
+# K1/K3 mutants: the foreign-source test removed (Blinc/fs-capnpc become findings), the Windows pin check removed (every caller is fine)
+cp "$here"/kaskade-lage "$here"/kaskade-plan "$tmp/mut/"; cp "$here"/kaskade_lib/kcargo.py "$here"/kaskade_lib/kwindows.py "$tmp/mut/kaskade_lib/"  # clean copies again
+mutate "$here/kaskade_lib/kcargo.py" 'return f"{dep['"'"'owner'"'"']}/{dep['"'"'repo'"'"']}".lower() in fremd' 'return False' "$tmp/mut/kaskade_lib/kcargo.py" || bad "mutant kcargo not applied"
+py "$tmp/mut/kaskade-plan" --lage "$tmp/lage4.json" >"$tmp/o.json"; rc=$?
+chk "mutant plan (foreign sources never recognised) is caught by the Blinc/fs-capnpc case" [ "$rc" -ne 0 ]
+cp "$here"/kaskade_lib/kcargo.py "$tmp/mut/kaskade_lib/"
+mutate "$here/kaskade_lib/kwindows.py" 'return True, ref, bool(k and lo and k >= lo)' 'return True, ref, True' "$tmp/mut/kaskade_lib/kwindows.py" || bad "mutant kwindows not applied"
+py "$tmp/mut/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/g5.json" --ohne-ci >"$tmp/o.json"
+chk "mutant lage (every Windows pin accepted, MD) is caught by the too-old and @main case" [ "$(q "$tmp/o.json" 'sorted(d["ohne_aufrufer"])')" != "['win-main', 'win-old']" ]
+cp "$here"/kaskade_lib/kwindows.py "$tmp/mut/kaskade_lib/"
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

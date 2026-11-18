@@ -8,6 +8,7 @@ every git dependency on a FreeSynergy repo (`tag` AND `rev`): the owner repo is 
 Glied is none); the trigger repo fs-types is a known owner. Sorted topologically with the stable tie order of the `glieder` list (the first Glied of the list whose dependencies are all done).
 A dependency on a FreeSynergy repo that is neither a Glied, fs-types nor a KNOWN FOREIGN SOURCE (workflows/kaskade-fremdquellen.txt, e.g. the Blinc patch repos), a crate that comes from a repo
 that is not its owner and cannot be moved by the lift (only the crate `fs-types` is moved from the repo fs-interfaces) and a cycle are `befunde` (the cascade stops, nothing is guessed).
+`[patch]` tables are not read (a patch source is no dependency edge).
 Result JSON: {status, red, ausloeser, offen:[{repo, art, tag, allow, besonderes, abhaengig, rev_pins, falsche_quellen, fremdquellen}], erledigt, kanten, befunde}.
 rc 0 = plan, 1 = befunde, 2 = bad input or no remote.
 """
