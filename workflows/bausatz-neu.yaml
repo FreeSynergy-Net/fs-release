@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: bausatz-neu
-  version: 0.0.13
+  version: 0.0.14
   title: Create a data kit (ADR 0098) - existing first, 2 users, standard per field, description, storage plan, release, trait review
 do:
   - vorhanden-pruefen:
-      call: vorhanden-pruefen-ai:0.0.13@fs
+      call: vorhanden-pruefen-ai:0.0.14@fs
       with:
         suche: ${ .input }
       export:
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
   - vorhanden-pruefen-check:
-      call: befund-beleg:0.0.13@fs
+      call: befund-beleg:0.0.14@fs
       with:
         befund: ${ $context.befund }
       export:
@@ -72,7 +72,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - `vorhanden` ends the run with the reference \"extend X\" (no new build); `neu` (with proof, checked above) goes on; a missing result goes to the escalation."
   - karte:
-      call: board-card:0.0.13@fs
+      call: board-card:0.0.14@fs
       with:
         workflow: bausatz-neu
         name: ${ .input.name }
@@ -83,7 +83,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
   - nutzer-pruefen:
-      call: nutzer-zaehlen:0.0.13@fs
+      call: nutzer-zaehlen:0.0.14@fs
       with:
         art: bausatz
         nutzer: ${ .input.nutzer }
@@ -113,7 +113,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - fewer than 2 users abort the run; a missing result goes to `eskalation`."
   - standard-pruefen:
-      call: standard-belegen-ai:0.0.13@fs
+      call: standard-belegen-ai:0.0.14@fs
       with:
         felder: ${ .input.felder }
       metadata:
@@ -123,7 +123,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Prove a standard URI with a section for every field."
   - standard-pruefen-check:
-      call: standard-belege:0.0.13@fs
+      call: standard-belege:0.0.14@fs
       with:
         felder: ${ .input.felder }
       export:
@@ -154,7 +154,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `standard-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - beschreibung:
-      call: bausatz-beschreibung-ai:0.0.13@fs
+      call: bausatz-beschreibung-ai:0.0.14@fs
       with:
         name: ${ .input.name }
         medientyp: ${ .input.medientyp }
@@ -166,7 +166,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Description of the kit in fs-types on the branch `unreviewed/bausatz-<name>` (local commit, no push): fields, form duty, media type; no duty beyond the form (a duty only in contracts)."
   - beschreibung-check:
-      call: bausatz-form-regel:0.0.13@fs
+      call: bausatz-form-regel:0.0.14@fs
       with:
         name: ${ .input.name }
       export:
@@ -197,7 +197,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `beschreibung` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - erzeugen-plan:
-      call: erzeugen-plan-ai:0.0.13@fs
+      call: erzeugen-plan-ai:0.0.14@fs
       with:
         name: ${ .input.name }
       metadata:
@@ -207,7 +207,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Describe the storage form (1:1 column group, 1:n sub table), `accepts` and the `TypeCatalog` entry; the generation itself comes with `fs-blueprint`. Only append; no JSON or blob column."
   - erzeugen-plan-check:
-      call: bausatz-speicher-regel:0.0.13@fs
+      call: bausatz-speicher-regel:0.0.14@fs
       with:
         name: ${ .input.name }
       export:
@@ -238,7 +238,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `erzeugen-plan` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - freigabe-pruefen:
-      call: freigabe-pruefen-ai:0.0.13@fs
+      call: freigabe-pruefen-ai:0.0.14@fs
       with:
         name: ${ .input.name }
         felder: ${ .input.felder }
@@ -249,7 +249,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Personal data? Then a release per kit group is foreseen (ADR 0098 point 4.6); no personal data: say so."
   - freigabe-pruefen-check:
-      call: bausatz-freigabe-regel:0.0.13@fs
+      call: bausatz-freigabe-regel:0.0.14@fs
       with:
         name: ${ .input.name }
       export:
@@ -280,7 +280,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `freigabe-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - trait-review:
-      call: trait-review-opus:0.0.13@fs
+      call: trait-review-opus:0.0.14@fs
       with:
         name: ${ .input.name }
       export:
@@ -311,7 +311,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a NO goes back to `beschreibung` (at most two repeats), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
   - bericht:
-      call: report-write:0.0.13@fs
+      call: report-write:0.0.14@fs
       with:
         lauf: ${ $context }
       then: end

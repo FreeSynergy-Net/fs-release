@@ -6,11 +6,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: picture-acceptance
-  version: 0.0.13
+  version: 0.0.14
   title: Show model and our pictures, take the strategy's and the user's verdict
 do:
   - menue-bilder:
-      call: menu-images:0.0.13@fs
+      call: menu-images:0.0.14@fs
       with:
         dossier: ${ .input.dossier }
         model: ${ .input.model }
@@ -40,7 +40,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a missing menu tree in the dossier is red and goes to `dossier-menue-fehlt` (first complete the dossier); a missing picture pair is red and goes to `menue-bild-fehlt`; only a complete package goes on to `pictures`. Nothing is built before the package Vorbild|unser exists."
   - pictures:
-      call: show-images:0.0.13@fs
+      call: show-images:0.0.14@fs
       with:
         model: ${ .input.model }
         ours: ${ .input.ours }
@@ -52,7 +52,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Shows the model (Vorbild) and our picture side by side; whatever they look like, the state changes to shown.
   - strategy-verdict:
-      call: verdict-ai:0.0.13@fs
+      call: verdict-ai:0.0.14@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application
@@ -60,7 +60,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The strategy judges each pair - accepted or what differs; it is an opinion, not a measurement.
   - user-verdict:
-      call: ask:0.0.13@fs
+      call: ask:0.0.14@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -68,7 +68,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The user's verdict is subjective and is taken as it is; nobody argues it down.
   - next:
-      call: route-verdict:0.0.13@fs
+      call: route-verdict:0.0.14@fs
       metadata:
         freesynergy.net:actor: ai
         freesynergy.net:actor-type: Application

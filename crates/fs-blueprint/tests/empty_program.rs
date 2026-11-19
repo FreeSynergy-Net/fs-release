@@ -88,7 +88,7 @@ fn the_pins_come_from_the_skeleton_table() {
         ".github/workflows/check.yml",
         ".github/workflows/windows.yml",
     ] {
-        assert!(get(&a, p).contains("@v0.0.13"), "{p}");
+        assert!(get(&a, p).contains("@v0.0.14"), "{p}");
     }
 }
 

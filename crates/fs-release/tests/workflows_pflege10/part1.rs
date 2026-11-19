@@ -67,7 +67,7 @@ pub(super) fn fixed_calls(t: &str) -> bool {
         .collect();
     calls.len() == CALLS.len()
         && calls.iter().all(|c| {
-            c.strip_suffix(":0.0.13@fs")
+            c.strip_suffix(":0.0.14@fs")
                 .is_some_and(|name| CALLS.contains(&name))
         })
 }

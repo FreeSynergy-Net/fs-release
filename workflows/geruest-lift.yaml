@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: geruest-lift
-  version: 0.0.13
+  version: 0.0.14
   title: Lift the scaffold version of a program - INACTIVE, only created; active from fs-blueprint on (plan baukasten section c2)
 do:
   - bauplan-anheben:
-      call: bauplan-anheben-ai:0.0.13@fs
+      call: bauplan-anheben-ai:0.0.14@fs
       with:
         programm: ${ .input.programm }
         skeleton_neu: ${ .input.skeleton_neu }
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "INACTIVE until `fs-blueprint` exists. Raise `skeleton` in the blueprint of the program to `skeleton_neu` (local commit on `unreviewed/geruest-lift-<programm>`, no push)."
   - erzeugen:
-      call: fs-blueprint-generate:0.0.13@fs
+      call: fs-blueprint-generate:0.0.14@fs
       with:
         programm: ${ .input.programm }
       metadata:
@@ -38,7 +38,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: lift
-          version: 0.0.13
+          version: 0.0.14
         input:
           repo: ${ .input.repo }
           commit: true
@@ -52,7 +52,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (library tags of the program)."
   - check:
-      call: fs-blueprint-check:0.0.13@fs
+      call: fs-blueprint-check:0.0.14@fs
       with:
         programm: ${ .input.programm }
       export:

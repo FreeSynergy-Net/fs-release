@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: ausnahme-gespraech
-  version: 0.0.13
+  version: 0.0.14
   title: Exception only after a conversation - prepare candidates and alternatives, conversation of the user and Opus, protocol, then enter
 do:
   - karte:
-      call: board-card:0.0.13@fs
+      call: board-card:0.0.14@fs
       with:
         workflow: ausnahme-gespraech
         programm: ${ .input.programm }
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
   - vorbereiten:
-      call: gespraech-vorbereiten-ai:0.0.13@fs
+      call: gespraech-vorbereiten-ai:0.0.14@fs
       with:
         programm: ${ .input.programm }
         was: ${ .input.was }
@@ -39,7 +39,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus checks the candidates (modules, kits, rule sets, workflows, components), formulates ALTERNATIVES and \"to what does it fit?\"; output `talk-vorlage.md`."
   - vorbereiten-check:
-      call: vorlage-regel:0.0.13@fs
+      call: vorlage-regel:0.0.14@fs
       with:
         vorlage: ${ $context.vorlage }
       export:
@@ -70,7 +70,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `vorbereiten` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - gespraech:
-      call: talk:0.0.13@fs
+      call: talk:0.0.14@fs
       with:
         programm: ${ .input.programm }
         vorlage: talk-vorlage.md
@@ -109,7 +109,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: modul-neu
-          version: 0.0.13
+          version: 0.0.14
         input:
           name: ${ $context.protokoll.modul }
           kategorie: ${ $context.protokoll.kategorie }
@@ -125,7 +125,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sub-workflow `modul-neu` for the module the conversation decided on (existing first, users, standard)."
   - eintragen:
-      call: ausnahme-eintragen-ai:0.0.13@fs
+      call: ausnahme-eintragen-ai:0.0.14@fs
       with:
         programm: ${ .input.programm }
         talk: ${ $context.protokoll.pfad }
@@ -137,7 +137,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "By the decision of the protocol: use the block, or the module from `modul-anlegen`, or `[[exception]]` with `what`, `why`, `checked`, `alternatives` and `talk` (path of the protocol). Output a diff of the plan (blueprint); local commit on `unreviewed/ausnahme-<programm>`, no push."
   - eintragen-check:
-      call: ausnahme-regel:0.0.13@fs
+      call: ausnahme-regel:0.0.14@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -168,7 +168,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `eintragen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - bericht:
-      call: report-write:0.0.13@fs
+      call: report-write:0.0.14@fs
       with:
         lauf: ${ $context }
       then: end

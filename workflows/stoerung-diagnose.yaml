@@ -11,11 +11,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: stoerung-diagnose
-  version: 0.0.13
+  version: 0.0.14
   title: "Diagnose a fault read-only in the own directory - cause, proof, proposal, no fix in the same run"
 do:
   - symptom-aufnehmen:
-      call: take-symptom:0.0.13@fs
+      call: take-symptom:0.0.14@fs
       with:
         symptom: ${ .input.symptom }
         bereich: ${ .input.bereich }
@@ -28,7 +28,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The symptom is taken as the person tells it (what was done, what was expected, what happened, since when, how often, which version); nothing is corrected, nothing guessed. Missing facts are asked for, never invented. Result `symptom`."
   - ort-pruefen:
-      call: diagnose-place:0.0.13@fs
+      call: diagnose-place:0.0.14@fs
       with:
         repo: ${ .input.repo }
         logs: ${ .input.logs }
@@ -54,7 +54,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red or missing `ort` result goes to `nutzeranleitung` (the run measures nothing and ends there); only `red == false` goes on to the logs."
   - logs-lesen:
-      call: read-logs-ai:0.0.13@fs
+      call: read-logs-ai:0.0.14@fs
       with:
         repo: ${ .input.repo }
         version: ${ .input.version }
@@ -69,7 +69,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent READS the copies of logs and protocols (program log, journal extract, crash report, `tasks.log` style files) and the code paths named by them; it only reads: it starts nothing, changes no file outside its own report folder, calls no tool on a real server. Facts are quoted with file and line. Result `logs` (list of facts: where, what, since when, which version)."
   - hypothesen:
-      call: hypotheses-ai:0.0.13@fs
+      call: hypotheses-ai:0.0.14@fs
       with:
         logs: ${ $context.logs }
         symptom: ${ $context.symptom }
@@ -82,7 +82,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent writes the hypotheses, each with what would PROVE it and what would REFUTE it (the lesson of the single-instance hang: 'handed over and ended' was refuted by the code, not by feeling); in a later round it takes the result of the last reproduction into account. Result `hypothesen`, the most likely first, carrying `runde` (+1 for each jump back)."
   - reproduktion:
-      call: reproduce-ai:0.0.13@fs
+      call: reproduce-ai:0.0.14@fs
       with:
         repo: ${ .input.repo }
         version: ${ .input.version }
@@ -112,7 +112,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - not reproduced goes back to `hypothesen`, from the third round (`runde` >= 3) to `eskalation` (the person decides, a safe instruction for a measurement on the person's side may follow); only `red == false` goes on."
   - ursache-belegen:
-      call: prove-cause-ai:0.0.13@fs
+      call: prove-cause-ai:0.0.14@fs
       with:
         repo: ${ .input.repo }
         repro: ${ $context.repro }
@@ -142,7 +142,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a cause that is not proven (or a missing result) goes back to `hypothesen`, from the third round (`runde` >= 3) to `eskalation`; only `belegt == true` goes on to the check that nothing was fixed."
   - kein-fix:
-      call: no-fix-check:0.0.13@fs
+      call: no-fix-check:0.0.14@fs
       with:
         repo: ${ .input.repo }
         version: ${ .input.version }
@@ -168,7 +168,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a changed product code (or a missing result) goes to `eskalation` (the change is dropped, a fix is its own run through `bugfix`); only `red == false` goes on to the report."
   - bericht:
-      call: report-ai:0.0.13@fs
+      call: report-ai:0.0.14@fs
       with:
         symptom: ${ $context.symptom }
         ursache: ${ $context.ursache }
@@ -181,7 +181,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The agent writes the report ([BERICHT], at most 20 lines) with cause, proof (facts with source and measured numbers), the reproduction (how to repeat it in the own directory) and a PROPOSAL for the fix; it also says what is NOT proven. The report names no real server, no user data and no address."
   - uebergabe:
-      call: hand-over:0.0.13@fs
+      call: hand-over:0.0.14@fs
       with:
         bericht: ${ $context.bericht }
       then: end

@@ -1,4 +1,4 @@
-# created by fs-blueprint 0.0.13; from now on this file belongs to the program and is never overwritten
+# created by fs-blueprint 0.0.14; from now on this file belongs to the program and is never overwritten
 [package]
 name = "fs-tasks-core"
 description = "The own core of fs-tasks: the domain code of the program (a seed: it belongs to the program once it is written)"

@@ -62,8 +62,8 @@ fn counter_gate_after_convert_or_by_the_agent_is_caught() {
         "zwei-stile"
     )));
     let ai = text.replacen(
-        "  - zwei-stile:\n      call: zwei-stile:0.0.13@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { stile2: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
-        "  - zwei-stile:\n      call: zwei-stile:0.0.13@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { stile2: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
+        "  - zwei-stile:\n      call: zwei-stile:0.0.14@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { stile2: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
+        "  - zwei-stile:\n      call: zwei-stile:0.0.14@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { stile2: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
         1,
     );
     assert_ne!(ai, text);
@@ -137,8 +137,8 @@ fn counter_style_save_without_licence_or_after_images_is_caught() {
         "images"
     )));
     let by_ai = text.replacen(
-        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.13@fs\n      with:\n        contract: ${ .input.contract }\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
-        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.13@fs\n      with:\n        contract: ${ .input.contract }\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
+        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.14@fs\n      with:\n        contract: ${ .input.contract }\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: machine",
+        "  - stil-vollstaendigkeit:\n      call: stil-vollstaendigkeit:0.0.14@fs\n      with:\n        contract: ${ .input.contract }\n      export:\n        as: '${ $context + { vollstaendig: . } }'\n      metadata:\n        freesynergy.net:actor: ai",
         1,
     );
     assert_ne!(by_ai, text);

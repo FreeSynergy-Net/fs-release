@@ -259,7 +259,7 @@ fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
     let (r, _) = run(&w, &w.opts());
     assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
     let t = w.read(".github/workflows/check.yml");
-    assert!(t.contains("check.yml@v0.0.13\n") && t.contains("actions/checkout@v4"));
+    assert!(t.contains("check.yml@v0.0.14\n") && t.contains("actions/checkout@v4"));
     assert!(!t.contains("@main"));
     // A second run finds the tag in place and changes nothing.
     let (r, _) = run(&w, &w.opts());
