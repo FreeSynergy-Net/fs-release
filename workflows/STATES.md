@@ -58,3 +58,6 @@ reasons), `- assign-role: reviewer`, `- create-decision: <title>`, `- run-status
 `freesynergy.net:origin: local` (only runs of local origin), no shell, no shell syntax (also no line break), no INTERPRETER (perl, python*, ruby, node,
 awk, find, xargs, sudo ... run any code, on the command line or on the allow list), and the command is a script under `scripts/` or a program in the
 list `freesynergy.net:allow`.
+Every entry of `freesynergy.net:allow` is a decision of trust: the interpreter list cannot be complete (it is compared without upper/lower case), and
+a program that is not on it may still run foreign code. / Jeder Eintrag von `freesynergy.net:allow` ist eine Vertrauensentscheidung: die Liste der
+Interpreter kann nie vollständig sein (Vergleich ohne Groß-/Kleinschreibung), ein Programm, das nicht darauf steht, kann trotzdem fremden Code ausführen.
