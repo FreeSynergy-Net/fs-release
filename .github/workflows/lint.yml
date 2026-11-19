@@ -114,6 +114,10 @@ jobs:
         id: blueprint-check-step
         continue-on-error: true
         run: bash scripts/test_blueprint_check_step.sh
+      - name: release plan probe step of check.yml self test (fixture workspaces, the real plan.py; the fs-forms-run case; mutants)
+        id: plan-probe-step
+        continue-on-error: true
+        run: bash scripts/test_plan_probe_step.sh
       - name: topmost CHANGELOG section (Unreleased or the crate version, no date, not empty) and its mutants
         id: topmost-changelog-section
         continue-on-error: true
@@ -172,6 +176,7 @@ jobs:
             pin-consistency-one ${{ steps.pin-consistency-one.outcome }}
             readme-runner-self ${{ steps.readme-runner-self.outcome }}
             blueprint-check-step ${{ steps.blueprint-check-step.outcome }}
+            plan-probe-step ${{ steps.plan-probe-step.outcome }}
             topmost-changelog-section ${{ steps.topmost-changelog-section.outcome }}
             signing-setup-script ${{ steps.signing-setup-script.outcome }}
             lock-check-self ${{ steps.lock-check-self.outcome }}

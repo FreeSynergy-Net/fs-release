@@ -99,12 +99,84 @@ jobs:
             if [ "$MODE" = block ]; then exit "$rc"; fi
             echo "::warning::fs-blueprint check found errors (mode warn: the job stays green)"
           fi
+      # Release plan probe: a repo with its own .github/workflows/release.yml (a call of the fs-release release workflow) runs the REAL plan action on the release inputs read from that file,
+      # so a new binary crate that is neither in `binaries` nor in `ignore-binaries` (fs-forms v0.0.3: fs-forms-run) is red on the branch, not first at the tag. The tag the plan needs is
+      # taken from the Cargo version of the package that owns the binaries. Self test: scripts/test_plan_probe_step.sh (also keeps the defaults below equal to those of release.yml).
+      - name: Release plan inputs (read from the caller's release.yml)
+        id: release-inputs
+        continue-on-error: true
+        if: hashFiles('.github/workflows/release.yml') != ''
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+        run: |
+          python3 -I - <<'PY'
+          import json, os, re, subprocess, sys
+          import yaml
+          DEFAULTS = {"name": "", "binaries": "", "ignore-binaries": "", "cargo-package": "", "working-directory": ".", "features": "", "kind": "cli", "app-id": "", "app-name": "",
+                      "description": "", "linux-targets": "x86_64,aarch64", "windows-targets": "x86_64", "macos": "true", "linux-formats": "", "windows-formats": "", "macos-formats": ""}
+          root, out = os.environ["REPO_ROOT"], os.environ["GITHUB_OUTPUT"]
+          def put(k, v):
+              with open(out, "a", encoding="utf-8") as f:
+                  f.write(f"{k}={v}\n")
+          doc = yaml.safe_load(open(os.path.join(root, ".github/workflows/release.yml"), encoding="utf-8"))
+          calls = [j for j in (doc.get("jobs") or {}).values() if isinstance(j, dict) and str(j.get("uses", "")).startswith("FreeSynergy/fs-release/.github/workflows/release.yml@")]
+          if not calls:
+              print("::notice::release.yml does not call the fs-release release workflow: no plan probe")
+              put("probe", "false")
+              sys.exit(0)
+          if len(calls) > 1:
+              print("::warning::release.yml calls the release workflow more than once: only the first call is probed")
+          vals = dict(DEFAULTS)
+          for k, v in (calls[0].get("with") or {}).items():
+              if k not in DEFAULTS:
+                  continue
+              vals[k] = ("true" if v else "false") if isinstance(v, bool) else str(v)
+          bad = [k for k, v in vals.items() if "${{" in v or "\n" in v or "\r" in v]
+          if bad:
+              print(f"::warning::release.yml input(s) {', '.join(bad)} are not plain values: no plan probe")
+              put("probe", "false")
+              sys.exit(0)
+          workdir = os.path.join(root, vals["working-directory"])
+          pkgs = json.loads(subprocess.run(["cargo", "metadata", "--format-version", "1", "--no-deps"], cwd=workdir, check=True, capture_output=True, text=True).stdout)["packages"]
+          bins = set(re.split(r"[,\s]+", vals["binaries"]))
+          mine = [p for p in pkgs if not vals["cargo-package"] or p["name"] == vals["cargo-package"]]
+          owners = [p for p in mine if any("bin" in t["kind"] and t["name"] in bins for t in p["targets"])] or mine
+          put("tag", "v" + owners[0]["version"] if owners else "v0.0.0")
+          for k, v in vals.items():
+              put(k, v)
+          put("probe", "true")
+          PY
+      - name: Release plan probe (actions/plan on those inputs; a binary crate that is not packaged and not ignored is red now, not at the tag)
+        id: release-plan-probe
+        continue-on-error: true
+        if: steps.release-inputs.outputs.probe == 'true'
+        uses: FreeSynergy/fs-release/actions/plan@89df64ec85e6d362708e1b433b46448fe27b8bd4
+        with:
+          tag: ${{ steps.release-inputs.outputs.tag }}
+          name: ${{ steps.release-inputs.outputs.name }}
+          binaries: ${{ steps.release-inputs.outputs.binaries }}
+          ignore-binaries: ${{ steps.release-inputs.outputs.ignore-binaries }}
+          cargo-package: ${{ steps.release-inputs.outputs.cargo-package }}
+          working-directory: ${{ steps.release-inputs.outputs.working-directory }}
+          features: ${{ steps.release-inputs.outputs.features }}
+          kind: ${{ steps.release-inputs.outputs.kind }}
+          app-id: ${{ steps.release-inputs.outputs.app-id }}
+          app-name: ${{ steps.release-inputs.outputs.app-name }}
+          description: ${{ steps.release-inputs.outputs.description }}
+          linux-targets: ${{ steps.release-inputs.outputs.linux-targets }}
+          windows-targets: ${{ steps.release-inputs.outputs.windows-targets }}
+          macos: ${{ steps.release-inputs.outputs.macos }}
+          linux-formats: ${{ steps.release-inputs.outputs.linux-formats }}
+          windows-formats: ${{ steps.release-inputs.outputs.windows-formats }}
+          macos-formats: ${{ steps.release-inputs.outputs.macos-formats }}
       - name: Collect the results (every step above ran; the job is red when one was)
         if: always()
         env:
           RESULTS: |
             gates-fmt-clippy ${{ steps.gates-fmt-clippy.outcome }}
             blueprint-check-fs ${{ steps.blueprint-check-fs.outcome }}
+            release-inputs ${{ steps.release-inputs.outcome }}
+            release-plan-probe ${{ steps.release-plan-probe.outcome }}
         run: |
           red=0
           list="$(mktemp)"
