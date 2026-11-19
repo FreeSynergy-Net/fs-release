@@ -135,11 +135,11 @@ refused = ["cargo test --config=/tmp/evil.toml", "cargo test --manifest-path=/tm
            "cargo fmt -- --config-path=/tmp/x", "bash {SCRIPTS}/gates-lock.sh /etc", "scripts/gates-komplett --repo-dir=/ --nur-fehlerliste=/tmp/x.md", "cargo test -C /tmp",
            "cargo test -p x RUSTC=evil", "cargo test /etc/passwd", "cargo test ../x", "cargo test -p /abs", "cargo test -- --test-threads=1;", "cargo test --config build.rustc-wrapper=x",
            "cargo test -Zunstable", "cargo test -p x -- --include-ignored", "python3 -I {SCRIPTS}/check_rust_rules.py /etc", "python3 -c x", "bash {SCRIPTS}/gates-lock.sh {ROOT} extra", "bash -c x",
-           "cargo build", "cargo test -p x $(touch y)", "cargo test | touch y", "cargo clippy -p x -- -A warnings", "cargo clippy -- -D warnings --cap-lints allow", "cargo test --features=evil",
+           "cargo test -p x -- /etc/passwd", "cargo test -p x -- ../x", "cargo test it_works", "cargo test --workspace --", "cargo test -p x --", "cargo clippy -p x", "cargo clippy --workspace --all-targets", "cargo clippy -p x -- -D warnings", "cargo fmt -- --check", "cargo build", "cargo test -p x $(touch y)", "cargo test | touch y", "cargo clippy -p x -- -A warnings", "cargo clippy -- -D warnings --cap-lints allow", "cargo test --features=evil",
            "cargo test --release", "cargo fmt --check --config-path=/x", "cargo test -p ../x", "cargo test -p x -p"]
 good = ["cargo fmt --check", "cargo clippy -p fs-demo --all-targets --all-features --locked -- -D warnings -W clippy::pedantic", "cargo test -p fs-demo --test gold --all-features --locked -- it_breaks mod_a::case",
         "cargo test --workspace --all-features --locked --no-fail-fast", "cargo test -p x --lib", "cargo test -p x --bin fs-x --locked -q", "python3 -I {SCRIPTS}/check_rust_rules.py {ROOT}",
-        "bash {SCRIPTS}/gates-lock.sh {ROOT}", "bash {SCRIPTS}/gates-files.sh {ROOT}", "cargo test it_works", "cargo fmt --all --check", "cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic"]
+        "bash {SCRIPTS}/gates-lock.sh {ROOT}", "bash {SCRIPTS}/gates-files.sh {ROOT}", "cargo fmt --all --check", "cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic"]
 bad = [c for c in refused if teil.check_command(c, "/s", "/r") is not None]
 miss = [c for c in good if teil.check_command(c, "/s", "/r") is None]
 assert not bad and not miss, (bad, miss)
@@ -148,15 +148,15 @@ assert teil.check_command("bash {SCRIPTS}/gates-lock.sh {ROOT}", "/s", "/r") == 
 d = tempfile.mkdtemp(dir=sys.argv[2])
 f = os.path.join(d, "fehlerliste-main.md"); open(f, "w").write("x\n"); os.chmod(f, 0o600)
 uid = os.getuid()
-assert teil.check_list_file(f, d, uid) is None
-assert teil.check_list_file(f, d, uid + 1), "foreign owner"
-os.chmod(f, 0o666); assert teil.check_list_file(f, d, uid), "writable by others"; os.chmod(f, 0o600)
-os.symlink(f, os.path.join(d, "fehlerliste-link.md")); assert teil.check_list_file(os.path.join(d, "fehlerliste-link.md"), d, uid), "symlink"
-import stat as _st
-fake = lambda p: os.stat_result((_st.S_IFLNK | 0o600, 0, 0, 1, uid, 0, 1, 0, 0, 0))  # a symbolic link whose mode looks harmless
-assert teil.check_list_file(f, d, uid, lstat=fake), "a symlink with a harmless mode"
-assert teil.check_list_file(f, os.path.join(d, "other"), uid), "other folder"
-g = os.path.join(d, "list.md"); open(g, "w").write("x"); os.chmod(g, 0o600); assert teil.check_list_file(g, d, uid), "name"
+assert teil.read_list_file(f, d, uid) == ("x\n", None)
+assert teil.read_list_file(f, d, uid + 1)[1], "foreign owner"
+os.chmod(f, 0o666); assert teil.read_list_file(f, d, uid)[1], "writable by others"; os.chmod(f, 0o600)
+link = os.path.join(d, "fehlerliste-link.md"); os.symlink(f, link)
+assert teil.read_list_file(link, d, uid)[1], "a symlink to a good file is refused (O_NOFOLLOW)"
+assert teil.read_list_file(f, os.path.join(d, "other"), uid)[1], "other folder"
+g = os.path.join(d, "list.md"); open(g, "w").write("x"); os.chmod(g, 0o600); assert teil.read_list_file(g, d, uid)[1], "name"
+os.mkdir(os.path.join(d, "fehlerliste-dir.md")); assert teil.read_list_file(os.path.join(d, "fehlerliste-dir.md"), d, uid)[1], "a folder"
+assert teil.read_list_file(os.path.join(d, "fehlerliste-none.md"), d, uid)[1], "missing"
 PY
 }
 rc_check() { # <mechanism folder>: the reading of the rc of a step
@@ -255,11 +255,16 @@ mut "whitelist: cargo test unchecked" kaskade_lib/teil.py '    if w[0] == "cargo
 ' '    if w[0] == "cargo" and w[1] == "test":
         return True
 ' probes
+mut "whitelist: name regex loose"      kaskade_lib/teil.py 'NAME = r"[A-Za-z0-9_][A-Za-z0-9_-]*"' 'NAME = r"[^ ]+"' probes
+mut "whitelist: clippy tail not needed" kaskade_lib/teil.py 'and tail == ["-D", "warnings", "-W", "clippy::pedantic"]' 'and True' probes
+mut "whitelist: a bare -- allowed"    kaskade_lib/teil.py '(tail is None or (len(tail) > 0 and all(' '(tail is None or (all(' probes
+mut "whitelist: bash arguments free"  kaskade_lib/teil.py ' and w[2] == "{ROOT}"' '' probes
 mut "whitelist empty"                 kaskade_lib/teil.py '    if len(w) < 2:
         return False
     if w[0] == "cargo" and w[1] == "test":' '    return False
     if w[0] == "cargo" and w[1] == "test":' probes
-mut "list: symlink allowed"           kaskade_lib/teil.py '    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):' '    if False:' probes
+mut "list: symlink followed"          kaskade_lib/teil.py 'os.O_RDONLY | os.O_NOFOLLOW | ' 'os.O_RDONLY | ' probes
+mut "list: no regular file needed"    kaskade_lib/teil.py '        if not stat.S_ISREG(st.st_mode):' '        if False:' probes
 mut "list: foreign owner allowed"     kaskade_lib/teil.py '    if st.st_uid != uid:' '    if False:' probes
 mut "list: writable by others allowed" kaskade_lib/teil.py '    if st.st_mode & 0o022:' '    if False:' probes
 mut "list: any folder allowed"        kaskade_lib/teil.py '    if os.path.realpath(os.path.dirname(os.path.abspath(path))) != os.path.realpath(list_dir):' '    if False:' probes

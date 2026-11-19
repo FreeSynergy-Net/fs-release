@@ -153,7 +153,7 @@ def teilpruefung(a, d):
     """--nur-fehlerliste: run ONLY the `nachpruefung` commands of the list (scripts/kaskade_lib/teil.py), tick the green ones. NEVER a gate result."""
     folder = list_dir()
     path = os.path.abspath(a.nur_fehlerliste) if a.nur_fehlerliste != "AUTO" else os.path.join(folder, f"fehlerliste-{branch_of(d)}.md")
-    why = teil.check_list_file(path, folder, os.getuid())
+    text, why = teil.read_list_file(path, folder, os.getuid())
     if why:
         return kio.skipped(f"the Fehlerliste {path} is refused: {why}")
     slot = os.environ.get("FS_GATES_BUILD_SLOT", "/srv/FreeSynergy/.scratch/build-slot.sh")
@@ -169,7 +169,7 @@ def teilpruefung(a, d):
         env = {**{k: v for k, v in os.environ.items() if k != "FS_GATES_SKIP_TEST"}, "CARGO_BUILD_JOBS": str(a.jobs), "BUILD_PRIORITY": str(a.prioritaet)}
         if os.path.isfile(toolchain):
             env["RUSTUP_TOOLCHAIN"] = open(toolchain, encoding="utf-8").read().strip()
-        still, results = teil.run_partial(path, d, scripts_dir, slot, env)
+        still, results = teil.run_partial(path, text, d, scripts_dir, slot, env)
     kio.emit({"status": "teilpruefung", "red": True, "gate_ergebnis": False, "liste": path, "offen": still, "punkte": results})
     print(teil.LAST_LINE)
     return teil.EXIT_OPEN if still else teil.EXIT_PART_GREEN  # never 0: a script that reads only the exit code must not see "green"
