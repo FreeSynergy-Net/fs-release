@@ -42,7 +42,7 @@ fn the_canonical_form_is_a_fixed_point_and_keeps_the_meaning() {
         blueprint_hash(&bp).unwrap()
     );
     assert_eq!(canonical(&again).unwrap(), text);
-    assert!(text.ends_with("\n") && !text.ends_with("\n\n") && !text.contains('\r'));
+    assert!(text.ends_with('\n') && !text.ends_with("\n\n") && !text.contains('\r'));
     assert!(text.starts_with("schema = 2\n"), "{}", &text[..40]);
 }
 
