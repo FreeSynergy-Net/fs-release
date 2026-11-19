@@ -48,7 +48,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy/fs-release/actions/setup-rust@1bf6c81a13edb7a176e55d95cce82cdb1f67dd63
+      - uses: FreeSynergy/fs-release/actions/setup-rust@89df64ec85e6d362708e1b433b46448fe27b8bd4
         with:
           toolchain: pinned
           components: rustfmt,clippy
@@ -62,7 +62,7 @@ jobs:
       - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
         id: gates-fmt-clippy
         continue-on-error: true
-        uses: FreeSynergy/fs-release/actions/gates@1bf6c81a13edb7a176e55d95cce82cdb1f67dd63
+        uses: FreeSynergy/fs-release/actions/gates@89df64ec85e6d362708e1b433b46448fe27b8bd4
         with:
           working-directory: ${{ inputs.working-directory }}
       # Blueprint check (S5): only when asked (`blueprint` warn or block) and only when the repo has a scaffold.toml. The talk records of the exceptions are read from a
