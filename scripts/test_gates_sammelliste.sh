@@ -121,6 +121,7 @@ chk "gates-komplett: red (rc 1), ALL THREE runs ran to the end" bash -c "[ $rc -
 chk "gates-komplett: the merged list has both findings once, with their runs" bash -c "[ \$(grep -c '^- \[ \] \*\*fmt\*\*' '$tmp/l7'/fehlerliste-main.md) -eq 1 ] && [ \$(grep -c '^- \[ \] \*\*test\*\*' '$tmp/l7'/fehlerliste-main.md) -eq 1 ] && grep -q 'runs: lokal, ci, flach-ohne-tags' '$tmp/l7'/fehlerliste-main.md"
 mkrepo "$app"
 PATH="$tmp/bin:$PATH" FS_GATES_FEHLERLISTE_DIR="$tmp/l7b" python3 -I "$app/scripts/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs7b" >"$tmp/k.json" 2>"$tmp/k.err"; rc=$?
+[ "$rc" -eq 0 ] || { echo "--- diagnostics (7b): rc=$rc"; cat "$tmp/k.err" | head -20; head -c 600 "$tmp/k.json"; echo; ls -R "$tmp/l7b" "$tmp/logs7b" 2>&1 | head -20; }
 chk "gates-komplett: no error: exit 0, empty list" bash -c "[ $rc -eq 0 ] && grep -q '^0 findings' '$tmp/l7b'/fehlerliste-main.md && ! grep -q '^- \[' '$tmp/l7b'/fehlerliste-main.md"
 
 # 8. mutants: each one must turn a case red
