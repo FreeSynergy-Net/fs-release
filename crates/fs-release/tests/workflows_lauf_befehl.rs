@@ -141,12 +141,33 @@ fn mutation_a_shell_or_an_interpreter_is_no_status_command() {
         "find . -x",
         "xargs ls",
         "sudo ls",
+        "sed -n 1e",
+        "git -c alias.x=!id x",
+        "timeout 5 id",
+        "make -f x",
+        "dc -e1",
+        "pypy3 x.py",
+        "deno run x.ts",
+        "bun x.ts",
+        "PERL -e1",
+        "/usr/bin/Python3 x.py",
     ] {
         assert_red("bugfix", "an interpreter is no status command", |t| {
             with_status(&t, cmd, LOCAL, T30)
         });
     }
-    for ip in ["perl", "python3", "node", "ruby", "awk", "find", "xargs"] {
+    assert_red("bugfix", "a shell is no status command", |t| {
+        with_status(
+            &t,
+            "scripts/check-x",
+            &format!("{LOCAL}        freesynergy.net:allow: [BASH]\n"),
+            T30,
+        )
+    });
+    for ip in [
+        "perl", "python3", "node", "ruby", "awk", "find", "xargs", "sed", "git", "timeout", "make",
+        "dc", "pypy", "deno", "PERL",
+    ] {
         assert_red("bugfix", "an interpreter is no status command", |t| {
             with_status(
                 &t,
