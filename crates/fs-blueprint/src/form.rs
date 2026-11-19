@@ -154,20 +154,10 @@ pub fn is_covers_entry(s: &str) -> bool {
         .is_some_and(|(a, b)| is_pascal(a) && is_camel(b))
 }
 
-/// The variables `{$name}` of an MF2 message.
+/// The variables `{$name}` of an MF2 message (see [`crate::mf2::variables`]).
 #[must_use]
 pub fn variables(message: &str) -> BTreeSet<String> {
-    let mut out = BTreeSet::new();
-    let mut rest = message;
-    while let Some(i) = rest.find("{$") {
-        let tail = &rest[i + 2..];
-        let end = tail
-            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'))
-            .unwrap_or(tail.len());
-        out.insert(tail[..end].to_string());
-        rest = &tail[end..];
-    }
-    out
+    crate::mf2::variables(message)
 }
 
 /// The names Windows reserves for devices: they cannot be a file or folder name, with or without an extension (`NUL`, `nul.txt`, `Com1`, `CONIN$`, `COM¹`).

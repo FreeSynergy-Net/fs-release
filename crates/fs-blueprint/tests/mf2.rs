@@ -15,6 +15,8 @@ fn what_is_a_simple_message() {
         "{$a}{$b-c_d}",
         "esc \\{ \\} \\\\ \\|",
         "ä ö {$x}",
+        "{$a.b}{$_x}{$x1}",
+        "x .input",
     ] {
         assert!(is_simple(ok), "{ok:?}");
     }
@@ -34,6 +36,14 @@ fn what_is_a_simple_message() {
         "\\",
         "trailing \\",
         ".input {$x}",
+        " .input {$x}",
+        "\t\n.match",
+        "\u{3000}.local",
+        "{$1}",
+        "{$-x}",
+        "{$.x}",
+        "{$1a}",
+        "{$ä}",
     ] {
         assert!(!is_simple(bad), "{bad:?}");
     }
@@ -81,4 +91,19 @@ fn a_text_of_the_blueprint_that_is_no_simple_message_is_refused_with_its_languag
         "summary = { en = \"Tasks \\\\{ {$n}\", de = \"Aufgaben \\\\{ {$n}\" }",
     );
     assert!(!run(&good, true).has("text-syntax"));
+}
+
+#[test]
+fn names_and_variables_follow_the_same_rule() {
+    use fs_blueprint::mf2::{is_name, variables};
+    for ok in ["a", "_a", "a1", "a-b", "a.b", "A_B-c.d"] {
+        assert!(is_name(ok), "{ok}");
+    }
+    for bad in ["", "1", "-a", ".a", "a b", "ä", "a$"] {
+        assert!(!is_name(bad), "{bad:?}");
+    }
+    assert_eq!(
+        variables("{$a.b} {$c-d}").into_iter().collect::<Vec<_>>(),
+        ["a.b", "c-d"]
+    );
 }

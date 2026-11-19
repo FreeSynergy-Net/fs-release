@@ -1,7 +1,8 @@
 //! Pattern: Facade (the command `fs-blueprint fmt`: write a blueprint in its canonical form, ADR 0099 point 14).
 //!
-//! The canonical form is the TOML text of the parsed value (the same text the blueprint hash is made of): tables and keys in the order of the schema, the
-//! order of the entries of a list kept, UTF-8, LF, one LF at the end. It cannot keep comments, so a file that has one is refused and nothing is written.
+//! The canonical form: tables and keys in the order of the schema (the order of the canonical text, the text the blueprint hash is made of), the entries of a list in the
+//! author's order, UTF-8, LF, one LF at the end. Comments and the form of every value are kept (`fmt_order`): a comment belongs to the line below it and moves with it.
+//! Before a file is written the result is read again: it must be the same blueprint (same hash), else nothing is written (`fmt-unsafe`).
 
 use crate::emit::dirstore::{DirStore, Rename};
 use crate::emit::write::Store;
@@ -9,52 +10,6 @@ use crate::error::{Coded, Report};
 use crate::model::Blueprint;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-
-/// True when a TOML text has a comment (a `#` outside of every kind of string).
-#[must_use]
-pub fn has_comment(src: &str) -> bool {
-    #[derive(PartialEq)]
-    enum S {
-        Plain,
-        Basic,
-        Literal,
-        MultiBasic,
-        MultiLiteral,
-    }
-    let b: Vec<char> = src.chars().collect();
-    let (mut i, mut s) = (0, S::Plain);
-    let at = |i: usize, t: &str| t.chars().enumerate().all(|(k, c)| b.get(i + k) == Some(&c));
-    while i < b.len() {
-        match s {
-            S::Plain => {
-                if b[i] == '#' {
-                    return true;
-                }
-                if at(i, "\"\"\"") {
-                    (s, i) = (S::MultiBasic, i + 3);
-                    continue;
-                }
-                if at(i, "'''") {
-                    (s, i) = (S::MultiLiteral, i + 3);
-                    continue;
-                }
-                s = match b[i] {
-                    '"' => S::Basic,
-                    '\'' => S::Literal,
-                    _ => S::Plain,
-                };
-            }
-            S::Basic | S::MultiBasic if b[i] == '\\' => i += 1,
-            S::Basic if b[i] == '"' || b[i] == '\n' => s = S::Plain,
-            S::MultiBasic if at(i, "\"\"\"") => (s, i) = (S::Plain, i + 2),
-            S::Literal if b[i] == '\'' || b[i] == '\n' => s = S::Plain,
-            S::MultiLiteral if at(i, "'''") => (s, i) = (S::Plain, i + 2),
-            _ => {}
-        }
-        i += 1;
-    }
-    false
-}
 
 /// The canonical text of a blueprint.
 ///
@@ -69,11 +24,25 @@ pub fn canonical(bp: &Blueprint) -> Result<String, Coded> {
 
 /// What `fmt` found out about one file: the canonical text, or the finding that stops it.
 fn judge(path: &Path, text: &str) -> Result<String, Coded> {
+    judge_with(path, text, crate::fmt_order::in_order)
+}
+
+/// [`judge`] with the function that puts the text in order (a test stands in one that breaks the blueprint: the result is read again and refused).
+///
+/// # Errors
+/// The code of the blueprint (it does not load), or `fmt-unsafe{path}` when the ordered text is no TOML or is another blueprint.
+pub fn judge_with(
+    path: &Path,
+    text: &str,
+    order: impl Fn(&str, &str) -> Option<String>,
+) -> Result<String, Coded> {
     let bp = Blueprint::from_toml(text)?;
-    if has_comment(text) {
-        return Err(Coded::new("fmt-comments").with("path", path.display().to_string()));
+    let unsafe_form = || Coded::new("fmt-unsafe").with("path", path.display().to_string());
+    let out = order(text, &canonical(&bp)?).ok_or_else(unsafe_form)?;
+    match Blueprint::from_toml(&out) {
+        Ok(again) if again == bp => Ok(out),
+        _ => Err(unsafe_form()),
     }
-    canonical(&bp)
 }
 
 /// Checks (`check`) or writes the canonical form of one file; the write is atomic (a temporary file next to it, then a rename). Returns the exit code.
