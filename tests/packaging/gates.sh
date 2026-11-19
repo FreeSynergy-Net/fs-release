@@ -44,7 +44,7 @@ printf 'cargo clippy --workspace --locked\ncargo test --workspace\n' > "$T/gates
 if unlocked "$T/gates-one.sh"; then pass "gates: one line without --locked among locked ones is red"; else fail "gates: one unlocked line must be red"; fi
 # FS_GATES_SKIP_TEST (named exception of scripts/gates-komplett): only the ONE entry may be skipped, visibly; any other value is refused; unset = no skip.
 GK="$T/gk"; mkdir -p "$GK/scripts" "$GK/root" "$GK/bin"
-cp "$G" "$GK/scripts/gates.sh"; cp "$ROOT/scripts/lib_gates_guard.sh" "$GK/scripts/"; git init -q "$GK/root"; git -C "$GK/root" -c user.name=t -c user.email=t@t commit -q --allow-empty -m x; echo 1.0.0 > "$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' > "$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; : > "$GK/scripts/check_rust_rules.py"
+cp "$G" "$GK/scripts/gates.sh"; cp "$ROOT/scripts/lib_gates_guard.sh" "$ROOT/scripts/lib_gates_list.sh" "$GK/scripts/"; git init -q "$GK/root"; git -C "$GK/root" -c user.name=t -c user.email=t@t commit -q --allow-empty -m x; echo 1.0.0 > "$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' > "$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; : > "$GK/scripts/check_rust_rules.py"
 printf '#!/usr/bin/env bash\necho "cargo $*" >> "%s/cargo.log"\n' "$GK" > "$GK/bin/cargo"; printf '#!/usr/bin/env bash\necho rustc-stub\n' > "$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
 skiprun() { : > "$GK/cargo.log"  # <script> <value or empty>: runs a copy of gates.sh with stub cargo; output in $GK/out
   PATH="$GK/bin:$PATH" CI=true FS_GATES_SKIP_TEST="$2" bash "$1" "$GK/root" > "$GK/out" 2>&1; }

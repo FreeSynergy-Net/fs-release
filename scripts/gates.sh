@@ -26,6 +26,8 @@ fi
 # Guard (rule [GATES-WAECHTER], scripts/lib_gates_guard.sh): lock `.gates.lock` + hash of the working tree at start and end.
 # shellcheck source=scripts/lib_gates_guard.sh
 . "$here/lib_gates_guard.sh"
+# shellcheck source=scripts/lib_gates_list.sh
+. "$here/lib_gates_list.sh"
 gates_guard_lock "$root" || exit 1
 guard_snap=""
 finding_work="$(mktemp -d "${TMPDIR:-/tmp}/gates-list.XXXXXX")"
@@ -47,9 +49,9 @@ step() {
   shift 2
   local out="$finding_work/$name.out" rc=0
   { rc=0; "$@" 2>&1 || rc=$?; echo "$rc" > "$out.rc"; } | tee "$out" || true
-  rc=$(cat "$out.rc" 2>/dev/null || echo 1)
+  rc="$(gates_read_rc "$out.rc")"
   echo "gate $name: rc=$rc"
-  if [ "$rc" -ne 0 ]; then
+  if [ "$rc" != 0 ]; then
     findings+=("$name|$severity|$rc|$*")
     finding_names+=("$name")
   fi
