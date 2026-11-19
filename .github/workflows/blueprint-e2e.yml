@@ -137,8 +137,10 @@ jobs:
           cache-key: blueprint-install
       - name: the install line of check.yml, with its default revision
         run: |
-          rev=$(sed -n 's/.*blueprint-rev: .*default: "\([0-9a-f]\{40\}\)".*/\1/p' .github/workflows/check.yml)
-          test -n "$rev"
+          # the default of `blueprint-rev` is empty = the commit of the called workflow; for a caller pinned to a tag that is the tag commit, here it is this commit
+          grep -q 'blueprint-rev: { type: string, default: ""' .github/workflows/check.yml
+          rev="$GITHUB_SHA"
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]]
           cargo install --git https://github.com/FreeSynergy/fs-release --rev "$rev" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
           "$RUNNER_TEMP/fsbp/bin/fs-blueprint" --version
           "$RUNNER_TEMP/fsbp/bin/fs-blueprint" check --repo crates/fs-blueprint/tests/data/repos/ok
