@@ -23,8 +23,13 @@ META_ALLOW, META_ORIGIN = "freesynergy.net:allow", "freesynergy.net:origin"
 ON_ENTER = ("assign-role", "run-status-command", "create-decision", "set-wait-reason")
 RULE_KEYS = {"allow", "on-enter", "from", "confirm"}
 SHELLS = {"sh", "bash", "zsh", "dash", "fish", "ksh", "csh", "tcsh", "cmd", "powershell", "pwsh", "env"}
-INTERPRETERS = {"perl", "ruby", "node", "nodejs", "awk", "gawk", "mawk", "find", "xargs", "php", "lua", "tclsh", "osascript", "sudo", "nohup", "busybox", "expect"}
-INTERPRETER_RE = re.compile(r"python[0-9.]*|perl[0-9.]*|ruby[0-9.]*")
+# Programs that run any code they are given (so they are no status command, also on the allow list). The list can never be complete: every
+# `allow` entry stays a decision of trust (STATES.md). Reasons: script languages (perl, ruby, node, deno, bun, php, lua, tclsh, expect,
+# python*, pypy*), text tools that execute (awk, find -exec, xargs, sed `e`, dc `!`), runners of other commands (sudo, nohup, timeout, make,
+# git alias/hooks, busybox).
+INTERPRETERS = {"perl", "ruby", "node", "nodejs", "deno", "bun", "awk", "gawk", "mawk", "find", "xargs", "sed", "dc", "php", "lua", "tclsh",
+                "osascript", "sudo", "nohup", "timeout", "make", "git", "busybox", "expect"}
+INTERPRETER_RE = re.compile(r"python[0-9.]*|pypy[0-9.]*|perl[0-9.]*|ruby[0-9.]*")
 SHELL_CHARS = re.compile(r"[;&|`$<>(){}\n\r\\]")
 MAX_TIMEOUT = 3600
 
@@ -34,7 +39,7 @@ def is_str_list(x):
 
 
 def program_name(p):
-    return p.rsplit("/", 1)[-1]
+    return p.rsplit("/", 1)[-1].lower()
 
 
 def is_shell(p):

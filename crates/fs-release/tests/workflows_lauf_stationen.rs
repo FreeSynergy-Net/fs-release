@@ -55,7 +55,14 @@ fn mutation_a_flow_with_its_own_states_transitions_or_another_rule_set_is_red() 
             )
         },
     );
-    for v in ["mine", "9", "[freesynergy]"] {
+    for v in [
+        "mine",
+        "9",
+        "[freesynergy]",
+        "freesynergy2",
+        "xfreesynergy",
+        "Freesynergy",
+    ] {
         assert_red("bugfix", "only the rule set 'freesynergy' exists", |t| {
             with_doc_meta(&t, &format!("    freesynergy.net:run-rules: {v}\n"))
         });
