@@ -17,6 +17,8 @@ fn what_is_a_simple_message() {
         "ä ö {$x}",
         "{$a.b}{$_x}{$x1}",
         "x .input",
+        "tab\tand\nlines\r",
+        "a\u{200E}b",
     ] {
         assert!(is_simple(ok), "{ok:?}");
     }
@@ -44,6 +46,13 @@ fn what_is_a_simple_message() {
         "{$.x}",
         "{$1a}",
         "{$ä}",
+        "\u{200E}.input",
+        "\u{61C} .match",
+        "\u{2066}.local",
+        "\u{2069}.local",
+        "a\u{0}b",
+        "a\u{1}b",
+        "bell\u{7}",
     ] {
         assert!(!is_simple(bad), "{bad:?}");
     }

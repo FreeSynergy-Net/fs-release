@@ -7,9 +7,13 @@
 
 use std::collections::BTreeSet;
 
-/// The white space of MF2 (`s`): a message that starts with it and then a `.` is a complex message (declarations), never a simple one.
+/// The white space of MF2 (`s` = white space and the bidi marks U+061C, U+200E, U+200F, U+2066 to U+2069): a message that starts with it and then a `.` is a complex message (declarations), never a simple one.
 fn is_mf2_space(c: char) -> bool {
-    matches!(c, ' ' | '\t' | '\r' | '\n' | '\u{3000}')
+    matches!(
+        c,
+        ' ' | '\t' | '\r' | '\n' | '\u{3000}' | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{2066}'
+            ..='\u{2069}'
+    )
 }
 
 fn is_name_char(c: char) -> bool {
@@ -49,6 +53,10 @@ pub fn is_simple(message: &str) -> bool {
     }
     let mut chars = message.chars().peekable();
     while let Some(c) = chars.next() {
+        // NUL and the control characters other than tab, line feed and carriage return are no text of the subset
+        if c.is_control() && !matches!(c, '\t' | '\n' | '\r') {
+            return false;
+        }
         match c {
             '\\' => {
                 if !matches!(chars.next(), Some('\\' | '{' | '}' | '|')) {

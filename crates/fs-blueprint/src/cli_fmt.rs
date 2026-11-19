@@ -30,18 +30,25 @@ fn judge(path: &Path, text: &str) -> Result<String, Coded> {
 /// [`judge`] with the function that puts the text in order (a test stands in one that breaks the blueprint: the result is read again and refused).
 ///
 /// # Errors
-/// The code of the blueprint (it does not load), or `fmt-unsafe{path}` when the ordered text is no TOML or is another blueprint.
+/// The code of the blueprint (it does not load), or `fmt-unsafe{path, reason}` (`not-toml`, `other-blueprint` or `carriage-return-in-a-value`) when the ordered text is no TOML or is another blueprint.
 pub fn judge_with(
     path: &Path,
     text: &str,
     order: impl Fn(&str, &str) -> Option<String>,
 ) -> Result<String, Coded> {
     let bp = Blueprint::from_toml(text)?;
-    let unsafe_form = || Coded::new("fmt-unsafe").with("path", path.display().to_string());
-    let out = order(text, &canonical(&bp)?).ok_or_else(unsafe_form)?;
+    let unsafe_form = |reason: &str| {
+        Coded::new("fmt-unsafe")
+            .with("path", path.display().to_string())
+            .with("reason", reason.to_string())
+    };
+    let out = order(text, &canonical(&bp)?).ok_or_else(|| unsafe_form("not-toml"))?;
     match Blueprint::from_toml(&out) {
         Ok(again) if again == bp => Ok(out),
-        _ => Err(unsafe_form()),
+        // a CR in a multi-line string is part of the value: LF only would change it
+        Ok(_) if text.contains('\r') => Err(unsafe_form("carriage-return-in-a-value")),
+        Ok(_) => Err(unsafe_form("other-blueprint")),
+        Err(_) => Err(unsafe_form("not-toml")),
     }
 }
 

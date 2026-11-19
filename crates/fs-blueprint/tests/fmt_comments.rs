@@ -199,9 +199,16 @@ fn a_result_that_is_another_blueprint_or_no_toml_is_refused_and_never_written() 
         .unwrap(),
     )
     .unwrap();
-    for broken in [Some(other), Some("not [toml".to_string()), None] {
+    for (broken, reason) in [
+        (Some(other), "other-blueprint"),
+        (Some("not [toml".to_string()), "not-toml"),
+        (None, "not-toml"),
+    ] {
         let e = judge_with(path, TASKS, |_, _| broken.clone()).unwrap_err();
-        assert_eq!(e.to_string(), "fmt-unsafe{path=scaffold.toml}");
+        assert_eq!(
+            e.to_string(),
+            format!("fmt-unsafe{{path=scaffold.toml, reason={reason}}}")
+        );
     }
     assert!(judge_with(path, TASKS, |t, _| Some(t.to_string())).is_ok());
 }
@@ -223,9 +230,44 @@ fn a_carriage_return_inside_a_multi_line_string_cannot_be_made_an_lf_without_cha
     let (code, out, _) = cli(&["fmt", f.to_str().unwrap()]);
     assert_eq!(code, 1, "{out}");
     assert!(out.contains("fmt-unsafe{path="), "{out}");
+    assert!(
+        out.contains("reason=carriage-return-in-a-value"),
+        "the cause is named: {out}"
+    );
     assert_eq!(
         std::fs::read_to_string(&f).unwrap(),
         text,
         "nothing was written"
+    );
+}
+
+#[test]
+fn a_comment_at_the_end_of_the_file_without_a_line_after_it_is_kept() {
+    let d = scratch("end-comment");
+    let f = d.join("scaffold.toml");
+    let text = format!("{}# the last word", canon().trim_end());
+    std::fs::write(&f, &text).unwrap();
+    assert_eq!(cli(&["fmt", f.to_str().unwrap()]).0, 0);
+    let done = std::fs::read_to_string(&f).unwrap();
+    assert!(done.ends_with("# the last word\n"), "{done:?}");
+    assert_eq!(cli(&["fmt", "--check", f.to_str().unwrap()]).0, 0);
+}
+
+#[test]
+fn comments_inside_a_multi_line_array_are_kept() {
+    let d = scratch("array-comment");
+    let f = d.join("scaffold.toml");
+    let text = TASKS.replace(
+        "categories = [\"Office\", \"ProjectManagement\"]",
+        "categories = [\n  \"Office\", # the first\n  # between\n  \"ProjectManagement\", # the last\n]",
+    );
+    assert_ne!(text, TASKS);
+    std::fs::write(&f, &text).unwrap();
+    assert_eq!(cli(&["fmt", f.to_str().unwrap()]).0, 0);
+    let done = std::fs::read_to_string(&f).unwrap();
+    assert_eq!(comment_lines(&done), comment_lines(&text));
+    assert_eq!(
+        Blueprint::from_toml(&done).unwrap(),
+        Blueprint::from_toml(&text).unwrap()
     );
 }
