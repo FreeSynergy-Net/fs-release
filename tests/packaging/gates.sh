@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pattern: none (test). check.yml must not carry its own copy of the gate flags: it runs scripts/gates.sh (one definition) and the pinned toolchain.
 W="$ROOT/.github/workflows/check.yml"; G="$ROOT/scripts/gates.sh"
-grep -q 'clippy --workspace --all-targets --all-features --locked -- -D warnings -W clippy::pedantic' "$G" && pass "gates: gates.sh defines clippy -D warnings + pedantic" || fail "gates: gates.sh lacks the clippy flags"
+grep -q 'clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic' "$G" && pass "gates: gates.sh defines clippy -D warnings + pedantic" || fail "gates: gates.sh lacks the clippy flags"
 grep -Eq 'cargo (fmt|clippy|test)' "$W" && fail "gates: check.yml has its own cargo command (must only call actions/gates)" || pass "gates: check.yml has no own cargo commands"
 grep -q 'actions/gates@' "$W" && pass "gates: check.yml calls actions/gates" || fail "gates: check.yml does not call actions/gates"
 grep -q 'gates.sh' "$ROOT/actions/gates/action.yml" && pass "gates: actions/gates runs gates.sh" || fail "gates: actions/gates does not run gates.sh"
@@ -34,7 +34,7 @@ scan && fail "gates: *.yaml must be scanned" || pass "gates: *.yaml files are sc
 rm -rf "$TG"
 grep -q 'default: pinned' "$ROOT/actions/setup-rust/action.yml" && pass "gates: setup-rust defaults to pinned" || fail "gates: setup-rust default is not pinned"
 # --locked lint: every `cargo clippy` / `cargo test` line of gates.sh carries --locked; the old lines (without it) must be red.
-unlocked() { grep -E '^[[:space:]]*cargo (clippy|test)( |$)' "$1" | grep -vq -- '--locked'; }
+unlocked() { grep -E '^[[:space:]]*[^#[:space:]].*cargo (clippy|test)( |$)' "$1" | grep -vq -- '--locked'; }  # [GATES-SAMMELLISTE]: the lines are `step <name> <severity> cargo ...`, so not only line starts count
 if unlocked "$G"; then fail "gates: gates.sh has a cargo clippy/test line without --locked"; else pass "gates: every cargo clippy/test line of gates.sh has --locked"; fi
 printf 'cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\ncargo test --workspace --all-features\n' > "$T/gates-old.sh"
 if unlocked "$T/gates-old.sh"; then pass "gates: the OLD lines (no --locked) are red"; else fail "gates: the old lines must be red"; fi
