@@ -26,7 +26,7 @@ pub enum Slot {
     Version,
     /// `v0.0.2`: the tag of fs-rpc of the skeleton version
     PinRpc,
-    /// `v0.0.15`: the tag of fs-release of the skeleton version
+    /// `v0.0.16`: the tag of fs-release of the skeleton version
     ReleaseTag,
     /// The summary in English, on one line
     SummaryEn,

@@ -44,7 +44,7 @@ mk() { mkdir -p "$1/src"; printf '[package]\nname = "%s"\nversion = "%s"\neditio
 fixture() { rm -rf "$1"; mk "$1/crates/fs-forms" fs-forms 0.3.1; mk "$1/crates/fs-forms-run" fs-forms-run 0.4.0; printf '[workspace]\nmembers = ["crates/fs-forms", "crates/fs-forms-run"]\nresolver = "2"\n' >"$1/Cargo.toml"; mkdir -p "$1/.github/workflows"; }
 # release_yml DIR USES WITH-LINES...
 release_yml() { local d=$1 u=$2; shift 2; { printf 'name: release\non:\n  push:\n    tags: ["v*"]\njobs:\n  release:\n    uses: %s\n    with:\n' "$u"; printf '      %s\n' "$@"; } >"$d/.github/workflows/release.yml"; }
-REL=FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.15
+REL=FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.16
 
 # run_case SCRIPT DIR -> prints "probe=<true|false|none> plan_rc=<rc>" and leaves the output in $tmp/case.out
 run_case() {

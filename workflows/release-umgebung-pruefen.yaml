@@ -6,11 +6,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: release-umgebung-pruefen
-  version: 0.0.15
+  version: 0.0.16
   title: Check the signing environment release-signing in all calling repos - report only
 do:
   - pruefen:
-      call: check-release-env:0.0.15@fs
+      call: check-release-env:0.0.16@fs
       with:
         repos: ${ .input.repos }
         org: ${ .input.org }
@@ -27,7 +27,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Script `scripts/check_release_env.sh` (bash, GET calls of `gh api` only, a write flag is refused; self test `scripts/test_check_release_env.sh` with a mock gh and mutants) - one line per repo: environment exists (404 = fehlt), required reviewer >= 1, tag rule `v*`, GPG_PRIVATE_KEY and GPG_PASSPHRASE as environment secrets, the same names as repository secrets (hint: double holding), calls release.yml (info); result OK, WARN (no protection, secrets only in the repository), FEHLT (404 where release.yml is called or unknown) or nicht nötig (404, no release.yml call; not counted). Section fs-release: rulesets (only at status ok; 404/odd answer = Tag-Schutz unbekannt; empty = Tag-Schutz fehlt) and whether the tag points at the expected commit. rc 0 = report, rc 2 = call or gh error (401/403/5xx is not 404), with `strict` rc 1 if a repo is not OK (nicht nötig excluded) or the tag is a MISMATCH. Only names of secrets, never values."
   - melden:
-      call: report-to-strategy:0.0.15@fs
+      call: report-to-strategy:0.0.16@fs
       with:
         bericht: ${ $context.bericht }
       metadata:
@@ -37,7 +37,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Hands the table (workflow, run, result) to the strategy; names every repo that is WARN or FEHLT and the rulesets finding. The AI changes nothing on GitHub and does not call `gh` itself.
   - einrichten:
-      call: owner-sets-environment:0.0.15@fs
+      call: owner-sets-environment:0.0.16@fs
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person

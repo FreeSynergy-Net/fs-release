@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.16
+
+Released 2026-11-19 (UTC; the date of the version commit, the tag follows after the checks and the pin rounds). / Veröffentlicht am 2026-11-19 (UTC; Datum des Version-Commits, der Tag folgt nach den Prüfungen und den Pin-Runden).
+
+- `package-windows`: `cargo wix` (init and msi) now always gets `-p <package>` when the cargo workspace has more than one member, also for one package group without `cargo-package` (new helper `wix_select` in `scripts/lib.sh`). cargo-wix refuses a workspace without a package name ("Workspace detected. Please pass a package name."); the msi step of the fs-capnpc releases v0.2.1 and v0.2.2 failed on it and stopped the whole release. Test with a root-package-plus-member fixture in `tests/packaging/msi.sh`. / `package-windows`: `cargo wix` bekommt in jedem Workspace mit mehr als einem Mitglied `-p`, auch bei einer Paketgruppe ohne `cargo-package` (fs-capnpc v0.2.1/v0.2.2).
+- `check.yml`: release plan probe. A repo with its own `.github/workflows/release.yml` that calls the fs-release release workflow gets the real `actions/plan` run on the inputs of that call (steps `release-inputs` and `release-plan-probe`, both collected), so a new binary crate under `crates/` that is neither in `binaries` nor in `ignore-binaries` is red on the branch, not first at the tag (fs-forms v0.0.3: `fs-forms-run`). Self test `scripts/test_plan_probe_step.sh` (10 mutants). / `check.yml`: Release-Plan-Probe, damit neue Binary-Crates vor dem Tag auffallen.
+- `check.yml`: CI cost. On branches `unreviewed/*` the test gate runs only the crates that changed against main plus their dependants (`scripts/affected_crates.py`, new input `diff-base` of `actions/gates` = `FS_GATES_DIFF_BASE` of `scripts/gates.sh`, new `check.yml` input `full`); fmt, clippy, rules, lock and files stay on the whole workspace; main, tags, every other ref, `full: true` and every unclear case (Cargo.lock, manifests, toolchain or cargo config, files no crate owns, errors) test everything. Local `scripts/gates.sh` is unchanged. Self test `scripts/test_affected_crates.sh` (11 mutants). Both `check.yml` changes reach callers only with a pin that contains them (`actions/gates` and `actions/plan` are used at the pinned commit). / `check.yml`: auf `unreviewed/*` nur geänderte Crates und ihre Abhängigen testen.
+- Version 0.0.16 (version = tag): the three crates, `Cargo.lock`, `chains/release.chain.yaml`, all flows and `@fs` calls, the release tag `v0.0.16` of the generated skeleton (gold files), the README install line; the pin rounds follow as separate commits.
+
 ## 0.0.15
 
 Released 2026-11-19 (UTC; the date of the version commit, the tag follows after the pin rounds). / Veröffentlicht am 2026-11-19 (UTC; Datum des Version-Commits, der Tag folgt nach den Pin-Runden).

@@ -10,11 +10,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: frontend-umbau
-  version: 0.0.15
+  version: 0.0.16
   title: Convert one group of building blocks to the layers of ADR 0074
 do:
   - vorhanden-pruefen:
-      call: vorhanden-pruefen-ai:0.0.15@fs
+      call: vorhanden-pruefen-ai:0.0.16@fs
       with:
         suche: ${ .input }
       export:
@@ -26,7 +26,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. The following steps read `befund`; nothing is built without it."
   - vorhanden-pruefen-check:
-      call: befund-beleg:0.0.15@fs
+      call: befund-beleg:0.0.16@fs
       with:
         befund: ${ $context.befund }
       export:
@@ -57,7 +57,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never on."
   - texte:
-      call: texts-convert-ai:0.0.15@fs
+      call: texts-convert-ai:0.0.16@fs
       with:
         befund: ${ $context.befund }
         group: ${ .input.group }
@@ -72,7 +72,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: First the texts, then the tokens, in the same run per crate. The agent moves every fixed text of the group to `Words` with MF2 messages (ADR 0057, not Fluent), German and English together; own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT].
   - texts-check:
-      call: texts-check:0.0.15@fs
+      call: texts-check:0.0.16@fs
       with:
         group: ${ .input.group }
       export:
@@ -97,7 +97,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a red `texts-check` goes back to texte, only green texts go on to the token steps.
   - count:
-      call: count-fixed-values:0.0.15@fs
+      call: count-fixed-values:0.0.16@fs
       with:
         group: ${ .input.group }
       export:
@@ -109,7 +109,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Script - counts in the group the fixed colors, fixed spacings and block names that are not in the contract (ADR 0074, conventions/decisions/0074-stil-bausteine-bewegung-klang-menues.md); whatever the numbers are, they are written down as the starting state.
   - assign:
-      call: assign-tokens:0.0.15@fs
+      call: assign-tokens:0.0.16@fs
       with:
         group: ${ .input.group }
         counted: ${ $context.count }
@@ -122,7 +122,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent maps every counted value to a DTCG token and every block to its fixed contract name (WAI-ARIA, Open UI); a value without a fitting token is listed, not invented.
   - bruecke:
-      call: theme-bridge-ai:0.0.15@fs
+      call: theme-bridge-ai:0.0.16@fs
       with:
         group: ${ .input.group }
         mapping: ${ $context.assign }
@@ -137,7 +137,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Before a painted copy is replaced by a real Blinc block - the agent gives every Blinc block of the group its fixed contract name with parts and states (WAI-ARIA, Open UI) and the `blinc` entry (class and state selectors) and maps the DTCG tokens to the Blinc theme slots, the generated style sheet and the wrapper; nothing may stay in the Blinc default look (ADR 0074, one style for everything). Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md. Own worktree, local commits, no push, no tag.
   - alle-stile-erweitern:
-      call: styles-extend-ai:0.0.15@fs
+      call: styles-extend-ai:0.0.16@fs
       with:
         group: ${ .input.group }
         repo: ${ .input.repo }
@@ -151,7 +151,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Fixed step of the flow that introduces a block, part or state - a new version of the theme contract, and EVERY existing style gets an explicit entry for it (mostly only assigning tokens; no silent gaps). Own worktree, local commits, no push, no tag.
   - stil-vollstaendigkeit:
-      call: stil-vollstaendigkeit:0.0.15@fs
+      call: stil-vollstaendigkeit:0.0.16@fs
       with:
         contract: ${ .input.contract }
       export:
@@ -179,7 +179,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a missing entry goes back to alle-stile-erweitern (from the third red round, `runde` >= 3, to the person in `umbau-eskalation`), otherwise on to zwei-stile.
   - zwei-stile:
-      call: zwei-stile:0.0.15@fs
+      call: zwei-stile:0.0.16@fs
       with:
         group: ${ .input.group }
       export:
@@ -207,7 +207,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a block that does not follow the style goes back to bruecke (from the third red round, `runde` >= 3, to the person in `umbau-eskalation`), otherwise on to the images before the change and to convert.
   - before:
-      call: render-images:0.0.15@fs
+      call: render-images:0.0.16@fs
       with:
         group: ${ .input.group }
         state: before
@@ -218,7 +218,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Renders the images of the group before the change (the reference for the pixel comparison).
   - convert:
-      call: convert-ai:0.0.15@fs
+      call: convert-ai:0.0.16@fs
       with:
         group: ${ .input.group }
         mapping: ${ $context.assign }
@@ -233,7 +233,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent replaces fixed colors, spacings and names by tokens and contract names and keeps the arrangement in its own layer. Own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT]. The loop back from `repeat` runs until the script counts 0 fixed colors and spacings.
   - recount:
-      call: count-fixed-values:0.0.15@fs
+      call: count-fixed-values:0.0.16@fs
       with:
         group: ${ .input.group }
       export:
@@ -245,7 +245,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - the same count as at the start; the result is `fixed` (colors and spacings still fixed).
   - gates:
-      call: gates:0.0.15@fs
+      call: gates:0.0.16@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -255,7 +255,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh ([GATES]), the one definition of the checks; the result is `red` or not.
   - same-pictures:
-      call: pixel-compare:0.0.15@fs
+      call: pixel-compare:0.0.16@fs
       with:
         group: ${ .input.group }
       export:
@@ -280,7 +280,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - fixed values left, red gates or a changed picture go back to convert, otherwise on to the release.
   - frontend-nur-komponenten:
-      call: frontend-nur-komponenten:0.0.15@fs
+      call: frontend-nur-komponenten:0.0.16@fs
       with:
         frontend_crate: ${ .input.frontend_crate }
       export:
@@ -311,7 +311,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a finding goes to the conversation `frontend-befund-talk` (at most two repeats, then the escalation); only an empty list (not a missing result) goes on; a missing result goes to the escalation, never on."
   - frontend-befund-talk:
-      call: talk:0.0.15@fs
+      call: talk:0.0.16@fs
       with:
         frontend_crate: ${ .input.frontend_crate }
         befunde: ${ $context.komponenten.befunde }
@@ -328,7 +328,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.15
+          version: 0.0.16
         input:
           repo: ${ .input.repo }
           tag: ${ .input.tag }

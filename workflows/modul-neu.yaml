@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: modul-neu
-  version: 0.0.15
+  version: 0.0.16
   title: Create a shared module or specialist module - existing first, users, standard, place, way, description, trait review, create, catalog proposal
 do:
   - vorhanden-pruefen:
-      call: vorhanden-pruefen-ai:0.0.15@fs
+      call: vorhanden-pruefen-ai:0.0.16@fs
       with:
         suche: ${ .input }
       export:
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
   - vorhanden-pruefen-check:
-      call: befund-beleg:0.0.15@fs
+      call: befund-beleg:0.0.16@fs
       with:
         befund: ${ $context.befund }
       export:
@@ -72,7 +72,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - `vorhanden` ends the run with the reference \"extend X\" (no new build); `neu` (with proof, checked above) goes on; a missing result goes to the escalation."
   - karte:
-      call: board-card:0.0.15@fs
+      call: board-card:0.0.16@fs
       with:
         workflow: modul-neu
         name: ${ .input.name }
@@ -83,7 +83,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the board card of this run in fs-tasks (project `bahn5-crates`; `timeout 15 fs-tasks list` first, then add, claim, in-progress; a note per interim state, done at the end). Specification, no script yet (`board-card`). Rule [ARBEIT-IN-FS-TASKS]."
   - nutzer-pruefen:
-      call: nutzer-zaehlen:0.0.15@fs
+      call: nutzer-zaehlen:0.0.16@fs
       with:
         art: ${ .input.art }
         nutzer: ${ .input.nutzer }
@@ -113,7 +113,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - too few users abort the run (the feature stays a feature of the program); a missing result goes to `eskalation`."
   - standard-pruefen:
-      call: standard-belegen-ai:0.0.15@fs
+      call: standard-belegen-ai:0.0.16@fs
       with:
         standard: ${ .input.standard }
         name: ${ .input.name }
@@ -124,7 +124,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Prove the standard per method or field (URI and section) or write an own open specification; nothing is invented."
   - standard-pruefen-check:
-      call: standard-belege:0.0.15@fs
+      call: standard-belege:0.0.16@fs
       with:
         name: ${ .input.name }
       export:
@@ -155,7 +155,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `standard-pruefen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - ort:
-      call: modul-ort:0.0.15@fs
+      call: modul-ort:0.0.16@fs
       with:
         name: ${ .input.name }
         kategorie: ${ .input.kategorie }
@@ -168,7 +168,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the place: test \"general enough for crates.io?\" (no fs dependency, own docs, MIT OR Apache-2.0, Claude named) gives a candidate (publication later, without \"freesynergy\" in the name); otherwise the group repo of the category (plan section b2.5). The result stands in the report."
   - kommunikation:
-      call: kommunikation-ai:0.0.15@fs
+      call: kommunikation-ai:0.0.16@fs
       with:
         nutzer: ${ .input.nutzer }
         ort: ${ $context.ort }
@@ -179,7 +179,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The way by closeness (plan section b2.0): near = WebAssembly, without a program = Cap'n Proto, far away = Cap'n Proto, JSON or gRPC. The process model is named as well (supplement G2b point 4). Way, process model and reason go into the manifest."
   - beschreibung:
-      call: modul-beschreibung-ai:0.0.15@fs
+      call: modul-beschreibung-ai:0.0.16@fs
       with:
         name: ${ .input.name }
         art: ${ .input.art }
@@ -190,7 +190,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Module description: contract part, kits, `accepts`, duties (plan section b2.3: data of others only through a contract, own data with export, import, share, delete, media type, version)."
   - beschreibung-check:
-      call: modul-pflichten:0.0.15@fs
+      call: modul-pflichten:0.0.16@fs
       with:
         name: ${ .input.name }
       export:
@@ -221,7 +221,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `beschreibung` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - trait-review:
-      call: trait-review-opus:0.0.15@fs
+      call: trait-review-opus:0.0.16@fs
       with:
         name: ${ .input.name }
       export:
@@ -252,7 +252,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a NO goes back to `beschreibung` (at most two repeats), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
   - anlegen:
-      call: modul-anlegen-ai:0.0.15@fs
+      call: modul-anlegen-ai:0.0.16@fs
       with:
         name: ${ .input.name }
         ort: ${ $context.ort }
@@ -264,7 +264,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Create the crate in the target repo and the manifest (AppStream `addon`, `extends`, `fs:requires`) on a branch `unreviewed/modul-<name>`; local commit, no push."
   - anlegen-check:
-      call: manifest-pruefen:0.0.15@fs
+      call: manifest-pruefen:0.0.16@fs
       with:
         name: ${ .input.name }
       export:
@@ -295,7 +295,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `anlegen` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - katalog-vorschlag:
-      call: katalog-vorschlag-ai:0.0.15@fs
+      call: katalog-vorschlag-ai:0.0.16@fs
       with:
         name: ${ .input.name }
       metadata:
@@ -305,7 +305,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Catalog proposal: an entry `kind = module` (ADR 0077) as a diff, not pushed; the strategy approves the entry."
   - katalog-vorschlag-check:
-      call: gen-catalog-check:0.0.15@fs
+      call: gen-catalog-check:0.0.16@fs
       with:
         name: ${ .input.name }
       export:
@@ -336,7 +336,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `katalog-vorschlag` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - doku-hilfe:
-      call: doku-hilfe-ai:0.0.15@fs
+      call: doku-hilfe-ai:0.0.16@fs
       with:
         programmseite: ${ .input.programmseite // ("programs/apps/" + (.input.programm // .input.name) + "/index.md") }
         hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
@@ -347,7 +347,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`, default `programs/apps/<programm>/index.md`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
   - doku-hilfe-check:
-      call: doku-hilfe-regel:0.0.15@fs
+      call: doku-hilfe-regel:0.0.16@fs
       with:
         programmseite: ${ .input.programmseite // ("programs/apps/" + (.input.programm // .input.name) + "/index.md") }
       export:
@@ -378,7 +378,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `doku-hilfe` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never to green."
   - bericht:
-      call: report-write:0.0.15@fs
+      call: report-write:0.0.16@fs
       with:
         lauf: ${ $context }
       then: end

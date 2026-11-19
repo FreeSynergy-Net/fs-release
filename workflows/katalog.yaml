@@ -8,11 +8,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: katalog
-  version: 0.0.15
+  version: 0.0.16
   title: Catalog entry new, raised or removed - asset and release checks, fresh review, signed catalog.xml as proof
 do:
   - ketten-plan:
-      call: chain-plan:0.0.15@fs
+      call: chain-plan:0.0.16@fs
       with:
         repo: FreeSynergy/Catalog
         branches: ${ .input.branches }
@@ -39,7 +39,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The counters of the two loops start at 0 for each branch of the chain (`zaehler.gen`: red generator rounds, at most 3 restarts; `zaehler.sign`: sign restarts, at most 1)."
   - alt-kopf:
-      call: ls-remote-head:0.0.15@fs
+      call: ls-remote-head:0.0.16@fs
       with:
         repo: FreeSynergy/Catalog
         branch: ${ $context.kette.aktuell.branch }
@@ -65,7 +65,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow in chain mode - the FIRST entry of the chain (`kette.erster`, set by `ketten-plan`; `ketten-naechster` sets it to false) goes to `eintrag`; EVERY later entry goes to `kette-rebase` (lease `$context.alt.head`, onto the new main) and from there with the NEW head through `asset-pruefen` ... `frische-pruefung`, so that the ff by the strategy is a real ff and the new head is reviewed."
   - eintrag:
-      call: catalog-entry:0.0.15@fs
+      call: catalog-entry:0.0.16@fs
       with:
         repo: FreeSynergy/Catalog
         branch: ${ $context.kette.aktuell.branch }
@@ -81,7 +81,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "In an own worktree of fs-catalog, branch `unreviewed/catalog-<program>` (the branch of `kette.aktuell`; the result carries the NEW head, a changed entry is a new head and needs a new JA): mode `neu` adds the entry in packages.toml, `heben` raises the tag of an existing entry, `entfernen` removes the entry (with its `replaces` or retired-name note if the order says so). Only packages.toml and the docs of the repo change; the CHANGELOG gets one entry."
   - asset-pruefen:
-      call: asset-check:0.0.15@fs
+      call: asset-check:0.0.16@fs
       with:
         repo: ${ $context.kette.aktuell.program }
         tag: ${ $context.kette.aktuell.tag }
@@ -93,7 +93,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Only for `neu` and `heben` (a removal has no asset): (1) the asset name of the entry answers HTTP 200 (`curl -sIL`, read only); (2) the release of the tag is published AND is a pre-release or a release, NEVER a draft (a draft has no public asset); (3) the tarball holds the binary of the program (`tar -tzf`)."
   - gen-catalog:
-      call: gen-catalog-check:0.0.15@fs
+      call: gen-catalog-check:0.0.16@fs
       export:
         as: '${ $context + { gen: . } }'
       metadata:
@@ -123,7 +123,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.15
+          version: 0.0.16
         input:
           repo: FreeSynergy/Catalog
           branch: ${ $context.kette.aktuell.branch }
@@ -159,7 +159,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - ONLY a JA goes on to the ff; a NEIN goes back to `eintrag` (the third NEIN of the delta escalates), an unknown verdict escalates; a NEIN never reaches the ff by the strategy or the next chain entry."
   - ff-ueber-strategie:
-      call: merge-ff:0.0.15@fs
+      call: merge-ff:0.0.16@fs
       with:
         into: main
         branch: ${ $context.kette.aktuell.branch }
@@ -171,7 +171,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The fast-forward into main of fs-catalog goes through the strategy (the person or the coordinator, never forced, no merge commit); agents never merge."
   - sign-abwarten:
-      call: sign-run:0.0.15@fs
+      call: sign-run:0.0.16@fs
       with:
         workflow: sign.yml
         repo: FreeSynergy/Catalog
@@ -182,7 +182,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The sign run: the path filter of sign.yml starts it ONLY for a change of packages.toml or scripts/*.py; every other change waits for the cron, or the run is started by `workflow_dispatch`. Waits for the end of the run for exactly this main head; red goes to `bugfix` for that run."
   - catalog-beleg:
-      call: catalog-proof:0.0.15@fs
+      call: catalog-proof:0.0.16@fs
       with:
         repo: FreeSynergy/Catalog
         program: ${ $context.kette.aktuell.program }
@@ -229,7 +229,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the next catalog branch goes on only after the proof of the earlier one (and only after a JA: a NEIN never gets here)."
   - ketten-naechster:
-      call: chain-next:0.0.15@fs
+      call: chain-next:0.0.16@fs
       with:
         repo: FreeSynergy/Catalog
         branches: ${ .input.branches }
@@ -243,7 +243,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Takes the next catalog branch of the chain: `kette.aktuell` (branch, program, tag, head = the OLD head of that branch), `erster: false`, `rest` counted down; then `zaehler-start` (counters at 0) and `alt-kopf` (`alt` = old head = lease) run again for this branch."
   - kette-rebase:
-      call: chain-rebase:0.0.15@fs
+      call: chain-rebase:0.0.16@fs
       with:
         repo: FreeSynergy/Catalog
         branch: ${ $context.kette.aktuell.branch }
@@ -285,7 +285,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Counter of the sign restarts (the raw cache rule): `zaehler.sign` +1, at most ONE; `raw-cache` escalates the second time."
   - sign-neu:
-      call: sign-run:0.0.15@fs
+      call: sign-run:0.0.16@fs
       with:
         workflow: sign.yml
         repo: FreeSynergy/Catalog
