@@ -66,11 +66,11 @@ chk "a pipe character in an error line does not break the list" bash -c "grep -q
 
 # 4. the partial check (TEILPRUEFUNG): a fixed error is ticked, an open one stays, nothing looks like a gate result
 export FS_GATES_BUILD_SLOT="$tmp/slot.sh" FS_GATES_SCRATCH="$tmp/scratch" FS_GATES_FMT=true
-teil() { PATH="$tmp/bin:$PATH" FS_GATES_FEHLERLISTE_DIR="$tmp/l1" python3 -I "$app/scripts/gates-komplett" --repo-dir "$app" --nur-fehlerliste "$1" >"$tmp/t.txt" 2>&1; }
-cp "$tmp/l1/fehlerliste-main.md" "$tmp/liste.md"
-: >"$STUBLOG"; RED_TEST=1 teil "$tmp/liste.md"; rc=$?
-chk "partial: the fixed fmt item is ticked with a UTC time" bash -c "grep -q '^- \[x\] \*\*fmt\*\*' '$tmp/liste.md' && grep -Eq 'nachgeprueft: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z' '$tmp/liste.md'"
-chk "partial: the open test item stays open with its rc and error lines, exit 1" bash -c "[ $rc -eq 1 ] && grep -q '^- \[ \] \*\*test\*\*' '$tmp/liste.md' && grep -q 'letzte pruefung: .* rc 101' '$tmp/liste.md'"
+teil() { PATH="$tmp/bin:$PATH" FS_GATES_FEHLERLISTE_DIR="$(dirname "$1")" python3 -I "$app/scripts/gates-komplett" --repo-dir "$app" --nur-fehlerliste "$1" >"$tmp/t.txt" 2>&1; }
+mkdir -p "$tmp/pl"; cp "$tmp/l1/fehlerliste-main.md" "$tmp/pl/fehlerliste-liste.md"
+: >"$STUBLOG"; RED_TEST=1 teil "$tmp/pl/fehlerliste-liste.md"; rc=$?
+chk "partial: the fixed fmt item is ticked with a UTC time" bash -c "grep -q '^- \[x\] \*\*fmt\*\*' '$tmp/pl/fehlerliste-liste.md' && grep -Eq 'nachgeprueft: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z' '$tmp/pl/fehlerliste-liste.md'"
+chk "partial: the open test item stays open with its rc and error lines, exit 1" bash -c "[ $rc -eq 1 ] && grep -q '^- \[ \] \*\*test\*\*' '$tmp/pl/fehlerliste-liste.md' && grep -q 'letzte pruefung: .* rc 101' '$tmp/pl/fehlerliste-liste.md'"
 chk "partial: only the commands of the list ran (no clippy, no gates.sh)" bash -c "! grep -q 'cargo clippy' '$STUBLOG' && grep -q 'cargo fmt --check' '$STUBLOG' && grep -q 'cargo test -p fs-demo --test gold' '$STUBLOG'"
 chk "partial: the last line says TEILPRUEFUNG, no gate result" bash -c "[ \"\$(tail -n 1 '$tmp/t.txt')\" = 'TEILPRÜFUNG: kein Gate-Ergebnis, volle CI nötig' ]"
 chk "partial: the JSON is no gate result (status teilpruefung, red, no head, no runs)" python3 -I - "$tmp/t.txt" <<'PY'
@@ -79,12 +79,12 @@ d = json.loads([l for l in open(sys.argv[1], encoding="utf-8") if l.startswith("
 assert d["status"] == "teilpruefung" and d["red"] is True and d["gate_ergebnis"] is False
 assert "kopf" not in d and "laeufe" not in d and "befunde" not in d
 PY
-RED_TEST='' teil "$tmp/liste.md"; rc=$?
-chk "partial: all items green ends with exit 0 and STILL says TEILPRUEFUNG and is no gate result" bash -c "[ $rc -eq 0 ] && [ \"\$(tail -n 1 '$tmp/t.txt')\" = 'TEILPRÜFUNG: kein Gate-Ergebnis, volle CI nötig' ] && grep -q '\"red\": true' '$tmp/t.txt'"
+RED_TEST='' teil "$tmp/pl/fehlerliste-liste.md"; rc=$?
+chk "partial: all items green ends with exit 3 (never 0) and STILL says TEILPRUEFUNG and is no gate result" bash -c "[ $rc -eq 3 ] && [ \"\$(tail -n 1 '$tmp/t.txt')\" = 'TEILPRÜFUNG: kein Gate-Ergebnis, volle CI nötig' ] && grep -q '\"red\": true' '$tmp/t.txt'"
 chk "partial: no gate marker file is written (repo tree and list folder hold only the list)" bash -c "[ -z \"\$(git -C '$app' status --porcelain)\" ] && ! ls '$tmp'/l1 '$tmp/scratch' 2>/dev/null | grep -qiE 'gates.json|gate-ergebnis|\.ok$'"
 # 5. injection: a hand-edited list (or an error text) cannot run anything but the allowed word lists
 rm -f "$tmp/PWNED"
-cat >"$tmp/evil.md" <<E
+mkdir -p "$tmp/pe"; cat >"$tmp/pe/fehlerliste-evil.md" <<E
 # Fehlerliste
 - [ ] **a**: x
   - nachpruefung: cargo test; touch $tmp/PWNED
@@ -102,17 +102,17 @@ cat >"$tmp/evil.md" <<E
   - first error lines: x
   - nachpruefung: cargo fmt --check
 E
-: >"$STUBLOG"; teil "$tmp/evil.md"; rc=$?
+: >"$STUBLOG"; teil "$tmp/pe/fehlerliste-evil.md"; rc=$?
 chk "injection: only the one allowed command ran, nothing was created" bash -c "[ ! -e '$tmp/PWNED' ] && [ \"\$(cat '$STUBLOG')\" = 'cargo fmt --check' ]"
-chk "injection: the refused items are open with the reason" bash -c "[ \$(grep -c 'command refused' '$tmp/evil.md') -ge 6 ] && [ $rc -eq 1 ]"
+chk "injection: the refused items are open with the reason" bash -c "[ \$(grep -c 'command refused' '$tmp/pe/fehlerliste-evil.md') -ge 6 ] && [ $rc -eq 1 ]"
 # a finding whose error text imitates a nachpruefung line cannot become one (the text is one line behind `first error lines`)
 chk "injection: error text that looks like a command stays in the first-error line" bash -c "! grep -q '^  - nachpruefung: touch' '$tmp/l1'/*.md"
 
 # 6. a fixed error and a new one: the partial check ticks the first, the full check finds the second
 mkrepo "$app"
-gates "$app/scripts/gates.sh" "$tmp/l6" RED_FMT=1 >/dev/null; cp "$tmp/l6"/fehlerliste-main.md "$tmp/l6.md"
-: >"$STUBLOG"; RED_FMT='' RED_CLIPPY=1 teil "$tmp/l6.md"; rc=$?
-chk "fixed + new: the partial check reports the fixed error green (ticked)" bash -c "grep -q '^- \[x\] \*\*fmt\*\*' '$tmp/l6.md' && [ $rc -eq 0 ]"
+gates "$app/scripts/gates.sh" "$tmp/l6" RED_FMT=1 >/dev/null; mkdir -p "$tmp/p6"; cp "$tmp/l6"/fehlerliste-main.md "$tmp/p6/fehlerliste-l6.md"
+: >"$STUBLOG"; RED_FMT='' RED_CLIPPY=1 teil "$tmp/p6/fehlerliste-l6.md"; rc=$?
+chk "fixed + new: the partial check reports the fixed error green (ticked), exit 3 (never 0)" bash -c "grep -q '^- \[x\] \*\*fmt\*\*' '$tmp/p6/fehlerliste-l6.md' && [ $rc -eq 3 ]"
 PATH="$tmp/bin:$PATH" RED_CLIPPY=1 FS_GATES_FEHLERLISTE_DIR="$tmp/l6k" python3 -I "$app/scripts/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs6" --ohne-flachprobe >"$tmp/k.json" 2>"$tmp/k.err"; rc=$?
 chk "fixed + new: the full check (gates-komplett) is red and its list has the NEW clippy error, not the fixed fmt" bash -c "[ $rc -eq 1 ] && grep -q '\*\*clippy\*\*' '$tmp/l6k'/fehlerliste-main.md && ! grep -q '\*\*fmt\*\*' '$tmp/l6k'/fehlerliste-main.md"
 # 7. gates-komplett: two errors in different steps, three runs all go to the end, ONE merged list, exit 1; clean = empty list, exit 0
@@ -126,6 +126,45 @@ PATH="$tmp/bin:$PATH" FS_GATES_FEHLERLISTE_DIR="$tmp/l7b" python3 -I "$app/scrip
 chk "gates-komplett: no error: exit 0, empty list" bash -c "[ $rc -eq 0 ] && grep -q '^0 findings' '$tmp/l7b'/fehlerliste-main.md && ! grep -q '^- \[' '$tmp/l7b'/fehlerliste-main.md"
 
 # 8. mutants: each one must turn a case red
+probes_check() { # <scripts dir>: the argument whitelist and the rules for the list file (the probes of the review)
+      python3 -I - "$1/kaskade_lib" "$tmp" <<'PY'
+import os, sys, tempfile
+sys.path.insert(0, sys.argv[1])
+import teil
+refused = ["cargo test --config=/tmp/evil.toml", "cargo test --manifest-path=/tmp/evil/Cargo.toml", "cargo clippy -Zunstable-options", "cargo test --target-dir=/",
+           "cargo fmt -- --config-path=/tmp/x", "bash {SCRIPTS}/gates-lock.sh /etc", "scripts/gates-komplett --repo-dir=/ --nur-fehlerliste=/tmp/x.md", "cargo test -C /tmp",
+           "cargo test -p x RUSTC=evil", "cargo test /etc/passwd", "cargo test ../x", "cargo test -p /abs", "cargo test -- --test-threads=1;", "cargo test --config build.rustc-wrapper=x",
+           "cargo test -Zunstable", "cargo test -p x -- --include-ignored", "python3 -I {SCRIPTS}/check_rust_rules.py /etc", "python3 -c x", "bash {SCRIPTS}/gates-lock.sh {ROOT} extra", "bash -c x",
+           "cargo build", "cargo test -p x $(touch y)", "cargo test | touch y", "cargo clippy -p x -- -A warnings", "cargo clippy -- -D warnings --cap-lints allow", "cargo test --features=evil",
+           "cargo test --release", "cargo fmt --check --config-path=/x", "cargo test -p ../x", "cargo test -p x -p"]
+good = ["cargo fmt --check", "cargo clippy -p fs-demo --all-targets --all-features --locked -- -D warnings -W clippy::pedantic", "cargo test -p fs-demo --test gold --all-features --locked -- it_breaks mod_a::case",
+        "cargo test --workspace --all-features --locked --no-fail-fast", "cargo test -p x --lib", "cargo test -p x --bin fs-x --locked -q", "python3 -I {SCRIPTS}/check_rust_rules.py {ROOT}",
+        "bash {SCRIPTS}/gates-lock.sh {ROOT}", "bash {SCRIPTS}/gates-files.sh {ROOT}", "cargo test it_works", "cargo fmt --all --check", "cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic"]
+bad = [c for c in refused if teil.check_command(c, "/s", "/r") is not None]
+miss = [c for c in good if teil.check_command(c, "/s", "/r") is None]
+assert not bad and not miss, (bad, miss)
+assert teil.check_command("cargo test -p x --lib", "/s", "/r") == ["cargo", "test", "-p", "x", "--lib"]
+assert teil.check_command("bash {SCRIPTS}/gates-lock.sh {ROOT}", "/s", "/r") == ["bash", "/s/gates-lock.sh", "/r"]
+d = tempfile.mkdtemp(dir=sys.argv[2])
+f = os.path.join(d, "fehlerliste-main.md"); open(f, "w").write("x\n"); os.chmod(f, 0o600)
+uid = os.getuid()
+assert teil.check_list_file(f, d, uid) is None
+assert teil.check_list_file(f, d, uid + 1), "foreign owner"
+os.chmod(f, 0o666); assert teil.check_list_file(f, d, uid), "writable by others"; os.chmod(f, 0o600)
+os.symlink(f, os.path.join(d, "fehlerliste-link.md")); assert teil.check_list_file(os.path.join(d, "fehlerliste-link.md"), d, uid), "symlink"
+import stat as _st
+fake = lambda p: os.stat_result((_st.S_IFLNK | 0o600, 0, 0, 1, uid, 0, 1, 0, 0, 0))  # a symbolic link whose mode looks harmless
+assert teil.check_list_file(f, d, uid, lstat=fake), "a symlink with a harmless mode"
+assert teil.check_list_file(f, os.path.join(d, "other"), uid), "other folder"
+g = os.path.join(d, "list.md"); open(g, "w").write("x"); os.chmod(g, 0o600); assert teil.check_list_file(g, d, uid), "name"
+PY
+}
+rc_check() { # <mechanism folder>: the reading of the rc of a step
+      bash -c '. "$1/scripts/lib_gates_list.sh"; d=$(mktemp -d); : > "$d/e"; echo abc > "$d/a"; echo 0 > "$d/z"; echo 101 > "$d/n"; [ "$(gates_read_rc "$d/e")" = 1 ] && [ "$(gates_read_rc "$d/a")" = 1 ] && [ "$(gates_read_rc "$d/none")" = 1 ] && [ "$(gates_read_rc "$d/z")" = 0 ] && [ "$(gates_read_rc "$d/n")" = 101 ]' _ "$1" 
+}
+chk "whitelist: every probe of the review is refused, every normal form of the list is accepted; the list file must be ours, plain, not writable by others, in its folder" probes_check "$here"
+chk "rc of a step: missing, empty or no number is red, a number is that number" rc_check "$(dirname "$here")"
+
 mut() { # <name> <file> <python expression old> <new> <suite>: makes the mutated copy in a mechanism folder and runs the cases that must catch it
   local name="$1" file="$2" old="$3" new="$4" want="$5"
   local m="$tmp/mut-$$-$RANDOM"; mkmech "$m"
@@ -149,9 +188,11 @@ PY
       ;;
     teil) # the partial check: tick, injection, no gate result, no abort at the first green
       mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m; rm -f "$tmp/PWNED"
-      printf -- '- [ ] **a**: x\n  - nachpruefung: cargo fmt --check\n- [ ] **b**: x\n  - nachpruefung: cargo test -p fs-demo --test gold -- it_breaks\n- [ ] **c**: x\n  - nachpruefung: cargo test -p x --lib;touch %s\n- [ ] **d**: x\n  - nachpruefung: sh -c touch\n- [ ] **e**: x\n  - nachpruefung: cargo clippy -p fs-demo --all-targets\n' "$tmp/PWNED" >"$tmp/ml.md"
-      : >"$STUBLOG"; PATH="$tmp/bin:$PATH" RED_TEST=1 python3 -I "$tmp/app-m/scripts/gates-komplett" --repo-dir "$tmp/app-m" --nur-fehlerliste "$tmp/ml.md" >"$tmp/mt.txt" 2>&1; local rc=$?
-      python3 -I - "$tmp/mt.txt" "$tmp/ml.md" "$STUBLOG" "$tmp/PWNED" "$rc" <<'PY' || r=1
+      mkdir -p "$tmp/pm"; printf -- '- [ ] **a**: x\n  - nachpruefung: cargo fmt --check\n- [ ] **b**: x\n  - nachpruefung: cargo test -p fs-demo --test gold -- it_breaks\n- [ ] **c**: x\n  - nachpruefung: cargo test -p x --lib;touch %s\n- [ ] **d**: x\n  - nachpruefung: sh -c touch\n- [ ] **e**: x\n  - nachpruefung: cargo clippy -p fs-demo --all-targets\n' "$tmp/PWNED" >"$tmp/pm/fehlerliste-ml.md"
+      : >"$STUBLOG"; PATH="$tmp/bin:$PATH" FS_GATES_FEHLERLISTE_DIR="$tmp/pm" RED_TEST=1 python3 -I "$tmp/app-m/scripts/gates-komplett" --repo-dir "$tmp/app-m" --nur-fehlerliste "$tmp/pm/fehlerliste-ml.md" >"$tmp/mt.txt" 2>&1; local rc=$?
+      printf -- '- [ ] **a**: x\n  - nachpruefung: cargo fmt --check\n' >"$tmp/pm/fehlerliste-mg.md"
+      PATH="$tmp/bin:$PATH" FS_GATES_FEHLERLISTE_DIR="$tmp/pm" python3 -I "$tmp/app-m/scripts/gates-komplett" --repo-dir "$tmp/app-m" --nur-fehlerliste "$tmp/pm/fehlerliste-mg.md" >/dev/null 2>&1; [ "$?" -eq 3 ] || r=1  # all ticked: exit 3, never 0
+      python3 -I - "$tmp/mt.txt" "$tmp/pm/fehlerliste-ml.md" "$STUBLOG" "$tmp/PWNED" "$rc" <<'PY' || r=1
 import json, os, sys
 out, lst, log, pwned, rc = sys.argv[1:6]
 d = json.loads([l for l in open(out, encoding="utf-8") if l.startswith("{")][0])
@@ -165,6 +206,8 @@ runs = open(log, encoding="utf-8").read().splitlines()
 assert len(runs) == 3, runs  # a, b, e ran (c and d did not)
 PY
       ;;
+    probes) probes_check "$m/scripts" || r=1 ;;
+    rc) rc_check "$m" || r=1 ;;
     full) # gates-komplett with two errors: the three runs all go to the end
       mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m
       PATH="$tmp/bin:$PATH" RED_FMT=1 RED_TEST=1 FS_GATES_FEHLERLISTE_DIR="$tmp/mm-l" python3 -I "$tmp/app-m/scripts/gates-komplett" --repo-dir "$tmp/app-m" --log-dir "$tmp/mm-logs" >"$tmp/mk.json" 2>/dev/null
@@ -174,7 +217,7 @@ PY
   if [ "$r" -ne 0 ]; then ok "mutant $name is red"; else bad "mutant $name SURVIVED"; fi
   rm -rf "$m" "$tmp/app-m" "$tmp/mm-"* 2>/dev/null
 }
-mut "step swallows the rc"            gates.sh 'rc=$(cat "$out.rc" 2>/dev/null || echo 1)' 'rc=0' gates
+mut "step swallows the rc"            gates.sh 'rc="$(gates_read_rc "$out.rc")"' 'rc=0' gates
 mut "stop at the first red"           gates.sh '    finding_names+=("$name")' '    finding_names+=("$name"); echo "gates FAILED: stop" >&2; exit 1' gates
 mut "list incomplete (first only)"    gates.sh '    findings+=("$name|$severity|$rc|$*")' '    [ "${#findings[@]}" -eq 0 ] && findings+=("$name|$severity|$rc|$*")' gates
 mut "exit 0 although findings"        gates.sh '    exit 1
@@ -189,17 +232,39 @@ mut "test without --no-fail-fast"     gates.sh ' --no-fail-fast "${skip[@]}"' ' 
 mut "list inside the repo tree"       gates.sh '  case "$(cd "$dir" && pwd)/" in "$root"/*) dir="${TMPDIR:-/tmp}" ;; esac' '  dir="$root"' gates
 mut "guard step removed"             gates.sh '  step guard error gates_guard_compare "$guard_snap" "$guard_snap.end"' '  true' gates
 mut "list file not written"           gates.sh '  } > "$findings_file"' '  } > /dev/null' gates
-mut "tick without running"            gates-komplett '                if rc != 0:
-                    reds.append((cmd, rc, " // ".join(err)))' '                if False:
-                    reds.append((cmd, rc, " // ".join(err)))' teil
+mut "tick without running"            kaskade_lib/teil.py '            if rc != 0:
+                reds.append((cmd, rc, " // ".join(err)))' '            if False:
+                reds.append((cmd, rc, " // ".join(err)))' teil
 mut "partial run writes a gate result" gates-komplett '"status": "teilpruefung", "red": True' '"status": "ok", "red": False' teil
-mut "partial without the TEILPRUEFUNG line" gates-komplett '    print("TEILPRÜFUNG: kein Gate-Ergebnis, volle CI nötig")' '    pass' teil
-mut "injection through a shell"       gates-komplett 'rc = subprocess.run([slot, *argv], cwd=d,@@@if not w or any(not x or not PLAIN.match(x) for x in w) or any(".." in x.split("/") for x in w):' 'rc = subprocess.run(" ".join([slot, *argv]), shell=True, cwd=d,@@@if not w:' teil
-mut "word check off"                  gates-komplett 'if not w or any(not x or not PLAIN.match(x) for x in w) or any(".." in x.split("/") for x in w):' 'if not w:' teil
-mut "any program allowed"             gates-komplett '    if not ok:
-        return None' '    if False:
-        return None' teil
-mut "abort at the first green command" gates-komplett '                results.append({"item": it["title"], "gruen": True})' '                results.append({"item": it["title"], "gruen": True}); new_lines[it["start"]:it["end"]] = [head, *body, *add]; break' teil
+mut "partial without the TEILPRUEFUNG line" gates-komplett '    print(teil.LAST_LINE)' '    pass' teil
+mut "partial exits 0 when all is ticked" kaskade_lib/teil.py 'EXIT_OPEN, EXIT_PART_GREEN = 1, 3' 'EXIT_OPEN, EXIT_PART_GREEN = 1, 0' teil
+mut "injection through a shell"       kaskade_lib/teil.py 'rc = subprocess.run([slot, *argv], cwd=repo_dir,@@@    if not w or any(not x for x in w) or not _check_argv(w):' 'rc = subprocess.run(" ".join([slot, *argv]), shell=True, cwd=repo_dir,@@@    if not w:' teil
+mut "word check off"                  kaskade_lib/teil.py '    if not w or any(not x for x in w) or not _check_argv(w):' '    if not w:' teil
+mut "whitelist: every program allowed" kaskade_lib/teil.py '        return w == ["python3", "-I", "{SCRIPTS}/check_rust_rules.py", "{ROOT}"]
+    return False' '        return w == ["python3", "-I", "{SCRIPTS}/check_rust_rules.py", "{ROOT}"]
+    return True' teil
+mut "whitelist: any option allowed"   kaskade_lib/teil.py '        else:
+            return False
+    return True' '        elif w.startswith("-"):
+            i += 1
+        else:
+            return False
+    return True' probes
+mut "whitelist: paths allowed as filter" kaskade_lib/teil.py 'TEST = r"[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*"' 'TEST = r"[A-Za-z0-9_/.:]+"' probes
+mut "whitelist: cargo test unchecked" kaskade_lib/teil.py '    if w[0] == "cargo" and w[1] == "test":
+' '    if w[0] == "cargo" and w[1] == "test":
+        return True
+' probes
+mut "whitelist empty"                 kaskade_lib/teil.py '    if len(w) < 2:
+        return False
+    if w[0] == "cargo" and w[1] == "test":' '    return False
+    if w[0] == "cargo" and w[1] == "test":' probes
+mut "list: symlink allowed"           kaskade_lib/teil.py '    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):' '    if False:' probes
+mut "list: foreign owner allowed"     kaskade_lib/teil.py '    if st.st_uid != uid:' '    if False:' probes
+mut "list: writable by others allowed" kaskade_lib/teil.py '    if st.st_mode & 0o022:' '    if False:' probes
+mut "list: any folder allowed"        kaskade_lib/teil.py '    if os.path.realpath(os.path.dirname(os.path.abspath(path))) != os.path.realpath(list_dir):' '    if False:' probes
+mut "rc of a step: empty is green"    lib_gates_list.sh 'if [[ "$v" =~ ^[0-9]+$ ]]; then echo "$v"; else echo 1; fi' 'if [[ "$v" =~ ^[0-9]+$ ]]; then echo "$v"; else echo 0; fi' rc
+mut "rc of a step: missing is green"  lib_gates_list.sh '  [ -r "$1" ] && v="$(cat "$1")"' '  [ -r "$1" ] && v="$(cat "$1")" || v=0' rc
 mut "full check stops at the first red" gates-komplett '        for name, wd, e in plan:
 ' '        for name, wd, e in plan:
             if befunde:

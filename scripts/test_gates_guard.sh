@@ -18,7 +18,7 @@ TEXT="Arbeitsbaum während der Prüfung geändert"
 # mkscripts <dir>: a copy of the scripts the guard needs (gates.sh, the library, RUST_VERSION) in <dir>/s/scripts
 mkscripts() {
   mkdir -p "$1/s/scripts"
-  cp "$here/gates.sh" "$here/lib_gates_guard.sh" "$1/s/scripts/"
+  cp "$here/gates.sh" "$here/lib_gates_guard.sh" "$here/lib_gates_list.sh" "$1/s/scripts/"
   echo "1.0.0" > "$1/s/RUST_VERSION"
 }
 # mkrepo <dir>: a clean throw-away repo with two tracked files and an ignored target/
