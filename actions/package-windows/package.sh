@@ -34,7 +34,7 @@ make_msi() {
   for g in "${groups[@]}"; do
     p=${g%%$'\t'*}
     if [[ ${#groups[@]} -eq 1 ]]; then out="$dist/$base.msi"; else out="$dist/$p-$version-windows-$ARCH.msi"; fi
-    sel=(); while IFS= read -r _l; do sel+=("$_l"); done < <(pkg_select "$p")
+    sel=(); while IFS= read -r _l; do sel+=("$_l"); done < <(wix_select "$p")   # cargo-wix needs -p in ANY workspace, also with one group
     dir=$(pkg_dir "$p")
     # wix/main.wxs lives in the package directory; an existing one (the app repo's own) is never overwritten.
     [[ -f "$dir/wix/main.wxs" ]] || cargo wix init ${sel[@]+"${sel[@]}"}

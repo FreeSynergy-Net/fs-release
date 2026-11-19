@@ -31,3 +31,12 @@ TS="$T/msi1"; make_pkg "$TS" wsolo 0.1.1 wsolo
 out=$(run_win "$TS" "$(make_plan "$TS" BINARIES=wsolo NAME=wsolo)" | sed "s#$TS#@R@#g")
 check_has "msi: single package keeps <name>-<version>-windows-<arch>.msi" "$out" "wsolo-0.1.1-windows-x86_64.msi"
 check_has "msi: single package build unchanged (no -p)" "$out" "cargo wix --no-build --nocapture --target $X --install-version 0.1.1 --output @R@/dist/wsolo-0.1.1-windows-x86_64.msi"
+# fs-capnpc case (release v0.2.1/v0.2.2 red): root package + [workspace] with a second member, ONE group, no cargo-package.
+# cargo-wix says "Workspace detected. Please pass a package name." without -p: init and msi must both carry -p wroot.
+TW="$T/msiws"; make_pkg "$TW" wroot 0.1.1
+make_pkg "$TW/crates/whelper" whelper 0.1.1
+printf '\n[workspace]\nmembers = [".", "crates/whelper"]\nresolver = "2"\n' >> "$TW/Cargo.toml"
+out=$(run_win "$TW" "$(make_plan "$TW" BINARIES=wroot NAME=wroot 'IGNORE_BINARIES=*')" | sed "s#$TW#@R@#g")
+check_has "msi: workspace with one group -> wix init -p" "$out" "cargo wix init -p wroot"
+check_has "msi: workspace with one group -> msi -p (the v0.2.2 failure)" "$out" "cargo wix --no-build --nocapture --target $X -p wroot --install-version 0.1.1 --output @R@/dist/wroot-0.1.1-windows-x86_64.msi"
+check_has "msi: workspace with one group keeps the plain file name" "$out" "wroot-0.1.1-windows-x86_64.msi"

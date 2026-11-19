@@ -50,6 +50,16 @@ pkg_select() {
   return 0
 }
 
+# wix_select PKG -> like pkg_select, and ALSO "-p PKG" when the cargo workspace has more than one member: cargo-wix refuses
+# a workspace without a package name ("Workspace detected. Please pass a package name."), even when the plan has one group
+# and no cargo_package (fs-capnpc: root package + crates/cligen-fixtures; the msi step of v0.2.1 and v0.2.2 failed on it).
+wix_select() {
+  local sel; sel=$(pkg_select "$1")
+  if [[ -z "$sel" && $(cargo metadata --format-version 1 --no-deps | jq '.workspace_members | length') -gt 1 ]]; then sel=$(printf -- '-p\n%s' "$1"); fi
+  [[ -z "$sel" ]] || printf '%s\n' "$sel"
+  return 0
+}
+
 # group_list -> fills the global array `groups` with the lines of package_groups (bash 3.2 safe, no mapfile).
 group_list() { groups=(); while IFS= read -r _l; do groups+=("$_l"); done < <(package_groups); }
 
