@@ -59,16 +59,16 @@ def check_step(item, seen, where):
     return problems
 
 
-def check_states(head, step_names):
+def check_states(head, step_names, rules):
     """No states in a flow, rules only for its own steps, no step named like a state."""
-    problems = runrules.check_station_rules(head.get("metadata") if isinstance(head, dict) else None, step_names)
+    problems = runrules.check_station_rules(head.get("metadata") if isinstance(head, dict) else None, step_names, rules)
     for n in step_names:
-        if n in runrules.STATES or n == runrules.STATIONS:
+        if n in (rules or {}).get("states", []):
             problems.append(f"step {n!r} carries the name of a state (own steps are the stations between the states)")
     return problems
 
 
-def check_doc(doc):
+def check_doc(doc, rules=None):
     if not isinstance(doc, dict):
         return ["top level is not a mapping"]
     problems = []
@@ -88,7 +88,7 @@ def check_doc(doc):
     for i, item in enumerate(steps):
         problems += check_step(item, seen, f"do[{i}]")
     names = [next(iter(i)) for i in steps if isinstance(i, dict) and len(i) == 1]
-    return problems + check_states(head, names) + check_then(steps, seen)
+    return problems + check_states(head, names, rules) + check_then(steps, seen)
 
 
 def check_then(steps, names):
@@ -160,11 +160,15 @@ def main(argv):
         return 1
     bad = 0
     rules_path = os.path.join(folder, runrules.RULES_FILE)
+    rules = None
     try:
         with open(rules_path, encoding="utf-8") as f:
-            rule_problems = runrules.check_rules(yaml.safe_load(f))
+            rules = yaml.safe_load(f)
+        rule_problems = runrules.check_rules(rules)
     except (OSError, yaml.YAMLError) as e:
         rule_problems = [f"the run rule set is not readable: {e}"]
+    if not isinstance(rules, dict):
+        rules = None
     for p in rule_problems:
         print(f"{runrules.RULES_FILE}: {p}")
         bad += 1
@@ -180,7 +184,7 @@ def main(argv):
             print(f"{rel}:{mark.line + 1 if mark else 0}: {getattr(e, 'problem', None) or 'not YAML'}")
             bad += 1
             continue
-        problems = check_doc(doc)
+        problems = check_doc(doc, rules)
         if not problems:
             problems = check_events(doc, rel.rsplit(".", 1)[0], readme)
         for p in problems:
