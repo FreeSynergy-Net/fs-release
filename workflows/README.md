@@ -11,7 +11,7 @@ werden nur geprüft (`scripts/check_workflows.py`, Test `crates/fs-release/tests
 `flow` müssen mit dem Code übereinstimmen). In einem zweiten Schritt liest `fs-release flow` diese Dateien und führt den
 Ablauf daraus aus. Keine Geheimnisse in diese Dateien.
 
-**Zustände eines Laufs.** Die Zustände gehören dem Lauf, einmal: `workflows/run/rules.yaml` (Standard `STATES.md`, Prüfung `scripts/check_run_rules.py`); eine Workflow-Datei trägt sie nicht, sondern höchstens Regeln für ihre eigenen Stationen (die Schritte `do`) und Status-Befehle mit `timeout`. Die Spalten in fs-tasks sind die Zustände plus die Stationen.
+**Zustände eines Laufs.** Die Zustände gehören dem Lauf, einmal: `workflows/run/rules.yaml` (Standard `STATES.md`, Prüfung `scripts/check_run_rules.py`; acht Zustände, `wartet` immer mit Grund); eine Workflow-Datei trägt sie nicht, sondern höchstens Regeln für ihre eigenen Stationen (die Schritte `do`) und Status-Befehle mit `timeout`. Die Spalten in fs-tasks sind Zustände (und je Grund) plus Stationen, eine Anzeige-Einstellung.
 
 **Regel: alle Arbeitsschritte laufen über einen Workflow.** Gibt es für einen Schritt keinen, ist der erste Schritt, den
 Workflow zu schreiben oder zu erweitern (`workflow-pflege`). Ein Agentenauftrag verweist auf den Flow so:

@@ -127,6 +127,28 @@ pub fn assert_rules_red(needle: &str, edit: impl Fn(String) -> String) {
     check_red(code, &out, needle);
 }
 
+/// The flows as they are, but without the rule set file.
+pub fn assert_red_without_rules(needle: &str) {
+    let tmp = tempfile::tempdir().unwrap();
+    for f in FILES {
+        fs::write(tmp.path().join(format!("{f}.yaml")), read(f)).unwrap();
+    }
+    let (code, out) = python(&script(), &[tmp.path()]);
+    check_red(code, &out, needle);
+}
+
+/// One state of a run checked against the real rule set (`check_run_rules.py <rules> <state> [reason]`).
+pub fn run_state(state: &str, reason: Option<&str>) -> (i32, String) {
+    let rules = root().join("workflows/run/rules.yaml");
+    let state = PathBuf::from(state);
+    let reason = reason.map(PathBuf::from);
+    let mut args: Vec<&Path> = vec![&rules, &state];
+    if let Some(r) = &reason {
+        args.push(r);
+    }
+    python(&root().join("scripts/check_run_rules.py"), &args)
+}
+
 /// A change that must stay green (a valid use of the profile).
 pub fn assert_green(file: &str, edit: impl Fn(String) -> String) {
     let (code, out) = mutated(file, edit);
