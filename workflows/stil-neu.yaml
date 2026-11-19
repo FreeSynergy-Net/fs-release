@@ -15,11 +15,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: stil-neu
-  version: 0.0.14
+  version: 0.0.15
   title: Create a new style in fs-components-styles - dossier, contract, tokens, blocks, gates, pictures, review, user OK, release
 do:
   - vorhanden-pruefen:
-      call: vorhanden-pruefen-ai:0.0.14@fs
+      call: vorhanden-pruefen-ai:0.0.15@fs
       with:
         suche: ${ .input }
       export:
@@ -31,7 +31,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. The following steps read `befund`; nothing is built without it."
   - vorhanden-pruefen-check:
-      call: befund-beleg:0.0.14@fs
+      call: befund-beleg:0.0.15@fs
       with:
         befund: ${ $context.befund }
       export:
@@ -62,7 +62,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never on."
   - dossier:
-      call: dossier-ai:0.0.14@fs
+      call: dossier-ai:0.0.15@fs
       with:
         befund: ${ $context.befund }
         stil: ${ .input.stil }
@@ -75,7 +75,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet writes the dossier of the model (pictures, colours, edges, depth, motion, states of the blocks) in the dossier folder; every row of the table `Zustand | belegt | Quelle` carries a source or is `[offen]` marked `ohne Vorbild` (own version). No model at all is allowed, but then the whole style is `ohne Vorbild`."
   - dossier-gate:
-      call: dossier-gate:0.0.14@fs
+      call: dossier-gate:0.0.15@fs
       with:
         dossier: ${ .input.dossier }
       export:
@@ -106,7 +106,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `dossier`, from the third red round to `eskalation`; only `red == false` goes on, a missing result goes to `eskalation`."
   - vertrag:
-      call: style-contract-read:0.0.14@fs
+      call: style-contract-read:0.0.15@fs
       with:
         contract: ${ .input.contract }
         blocks: ${ .input.blocks }
@@ -119,7 +119,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent reads contracts/THEME-CONTRACT.md and blocks/*.toml and writes down the list of ALL blocks of the contract (result field `bausteine`). Rule `stil-vollstaendigkeit`: a new style has one entry for EVERY block and the 16 block_tokens, otherwise fs-components does not compile; a block missing in the list is a defect of this step."
   - tokens:
-      call: style-tokens-ai:0.0.14@fs
+      call: style-tokens-ai:0.0.15@fs
       with:
         stil: ${ .input.stil }
         dossier: ${ .input.dossier }
@@ -136,7 +136,7 @@ do:
         in: ${ $context.vertrag.bausteine }
         do:
           - baustein:
-              call: style-block-ai:0.0.14@fs
+              call: style-block-ai:0.0.15@fs
               with:
                 stil: ${ .input.stil }
                 baustein: ${ $baustein }
@@ -148,7 +148,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Every block of the contract list on its own: one entry per block in blocks/*.toml with the 16 block_tokens, light and dark; no block is left out or copied from another style without a look (the distance gate below catches a copy)."
   - vollstaendigkeit:
-      call: stil-vollstaendigkeit:0.0.14@fs
+      call: stil-vollstaendigkeit:0.0.15@fs
       with:
         repo: ${ .input.repo }
         stil: ${ .input.stil }
@@ -162,7 +162,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Rule `stil-vollstaendigkeit` (script follows, TODO - not invented, see the header): until then `/srv/FreeSynergy/.scratch/build-slot.sh cargo test -p fs-components --test block_tokens --locked` (one entry per style for ALL blocks, 16 block_tokens, a missing entry does not compile). Carries red and runde."
   - kontrast:
-      call: contrast-gate:0.0.14@fs
+      call: contrast-gate:0.0.15@fs
       with:
         repo: ${ .input.repo }
         stil: ${ .input.stil }
@@ -175,7 +175,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Contrast gate on the DRAWN colours (not on the tokens alone): text 4.5:1, edges and controls 3:1, light and dark. An exception is allowed only when it is written down with a reason in the contract exception list; an undocumented miss is red. Specification, no script yet. Carries red and runde."
   - abstand:
-      call: zwei-stile:0.0.14@fs
+      call: zwei-stile:0.0.15@fs
       with:
         repo: ${ .input.repo }
         stil: ${ .input.stil }
@@ -189,7 +189,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Two-styles distance: r >= 0.25 against EVERY other style (a new style that is only a recolour of another is red). Script `zwei-stile` follows (TODO, not invented); until then `/srv/FreeSynergy/.scratch/build-slot.sh cargo test -p fs-components --test blocks_styles --locked`. Carries red and runde."
   - waechter:
-      call: theme-guard:0.0.14@fs
+      call: theme-guard:0.0.15@fs
       with:
         repo: ${ .input.repo }
       export:
@@ -220,7 +220,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `tokens`, from the third red round to `eskalation`; only all four `red == false` goes on, a missing result goes to `eskalation`, never to green."
   - bilder:
-      call: picture-gate:0.0.14@fs
+      call: picture-gate:0.0.15@fs
       with:
         repo: ${ .input.repo }
         stil: ${ .input.stil }
@@ -253,7 +253,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `tokens` (and through `checks-again` again), from the third red round to `eskalation`; a missing result goes to `eskalation`."
   - head:
-      call: resolve-head:0.0.14@fs
+      call: resolve-head:0.0.15@fs
       with:
         branch: ${ .input.branch }
       export:
@@ -269,7 +269,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.14
+          version: 0.0.15
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -303,7 +303,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a NO goes back to `tokens` (the gates run again, the head changes), from the third NO to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
   - bild-ok:
-      call: user-acceptance:0.0.14@fs
+      call: user-acceptance:0.0.15@fs
       with:
         stil: ${ .input.stil }
         bilder: ${ .input.bilder }
@@ -352,7 +352,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.14
+          version: 0.0.15
         input:
           repo: ${ .input.repo }
           tag: ${ .input.tag }

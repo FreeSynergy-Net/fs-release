@@ -1,6 +1,6 @@
 [package]
 name = "fs-blueprint"
-version = "0.0.14"
+version = "0.0.15"
 description = "fs-blueprint: the blueprint (scaffold.toml, schema 2) as a checked value object and the check of it"
 edition.workspace = true
 license.workspace = true

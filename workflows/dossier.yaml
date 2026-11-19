@@ -6,11 +6,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: dossier
-  version: 0.0.14
+  version: 0.0.15
   title: Research a Frontend into a dossier and publish it to the docs
 do:
   - research:
-      call: research-ai:0.0.14@fs
+      call: research-ai:0.0.15@fs
       with:
         vorbild: ${ .input.vorbild }
         repo: ${ .input.repo }
@@ -23,7 +23,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes one research file each for states, dialogs, menus and context menus, shortcuts, workflows, acceptance.md and gaps into R2; every fact has a source, what is not proven is marked [nicht belegt]; the dossier template has the REQUIRED sections `## Menübaum (vollständig)` (every main menu opened, entries, order, separators, submenus, check marks and radio groups, disabled entries, shortcuts), `## Kontextmenüs` (right click on an element and on empty space, per place), `## Werkzeugleiste` (buttons in order) and `## Tastenkürzel`; source official documentation screenshots or the real program in a container (concept only, no code, no graphics, ADR 0013); what is not proven is written `nicht belegt`, never invented; a dossier without these sections makes `picture-acceptance` (step `menue-bilder`) red (`dossier-menue-fehlt`); the menus file carries a `## Menü-Inventar` list (nested bullets with optional shortcut and names, format in docs/menue-vergleich.md) and the dialogs file a table or `## Dialog-Inventar` list, because scripts/menue-vergleich reads them (docs/menue-vergleich.md); bausteine.md carries the `## Baustein-Zuordnung` table (every area of the model -> 'what is this?' -> block id, with the column `Quelle` in the order family block (familie), Blinc widget through an adapter (blinc), new block (neu, only with the reason why neither a family block nor a Blinc widget fits); format in docs/baustein-zuordnung.md; the order of a Frontend is block analysis, then look, then composition); the states file carries the table `Zustand | belegt | Quelle` (`ja` with a source, or `[offen]` marked `ohne Vorbild` as own version; scripts/dossier-gate checks it, decision 16.11.); ADR 0013 - nothing is copied. Read-only on the Frontend, no network beyond the sources named in the order, commits per [COMMIT], report per [BERICHT].
   - check-docs:
-      call: check-docs:0.0.14@fs
+      call: check-docs:0.0.15@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -31,7 +31,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: check-docs on the dossier; red goes back to research until it is green.
   - baustein-zuordnung:
-      call: baustein-zuordnung:0.0.14@fs
+      call: baustein-zuordnung:0.0.15@fs
       with:
         dossier: ${ .input.dossier }/bausteine.md
         bestand: ${ .input.bestand }
@@ -64,7 +64,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - bad input (`fehler`, rc 2) and a third red round (`runde` >= 3, counted by `scripts/baustein-zuordnung` in its state file, rc 3) go to the person (`eingabe-fehler`), they never jump back; a red assignment goes back to research (the agent fixes bausteine.md), green goes on to publish.
   - publish:
-      call: docs-main:0.0.14@fs
+      call: docs-main:0.0.15@fs
       then: end
       with:
         vorbild: ${ .input.vorbild }

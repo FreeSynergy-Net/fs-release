@@ -9,7 +9,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: release-flow
-  version: 0.0.14
+  version: 0.0.15
   title: Release a branch of a program as a pre-release and bring it into the catalog
 do:
   - lift:
@@ -17,7 +17,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: lift
-          version: 0.0.14
+          version: 0.0.15
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -29,7 +29,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-mitziehen
-          version: 0.0.14
+          version: 0.0.15
         input:
           repo: ${ .input.repo }
           delta: ${ .input.delta }
@@ -60,7 +60,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review (`eskalation` ends it with `eskaliert: true` for the caller). Only green goes on."
   - gates:
-      call: gates:0.0.14@fs
+      call: gates:0.0.15@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -68,7 +68,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh on a fresh clone, the one definition of the checks.
   - lock-pruefung:
-      call: lock-check:0.0.14@fs
+      call: lock-check:0.0.15@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -76,7 +76,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Lock check (ADR 0092 rule 2, ADR 0093 rule 3), script `scripts/check_lock_sources.py` (also run by scripts/gates.sh through `scripts/gates-lock.sh`): in every Cargo.lock of the repo each of fs-types, fs-objects, fs-interfaces, fs-rpc, fs-jscalendar (list: scripts/lock-sources.toml) appears in exactly ONE source; two sources are an error that names both sources and the packages that pull them. Introduction: warning first, error later - switch `strict` (default false: a WARNING, the gate stays green; true in the repo's own `.fs-lock-sources.toml` once the repo is lifted to V1+, or env FS_LOCK_STRICT=1). V1+ addition, switch `only_from_enabled` (default OFF, env FS_LOCK_ONLY_FROM=1): fs-types only from the repo FreeSynergy/fs-types."
   - version-abgleich:
-      call: version-check:0.0.14@fs
+      call: version-check:0.0.15@fs
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -87,7 +87,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Version comparison BEFORE the review request (specification, no script yet): the version in Cargo.toml, in the entries of the own crates in Cargo.lock and the first heading of CHANGELOG.md are the SAME and the tag is v<version> (lesson fs-people v0.0.11: a lock with the old version was only seen at the tag); the `uses:` lines of fs-release in release.yml, ci.yml and check.yml are pinned to the NEWEST chain, today v0.0.10 (lesson fs-packages with v0.0.9: the old chain lacks later fixes); a pin is never lowered. Red goes back to the lift or the author before any review; the same check runs again on the fresh clone in `ff-und-tag`."
   - adresse-pruefen:
-      call: identity-check:0.0.14@fs
+      call: identity-check:0.0.15@fs
       with:
         range: main..release-<version>
         allowed_identity_key: FS_ALLOWED_IDENTITY
@@ -98,7 +98,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Identity check before the review (b7), specification, no script yet: `git log --format='%ae %ce' main..HEAD` lists author and committer address of every commit of the range; only the identity in the key/config `FS_ALLOWED_IDENTITY` is allowed. Every other address as author or as committer is a hit (no exception, also no machine or bot address): red, the branch is rewritten first (author and committer = the allowed identity) and the check runs again. The check names the commit, never an address. It sits BEFORE the review because a rewrite makes a new head, and a JA is bound to exactly one head; after the review or after the tag a rewrite would void the JA or leave a public tag on the old commits."
   - review-request:
-      call: review-request:0.0.14@fs
+      call: review-request:0.0.15@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -118,7 +118,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews the head and writes the approval file; a new head makes a JA invalid.
   - tag:
-      call: tag:0.0.14@fs
+      call: tag:0.0.15@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -126,7 +126,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Annotated tag v<version> on the approved head, locally.
   - push:
-      call: push:0.0.14@fs
+      call: push:0.0.15@fs
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -146,7 +146,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: CI of the pushed branch release-<version> must be green for exactly this head; red stops the flow.
   - main-ff:
-      call: merge-ff:0.0.14@fs
+      call: merge-ff:0.0.15@fs
       with:
         into: main
       metadata:
@@ -160,7 +160,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: publish-doc
-          version: 0.0.14
+          version: 0.0.15
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -197,7 +197,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The sender side of the event the step release waits for - the last job of release.yml sends it, only after publish was green and the Pre-release is really published (a draft sends nothing). It follows the approved push; no gate is skipped. No secret, no command in data.
   - bump:
-      call: bump:0.0.14@fs
+      call: bump:0.0.15@fs
       with:
         workflow: bump.yml
         repo: FreeSynergy/Catalog
@@ -226,7 +226,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-aufraeumen
-          version: 0.0.14
+          version: 0.0.15
         input:
           repo: ${ .input.repo }
           docs: ${ .input.docs }

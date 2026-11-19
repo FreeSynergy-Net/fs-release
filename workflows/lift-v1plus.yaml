@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: lift-v1plus
-  version: 0.0.14
+  version: 0.0.15
   title: Lift a program to the V1+ libraries - API switch (rpc -> fs-rpc) first, then lift
 do:
   - api-umstellung:
-      call: api-umstellung:0.0.14@fs
+      call: api-umstellung:0.0.15@fs
       input:
         repo: ${ .input.repo }
         delta: ${ .input.delta }
@@ -31,7 +31,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: lift
-          version: 0.0.14
+          version: 0.0.15
         input:
           repo: ${ .input.repo }
           commit: false
@@ -53,7 +53,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sub-workflow lift.yaml with `commit: false`, `online: true` (real tags on GitHub, the lock is written) and `FS_LIFT_V1PLUS=1` as input, and `--repo NAME=vX.Y.Z` for each library of the input: sets the tags, `cargo update --workspace`, proves the lock, then fmt, clippy and tests. It does not commit (the step `commit` of `lift` takes no `*.rs`). Red here (also: a program still asking for the feature `rpc` of fs-interfaces) stops the run; nothing is committed before `umstellung-commit`."
   - umstellung-commit:
-      call: umstellung-commit:0.0.14@fs
+      call: umstellung-commit:0.0.15@fs
       input:
         repo: ${ .input.repo }
       export:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.15
+
+Released 2026-11-19 (UTC; the date of the version commit, the tag follows after the pin rounds). / Veröffentlicht am 2026-11-19 (UTC; Datum des Version-Commits, der Tag folgt nach den Pin-Runden).
+
+- Pin round: the internal `uses:` of the reusable workflows and actions point to the release commit that carries the blinc-3.2 approval and all gate scripts since v0.0.11. v0.0.12, v0.0.13 and v0.0.14 were tagged WITHOUT a pin round: their `check.yml` still called `actions/gates` and `actions/setup-rust` at `eb35379` (the round-1 commit of v0.0.11), so callers ran with the gate scripts of v0.0.11 (no `fs-blinc-3.2` approval, no error list). Version 0.0.15 (version = tag): the three crates, `Cargo.lock`, `chains/release.chain.yaml`, all flows and `@fs` calls, the release tag `v0.0.15` of the generated skeleton (gold files written again), the README install line; then round 1 (`scripts/pin-refs.sh` to the version commit) and round 2 (to the round-1 commit); the tag stands on the last commit. / Pin-Runde: v0.0.12 bis v0.0.14 wurden OHNE Pin-Runde getaggt (Aufrufer liefen mit den Gate-Skripten von v0.0.11); 0.0.15 holt sie nach.
+
 ## 0.0.14
 
 Released 2026-11-19 (UTC; the date of the version commit, the tag follows after the checks). / Veröffentlicht am 2026-11-19 (UTC; Datum des Version-Commits, der Tag folgt nach den Prüfungen).
