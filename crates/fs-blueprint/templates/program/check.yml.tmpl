@@ -13,3 +13,5 @@ concurrency:
 jobs:
   check:
     uses: FreeSynergy/fs-release/.github/workflows/check.yml@{{release_tag}}
+    with:
+      blueprint: warn

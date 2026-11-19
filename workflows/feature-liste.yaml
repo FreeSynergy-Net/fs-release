@@ -10,11 +10,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: feature-liste
-  version: 0.0.12
+  version: 0.0.13
   title: Complete feature list of a program - model dossier, sorted list with stages, bridge table, Opus sample, docs branch, references
 do:
   - name-pruefen:
-      call: name-check:0.0.12@fs
+      call: name-check:0.0.13@fs
       with:
         programm: ${ .input.programm }
       metadata:
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the program name follows the naming rule (ADR 0087 and namensregel.md: programs plural, lower case, prefix fs-, e.g. fs-draw, fs-messages); the file is `todo/features/<name without fs->.md`; a retired or forbidden old form is red. No agent renames a name \"back\" or \"simpler\"."
   - dossier-lage:
-      call: dossier-present:0.0.12@fs
+      call: dossier-present:0.0.13@fs
       with:
         programm: ${ .input.programm }
         dossier: ${ .input.dossier }
@@ -50,7 +50,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a missing dossier (`fehlt`) goes to `dossier-kurz`, an existing one goes on to `liste`."
   - dossier-kurz:
-      call: research-ai:0.0.12@fs
+      call: research-ai:0.0.13@fs
       with:
         programm: ${ .input.programm }
         dossier: ${ .input.dossier }
@@ -62,7 +62,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Haiku or Sonnet (research, reads and writes notes only, never code) - a SHORT model dossier for the program when none exists: the functions of the models, each with its official source (official documentation, release notes, manuals); what is not proven is marked [nicht belegt]; nothing is copied (ADR 0013: no code, no text, no logos taken over), no foreign pictures quoted, own words; Pictures first: pictures of the models are only referred to by source, the design of our frontend goes through reference pictures and the picture OK (`picture-acceptance`). The larger dossier with states, menus and workflows is the flow `dossier` and is not replaced by this. A short dossier has the same required sections as the large one (`Menübaum (vollständig)`, `Kontextmenüs`, `Werkzeugleiste`, `Tastenkürzel`; `nicht belegt` instead of inventing)."
   - liste:
-      call: feature-list-ai:0.0.12@fs
+      call: feature-list-ai:0.0.13@fs
       with:
         programm: ${ .input.programm }
         dossier: ${ .input.dossier }
@@ -76,7 +76,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only, no slot) - writes `todo/features/<x>.md` in the format of `todo/features/people.md` lines 7-8: header with date, order, models and legend; per area a list `- [x]` built or `- [ ]` planned/missing, each line `Feature - models - state with us - priority - benefit`, PLUS the NEW field `Stufe: heute | als Nächstes | später`. Sorted per area `heute`, then `als Nächstes`, then `später`. ALL functions of the models, none left out because they are small or niche. The state with us is read from the program repo (`repo`, read only: core, trait fixpoint under `sperren/`, README \"What it can do today\"), never guessed; a function that is only in the trait or in the plan is `[ ]` marked `geplant (Trait)` or `geplant (Plan §)`, not `[x]` (the assessment `bewertung.md` found 14 wrong assignments of exactly this kind). German only. The file is not published and not checked by check-docs.sh. Local commit ([COMMIT]), report per [BERICHT]. REQUIREMENT \"Menübaum je Vorbild\": the list has a section `## Menübaum je Vorbild` (per model: main menus, entries, context menus, toolbar, shortcuts, taken from the dossier sections `Menübaum (vollständig)`, `Kontextmenüs`, `Werkzeugleiste`, `Tastenkürzel`; each entry is a feature with a stage too); a dossier without these sections is sent back (`dossier-menue-fehlt`), nothing is invented."
   - bruecke:
-      call: bridge-table-ai:0.0.12@fs
+      call: bridge-table-ai:0.0.13@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -89,7 +89,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only) - rule [BRUECKE-BEIDE-SEITEN]: a section in the same file, per program a table `Standard | Vertrag | Was fehlt` (which standard applies, e.g. AS2, JSCalendar, JSContact; which contract exists: Rust trait with fixpoint `sperren/*.sha256`, capnp in fs-interfaces `schema/`, server and client crates; what is missing in the feature list or in the head). Missing capabilities (known at the time of the plan: data, workflows, paint, decisions in fs-interfaces) are named, not hidden. Nothing invented: an entry without a source in the repo or the dossier is marked [nicht belegt]."
   - index:
-      call: index-ai:0.0.12@fs
+      call: index-ai:0.0.13@fs
       with:
         programm: ${ .input.programm }
         docs: ${ .input.docs }
@@ -101,7 +101,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only) - keeps the index `todo/features/README.md`: one line per list (`- [<x>](<x>.md)`), the reference to `bewertung.md` stays; the freeze rule there stays unchanged (only the user sets the feature freeze; the lists are input, not a decision)."
   - stichprobe:
-      call: sample-opus:0.0.12@fs
+      call: sample-opus:0.0.13@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -132,7 +132,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - from a third red round (`runde` >= 3) the person decides (`eingabe-fehler`); a red sample goes back to `liste` (the agent fixes the lines found), green goes on."
   - verweise:
-      call: reference-ai:0.0.12@fs
+      call: reference-ai:0.0.13@fs
       with:
         programm: ${ .input.programm }
         docs: ${ .input.docs }
@@ -144,7 +144,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only) - short references: in the user documentation `programs/apps/<x>/index.md` (de and en) the sections \"what it can do today\" and \"what comes\" are an EXCERPT of the stages `heute` and `als Nächstes` of the list (no own enumeration, `später` is not named); and a DIFF for fs-catalog (description en and de where it changes, written as a patch file in the report, NOT pushed; the catalog change itself is `catalog-bump` after a release). The feature list itself is not linked from the published pages (`todo/` is outside `docs_dir`)."
   - gates:
-      call: check-docs:0.0.12@fs
+      call: check-docs:0.0.13@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -167,7 +167,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red docs gate goes back to `verweise`, otherwise on to `veroeffentlichen`."
   - veroeffentlichen:
-      call: docs-main:0.0.12@fs
+      call: docs-main:0.0.13@fs
       with:
         branch: ${ .input.docs_branch }
       then: end

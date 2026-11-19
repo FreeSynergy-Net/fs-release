@@ -245,11 +245,24 @@ fn the_drift_is_shown_for_an_own_type_without_a_standard_that_an_exception_with_
         .join("main.rs");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
+    // a hand-written file that no exception names: the structure gate must not count it (it must not hide the drift)
+    std::fs::write(
+        repo.join("crates")
+            .join("fs-demo-core")
+            .join("src")
+            .join("loose.rs"),
+        "pub fn loose() {}\n",
+    )
+    .unwrap();
     let (code, out) = cli(&["check", "--repo", &repo_s, "--talks", &docs_s, "--drift"]);
     assert_eq!(code, 1, "{out}");
     assert!(
         out.contains("generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
         "the drift is hidden by the type without a standard: {out}"
+    );
+    assert!(
+        out.contains("file-unowned{path=crates/fs-demo-core/src/loose.rs}"),
+        "the hand-written file is shown next to the drift: {out}"
     );
     assert!(
         !out.contains("talk-not-found") && !out.contains("field-missing"),

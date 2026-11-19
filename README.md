@@ -27,7 +27,7 @@ Install the command, copy the example blueprint, make the program. Start in a ch
 
 <!-- readme-run -->
 ```sh
-cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.12 --locked fs-blueprint
+cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.13 --locked fs-blueprint
 cp -r examples/leer mein-plan
 cd mein-plan
 fs-blueprint new scaffold.toml --out fs-leer

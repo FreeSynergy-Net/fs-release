@@ -10,10 +10,10 @@ on:
       runs-on: { type: string, default: ubuntu-24.04, description: "Runner label" }
       software-gpu: { type: boolean, default: false, description: "Repos with window tests: installs lavapipe (software Vulkan adapter) and the fonts the tests need; merged with apt-packages" }
       blueprint: { type: string, default: "off", description: "Blueprint check (ADR 0099, step S5): off = not run; warn = `fs-blueprint check --drift` runs when the repo has a scaffold.toml and shows its findings (the job stays green); block = a finding fails the job" }
-      # blueprint-rev default = the commit that completes the blueprint step S5 (7ae4a5cf, it contains `check --drift` showing the drift next to other findings). The tag v0.0.12
-      # (20924e553d38fb6d78aa19f1a156b69d874eb4c5) does NOT contain that fix: with it `--drift` is skipped as soon as a hand-written file or a missing talk record is found.
-      # After the tag v0.0.13 the default is the peeled commit of that tag.
-      blueprint-rev: { type: string, default: "7ae4a5cf64fcc562a95f5ff44574da87c045e8e6", description: "The commit of fs-release the command `fs-blueprint` is built from (a full SHA, never a branch)" }
+      # blueprint-rev: empty (the default) = the commit of THIS workflow file (the context `job.workflow_sha` of a reusable workflow is the commit of the called file, read below out of
+      # `toJSON(job)`): a caller that pins `check.yml@v0.0.13` builds the command from the tag commit itself, so the command always fits the tag and no SHA has to stand in the file
+      # (the tag commit cannot name itself). A full commit SHA given here wins. Never a branch or a tag name.
+      blueprint-rev: { type: string, default: "", description: "Commit of fs-release the command `fs-blueprint` is built from: a full SHA, or empty = the commit of this workflow file (for a caller pinned to a tag: the tag commit)" }
       test-env: { type: string, default: "", description: "Environment for the test step, one KEY=VALUE per line (for tests that need a tool the runner lacks and say so)" }
 
 permissions:
@@ -76,12 +76,18 @@ jobs:
         if: inputs.blueprint != 'off' && hashFiles(format('{0}/scaffold.toml', inputs.working-directory)) != ''
         env:
           MODE: ${{ inputs.blueprint }}
-          REV: ${{ inputs.blueprint-rev }}
+          INPUT_REV: ${{ inputs.blueprint-rev }}
+          JOB: ${{ toJSON(job) }}
           DOCS: ${{ github.workspace }}/.fs-documentation
         run: |
           case "$MODE" in warn|block) ;; *) echo "::error::input blueprint must be off, warn or block, not $MODE"; exit 2 ;; esac
+          # the revision: the input, or when it is empty the commit of this workflow file (only when that file comes from fs-release; a copy elsewhere must name the revision)
+          REV="$INPUT_REV"
+          if [ -z "$REV" ]; then
+            REV=$(printf '%s' "$JOB" | python3 -I -c 'import json, sys; j = json.load(sys.stdin); print(j.get("workflow_sha", "") if j.get("workflow_repository") == "FreeSynergy/fs-release" else "")') || REV=""
+          fi
           # a full commit SHA, never a branch or a tag name: the install must be the same bytes tomorrow
-          if ! [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::input blueprint-rev must be a full commit SHA (40 lowercase hex digits)"; exit 2; fi
+          if ! [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::input blueprint-rev must be a full commit SHA (40 lowercase hex digits), or empty when this workflow runs from fs-release"; exit 2; fi
           cargo install --git https://github.com/FreeSynergy/fs-release --rev "$REV" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
           rc=0
           "$RUNNER_TEMP/fsbp/bin/fs-blueprint" check --repo "$PWD" --talks "$DOCS" --drift || rc=$?

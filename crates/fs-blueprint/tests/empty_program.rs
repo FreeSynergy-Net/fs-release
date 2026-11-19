@@ -88,7 +88,7 @@ fn the_pins_come_from_the_skeleton_table() {
         ".github/workflows/check.yml",
         ".github/workflows/windows.yml",
     ] {
-        assert!(get(&a, p).contains("@v0.0.12"), "{p}");
+        assert!(get(&a, p).contains("@v0.0.13"), "{p}");
     }
 }
 
@@ -100,6 +100,18 @@ fn an_unknown_skeleton_version_is_refused_by_generate() {
         generate(&bp, &FakeCatalog).unwrap_err().to_string(),
         "skeleton-unknown{found=9.9.9}"
     );
+}
+
+#[test]
+fn the_generated_caller_runs_the_blueprint_check_in_mode_warn_and_never_block() {
+    // block would turn red for every program that gets a hand-written file (file-unowned: 274 in fs-tasks, 161 in fs-people when checked); warn shows it and stays green
+    let a = probe();
+    let check = get(&a, ".github/workflows/check.yml");
+    assert!(
+        check.ends_with("    with:\n      blueprint: warn\n"),
+        "{check}"
+    );
+    assert!(!check.contains("blueprint: block") && !check.contains("blueprint-rev"));
 }
 
 #[test]

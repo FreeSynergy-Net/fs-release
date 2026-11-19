@@ -21,8 +21,17 @@ assert len(hit) == 1, "the step must be there exactly once"
 sys.stdout.write(hit[0]["run"])
 PY
 [ -s "$tmp/step.sh" ] || { echo "FAIL no run block"; exit 1; }
-default_rev="$(sed -nE 's/.*blueprint-rev: .*default: "([0-9a-f]{40})".*/\1/p' "$repo/.github/workflows/check.yml")"
-[ -n "$default_rev" ] || { echo "FAIL no default rev"; exit 1; }
+# the default of `blueprint-rev` is EMPTY (= the commit of the called workflow file): no fixed SHA that can fall back to an old commit (a fixed one would have to be raised by hand)
+python3 -I - "$repo/.github/workflows/check.yml" <<'PY' || { echo "FAIL the default of blueprint-rev is not empty"; exit 1; }
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1]))
+trigger = doc.get("on", doc.get(True))
+assert trigger["workflow_call"]["inputs"]["blueprint-rev"]["default"] == ""
+assert trigger["workflow_call"]["inputs"]["blueprint"]["default"] == "off"
+PY
+ok "the default of blueprint-rev is empty and of blueprint off"
+wf="fedcba9876543210fedcba9876543210fedcba98"
+job_ok="{\"workflow_sha\": \"$wf\", \"workflow_repository\": \"FreeSynergy/fs-release\", \"status\": \"in_progress\"}"
 
 # the stubs: cargo logs its words and makes a stub fs-blueprint under --root; the stub fs-blueprint logs its words and ends with $STUB_RC
 mkdir -p "$tmp/stub"
@@ -41,15 +50,15 @@ chmod +x "$root/bin/fs-blueprint"
 STUB
 chmod +x "$tmp/stub/cargo"
 
-# case <script> <name> <mode> <rev> <stub rc> <wanted rc> <log must contain (grep -E, "" = nothing)> <log must NOT contain> <output must contain>
+# case <script> <name> <mode> <INPUT_REV> <stub rc> <wanted rc> <log must contain (grep -E, "" = nothing)> <log must NOT contain> <output must contain> [<JOB json>]
 cases_fail=0
 case_run() {
-  local script=$1 name=$2 mode=$3 rev=$4 srun=$5 want=$6 has=$7 hasnot=$8 outhas=$9
+  local script=$1 name=$2 mode=$3 rev=$4 srun=$5 want=$6 has=$7 hasnot=$8 outhas=$9 job="${10-$job_ok}"
   local w="$tmp/w.$RANDOM"
   mkdir -p "$w/repo" "$w/rt"
   : >"$w/log"
   local rc
-  (cd "$w/repo" && PATH="$tmp/stub:$PATH" STUB_LOG="$w/log" STUB_RC="$srun" RUNNER_TEMP="$w/rt" MODE="$mode" REV="$rev" DOCS="$w/docs" \
+  (cd "$w/repo" && PATH="$tmp/stub:$PATH" STUB_LOG="$w/log" STUB_RC="$srun" RUNNER_TEMP="$w/rt" MODE="$mode" INPUT_REV="$rev" JOB="$job" DOCS="$w/docs" \
     bash -eo pipefail "$script" >"$w/out" 2>&1 </dev/null; echo $? >"$w/rc") || true
   rc=$(cat "$w/rc")
   local why=""
@@ -61,7 +70,7 @@ case_run() {
   if [ -n "$why" ]; then cases_fail=$((cases_fail + 1)); [ -z "${VERBOSE:-}" ] || echo "     $name: $why"; fi
 }
 all_cases() { # <script>: runs every case against it; counts failures in cases_fail
-  local s=$1 r=$default_rev
+  local s=$1 r=0123456789abcdef0123456789abcdef01234567
   cases_fail=0
   case_run "$s" "warn, clean" warn "$r" 0 0 "cargo install --git https://github.com/FreeSynergy/fs-release --rev $r --locked --root .*/fsbp fs-blueprint" "" ""
   case_run "$s" "the check words" warn "$r" 0 0 "fs-blueprint check --repo .+ --talks .+/docs --drift" "" ""
@@ -73,9 +82,20 @@ all_cases() { # <script>: runs every case against it; counts failures in cases_f
   for m in off "" bogus "warn;touch pwned" 'warn$(touch pwned)' "Warn" "block "; do
     case_run "$s" "bad mode '$m'" "$m" "$r" 0 2 "" "cargo|fs-blueprint" "::error::"
   done
-  for v in main v0.0.12 "${r:0:39}" "${r}0" "${r^^}" "" 'abc;touch pwned' "\$(touch pwned)" "$(printf '%s\nmain' "$r")" "${r:0:39}g"; do
+  for v in main v0.0.12 "${r:0:39}" "${r}0" "${r^^}" 'abc;touch pwned' "\$(touch pwned)" "$(printf '%s\nmain' "$r")" "${r:0:39}g"; do
     case_run "$s" "bad rev '${v:0:20}'" warn "$v" 0 2 "" "cargo|fs-blueprint" "::error::"
   done
+  # the revision from the workflow itself: empty input -> the commit of the called workflow file; an explicit SHA wins; no other source is believed
+  case_run "$s" "explicit rev wins over the workflow commit" warn "$r" 0 0 "--rev $r " "$wf" ""
+  case_run "$s" "empty input: the workflow commit" warn "" 0 0 "--rev $wf --locked" "$r" ""
+  case_run "$s" "empty input, block, the workflow commit" block "" 0 0 "--rev $wf --locked" "" ""
+  case_run "$s" "empty input, a workflow of another repo" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_sha": "'"$wf"'", "workflow_repository": "someone/else"}'
+  case_run "$s" "empty input, no repo given" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_sha": "'"$wf"'"}'
+  case_run "$s" "empty input, no sha given" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_repository": "FreeSynergy/fs-release"}'
+  case_run "$s" "empty input, a short sha" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_sha": "abc123", "workflow_repository": "FreeSynergy/fs-release"}'
+  case_run "$s" "empty input, upper case sha" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_sha": "'"${wf^^}"'", "workflow_repository": "FreeSynergy/fs-release"}'
+  case_run "$s" "empty input, no job context" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" ""
+  case_run "$s" "empty input, no json" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" "this is not json"
 }
 
 all_cases "$tmp/step.sh"
@@ -94,6 +114,11 @@ mutant "rev check off" 's/^( *)if ! \[\[ "\$REV" =~ .*; then (.*)$/\1if false; t
 mutant "rev check without the length" 's/\{40\}/+/'
 mutant "rev check accepts upper case" 's/\[0-9a-f\]/[0-9a-fA-F]/'
 mutant "rev check without the end anchor" 's/\{40\}\$ \]\]/{40} ]]/'
+mutant "workflow commit not read" 's/j\.get\("workflow_sha", ""\)/""/'
+mutant "repo of the workflow not checked" 's/ if j\.get\("workflow_repository"\) == "FreeSynergy\/fs-release" else ""//'
+mutant "input ignored (always the workflow commit)" 's/^( *)REV="\$INPUT_REV"$/\1REV=""/'
+mutant "workflow commit wins over the input" 's/^( *)if \[ -z "\$REV" \]; then$/\1if true; then/'
+mutant "failure of the reading is not caught" 's/ \|\| REV=""//'
 mutant "no --locked" 's/ --locked//'
 mutant "no --rev" 's/ --rev "\$REV"//'
 mutant "another repo" 's#FreeSynergy/fs-release#FreeSynergy/fs-types#'
