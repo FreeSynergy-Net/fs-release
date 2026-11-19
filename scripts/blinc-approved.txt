@@ -3,3 +3,4 @@
 # The sha is the commit the tag peels to (git rev-parse <tag>^{}); a moved tag therefore turns the gate red.
 fs-blinc-3.1 cf925af1230dafdb06598d8c33c4b1c9f00b13a9
 fs-blinc-3 8a0251b2105a070626ad8390cd14d7ef7483c0f5  # expires 2026-12-15
+fs-blinc-3.2 cd3e196eca4dd68360bd5f86fa35355a7f5eec4a
