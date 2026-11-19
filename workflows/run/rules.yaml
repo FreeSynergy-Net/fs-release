@@ -1,21 +1,22 @@
 # The ONE rule set of the states of a run (a Lauf). It belongs to the run, not to a single workflow file (ADR 0097 E4: no states wired
-# into every file). The standard text is workflows/STATES.md; scripts/check_run_rules.py checks this file, the tests compare STATES.md with it.
-# `stationen` is NOT a state: it stands for "the run is on one of the own steps (stations) of its workflow".
+# into every file; ADR 0103 E1-E3). The standard text is workflows/STATES.md; scripts/check_run_rules.py checks the structure of this file
+# (derived from the data below), the tests compare the default with STATES.md. `wartet` is ONE state with a mandatory reason (`reasons`);
+# one column per reason is a display setting, not part of this rule set.
 version: 1
+name: freesynergy
 start: offen
-states: [offen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, fehlgeschlagen, abgebrochen, erledigt, archiviert]
-wait-reasons:
-  wartet-auf-entscheidung: entscheidung
-  auf-anfrage: anfrage
-  in-prüfung: prüfung
+states: [offen, läuft, wartet, pausiert, fehlgeschlagen, abgebrochen, erledigt, archiviert]
+final: [erledigt, abgebrochen, archiviert]
+reopen: [erledigt, abgebrochen]
+archive-from: [erledigt, abgebrochen, fehlgeschlagen]
+reasons:
+  wartet: [auf-entscheidung, auf-anfrage, in-prüfung]
 transitions:
-  offen: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen]
-  stationen: [stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, pausiert, fehlgeschlagen, abgebrochen, erledigt]
-  wartet-auf-entscheidung: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-  auf-anfrage: [stationen, in-prüfung, pausiert, abgebrochen, erledigt]
-  in-prüfung: [stationen, wartet-auf-entscheidung, auf-anfrage, pausiert, abgebrochen, erledigt]
-  pausiert: [offen, stationen, wartet-auf-entscheidung, auf-anfrage, in-prüfung, abgebrochen]
-  fehlgeschlagen: [stationen, abgebrochen, archiviert]
+  offen: [läuft, wartet, pausiert, abgebrochen]
+  läuft: [läuft, wartet, pausiert, fehlgeschlagen, abgebrochen, erledigt]
+  wartet: [läuft, wartet, pausiert, abgebrochen, erledigt]
+  pausiert: [offen, läuft, wartet, abgebrochen]
+  fehlgeschlagen: [läuft, pausiert, abgebrochen, archiviert]
   abgebrochen: [offen, archiviert]
   erledigt: [offen, archiviert]
   archiviert: []
