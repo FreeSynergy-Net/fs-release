@@ -50,13 +50,13 @@ chk "gates: the rc lines of every gate are listed whole" [ "$(q "$tmp/o.json" 'a
 : >"$FAKE_OUT"; FAKE_FAIL=ci run --jobs 2 --prioritaet 3 >"$tmp/o.json"; rc=$?
 chk "gates: a red CI run is red with its rc (rc 1)" [ "$rc" -eq 1 ] && chk "gates: a red CI run is red with its rc (rc 1) [part 2]" [ "$(q "$tmp/o.json" '(d["laeufe"][1]["rc"], d["red"])')" = "(1, True)" ]
 chk "gates: the error lines are listed, never cut" [ "$(q "$tmp/o.json" '"error: boom in ci" in d["laeufe"][1]["fehler"] and any("FAILED" in x for x in d["laeufe"][1]["fehler"])')" = True ]
-chk "gates: after a red run the rest is 'nicht gelaufen' (no flat run)" [ "$(q "$tmp/o.json" 'd["laeufe"][2]["rc"]')" = None ] && chk "gates: after a red run the rest is 'nicht gelaufen' (no flat run) [part 2]" [ "$(wc -l <"$FAKE_OUT")" = 2 ]
+chk "gates: after a red run the rest still runs ([GATES-SAMMELLISTE]: no stop at the first red; the flat run is red too, rc 1)" [ "$(q "$tmp/o.json" 'd["laeufe"][2]["rc"]')" = 1 ] && chk "gates: after a red run the rest still runs [part 2]" [ "$(wc -l <"$FAKE_OUT")" = 3 ]
 chk "gates: jobs and priority are passed on" grep -q 'prio=3 jobs=2' "$FAKE_OUT"
 run --ohne-flachprobe >"$tmp/o.json"
 chk "gates: --ohne-flachprobe runs two" [ "$(q "$tmp/o.json" 'len(d["laeufe"])')" = 2 ]
 FS_GATES_FMT="sh -c 'echo y >>a.txt'" run >"$tmp/o.json"; rc=$?
 git -C "$app" checkout -q a.txt
-chk "gates: a fmt that changes files is red and no gate runs (commit the formatted tree first)" [ "$rc" -eq 1 ] && chk "gates: a fmt that changes files is red and no gate runs (commit the formatted tree first) [part 2]" [ "$(q "$tmp/o.json" '(d["fmt"]["geaendert"], d["laeufe"][0]["rc"])')" = "(True, None)" ]
+chk "gates: a fmt that changes files is red (commit the formatted tree first) and the gates still run to collect everything" [ "$rc" -eq 1 ] && chk "gates: a fmt that changes files is red [part 2]" [ "$(q "$tmp/o.json" '(d["fmt"]["geaendert"], d["laeufe"][0]["rc"])')" = "(True, 0)" ]
 run --jobs 0 >"$tmp/o.json"; rc=$?
 chk "gates: bad jobs is bad input (rc 2)" [ "$rc" -eq 2 ]
 run --skripte-tag v9.9.9 >"$tmp/o.json"; rc=$?
@@ -163,7 +163,7 @@ chk "deadline: also a run of another repo prints it" grep -q 'valid until fs-rel
 # fs-release v0.0.12 tagged: the list is not empty -> RED, no gate runs
 git clone -q "$base/fs-release" "$tmp/frw" 2>/dev/null; git -C "$tmp/frw" commit -q --allow-empty -m x; git -C "$tmp/frw" tag v0.0.12; git -C "$tmp/frw" push -q origin main v0.0.12 2>/dev/null
 : >"$FAKE_OUT"; rc=0; exrun "$app" >"$tmp/o.json" || rc=$?
-chk "deadline: fs-release v0.0.12 is tagged and the list is not empty: RED (rc 1), no gate run" [ "$rc" -eq 1 ] && chk "deadline: fs-release v0.0.12 is tagged and the list is not empty: RED (rc 1), no gate run [part 2]" [ "$(q "$tmp/o.json" '"EXPIRED" in d["befunde"][0]')" = True ] && chk "deadline: fs-release v0.0.12 is tagged and the list is not empty: RED (rc 1), no gate run [part 3]" [ "$(wc -l <"$FAKE_OUT")" = 0 ]
+chk "deadline: fs-release v0.0.12 is tagged and the list is not empty: RED (rc 1)" [ "$rc" -eq 1 ] && chk "deadline: fs-release v0.0.12 is tagged and the list is not empty: RED (rc 1) [part 2]" [ "$(q "$tmp/o.json" '"EXPIRED" in d["befunde"][0]')" = True ] && chk "deadline: fs-release v0.0.12 is tagged and the list is not empty: RED (rc 1) [part 3]" [ "$(wc -l <"$FAKE_OUT")" = 3 ]
 mutate "$mech/gates-komplett" 'if bis in tags:' 'if False:' "$tmp/mut/gates-komplett" || bad "mutant deadline-ignored not applied"
 rc=0; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >/dev/null 2>&1 || rc=$?
 chk "mutant deadline (tag check always false) is caught by the expired case" [ "$rc" -ne 1 ]

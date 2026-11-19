@@ -78,3 +78,10 @@ What moved out of the order: the gates ([GATES]), the Bash rule ([BASH]), "only 
 form and the binding to the head ([BERICHT]), the word rule ([WORTWAHL]); the check list by kind is in `review.yaml`, step
 `read`. The size is measured, not guessed: `scripts/measure-prompts.py` shows the mean size per kind before and after the
 switch (the table of the day is the "before" figure; run it again after some orders in the new form).
+
+## Fehlerliste (TÜV principle) / Error list
+
+DE: Ein Gate hört nicht beim ersten Rot auf, sondern sammelt ALLE Funde in `fehlerliste-<zweig>.md` (Ordner `$FS_GATES_FEHLERLISTE_DIR`, Standard der Scratch-Ordner, nie der Repo-Baum): je Fund Schritt, Schweregrad, rc, die genauen `nachpruefung:`-Befehle und die ersten Fehlerzeilen. Der Auftrag an den Bauer nennt die Liste; der Bauer arbeitet sie lokal mit `gates-komplett --repo-dir . --nur-fehlerliste` ab (TEILPRÜFUNG: hakt `[x]` ab, kein Gate-Ergebnis) und schiebt dann. Die Zweig-CI prüft wie bisher KOMPLETT; neue Funde kommen wieder auf die Liste. Ein Opus-Delta-Auftrag nimmt die Liste mit (`fehlerliste=<Pfad>` im Auftrag): geprüft werden nur die Auflagen der Liste und der Diff seit dem letzten Urteil. Tag und ff nur bei vollständig grüner CI am genauen Kopf plus JA.
+
+EN: A gate never stops at the first red: it collects ALL findings in `fehlerliste-<branch>.md` (folder `$FS_GATES_FEHLERLISTE_DIR`, default the scratch folder, never the repo tree): per finding step, severity, rc, the exact `nachpruefung:` commands and the first error lines. The order to the builder names the list; the builder works through it locally with `gates-komplett --repo-dir . --nur-fehlerliste` (TEILPRÜFUNG: ticks `[x]`, no gate result) and then pushes. The branch CI still checks EVERYTHING; new findings go back on the list. An Opus delta order carries the list (`fehlerliste=<path>` in the order): only the conditions of the list and the diff since the last verdict are reviewed. Tag and ff only with a fully green CI at the exact head plus a JA.
+

@@ -15,13 +15,40 @@ jobs:
         with:
           persist-credentials: false
       - name: actionlint
+        id: actionlint
+        continue-on-error: true
         run: |
           bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12 "$RUNNER_TEMP"
           "$RUNNER_TEMP/actionlint" -color
       - name: shellcheck
+        id: shellcheck
+        continue-on-error: true
         run: shellcheck -x -S warning scripts/*.sh scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh actions/*/*.sh
       - name: python
+        id: python
+        continue-on-error: true
         run: python3 -I -m py_compile actions/plan/plan.py actions/library-release/notes.py scripts/check-no-pkill scripts/check_lock_sources.py scripts/check_job_status.py scripts/check-mkdocs-quiet scripts/check-signing-env scripts/read-upstream-list scripts/fetch-upstream scripts/filter-new-comments scripts/kaskade-lage scripts/kaskade-plan scripts/kaskade-glied scripts/kaskade-glied-fertig scripts/kaskade-fremde-pins scripts/lock-gleich scripts/gates-komplett scripts/check_chk_shape.py scripts/check_run_rules.py scripts/kaskade_lib/kgit.py scripts/kaskade_lib/kcargo.py scripts/kaskade_lib/kio.py scripts/kaskade_lib/kwindows.py actions/package-linux/placeholder_icon.py scripts/check_rust_rules.py scripts/typing-test/analyze.py scripts/typing-test/fieldcheck.py scripts/typing-test/stau.py scripts/typing-test/summary.py tests/typing-test/caret.py tests/typing-test/glyphs.py
+      - name: Collect the results (every step above ran; the job is red when one was)
+        if: always()
+        env:
+          RESULTS: |
+            actionlint ${{ steps.actionlint.outcome }}
+            shellcheck ${{ steps.shellcheck.outcome }}
+            python ${{ steps.python.outcome }}
+        run: |
+          red=0
+          list="$(mktemp)"
+          {
+            echo "### Results of this job (one line per step, none stops the others)"
+            while read -r label outcome; do
+              [ -n "$label" ] || continue
+              echo "- $label: $outcome"
+              case "$outcome" in failure|cancelled) red=1 ;; esac
+            done <<< "$RESULTS"
+          } > "$list"
+          cat "$list"
+          cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit "$red"
   # Released history is never rewritten: this job needs ALL history and tags (a flat clone is "skipped", rc 2, and the job is red). It exists only in
   # the CI of fs-release itself: the reusable ci.yml / check.yml run in the CALLING repos, keep their flat clone and do not call this script.
   changelog-released:
@@ -33,7 +60,28 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
       - name: released CHANGELOG sections equal their tags
+        id: released-changelog-sections
+        continue-on-error: true
         run: bash scripts/test_changelog_released.sh
+      - name: Collect the results (every step above ran; the job is red when one was)
+        if: always()
+        env:
+          RESULTS: |
+            released-changelog-sections ${{ steps.released-changelog-sections.outcome }}
+        run: |
+          red=0
+          list="$(mktemp)"
+          {
+            echo "### Results of this job (one line per step, none stops the others)"
+            while read -r label outcome; do
+              [ -n "$label" ] || continue
+              echo "- $label: $outcome"
+              case "$outcome" in failure|cancelled) red=1 ;; esac
+            done <<< "$RESULTS"
+          } > "$list"
+          cat "$list"
+          cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit "$red"
   packaging-tests:
     runs-on: ubuntu-24.04
     steps:
@@ -41,39 +89,73 @@ jobs:
         with:
           persist-credentials: false
       - name: no composite action calls another fs-release action by a moving ref
+        id: no-composite-action
+        continue-on-error: true
         run: |
           # actions/ must not say `uses: FreeSynergy/fs-release/...@<ref>` (a pinned action would pull later main states of the
           # other one): call the shared script by path from $GITHUB_ACTION_PATH instead. Reusable workflows cannot use `./`
           # (it means the caller's repo) and are pinned by scripts/pin-refs.sh at release time.
           if grep -rnE 'uses:[[:space:]]*FreeSynergy/fs-release/' actions; then echo "::error::composite action refers to fs-release by @ref"; exit 1; fi
       - name: job status lint (a job below `!cancelled()`/`always()` needs a status function) and its self test
+        id: job-status-lint
+        continue-on-error: true
         run: |
           python3 -I scripts/check_job_status.py .
           bash scripts/test_check_job_status.sh
       - name: pin consistency (one SHA in all internal uses, no @main) and its mutants
+        id: pin-consistency-one
+        continue-on-error: true
         run: bash scripts/test_pins_consistent.sh
       - name: README runner self test (stub cargo; refused and failing READMEs, CRLF, stdin, hidden failures)
+        id: readme-runner-self
+        continue-on-error: true
         run: bash scripts/test_readme_run.sh
       - name: blueprint check step of check.yml self test (stub cargo and fs-blueprint; modes, revisions, exit codes, mutants)
+        id: blueprint-check-step
+        continue-on-error: true
         run: bash scripts/test_blueprint_check_step.sh
       - name: topmost CHANGELOG section (Unreleased or the crate version, no date, not empty) and its mutants
+        id: topmost-changelog-section
+        continue-on-error: true
         run: bash scripts/test_changelog_top.sh
       - name: signing setup script self test (mock gh, mutants)
+        id: signing-setup-script
+        continue-on-error: true
         run: bash scripts/test_set_signing_secrets.sh
       - name: lock check self test (one source per library in a Cargo.lock)
+        id: lock-check-self
+        continue-on-error: true
         run: bash scripts/test_check_lock_sources.sh
       - name: set_components_tag self test (fs-types stays out of the fs-interfaces lift, --move, mutants)
+        id: set-components-tag
+        continue-on-error: true
         run: bash scripts/test_set_components_tag.sh
       - name: gates guard self test (lock, snapshot compare, sweep, mutants)
+        id: gates-guard-self
+        continue-on-error: true
         run: bash scripts/test_gates_guard.sh
+      - name: gates error list and partial check self test (stub cargo; two errors, injection, mutants)
+        id: gates-error-list
+        continue-on-error: true
+        run: bash scripts/test_gates_sammelliste.sh
+      - name: CI collecting step self test (runs the step with made-up outcomes; mutants)
+        id: ci-collecting-step
+        continue-on-error: true
+        run: bash scripts/test_ci_sammelschritt.sh
       - name: pin-kaskade scripts self tests (local bare repos, fake build slot, mutants)
+        id: pin-kaskade-scripts
+        continue-on-error: true
         run: |
           bash scripts/test_kaskade_plan.sh
           bash scripts/test_kaskade_pins.sh
           bash scripts/test_kaskade_gates.sh
       - name: packaging tests (plan, package groups, fs-capnpc compatibility)
+        id: packaging-tests-plan
+        continue-on-error: true
         run: scripts/test-packaging.sh
       - name: typing test, caret and field detection on synthetic pictures
+        id: typing-test-caret
+        continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-pil
@@ -81,3 +163,36 @@ jobs:
           tests/typing-test/glyphs.sh
           tests/typing-test/runs.sh
           tests/typing-test/vsession.sh
+      - name: Collect the results (every step above ran; the job is red when one was)
+        if: always()
+        env:
+          RESULTS: |
+            no-composite-action ${{ steps.no-composite-action.outcome }}
+            job-status-lint ${{ steps.job-status-lint.outcome }}
+            pin-consistency-one ${{ steps.pin-consistency-one.outcome }}
+            readme-runner-self ${{ steps.readme-runner-self.outcome }}
+            blueprint-check-step ${{ steps.blueprint-check-step.outcome }}
+            topmost-changelog-section ${{ steps.topmost-changelog-section.outcome }}
+            signing-setup-script ${{ steps.signing-setup-script.outcome }}
+            lock-check-self ${{ steps.lock-check-self.outcome }}
+            set-components-tag ${{ steps.set-components-tag.outcome }}
+            gates-guard-self ${{ steps.gates-guard-self.outcome }}
+            gates-error-list ${{ steps.gates-error-list.outcome }}
+            ci-collecting-step ${{ steps.ci-collecting-step.outcome }}
+            pin-kaskade-scripts ${{ steps.pin-kaskade-scripts.outcome }}
+            packaging-tests-plan ${{ steps.packaging-tests-plan.outcome }}
+            typing-test-caret ${{ steps.typing-test-caret.outcome }}
+        run: |
+          red=0
+          list="$(mktemp)"
+          {
+            echo "### Results of this job (one line per step, none stops the others)"
+            while read -r label outcome; do
+              [ -n "$label" ] || continue
+              echo "- $label: $outcome"
+              case "$outcome" in failure|cancelled) red=1 ;; esac
+            done <<< "$RESULTS"
+          } > "$list"
+          cat "$list"
+          cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit "$red"

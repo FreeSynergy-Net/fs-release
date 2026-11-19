@@ -3,6 +3,12 @@
 """All gates of one Glied, COMPLETE (call `gates-komplett` of the workflow `pin-kaskade`, step `gates`). It writes the build output and the logs, and `cargo fmt --all` writes into the tree (a tree that fmt changes is red, see below).
 
   python3 -I scripts/gates-komplett --repo-dir DIR [--jobs 4] [--prioritaet 0] [--log-dir DIR] [--skripte-tag vX.Y.Z] [--ohne-flachprobe]
+  python3 -I scripts/gates-komplett --repo-dir DIR --nur-fehlerliste [DATEI]   (TEILPRÜFUNG: no gate result, see below)
+
+[GATES-SAMMELLISTE]: no run, no gate stops at the first red. Every run goes to its end; ALL findings are collected in `fehlerliste-<branch>.md` (folder `$FS_GATES_FEHLERLISTE_DIR`, default the scratch folder; never the repo tree):
+a checklist, one item per finding with step, severity, rc and the EXACT `nachpruefung:` command(s) (TUeV principle). `--nur-fehlerliste` runs ONLY those commands, ticks green items `[x]` (UTC time), keeps red ones open with rc and the first
+error lines, exit 1 while anything is open. It is NEVER a gate result: its JSON has status `teilpruefung`, red true, no head and no runs, and the last line says `TEILPRÜFUNG: kein Gate-Ergebnis, volle CI nötig`. Only commands that
+start with `cargo test|clippy|fmt`, `bash|python3 <script of the repo scripts or of the pinned fs-release tag>` or `scripts/...` run, as an argument list (no shell), words of the plain character set only (an error text never puts a command in).
 
 [GATE-GLEICH-CI]: the check scripts (`scripts/gates.sh`, check_rust_rules, check_lock_sources ...) come from the fs-release TAG the repo's own CI files pin (`git archive` of that tag out of
 $FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The tag is the highest `FreeSynergy/fs-release/...@vX.Y.Z` of DIR/.github/workflows/*.yml, or `--skripte-tag`; without
@@ -18,6 +24,7 @@ under `ausnahmen` (`gruen_fuer_test: false`), every entry has a deadline `bis` (
 Result JSON: {status, red, kopf, skripte:{tag, quelle}, fmt, laeufe:[{name, rc, log, gates, fehler}], ausnahmen:[{name, repo, lauf, bis, test, grund, angewendet, gruen_fuer_test}], ausnahmen_liste (the whole list, with `bis`), befunde}. rc 0 green / 1 red / 2 bad input.
 """
 import argparse
+import datetime
 import glob
 import os
 import re
@@ -90,7 +97,150 @@ def run_gates(name, gates, d, env, log_dir, repo):
     lines = open(log, encoding="utf-8", errors="replace").read().splitlines()
     plain = [re.sub(r"\x1b\[[0-9;]*m", "", x) for x in lines]
     return {"name": name, "rc": rc, "log": log, "gates": [x for x in plain if re.match(r"^gates? ", x) and "rc=" in x or x.startswith("gates ok")],
-            "fehler": [x for x in plain if SHOW.search(x) and "rc=0" not in x and not x.startswith("gates ok")][:200]}
+            "fehler": [x for x in plain if SHOW.search(x) and "rc=0" not in x and not x.startswith("gates ok")][:200],
+            "funde": [x[len("gates-finding: "):] for x in plain if x.startswith("gates-finding: ")]}
+
+
+ITEM = re.compile(r"^- \[( |x)\] (.*)$")
+PLAIN = re.compile(r"^[A-Za-z0-9_./:=@+,{}-]+$")
+CARGO_OK = {"test", "clippy", "fmt"}
+
+
+def utc():
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def branch_of(d):
+    rc, out = kgit.run(["rev-parse", "--abbrev-ref", "HEAD"], cwd=d)
+    b = out.strip() if rc == 0 else "unknown"
+    if b == "HEAD":
+        b = kgit.run(["rev-parse", "--short", "HEAD"], cwd=d)[1].strip() or "unknown"
+    return re.sub(r"[^A-Za-z0-9._-]", "-", b)
+
+
+def list_dir(log_dir=None):
+    return os.environ.get("FS_GATES_FEHLERLISTE_DIR") or os.environ.get("FS_GATES_SCRATCH", "/srv/FreeSynergy/.scratch")
+
+
+def parse_list(text):
+    """The items of a Fehlerliste: [{start, end, ticked, nach: [command, ...]}] (line indexes); only lines `  - nachpruefung: CMD` of an item count."""
+    lines, items = text.splitlines(), []
+    for i, line in enumerate(lines):
+        m = ITEM.match(line)
+        if m:
+            items.append({"start": i, "ticked": m.group(1) == "x", "title": m.group(2), "nach": []})
+    for k, it in enumerate(items):
+        it["end"] = items[k + 1]["start"] if k + 1 < len(items) else len(lines)
+        for line in lines[it["start"] + 1:it["end"]]:
+            if line.startswith("  - nachpruefung: ") and not line.startswith("  - nachpruefung: ("):
+                it["nach"].append(line[len("  - nachpruefung: "):])
+    return lines, items
+
+
+def check_command(cmd, scripts_dir, root):
+    """argv of an allowed command, or None. No shell: plain words only, the placeholders {ROOT} and {SCRIPTS}/... at the start of a word, an allowed program and word 1."""
+    w = cmd.split(" ")
+    if not w or any(not x or not PLAIN.match(x) for x in w) or any(".." in x.split("/") for x in w):
+        return None
+    for x in w:
+        if "{" in x or "}" in x:
+            if not (x == "{ROOT}" or re.fullmatch(r"\{SCRIPTS\}/[A-Za-z0-9_.-]+", x)):
+                return None
+    ok = (w[0] == "cargo" and len(w) > 1 and w[1] in CARGO_OK) \
+        or (w[0] == "bash" and len(w) > 1 and re.fullmatch(r"\{SCRIPTS\}/[A-Za-z0-9_.-]+", w[1])) \
+        or (w[0] == "python3" and len(w) > 2 and w[1] == "-I" and re.fullmatch(r"\{SCRIPTS\}/[A-Za-z0-9_.-]+", w[2])) \
+        or re.fullmatch(r"scripts/[A-Za-z0-9_./-]+", w[0]) is not None
+    if not ok:
+        return None
+    return [x.replace("{SCRIPTS}", scripts_dir).replace("{ROOT}", root) for x in w]
+
+
+def merged_list(d, log_dir, befunde, funde_by_run):
+    # a run with findings of its own (the new gates.sh) is not named a second time as a general finding
+    skip = [lauf for lauf, funde in funde_by_run if funde]
+    befunde = [b for b in befunde if not any(b.startswith(f"gates.sh red in the run `{l}`") for l in skip)]
+    """The Fehlerliste of a complete run: one item per finding (the same finding of several runs once, with the runs named)."""
+    items, seen = [], {}
+    for lauf, funde in funde_by_run:
+        listfile = os.path.join(log_dir, "fehlerlisten", f"fehlerliste-{branch_of(d)}-{lauf}.md")
+        if not os.path.isfile(listfile):
+            continue
+        lines, its = parse_list(open(listfile, encoding="utf-8").read())
+        for it in its:
+            key = (re.sub(r"\(severity.*", "", it["title"]), tuple(it["nach"]))
+            if key in seen:
+                seen[key]["runs"].append(lauf)
+                continue
+            seen[key] = {"runs": [lauf], "lines": lines[it["start"]:it["end"]]}
+            items.append(seen[key])
+    out = [f"# Fehlerliste {branch_of(d)} (gates-komplett, {utc()})", ""]
+    n = len(items) + len(befunde)
+    out.append(f"{n} findings. Work through it with `gates-komplett --repo-dir . --nur-fehlerliste` (TEILPRÜFUNG, no gate result); the full run decides.")
+    for it in items:
+        out += [""] + it["lines"][:1] + [f"  - runs: {', '.join(it['runs'])}"] + it["lines"][1:]
+    for b in befunde:
+        out += ["", f"- [ ] **gates-komplett**: {b}"]
+        if "cargo fmt --all" in b:
+            out.append("  - nachpruefung: cargo fmt --check")
+        else:
+            out.append("  - nachpruefung: (none: only the full run checks this)")
+    return "\n".join(out).rstrip("\n") + "\n", n
+
+
+def teilpruefung(a, d):
+    """--nur-fehlerliste: run ONLY the `nachpruefung` commands of the list, tick the green ones. Never a gate result."""
+    path = a.nur_fehlerliste if a.nur_fehlerliste != "AUTO" else os.path.join(list_dir(), f"fehlerliste-{branch_of(d)}.md")
+    if not os.path.isfile(path):
+        return kio.skipped(f"the Fehlerliste {path} does not exist")
+    text = open(path, encoding="utf-8").read()
+    lines, items = parse_list(text)
+    slot = os.environ.get("FS_GATES_BUILD_SLOT", "/srv/FreeSynergy/.scratch/build-slot.sh")
+    tag = a.skripte_tag or pinned_tag(d)
+    results = []
+    with tempfile.TemporaryDirectory(prefix="gates-teil-", dir=os.environ.get("TMPDIR")) as tmp:
+        scripts_dir, toolchain = os.path.join(d, "scripts"), os.path.join(d, "RUST_VERSION")
+        if tag:
+            src = os.environ.get("FS_RELEASE_REPO", "/srv/FreeSynergy/fs-release")
+            rc, out = kgit.run(["archive", "--format=tar", "-o", os.path.join(tmp, "s.tar"), tag, "scripts", "RUST_VERSION"], cwd=src)
+            if rc != 0 or subprocess.run(["tar", "-x", "-C", tmp, "-f", os.path.join(tmp, "s.tar")], check=False).returncode != 0:
+                return kio.skipped(f"cannot take the scripts of fs-release {tag} out of {src} (rc {rc}): {out.strip()}")
+            scripts_dir, toolchain = os.path.join(tmp, "scripts"), os.path.join(tmp, "RUST_VERSION")
+        env = {**{k: v for k, v in os.environ.items() if k not in ("FS_GATES_SKIP_TEST",)}, "CARGO_BUILD_JOBS": str(a.jobs), "BUILD_PRIORITY": str(a.prioritaet)}
+        if os.path.isfile(toolchain):
+            env["RUSTUP_TOOLCHAIN"] = open(toolchain, encoding="utf-8").read().strip()
+        new_lines = list(lines)
+        for it in reversed(items):  # from the end: line indexes of the earlier items stay valid
+            if it["ticked"]:
+                continue
+            reds = []
+            for cmd in it["nach"]:
+                argv = check_command(cmd, scripts_dir, d)
+                if argv is None:
+                    reds.append((cmd, None, "command refused: not an allowed word list"))
+                    continue
+                with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as fh:
+                    rc = subprocess.run([slot, *argv], cwd=d, env=env, stdout=fh, stderr=subprocess.STDOUT, check=False).returncode
+                    fh.seek(0)
+                    err = [x for x in fh.read().splitlines() if SHOW.search(x) and "rc=0" not in x][:6]
+                if rc != 0:
+                    reds.append((cmd, rc, " // ".join(err)))
+            body = [x for x in new_lines[it["start"] + 1:it["end"]] if not x.startswith("  - nachgeprueft:") and not x.startswith("  - letzte pruefung:")]
+            if it["nach"] and not reds:
+                head, add = f"- [x] {it['title']}", [f"  - nachgeprueft: {utc()}"]
+                results.append({"item": it["title"], "gruen": True})
+            else:
+                head = f"- [ ] {it['title']}"
+                add = [f"  - letzte pruefung: {utc()} " + ("; ".join(f"rc {rc}: {cmd}: {e}" for cmd, rc, e in reds) if reds else "no local check (only the full run)")]
+                results.append({"item": it["title"], "gruen": False})
+            new_lines[it["start"]:it["end"]] = [head, *body, *add]
+    tmpfile = path + ".tmp"
+    with open(tmpfile, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(new_lines).rstrip("\n") + "\n")
+    os.replace(tmpfile, path)
+    still = sum(1 for _, it in enumerate(parse_list(open(path, encoding="utf-8").read())[1]) if not it["ticked"])
+    kio.emit({"status": "teilpruefung", "red": True, "gate_ergebnis": False, "liste": path, "offen": still, "punkte": results[::-1]})
+    print("TEILPRÜFUNG: kein Gate-Ergebnis, volle CI nötig")
+    return 1 if still else 0
 
 
 def main(argv):
@@ -101,12 +251,15 @@ def main(argv):
     p.add_argument("--log-dir")
     p.add_argument("--skripte-tag")
     p.add_argument("--ohne-flachprobe", action="store_true")
+    p.add_argument("--nur-fehlerliste", nargs="?", const="AUTO", help="TEILPRÜFUNG: only the nachpruefung commands of the Fehlerliste (default: the list of this branch)")
     a = p.parse_args(argv)
     d = os.path.realpath(a.repo_dir)
     if not os.path.isdir(os.path.join(d, ".git")) and not os.path.isfile(os.path.join(d, ".git")):
         return kio.skipped(f"{a.repo_dir} is no git checkout")
     if not 1 <= a.jobs <= 64 or not 0 <= a.prioritaet <= 9 or (a.skripte_tag and not kio.TAG.match(a.skripte_tag)):
         return kio.skipped("jobs 1..64, prioritaet 0..9, skripte-tag vX.Y.Z")
+    if a.nur_fehlerliste is not None:
+        return teilpruefung(a, d)
     repo = repo_name(d)
     scratch = os.environ.get("FS_GATES_SCRATCH", "/srv/FreeSynergy/.scratch")
     log_dir = a.log_dir or os.path.join(scratch, "api-runner", "gates-logs")
@@ -144,9 +297,6 @@ def main(argv):
             plan.append(("flach-ohne-tags", flach, {**env, "CARGO_TERM_COLOR": "always", "CI": "true", "BUILD_NO_SHARED_TARGET": "1",
                                                     "CARGO_TARGET_DIR": os.path.join(scratch, "target", repo, os.path.basename(d.rstrip("/")) + "-flach")}))
         for name, wd, e in plan:
-            if befunde:
-                laeufe.append({"name": name, "rc": None, "log": None, "gates": [], "fehler": ["nicht gelaufen (an earlier step is red)"]})
-                continue
             if name == "flach-ohne-tags":
                 rc, out = kgit.run(["clone", "-q", "--depth", "1", "--no-tags", "file://" + d, flach])
                 if rc != 0:
@@ -161,12 +311,21 @@ def main(argv):
                 e = {**e, "FS_GATES_SKIP_TEST": ex["test"]}
                 ausnahmen.append({**ex, "angewendet": True, "gruen_fuer_test": False})
                 print(f"gates-komplett: run {name} of {repo}: SKIPPED test {ex['test']} by named exception {ex['name']}, reason: {ex['grund']} (not green for this test)", file=sys.stderr)
+            e = {**e, "FS_GATES_FEHLERLISTE_DIR": os.path.join(log_dir, "fehlerlisten"), "FS_GATES_LAUF": name}
             laeufe.append(run_gates(name, gates, wd, e, log_dir, repo))
             if laeufe[-1]["rc"] != 0:
                 befunde.append(f"gates.sh red in the run `{name}` (rc {laeufe[-1]['rc']}), log {laeufe[-1]['log']}")
         if not befunde and state(d) != before:
             befunde.append("head or working tree changed while the gates ran: the result is void")
-    kio.emit({"status": "ok", "red": bool(befunde), "kopf": before[0], "skripte": {"tag": tag, "quelle": quelle}, "fmt": fmt_res, "laeufe": laeufe, "ausnahmen": ausnahmen, "ausnahmen_liste": AUSNAHMEN, "befunde": befunde})
+    listfile, n_funde = None, 0
+    text, n_funde = merged_list(d, log_dir, befunde, [(l["name"], l.get("funde", [])) for l in laeufe])
+    listdir = list_dir()
+    os.makedirs(listdir, exist_ok=True)
+    if not os.path.realpath(listdir).startswith(d + os.sep):  # never into the repo tree
+        listfile = os.path.join(listdir, f"fehlerliste-{branch_of(d)}.md")
+        with open(listfile, "w", encoding="utf-8") as fh:
+            fh.write(text)
+    kio.emit({"status": "ok", "red": bool(befunde), "fehlerliste": listfile, "funde": n_funde, "kopf": before[0], "skripte": {"tag": tag, "quelle": quelle}, "fmt": fmt_res, "laeufe": laeufe, "ausnahmen": ausnahmen, "ausnahmen_liste": AUSNAHMEN, "befunde": befunde})
     return 1 if befunde else 0
 
 

@@ -51,8 +51,12 @@ jobs:
             [[ $v =~ ^[A-Za-z0-9_\ ,/=.:-]*$ ]] || { echo "::error::input with a character that is not allowed: $v"; exit 1; }
           done
       - name: fmt
+        id: fmt
+        continue-on-error: true
         run: cargo fmt --check
       - name: clippy
+        id: clippy
+        continue-on-error: true
         run: |
           set -euo pipefail
           sel=(--workspace)
@@ -60,6 +64,8 @@ jobs:
           # shellcheck disable=SC2086
           cargo clippy "${sel[@]}" --all-targets $FEATURES --locked -- -D warnings $CLIPPY_EXTRA
       - name: test
+        id: test
+        continue-on-error: true
         run: |
           set -euo pipefail
           sel=(--workspace)
@@ -68,3 +74,24 @@ jobs:
           if [ "$NO_FAIL_FAST" = "true" ]; then extra+=(--no-fail-fast); fi
           # shellcheck disable=SC2086
           cargo test "${sel[@]}" $FEATURES --locked "${extra[@]}"
+      - name: Collect the results (every step above ran; the job is red when one was)
+        if: always()
+        env:
+          RESULTS: |
+            fmt ${{ steps.fmt.outcome }}
+            clippy ${{ steps.clippy.outcome }}
+            test ${{ steps.test.outcome }}
+        run: |
+          red=0
+          list="$(mktemp)"
+          {
+            echo "### Results of this job (one line per step, none stops the others)"
+            while read -r label outcome; do
+              [ -n "$label" ] || continue
+              echo "- $label: $outcome"
+              case "$outcome" in failure|cancelled) red=1 ;; esac
+            done <<< "$RESULTS"
+          } > "$list"
+          cat "$list"
+          cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit "$red"
