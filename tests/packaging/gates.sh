@@ -34,7 +34,7 @@ scan && fail "gates: *.yaml must be scanned" || pass "gates: *.yaml files are sc
 rm -rf "$TG"
 grep -q 'default: pinned' "$ROOT/actions/setup-rust/action.yml" && pass "gates: setup-rust defaults to pinned" || fail "gates: setup-rust default is not pinned"
 # --locked lint: every `cargo clippy` / `cargo test` line of gates.sh carries --locked; the old lines (without it) must be red.
-unlocked() { grep -E '^[[:space:]]*[^#[:space:]].*cargo (clippy|test)( |$)' "$1" | grep -vq -- '--locked'; }  # [GATES-SAMMELLISTE]: the lines are `step <name> <severity> cargo ...`, so not only line starts count
+unlocked() { grep -E '^[[:space:]]*([^#[:space:]].*[[:space:]])?cargo (clippy|test)( |$)' "$1" | grep -vq -- '--locked'; }  # [GATES-SAMMELLISTE]: the lines are `step <name> <severity> cargo ...`, so not only line starts count
 if unlocked "$G"; then fail "gates: gates.sh has a cargo clippy/test line without --locked"; else pass "gates: every cargo clippy/test line of gates.sh has --locked"; fi
 printf 'cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\ncargo test --workspace --all-features\n' > "$T/gates-old.sh"
 if unlocked "$T/gates-old.sh"; then pass "gates: the OLD lines (no --locked) are red"; else fail "gates: the old lines must be red"; fi

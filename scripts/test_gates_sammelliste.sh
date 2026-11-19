@@ -15,6 +15,7 @@ bad() { echo "FAIL $1"; fails=$((fails + 1)); echo "$1" >>"$tmp/.fails"; }
 chk() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 unset CI CARGO_TERM_COLOR FS_GATES_SKIP_TEST
+export TMPDIR_GATES="$tmp"  # the local run (no CI) of gates.sh takes its TMPDIR from here: not /srv/... (it does not exist on a runner)
 export PYTHONDONTWRITEBYTECODE=1  # a __pycache__ the scripts write into the repo would be a change of the tree for the guard
 
 # the stub cargo: RED_FMT, RED_CLIPPY, RED_TEST make the step red; every call is logged
