@@ -179,3 +179,80 @@ fn the_drift_is_shown_together_with_a_hand_written_file_that_no_exception_covers
         "{out}"
     );
 }
+
+#[test]
+fn the_drift_is_shown_for_an_own_type_without_a_standard_that_an_exception_with_a_talk_record_excuses(
+) {
+    // a type without `standard` is allowed only when an exception names it and its talk record exists (decision 6e): the structure gate of the drift needs that record
+    let work = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("drift-no-standard-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&work);
+    let docs = work.join("docs-checkout");
+    std::fs::create_dir_all(docs.join("conventions").join("talks")).unwrap();
+    std::fs::write(
+        docs.join("conventions").join("talks").join("extra.md"),
+        "# talk\n",
+    )
+    .unwrap();
+    let repo = work.join("repo");
+    std::fs::create_dir_all(repo.join("forms")).unwrap();
+    std::fs::create_dir_all(repo.join("crates").join("fs-demo-core").join("src")).unwrap();
+    std::fs::copy(
+        fixture("ok").join("forms").join("demo.toml"),
+        repo.join("forms").join("demo.toml"),
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("crates")
+            .join("fs-demo-core")
+            .join("src")
+            .join("own.rs"),
+        "pub fn own() {}\n",
+    )
+    .unwrap();
+    let ok = std::fs::read_to_string(fixture("ok").join("scaffold.toml")).unwrap();
+    let extra = "\n[[type]]\nname = \"Extra\"\nenvelope = \"Note\"\nmedia_type = \"application/x-extra\"\nlabel = { en = \"Extra\", de = \"Extra\" }\n\n[[exception]]\nwhat = \"The type Extra has no standard\"\nwhy = \"for the test\"\nchecked = [\"x\"]\nalternatives = []\ntalk = \"conventions/talks/extra.md\"\npaths = [\"crates/fs-demo-core/src/own.rs\"]\n";
+    // the exception tables come last in the file: put the type before the frontend table
+    let text = ok.replacen(
+        "[frontend]",
+        &format!(
+            "{}\n[frontend]",
+            extra.split("[[exception]]").next().unwrap()
+        ),
+        1,
+    ) + "\n[[exception]]"
+        + extra.split("[[exception]]").nth(1).unwrap();
+    std::fs::write(repo.join("scaffold.toml"), text).unwrap();
+    let (repo_s, docs_s) = (
+        repo.to_string_lossy().into_owned(),
+        docs.to_string_lossy().into_owned(),
+    );
+    let (code, out) = cli(&[
+        "new",
+        &repo.join("scaffold.toml").to_string_lossy(),
+        "--out",
+        &repo_s,
+        "--talks",
+        &docs_s,
+    ]);
+    assert_eq!(code, 0, "{out}");
+    let (code, out) = cli(&["check", "--repo", &repo_s, "--talks", &docs_s, "--drift"]);
+    assert_eq!(code, 0, "clean with the talk record: {out}");
+    let main = repo
+        .join("crates")
+        .join("fs-demo-bin")
+        .join("src")
+        .join("main.rs");
+    let text = std::fs::read_to_string(&main).unwrap();
+    std::fs::write(&main, format!("{text}// hand\n")).unwrap();
+    let (code, out) = cli(&["check", "--repo", &repo_s, "--talks", &docs_s, "--drift"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
+        "the drift is hidden by the type without a standard: {out}"
+    );
+    assert!(
+        !out.contains("talk-not-found") && !out.contains("field-missing"),
+        "{out}"
+    );
+}
