@@ -2,9 +2,12 @@ name: gates
 description: Run scripts/gates.sh (fmt, clippy pedantic, test, coding rules ADR 0043) from this repo, at the same ref as the action. The toolchain is the one in RUST_VERSION.
 inputs:
   working-directory: { description: "Cargo workspace root", default: "." }
+  diff-base: { description: "Git revision to diff against (e.g. origin/main): the TEST gate then runs only the crates changed since it and their dependants (fmt, clippy, rules, lock, files stay full); empty = the whole workspace", default: "" }
 runs:
   using: composite
   steps:
     - shell: bash
       working-directory: ${{ inputs.working-directory }}
+      env:
+        FS_GATES_DIFF_BASE: ${{ inputs.diff-base }}
       run: '"$GITHUB_ACTION_PATH/../../scripts/gates.sh" "$PWD"'

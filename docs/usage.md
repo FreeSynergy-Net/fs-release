@@ -51,8 +51,20 @@ of a repo; it runs on every push. It needs no secrets and only `contents: read`.
 3. `cargo test --workspace --all-features`
 4. `python3 -I scripts/check_rust_rules.py <root>` (ADR 0043), taken from this repo at the same ref as the workflow (`actions/rust-rules`), no download
 
-Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env`, `software-gpu` (boolean, default false). Unlike
+Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env`, `software-gpu` (boolean, default false), `full` (boolean, default false). Unlike
 `ci.yml` there is no MSRV or cargo-deny step and no feature selection: everything is checked with all features. Repos can run both.
+
+**Scope of the test gate (CI cost).** On a branch `unreviewed/*` step 3 runs only the crates that own a file changed against main (merge base with
+`origin/main`) plus every workspace crate that depends on one of them (dev-dependencies and transitive ones included): `cargo test -p a -p b ...`
+(`scripts/affected_crates.py`, handed over by the `diff-base` input of `actions/gates` as `FS_GATES_DIFF_BASE`). fmt, clippy, the rules, the lock
+check and the file checks always run on the whole workspace. `main`, tags, every other ref and `full: true` test the whole workspace, and so does
+every unclear case (Cargo.lock, a workspace manifest, toolchain or cargo config, a file that no crate owns, an error): the gate output says which
+(`gates: test NARROWED ...` / `gates: test runs the WHOLE workspace (...)`). Locally `scripts/gates.sh` is unchanged.
+
+**Release plan probe.** A repo with its own `.github/workflows/release.yml` that calls the fs-release release workflow gets the real `actions/plan`
+run on the inputs of that call (`binaries`, `ignore-binaries`, `cargo-package`, `working-directory`, `kind`, ...; plain values only, the tag is the Cargo
+version of the package that owns the binaries). A new binary crate under `crates/` that is neither in `binaries` nor in `ignore-binaries` is red on the
+branch, not first at the tag. Needs the check workflow of a pin that contains it.
 
 `software-gpu: true` is for repos with window tests (fs-texts, fs-tasks, fs-components, ...): it installs exactly
 `mesa-vulkan-drivers libvulkan1 fonts-dejavu-core fonts-noto-core` (lavapipe is the software graphics adapter, the fonts make the

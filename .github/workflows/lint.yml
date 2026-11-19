@@ -118,6 +118,10 @@ jobs:
         id: plan-probe-step
         continue-on-error: true
         run: bash scripts/test_plan_probe_step.sh
+      - name: changed-crates test scope self test (fixture workspace, gates.sh with stub cargo; mutants)
+        id: affected-crates
+        continue-on-error: true
+        run: bash scripts/test_affected_crates.sh
       - name: topmost CHANGELOG section (Unreleased or the crate version, no date, not empty) and its mutants
         id: topmost-changelog-section
         continue-on-error: true
@@ -177,6 +181,7 @@ jobs:
             readme-runner-self ${{ steps.readme-runner-self.outcome }}
             blueprint-check-step ${{ steps.blueprint-check-step.outcome }}
             plan-probe-step ${{ steps.plan-probe-step.outcome }}
+            affected-crates ${{ steps.affected-crates.outcome }}
             topmost-changelog-section ${{ steps.topmost-changelog-section.outcome }}
             signing-setup-script ${{ steps.signing-setup-script.outcome }}
             lock-check-self ${{ steps.lock-check-self.outcome }}

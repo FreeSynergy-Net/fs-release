@@ -14,6 +14,7 @@ on:
       # `toJSON(job)`): a caller that pins `check.yml@v0.0.15` builds the command from the tag commit itself, so the command always fits the tag and no SHA has to stand in the file
       # (the tag commit cannot name itself). A full commit SHA given here wins. Never a branch or a tag name.
       blueprint-rev: { type: string, default: "", description: "Commit of fs-release the command `fs-blueprint` is built from: a full SHA, or empty = the commit of this workflow file (for a caller pinned to a tag: the tag commit)" }
+      full: { type: boolean, default: false, description: "On branches unreviewed/* the test gate runs only the crates changed against main and their dependants; true forces the whole workspace (main and tags always test everything)" }
       test-env: { type: string, default: "", description: "Environment for the test step, one KEY=VALUE per line (for tests that need a tool the runner lacks and say so)" }
 
 permissions:
@@ -59,12 +60,19 @@ jobs:
         env:
           TEST_ENV: ${{ inputs.test-env }}
         run: printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
+      # CI cost: on a branch `unreviewed/*` the TEST gate runs only the crates that changed against main and their dependants (scripts/affected_crates.py, via the gates input diff-base);
+      # fmt, clippy, rules, lock and files stay on the whole workspace. main, tags and every other ref test everything; so does `full: true`. The base is the merge base with origin/main, not the
+      # previous push, so a crate whose tests failed earlier is never skipped by a later green push. When main cannot be fetched the gates test everything.
+      - name: Fetch main for the changed-crates diff (unreviewed/* branches only)
+        if: ${{ !inputs.full && startsWith(github.ref, 'refs/heads/unreviewed/') }}
+        run: git fetch --no-tags --unshallow origin '+refs/heads/main:refs/remotes/origin/main' || git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main' || echo "::warning::main could not be fetched, the gates test the whole workspace"
       - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
         id: gates-fmt-clippy
         continue-on-error: true
         uses: FreeSynergy/fs-release/actions/gates@89df64ec85e6d362708e1b433b46448fe27b8bd4
         with:
           working-directory: ${{ inputs.working-directory }}
+          diff-base: ${{ (!inputs.full && startsWith(github.ref, 'refs/heads/unreviewed/')) && 'origin/main' || '' }}
       # Blueprint check (S5): only when asked (`blueprint` warn or block) and only when the repo has a scaffold.toml. The talk records of the exceptions are read from a
       # flat checkout of fs-documentation main (ADR 0099 addendum). `--drift` also finds a hand change in a generated file.
       - name: Documentation checkout for the talk records

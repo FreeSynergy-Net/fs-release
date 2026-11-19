@@ -138,7 +138,22 @@ else
   fi
   step fmt style cargo fmt --check
   step clippy lint cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic
-  step test error cargo test --workspace --all-features --locked --no-fail-fast "${skip[@]}"
+  # FS_GATES_DIFF_BASE: set ONLY by CI on `unreviewed/*` branches (actions/gates input diff-base, never locally, never on main or a tag): the TEST gate then runs the crates that own a changed
+  # file plus their dependants (scripts/affected_crates.py); fmt, clippy, rust-rules, lock and files stay on the whole workspace. Anything unclear (error, global file, every crate) = whole workspace, said below.
+  testsel=(--workspace)
+  if [ -n "${FS_GATES_DIFF_BASE:-}" ]; then
+    sel_rc=0
+    sel_out="$(python3 -I "$here/affected_crates.py" "$root" "$FS_GATES_DIFF_BASE")" || sel_rc=$?
+    if [ "$sel_rc" = 0 ] && [[ "$sel_out" == "PACKAGES "* ]]; then
+      read -ra sel_names <<<"${sel_out#PACKAGES }"
+      testsel=()
+      for sel_name in "${sel_names[@]}"; do testsel+=(-p "$sel_name"); done
+      echo "gates: test NARROWED to the crates changed against $FS_GATES_DIFF_BASE and their dependants: ${sel_names[*]} (fmt, clippy, rules, lock, files stay full)"
+    else
+      echo "gates: test runs the WHOLE workspace (${sel_out:-affected_crates.py rc=$sel_rc})"
+    fi
+  fi
+  step test error cargo test "${testsel[@]}" --all-features --locked --no-fail-fast "${skip[@]}"
   step rust-rules rule python3 -I "$rules" "$root"
   # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
   step lock error bash "$here/gates-lock.sh" "$root"
