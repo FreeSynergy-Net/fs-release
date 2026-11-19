@@ -141,8 +141,8 @@ mutant "lock never taken" 's/if (set -o noclobber; echo "\$\$" > "\$lock") 2>\/d
 mutant "gates.sh without guard end" 's/^gates_guard_compare().*/gates_guard_compare() { return 0; }\n_unused() {/' change
 
 # the end of the REAL run (gates.sh, the lines after the checks) is the same code in test mode: remove / neutralise its compare
-mutant "gates.sh: end compare removed" '/^gates_guard_compare "\$guard_snap" "\$guard_snap.end"$/d' change gates.sh
-mutant "gates.sh: end compare || true" 's/^gates_guard_compare "\$guard_snap" "\$guard_snap.end"$/& || true/' change gates.sh
+mutant "gates.sh: end compare removed" '/^  gates_guard_compare "\$guard_snap" "\$guard_snap.end"$/d' change gates.sh
+mutant "gates.sh: end compare || true" 's/^  gates_guard_compare "\$guard_snap" "\$guard_snap.end"$/& || true/' change gates.sh
 mutant "gates.sh: snapshot in /tmp" 's|^guard_dir=.*|guard_dir="/tmp"|' orphan gates.sh
 mutant "sweep removed" 's/kill -0 "\$pid" 2>\/dev\/null || rm -f -- "\$f"/true/' orphan
 # mutant: the PID check does not look at gates.sh (return 0 at the start of gates_guard_is_gates) -> a lock with a live foreign PID

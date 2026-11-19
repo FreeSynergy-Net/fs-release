@@ -32,4 +32,25 @@ jobs:
           components: rustfmt,clippy
           cache-key: branch-ci
       - name: gates of this branch (scripts/gates.sh, one rc per gate)
+        id: gates-of-this
+        continue-on-error: true
         run: scripts/gates.sh "$PWD"
+      - name: Collect the results (every step above ran; the job is red when one was)
+        if: always()
+        env:
+          RESULTS: |
+            gates-of-this ${{ steps.gates-of-this.outcome }}
+        run: |
+          red=0
+          list="$(mktemp)"
+          {
+            echo "### Results of this job (one line per step, none stops the others)"
+            while read -r label outcome; do
+              [ -n "$label" ] || continue
+              echo "- $label: $outcome"
+              case "$outcome" in failure|cancelled) red=1 ;; esac
+            done <<< "$RESULTS"
+          } > "$list"
+          cat "$list"
+          cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit "$red"

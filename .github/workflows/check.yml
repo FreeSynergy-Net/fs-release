@@ -60,6 +60,8 @@ jobs:
           TEST_ENV: ${{ inputs.test-env }}
         run: printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
       - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
+        id: gates-fmt-clippy
+        continue-on-error: true
         uses: FreeSynergy/fs-release/actions/gates@eb353790cf603a0ef119996012e01049b5d7545d
         with:
           working-directory: ${{ inputs.working-directory }}
@@ -73,6 +75,8 @@ jobs:
           path: .fs-documentation
           persist-credentials: false
       - name: Blueprint check (fs-blueprint check --drift)
+        id: blueprint-check-fs
+        continue-on-error: true
         if: inputs.blueprint != 'off' && hashFiles(format('{0}/scaffold.toml', inputs.working-directory)) != ''
         env:
           MODE: ${{ inputs.blueprint }}
@@ -95,3 +99,23 @@ jobs:
             if [ "$MODE" = block ]; then exit "$rc"; fi
             echo "::warning::fs-blueprint check found errors (mode warn: the job stays green)"
           fi
+      - name: Collect the results (every step above ran; the job is red when one was)
+        if: always()
+        env:
+          RESULTS: |
+            gates-fmt-clippy ${{ steps.gates-fmt-clippy.outcome }}
+            blueprint-check-fs ${{ steps.blueprint-check-fs.outcome }}
+        run: |
+          red=0
+          list="$(mktemp)"
+          {
+            echo "### Results of this job (one line per step, none stops the others)"
+            while read -r label outcome; do
+              [ -n "$label" ] || continue
+              echo "- $label: $outcome"
+              case "$outcome" in failure|cancelled) red=1 ;; esac
+            done <<< "$RESULTS"
+          } > "$list"
+          cat "$list"
+          cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit "$red"
