@@ -27,3 +27,9 @@ tags = ["0.0.29"]
 name = "board"
 kind = "component"
 tags = ["0.0.29"]
+
+# Art 1 (standard): the planning standard of the repo fs-modules-planning (tag v0.0.1; no presets, no kit facade: Opus verdict of the tag round).
+[[module]]
+name = "fs-modules-planning"
+kind = "standard"
+tags = ["0.0.1"]
