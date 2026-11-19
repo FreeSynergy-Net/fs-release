@@ -54,6 +54,8 @@ jobs:
         run: bash scripts/test_pins_consistent.sh
       - name: README runner self test (stub cargo; refused and failing READMEs, CRLF, stdin, hidden failures)
         run: bash scripts/test_readme_run.sh
+      - name: blueprint check step of check.yml self test (stub cargo and fs-blueprint; modes, revisions, exit codes, mutants)
+        run: bash scripts/test_blueprint_check_step.sh
       - name: topmost CHANGELOG section (Unreleased or the crate version, no date, not empty) and its mutants
         run: bash scripts/test_changelog_top.sh
       - name: signing setup script self test (mock gh, mutants)
