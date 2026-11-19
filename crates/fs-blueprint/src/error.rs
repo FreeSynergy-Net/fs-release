@@ -70,7 +70,7 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("text-vars", &["key"]),
     ("text-syntax", &["key", "lang"]),
     ("fmt-changed", &["path"]),
-    ("fmt-comments", &["path"]),
+    ("fmt-unsafe", &["path"]),
 ];
 
 /// One finding: a code of [`CODES`] and its named parameters.

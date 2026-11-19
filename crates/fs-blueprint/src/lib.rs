@@ -13,6 +13,7 @@ pub mod cli_fmt;
 pub mod cli_new;
 pub mod emit;
 pub mod error;
+pub mod fmt_order;
 pub mod form;
 pub mod kit;
 pub mod load;
