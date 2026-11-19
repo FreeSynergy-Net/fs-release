@@ -10,10 +10,16 @@
 use std::ffi::OsString;
 use std::process::ExitCode;
 
-/// The blueprint of this program, read at build time (reference: the file `scaffold.toml` in the repo root).
-const BLUEPRINT: &str = include_str!("../../../scaffold.toml");
 /// The program name (reference into the blueprint).
 const PROGRAM: &str = "{{program}}";
+/// The SHA-256 of the blueprint in its canonical form. The blueprint itself is NOT part of the binary: it is read when the program starts (see `blueprint_lines`).
+const BLUEPRINT_SHA256: &str = "{{blueprint_hash}}";
+
+/// The number of lines of the blueprint `scaffold.toml`, read now: the file named in `FS_BLUEPRINT`, else `scaffold.toml` in the current folder.
+fn blueprint_lines() -> Option<usize> {
+    let path = std::env::var_os("FS_BLUEPRINT").unwrap_or_else(|| "scaffold.toml".into());
+    std::fs::read_to_string(path).ok().map(|text| text.lines().count())
+}
 
 fn main() -> ExitCode {
     let words: Vec<OsString> = std::env::args_os().skip(1).collect();
@@ -62,7 +68,8 @@ fn start() -> ExitCode {
     let server = program_client::CommandStarter::new(me, ["serve".into(), "--socket".into(), socket.clone().into_os_string()]);
     match program_client::handshake(&socket, &server) {
         Ok(()) => {
-            eprintln!("fs-{PROGRAM}: the server runs; no frontend yet (blueprint of {} lines loaded)", BLUEPRINT.lines().count());
+            let blueprint = blueprint_lines().map_or_else(|| "no scaffold.toml here".to_string(), |n| format!("scaffold.toml of {n} lines read"));
+            eprintln!("fs-{PROGRAM}: the server runs; no frontend yet (blueprint sha256 {}; {blueprint})", &BLUEPRINT_SHA256[..12]);
             ExitCode::SUCCESS
         }
         Err(e) => {

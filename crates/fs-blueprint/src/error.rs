@@ -68,6 +68,9 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("blueprint-unserializable", &[]),
     ("text-pair", &["key", "missing"]),
     ("text-vars", &["key"]),
+    ("text-syntax", &["key", "lang"]),
+    ("fmt-changed", &["path"]),
+    ("fmt-comments", &["path"]),
 ];
 
 /// One finding: a code of [`CODES`] and its named parameters.

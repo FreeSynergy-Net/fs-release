@@ -67,6 +67,9 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("blueprint-unserializable", "The blueprint cannot be written in its canonical form", "Der Bauplan lässt sich nicht in seiner kanonischen Form schreiben"),
     ("text-pair", "The text {$key} lacks the language {$missing}", "Dem Text {$key} fehlt die Sprache {$missing}"),
     ("text-vars", "The text {$key} has different variables in en and de", "Der Text {$key} hat in en und de verschiedene Variablen"),
+    ("text-syntax", "The text {$key} in {$lang} is not a simple MF2 message (plain text and variable placeholders only)", "Der Text {$key} in {$lang} ist keine einfache MF2-Nachricht (nur Text und Variablen-Platzhalter)"),
+    ("fmt-changed", "The file {$path} is not in the canonical form", "Die Datei {$path} ist nicht in der kanonischen Form"),
+    ("fmt-comments", "The file {$path} has comments that the canonical form cannot keep; nothing was written", "Die Datei {$path} hat Kommentare, die die kanonische Form nicht behalten kann; es wurde nichts geschrieben"),
 ];
 
 /// The message of a code in `en` or `de`; `None` for an unknown code or language.

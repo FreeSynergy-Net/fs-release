@@ -216,6 +216,8 @@ pub fn is_repo_path(p: &str) -> bool {
 pub enum TextFault {
     Missing(&'static str),
     Vars,
+    /// Not a simple MF2 message (the language).
+    Syntax(&'static str),
 }
 
 /// The faults of a pair of texts (`de` and `en` both there, the same variables in both).
@@ -227,6 +229,11 @@ pub fn text_faults(t: &Text2) -> Vec<TextFault> {
     }
     if t.de.as_deref().is_none_or(str::is_empty) {
         out.push(TextFault::Missing("de"));
+    }
+    for (lang, text) in [("en", &t.en), ("de", &t.de)] {
+        if text.as_deref().is_some_and(|m| !crate::mf2::is_simple(m)) {
+            out.push(TextFault::Syntax(lang));
+        }
     }
     if let (Some(en), Some(de)) = (&t.en, &t.de) {
         if !en.is_empty() && !de.is_empty() && variables(en) != variables(de) {

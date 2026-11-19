@@ -50,6 +50,9 @@ impl<'a> Sink<'a> {
                     .with("key", key)
                     .with("missing", lang),
                 TextFault::Vars => Coded::new("text-vars").with("key", key),
+                TextFault::Syntax(lang) => Coded::new("text-syntax")
+                    .with("key", key)
+                    .with("lang", lang),
             });
         }
     }

@@ -83,10 +83,23 @@ fn the_main_names_nothing_of_the_program_but_its_name() {
 }
 
 #[test]
-fn two_mains_differ_in_exactly_two_lines_the_head_line_and_the_name() {
+fn two_mains_differ_in_exactly_three_lines_the_head_line_the_name_and_the_blueprint_hash() {
     let (a, b) = (main_of(&blueprint(0)), main_of(&blueprint(1)));
     let (la, lb): (Vec<&str>, Vec<&str>) = (a.lines().collect(), b.lines().collect());
     assert_eq!(la.len(), lb.len());
     let differing = la.iter().zip(&lb).filter(|(x, y)| x != y).count();
-    assert_eq!(differing, 2);
+    assert_eq!(differing, 3);
+    let differ: Vec<&&str> = la
+        .iter()
+        .zip(&lb)
+        .filter(|(x, y)| x != y)
+        .map(|(x, _)| x)
+        .collect();
+    assert!(
+        differ.iter().any(|l| l.starts_with("const PROGRAM"))
+            && differ
+                .iter()
+                .any(|l| l.starts_with("const BLUEPRINT_SHA256")),
+        "{differ:?}"
+    );
 }

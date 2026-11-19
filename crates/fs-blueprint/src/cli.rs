@@ -17,6 +17,8 @@ use std::path::PathBuf;
 const HELP: &str = "fs-blueprint new BAUPLAN [--out DIR] [--catalog FILE] [--talks DIR] [--lang en|de] [--rules NAME]\n\
   new        check BAUPLAN (the file scaffold.toml; a folder forms/ next to it is part of it); when it is clean, make the program in DIR (default fs-<name>); on an error nothing is written\n\
 fs-blueprint check [--repo DIR] [--catalog FILE] [--talks DIR] [--lang en|de] [--drift] [--rules NAME]\n\
+fs-blueprint fmt [BAUPLAN] [--check] [--lang en|de]\n\
+  fmt        write BAUPLAN (default scaffold.toml) in its canonical form (atomic); --check only says whether it is; a file with comments is refused, nothing is written\n\
 fs-blueprint --version | --help\n\
   check      read DIR/scaffold.toml and check it: structure, building blocks (catalog), files of the repo\n\
   --repo     the root of the repo (default: the current folder)\n\
@@ -167,6 +169,16 @@ pub fn run(words: &[String], out: &mut dyn Write, err: &mut dyn Write) -> i32 {
             0
         }
         Some("new") => match parse(&words[1..]).and_then(|o| crate::cli_new::run_new(&o, out)) {
+            Ok(code) => code,
+            Err(m) => {
+                drop(writeln!(
+                    err,
+                    "fs-blueprint: {m}\nTry `fs-blueprint --help`."
+                ));
+                2
+            }
+        },
+        Some("fmt") => match crate::cli_fmt::run_fmt(&words[1..], out) {
             Ok(code) => code,
             Err(m) => {
                 drop(writeln!(

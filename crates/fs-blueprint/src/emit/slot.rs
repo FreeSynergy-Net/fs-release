@@ -34,10 +34,12 @@ pub enum Slot {
     SummaryDe,
     /// `Office;ProjectManagement;`
     Categories,
+    /// The SHA-256 of the blueprint in its canonical form (64 hex digits): the only reference to the blueprint a generated file carries as a value
+    BlueprintHash,
 }
 
 impl Slot {
-    pub const ALL: [Slot; 14] = [
+    pub const ALL: [Slot; 15] = [
         Slot::Program,
         Slot::Kebab,
         Slot::Snake,
@@ -52,6 +54,7 @@ impl Slot {
         Slot::SummaryEn,
         Slot::SummaryDe,
         Slot::Categories,
+        Slot::BlueprintHash,
     ];
 
     /// The name in a template: `{{name}}`.
@@ -72,6 +75,7 @@ impl Slot {
             Slot::SummaryEn => "summary_en",
             Slot::SummaryDe => "summary_de",
             Slot::Categories => "categories",
+            Slot::BlueprintHash => "blueprint_hash",
         }
     }
 
@@ -112,11 +116,12 @@ impl Values {
     /// The values of every slot.
     ///
     /// # Errors
-    /// `skeleton-unknown{found}` when the skeleton version of the blueprint is not in the table of `skeleton.rs`.
+    /// `skeleton-unknown{found}` when the skeleton version of the blueprint is not in the table of `skeleton.rs`; `blueprint-unserializable` (does not happen).
     pub fn of(bp: &Blueprint) -> Result<Self, Coded> {
         let skeleton = super::skeleton::of(&bp.program.skeleton).ok_or_else(|| {
             Coded::new("skeleton-unknown").with("found", bp.program.skeleton.as_str())
         })?;
+        let hash = super::header::blueprint_hash(bp)?;
         let name = bp.program.name.as_str();
         let pascal = pascal(name);
         let value = |s: Slot| match s {
@@ -134,6 +139,7 @@ impl Values {
             Slot::SummaryEn => one_line(bp.program.summary.en.as_deref()),
             Slot::SummaryDe => one_line(bp.program.summary.de.as_deref()),
             Slot::Categories => bp.program.categories.join(";") + ";",
+            Slot::BlueprintHash => hash.clone(),
         };
         Ok(Self {
             list: Slot::ALL.into_iter().map(|s| (s, value(s))).collect(),
