@@ -3,6 +3,7 @@
 //! Only `Generated` is written, and not over a hand-written or hand-changed file. A `Seed` is created when it is missing and never touched again.
 //! An `Exception` is never written. Paths have `/` and are turned into native paths only here.
 
+use super::append_only;
 use super::artifact::{Artifact, Class};
 use super::header;
 use crate::error::Coded;
@@ -75,9 +76,17 @@ fn refusal(a: &Artifact, store: &dyn Store) -> Option<Coded> {
     match store.read(&a.path) {
         Found::Missing => None,
         Found::Unreadable => Some(Coded::new("file-unreadable").with("path", path())),
-        Found::Text(old) => {
-            hand_changed(&old).then(|| Coded::new("generated-changed").with("path", path()))
+        Found::Text(old) if hand_changed(&old) => {
+            Some(Coded::new("generated-changed").with("path", path()))
         }
+        // the contract text is append-only against the one that is there
+        Found::Text(old) if append_only::is_contract(&a.path) => append_only::broken(&old, &a.content)
+            .map(|what| {
+                Coded::new("contract-append-only")
+                    .with("path", path())
+                    .with("what", what)
+            }),
+        Found::Text(_) => None,
     }
 }
 
