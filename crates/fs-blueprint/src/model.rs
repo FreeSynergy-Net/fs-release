@@ -32,6 +32,13 @@ pub struct Blueprint {
     pub exception: Vec<Exception>,
 }
 
+impl Blueprint {
+    /// The program's own types (`[[type]]` without `module`), in the order of the file: the order is part of the contract (append-only).
+    pub fn own_types(&self) -> impl Iterator<Item = &TypeDef> {
+        self.types.iter().filter(|t| t.module.is_none())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Program {

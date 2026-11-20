@@ -20,6 +20,8 @@ pub enum Form {
     Hash,
     /// `<!-- text -->` (Markdown, XML, HTML)
     Html,
+    /// `-- text` (SQL)
+    Dash,
 }
 
 /// The comment form for a repo path, by its file name; `None` for a kind that has no comment (no head possible).
@@ -29,8 +31,10 @@ pub fn form_of(path: &str) -> Option<Form> {
     let ends = |list: &[&str]| list.iter().any(|e| name.ends_with(e));
     if ends(&[".rs"]) {
         Some(Form::Slash)
-    } else if name == ".gitattributes" || ends(&[".toml", ".yml", ".yaml", ".desktop"]) {
+    } else if name == ".gitattributes" || ends(&[".toml", ".yml", ".yaml", ".desktop", ".capnp"]) {
         Some(Form::Hash)
+    } else if ends(&[".sql"]) {
+        Some(Form::Dash)
     } else if ends(&[".md", ".xml", ".html"]) {
         Some(Form::Html)
     } else {
@@ -43,6 +47,7 @@ fn wrap(form: Form, text: &str) -> String {
         Form::Slash => format!("// {text}\n"),
         Form::Hash => format!("# {text}\n"),
         Form::Html => format!("<!-- {text} -->\n"),
+        Form::Dash => format!("-- {text}\n"),
     }
 }
 
@@ -101,7 +106,11 @@ pub fn stamp(path: &str, class: Class, hash: &str, body: &str) -> Result<String,
 /// The text of a head line without its comment marks, or `None` when the line is no comment.
 fn uncomment(line: &str) -> Option<&str> {
     let line = line.trim_end();
-    if let Some(t) = line.strip_prefix("// ").or_else(|| line.strip_prefix("# ")) {
+    if let Some(t) = line
+        .strip_prefix("// ")
+        .or_else(|| line.strip_prefix("# "))
+        .or_else(|| line.strip_prefix("-- "))
+    {
         return Some(t);
     }
     line.strip_prefix("<!-- ")?.strip_suffix(" -->")

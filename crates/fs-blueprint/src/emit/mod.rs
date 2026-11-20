@@ -4,13 +4,16 @@
 
 pub mod artifact;
 pub mod check;
+pub mod contract;
 pub mod dirstore;
 pub mod files;
 pub mod frontend;
 pub mod generate;
 pub mod header;
+pub mod shape;
 pub mod skeleton;
 pub mod slot;
+pub mod store;
 pub mod write;
 
 pub use artifact::{join, Artifact, Class, Emitter};
