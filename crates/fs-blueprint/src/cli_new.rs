@@ -176,13 +176,20 @@ fn run_new_with(o: &Options, out: &mut dyn Write, between: &dyn Fn()) -> Result<
         }
     };
     apply(&places)?;
+    // the full path is named, and a target nobody asked for is called the default: a program never lands in a working tree unnoticed
+    let full = std::path::absolute(&target).unwrap_or_else(|_| target.clone());
+    let how = if o.out_dir.is_some() {
+        ""
+    } else {
+        " (default target, choose another with --out DIR)"
+    };
     drop(writeln!(
         out,
-        "fs-blueprint: made {} (written {}, kept {}); a data package, no code; next: commit {}",
+        "fs-blueprint: made {} (written {}, kept {}); a data package, no code; next: commit {}{how}",
         bp.program.name,
         outcome.written.len(),
         outcome.kept.len(),
-        target.display()
+        full.display()
     ));
     Ok(0)
 }

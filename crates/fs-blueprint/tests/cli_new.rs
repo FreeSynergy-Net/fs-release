@@ -225,6 +225,35 @@ fn new_without_out_makes_the_folder_fs_name_in_the_current_folder() {
 }
 
 #[test]
+fn new_names_the_full_path_and_calls_a_target_nobody_asked_for_the_default() {
+    let work = scratch("new-message");
+    std::fs::create_dir_all(&work).unwrap();
+    let run = |extra: &[&str]| {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_fs-blueprint"))
+            .arg("new")
+            .arg(fixture("ok").join("scaffold.toml"))
+            .args(extra)
+            .current_dir(&work)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let said = run(&[]);
+    let full = std::path::absolute(work.join("fs-demo")).unwrap();
+    assert!(
+        said.contains(&format!("commit {}", full.display())) && said.contains("default target"),
+        "{said}"
+    );
+    let chosen = run(&["--out", "chosen"]);
+    let full = std::path::absolute(work.join("chosen")).unwrap();
+    assert!(
+        chosen.contains(&format!("commit {}", full.display())) && !chosen.contains("default"),
+        "{chosen}"
+    );
+}
+
+#[test]
 fn a_stray_word_after_check_is_refused_also_with_a_good_repo() {
     let (code, out, err) = cli(&["check", "stray", "--repo", &fixture("ok").to_string_lossy()]);
     assert_eq!(code, 2, "{out}");
