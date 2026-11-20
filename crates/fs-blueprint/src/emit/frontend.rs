@@ -8,6 +8,7 @@ use super::slot::{Slot, Values};
 use crate::error::Coded;
 use crate::kit::KitCatalog;
 use crate::model::{Blueprint, Covers};
+use serde::Serialize;
 
 /// The program that runs every forms description: the frontend is data, this is its host.
 pub const HOST: &str = "fs-forms-run";
@@ -67,20 +68,51 @@ fn manifest(bp: &Blueprint, values: &Values) -> Artifact {
 }
 
 /// The package `layout`: its name, the program and version it belongs to, the exchange file it carries and what that file covers.
-fn layout_package(bp: &Blueprint, values: &Values) -> Artifact {
+fn layout_package(bp: &Blueprint, values: &Values) -> Result<Artifact, Coded> {
     let name = format!("{}-layout", values.get(Slot::Kebab));
-    let body = format!(
-        "[package]\nname = \"{name}\"\nprogram = \"{program}\"\nversion = \"{version}\"\nhost = \"{HOST}\"\n\n[[file]]\nrole = \"exchange\"\npath = \"{layout}\"\ncovers = \"{covers}\"\n",
-        program = values.get(Slot::Program),
-        version = values.get(Slot::Version),
-        layout = bp.frontend.layout,
-        covers = covers(&bp.frontend.covers),
-    );
-    Artifact::new(
+    let package = LayoutPackage {
+        package: PackageHead {
+            name: &name,
+            program: values.get(Slot::Program),
+            version: values.get(Slot::Version),
+            host: HOST,
+        },
+        file: vec![ExchangeFile {
+            role: "exchange",
+            path: &bp.frontend.layout,
+            covers: covers(&bp.frontend.covers),
+        }],
+    };
+    // the writer of the toml crate escapes every value: a quote or a backslash in a path cannot break the file
+    let body =
+        toml::to_string(&package).map_err(|_| Coded::new("blueprint-unserializable"))?;
+    Ok(Artifact::new(
         format!("packaging/layout/{name}.toml"),
         Class::Generated,
         body,
-    )
+    ))
+}
+
+#[derive(Serialize)]
+struct PackageHead<'a> {
+    name: &'a str,
+    program: &'a str,
+    version: &'a str,
+    host: &'a str,
+}
+
+#[derive(Serialize)]
+struct ExchangeFile<'a> {
+    role: &'a str,
+    path: &'a str,
+    covers: String,
+}
+
+/// The package `layout` as it is written (the order of the fields is the order of the file).
+#[derive(Serialize)]
+struct LayoutPackage<'a> {
+    package: PackageHead<'a>,
+    file: Vec<ExchangeFile<'a>>,
 }
 
 /// The frontend of the program as data: the manifest and the package `layout`.
@@ -89,6 +121,6 @@ pub struct Frontend;
 impl Emitter for Frontend {
     fn emit(&self, bp: &Blueprint, _: &dyn KitCatalog) -> Result<Vec<Artifact>, Coded> {
         let values = Values::of(bp)?;
-        Ok(vec![manifest(bp, &values), layout_package(bp, &values)])
+        Ok(vec![manifest(bp, &values), layout_package(bp, &values)?])
     }
 }
