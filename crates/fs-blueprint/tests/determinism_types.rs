@@ -24,6 +24,9 @@ fn generating_twice_gives_byte_identical_contract_and_tables() {
 
 #[test]
 fn comments_and_blank_lines_of_the_author_change_nothing() {
-    let noisy = format!("# a comment\n\n{}\n\n# end\n", SHIFT.replace("\n\n", "\n\n\n"));
+    let noisy = format!(
+        "# a comment\n\n{}\n\n# end\n",
+        SHIFT.replace("\n\n", "\n\n\n")
+    );
     assert_eq!(schema_files(SHIFT), schema_files(&noisy));
 }

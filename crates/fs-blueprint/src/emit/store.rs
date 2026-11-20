@@ -43,7 +43,12 @@ fn write_tables(out: &mut String, t: &TypeDef) -> Result<(), Coded> {
             columns.push(format!("{name} {}", sql_type(&shape)));
         }
     }
-    writeln!(out, "\nCREATE TABLE {table} (\n  {}\n);", columns.join(",\n  ")).map_err(|_| bad())?;
+    writeln!(
+        out,
+        "\nCREATE TABLE {table} (\n  {}\n);",
+        columns.join(",\n  ")
+    )
+    .map_err(|_| bad())?;
     out.push_str(&children);
     Ok(())
 }
