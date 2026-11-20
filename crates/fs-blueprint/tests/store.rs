@@ -7,16 +7,16 @@ use support::{edit, generate, FakeCatalog, SHIFT, TASKS};
 
 const GOLD: &str = "-- Tables of schedules for contract 0.1: typed columns, no JSON column.
 
-CREATE TABLE shift (
-  id INTEGER PRIMARY KEY,
-  span TEXT
+CREATE TABLE \"shift\" (
+  \"id\" INTEGER PRIMARY KEY,
+  \"span\" TEXT
 );
 
-CREATE TABLE shift_assignee (
-  owner INTEGER NOT NULL REFERENCES shift(id),
-  pos INTEGER NOT NULL,
-  value TEXT NOT NULL,
-  PRIMARY KEY (owner, pos)
+CREATE TABLE \"shift_assignee\" (
+  \"owner\" INTEGER NOT NULL REFERENCES \"shift\"(\"id\"),
+  \"pos\" INTEGER NOT NULL,
+  \"value\" TEXT NOT NULL,
+  PRIMARY KEY (\"owner\", \"pos\")
 );
 ";
 
@@ -45,9 +45,9 @@ fn the_table_text_is_the_gold() {
 #[test]
 fn basic_types_become_typed_columns_in_snake_case() {
     for (basic, line) in [
-        ("integer", "  due_date INTEGER\n"),
-        ("flag", "  due_date BOOLEAN\n"),
-        ("text", "  due_date TEXT\n"),
+        ("integer", "  \"due_date\" INTEGER\n"),
+        ("flag", "  \"due_date\" BOOLEAN\n"),
+        ("text", "  \"due_date\" TEXT\n"),
     ] {
         assert!(
             tables_of(&with_field(basic)).unwrap().contains(line),
@@ -56,8 +56,8 @@ fn basic_types_become_typed_columns_in_snake_case() {
     }
     // a keywords field is a list: its own table, not a column
     let text = tables_of(&with_field("keywords")).unwrap();
-    assert!(text.contains("CREATE TABLE shift_due_date ("));
-    assert!(!text.contains("  due_date "));
+    assert!(text.contains("CREATE TABLE \"shift_due_date\" ("));
+    assert!(!text.contains("  \"due_date\" "));
 }
 
 #[test]
@@ -91,28 +91,28 @@ fn named_field(name: &str, basic: &str) -> String {
 }
 
 #[test]
-fn a_column_named_like_an_sql_key_word_is_quoted_and_one_that_is_not_stays_bare() {
-    let text = tables_of(&named_field("order", "integer")).unwrap();
-    assert!(text.contains("  \"order\" INTEGER\n"), "{text}");
-    let text = tables_of(&named_field("group", "text")).unwrap();
-    assert!(text.contains("  \"group\" TEXT\n"), "{text}");
-    // a list field is a child table: the owner is referenced by its (bare) name
+fn every_column_and_table_name_is_quoted_key_word_or_not() {
+    // these words are invalid bare in SQL (also `transaction`, `commit`)
+    for word in ["order", "group", "transaction", "commit"] {
+        let text = tables_of(&named_field(word, "integer")).unwrap();
+        assert!(text.contains(&format!("  \"{word}\" INTEGER\n")), "{text}");
+    }
+    // a list field is a child table of a quoted name
     let text = tables_of(&named_field("order", "keywords")).unwrap();
-    assert!(text.contains("CREATE TABLE shift_order ("), "{text}");
-    // not a key word: no quotes anywhere
+    assert!(text.contains("CREATE TABLE \"shift_order\" ("), "{text}");
     let text = tables_of(&named_field("orderNo", "integer")).unwrap();
-    assert!(
-        !text.contains('"') && text.contains("  order_no INTEGER\n"),
-        "{text}"
-    );
+    assert!(text.contains("  \"order_no\" INTEGER\n"), "{text}");
 }
 
 #[test]
 fn a_table_named_like_an_sql_key_word_is_quoted_in_every_statement() {
-    let text = tables_of(&SHIFT.replace("Shift", "Group")).unwrap();
-    assert!(text.contains("CREATE TABLE \"group\" ("), "{text}");
-    assert!(text.contains("REFERENCES \"group\"(id)"), "{text}");
-    assert!(text.contains("CREATE TABLE group_assignee ("), "{text}");
+    for word in ["Group", "Transaction", "Commit"] {
+        let lower = word.to_lowercase();
+        let text = tables_of(&SHIFT.replace("Shift", word)).unwrap();
+        assert!(text.contains(&format!("CREATE TABLE \"{lower}\" (")), "{text}");
+        assert!(text.contains(&format!("REFERENCES \"{lower}\"(\"id\")")), "{text}");
+        assert!(text.contains(&format!("CREATE TABLE \"{lower}_assignee\" (")), "{text}");
+    }
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn a_field_named_id_is_a_finding_a_list_named_id_is_not() {
     let err = generate(&bp, &FakeCatalog).unwrap_err();
     assert_eq!(err.to_string(), "column-collides{type=Shift, field=id}");
     let text = tables_of(&named_field("id", "keywords")).unwrap();
-    assert!(text.contains("CREATE TABLE shift_id ("), "{text}");
+    assert!(text.contains("CREATE TABLE \"shift_id\" ("), "{text}");
 }
 
 #[test]

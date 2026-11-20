@@ -28,7 +28,7 @@ fn sql_type(shape: &Shape) -> &'static str {
 fn write_tables(out: &mut String, t: &TypeDef) -> Result<(), Coded> {
     let bad = || Coded::new("blueprint-unserializable");
     let table = snake(&t.name);
-    let mut columns = vec!["id INTEGER PRIMARY KEY".to_string()];
+    let mut columns = vec![format!("{} INTEGER PRIMARY KEY", ident("id"))];
     let mut children = String::new();
     for f in &t.field {
         let (shape, list) = of(f)?;
@@ -42,9 +42,14 @@ fn write_tables(out: &mut String, t: &TypeDef) -> Result<(), Coded> {
         if list {
             writeln!(
                 children,
-                "\nCREATE TABLE {table}_{name} (\n  owner INTEGER NOT NULL REFERENCES {}(id),\n  pos INTEGER NOT NULL,\n  value {} NOT NULL,\n  PRIMARY KEY (owner, pos)\n);",
+                "\nCREATE TABLE {} (\n  {owner} INTEGER NOT NULL REFERENCES {}({}),\n  {pos} INTEGER NOT NULL,\n  {value} {} NOT NULL,\n  PRIMARY KEY ({owner}, {pos})\n);",
+                ident(&format!("{table}_{name}")),
                 ident(&table),
-                sql_type(&shape)
+                ident("id"),
+                sql_type(&shape),
+                owner = ident("owner"),
+                pos = ident("pos"),
+                value = ident("value")
             )
             .map_err(|_| bad())?;
         } else {

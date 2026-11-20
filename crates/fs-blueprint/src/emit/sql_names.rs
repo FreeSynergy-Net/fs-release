@@ -1,86 +1,25 @@
-//! Pattern: Value object table (the words SQL keeps for itself: a table or column of such a name is written in double quotes, never bare).
+//! Pattern: Value object table (a table or column name stands in the SQL text always in double quotes: no list of key words can be complete).
 
-/// The key words of SQLite and the SQL standard that a type or field name can plausibly be (lower case, sorted).
-const RESERVED: &[&str] = &[
-    "all",
-    "alter",
-    "and",
-    "as",
-    "asc",
-    "between",
-    "by",
-    "case",
-    "check",
-    "collate",
-    "column",
-    "constraint",
-    "create",
-    "cross",
-    "default",
-    "delete",
-    "desc",
-    "distinct",
-    "drop",
-    "else",
-    "end",
-    "except",
-    "exists",
-    "foreign",
-    "from",
-    "full",
-    "group",
-    "having",
-    "in",
-    "index",
-    "inner",
-    "insert",
-    "intersect",
-    "into",
-    "is",
-    "join",
-    "key",
-    "left",
-    "like",
-    "limit",
-    "natural",
-    "not",
-    "null",
-    "offset",
-    "on",
-    "or",
-    "order",
-    "outer",
-    "primary",
-    "references",
-    "right",
-    "select",
-    "set",
-    "table",
-    "then",
-    "to",
-    "union",
-    "unique",
-    "update",
-    "using",
-    "values",
-    "view",
-    "when",
-    "where",
-    "with",
-];
-
-/// True when the name is a key word of SQL.
-#[must_use]
-pub fn is_reserved(name: &str) -> bool {
-    RESERVED.binary_search(&name).is_ok()
-}
-
-/// The name as it stands in the SQL text: bare, or in double quotes when it is a key word.
+/// The name as it stands in the SQL text: in double quotes, a quote inside doubled.
 #[must_use]
 pub fn ident(name: &str) -> String {
-    if is_reserved(name) {
-        format!("\"{name}\"")
-    } else {
-        name.to_string()
+    format!("\"{}\"", name.replace('"', "\"\""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ident;
+
+    #[test]
+    fn every_name_is_quoted() {
+        assert_eq!(ident("shift"), "\"shift\"");
+        for word in ["transaction", "commit", "order"] {
+            assert_eq!(ident(word), format!("\"{word}\""));
+        }
+    }
+
+    #[test]
+    fn a_quote_in_the_name_is_doubled() {
+        assert_eq!(ident("a\"b"), "\"a\"\"b\"");
     }
 }
