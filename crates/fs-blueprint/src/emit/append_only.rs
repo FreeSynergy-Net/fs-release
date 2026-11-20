@@ -25,7 +25,10 @@ fn parse(text: &str) -> (Option<&str>, Vec<Block<'_>>) {
     let mut blocks: Vec<Block<'_>> = Vec::new();
     let mut open = false;
     for line in text.lines() {
-        let word = |k: &str| line.strip_prefix(k).and_then(|r| r.split_whitespace().next());
+        let word = |k: &str| {
+            line.strip_prefix(k)
+                .and_then(|r| r.split_whitespace().next())
+        };
         if line.starts_with('@') && id.is_none() {
             id = Some(line.trim_end());
         } else if let Some(name) = word("struct ") {

@@ -21,7 +21,9 @@ fn job<'a>(text: &'a str, name: &str) -> &'a str {
         .find(&format!("\n  {name}:\n"))
         .unwrap_or_else(|| panic!("no job {name}"))
         + 1;
-    let first = text[start..].find('\n').map_or(text.len(), |i| start + i + 1);
+    let first = text[start..]
+        .find('\n')
+        .map_or(text.len(), |i| start + i + 1);
     let mut end = text.len();
     let mut at = first;
     for line in text[first..].split_inclusive('\n') {
@@ -42,7 +44,10 @@ fn a_package_without_cargo_toml_gets_the_blueprint_check_and_no_cargo_gate() {
     ] {
         let text = workflow(path);
         let package = job(&text, "package");
-        assert!(package.contains("needs.kind.outputs.code != 'true'"), "{path}");
+        assert!(
+            package.contains("needs.kind.outputs.code != 'true'"),
+            "{path}"
+        );
         assert!(package.contains("fs-blueprint\" check"), "{path}");
         assert!(package.contains("--drift"), "{path}");
         // the reusable workflow of fs-release runs cargo fmt/clippy/test: not in the package job
@@ -77,7 +82,9 @@ fn the_package_job_installs_the_command_from_the_pinned_tag() {
     let text = workflow(".github/workflows/check.yml");
     let package = job(&text, "package");
     assert!(
-        package.contains("cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.13 --locked"),
+        package.contains(
+            "cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.13 --locked"
+        ),
         "{package}"
     );
 }
