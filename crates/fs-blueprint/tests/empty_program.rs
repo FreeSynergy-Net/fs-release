@@ -28,14 +28,9 @@ fn the_files_of_the_empty_program_are_these_with_these_classes() {
         (".github/workflows/windows.yml", g),
         ("Cargo.toml", g),
         ("crates/fs-probe-bin/Cargo.toml", g),
-        ("crates/fs-probe-bin/src/main.rs", g),
-        ("crates/fs-probe-bin/tests/start.rs", g),
         ("crates/fs-probe-client/Cargo.toml", g),
-        ("crates/fs-probe-client/src/lib.rs", g),
         ("crates/fs-probe-core/Cargo.toml", s),
-        ("crates/fs-probe-core/src/lib.rs", s),
         ("crates/fs-probe-server/Cargo.toml", g),
-        ("crates/fs-probe-server/src/lib.rs", g),
         ("packaging/net.freesynergy.Probe.desktop", g),
     ];
     assert_eq!(got, want.map(|(p, c)| (p.to_string(), c)));
@@ -134,14 +129,22 @@ fn the_workflow_expressions_stay_as_they_are_and_no_slot_is_left_anywhere() {
 }
 
 #[test]
-fn the_bin_crate_names_the_program_crates_so_the_entry_point_does_not() {
+fn no_rust_source_is_generated_a_program_is_data() {
+    for i in 0..COUNT {
+        let bp = blueprint(i);
+        for a in generate(&bp, &FakeCatalog).unwrap() {
+            assert!(
+                !std::path::Path::new(&a.path)
+                    .extension()
+                    .is_some_and(|x| x == "rs"),
+                "{}: {}",
+                bp.program.name,
+                a.path
+            );
+        }
+    }
     let a = probe();
-    let bin = get(&a, "crates/fs-probe-bin/Cargo.toml");
-    assert!(bin.contains("program_server = { package = \"fs-probe-server\""));
-    assert!(bin.contains("program_client = { package = \"fs-probe-client\""));
-    let main = get(&a, "crates/fs-probe-bin/src/main.rs");
-    assert!(main.contains("program_server::serve") && main.contains("program_client::handshake"));
-    assert!(!main.contains("fs_probe") && !main.contains("fs-probe-"));
+    assert!(a.iter().all(|x| !x.path.contains("/src/")));
 }
 
 #[test]
@@ -171,11 +174,11 @@ fn the_synthetic_blueprints_all_generate_the_same_number_of_files_under_their_ow
     for i in 0..COUNT {
         let bp = blueprint(i);
         let out = generate(&bp, &FakeCatalog).unwrap();
-        assert_eq!(out.len(), 14, "{}", bp.program.name);
+        assert_eq!(out.len(), 9, "{}", bp.program.name);
         let name = &bp.program.name;
         assert!(out
             .iter()
-            .any(|a| a.path == format!("crates/fs-{name}-bin/src/main.rs")));
+            .any(|a| a.path == format!("crates/fs-{name}-bin/Cargo.toml")));
     }
 }
 

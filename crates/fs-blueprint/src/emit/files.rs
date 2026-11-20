@@ -1,8 +1,7 @@
-//! Pattern: Strategy (one emitter that writes the files of the empty program from a table: workspace, core, server, client, entry point, tests, CI callers, package).
+//! Pattern: Strategy (one emitter that writes the files of the empty program from a table: workspace, crate manifests, CI callers, package).
 //!
-//! The entry point is purely generated and exchangeable (user decision 45): its template has one slot, the program name, which is a reference into the blueprint;
-//! the program-specific crate names stay in `Cargo.toml` of the bin crate (renamed dependencies `program_server`, `program_client`). Nothing else of the program
-//! may stand in it; the tests compare it across many blueprints.
+//! A program is data (ADR 0086, rule `code-in-program`): no Rust source is generated any more (no entry point, no `lib.rs`, no start test); the manifests of the
+//! crates stay until the data package replaces them (open follow-up of E1-2).
 
 use super::artifact::{Artifact, Class, Emitter};
 use super::slot::{fill, Values};
@@ -50,23 +49,8 @@ const FILES: &[Entry] = &[
         class: Class::Generated,
     },
     Entry {
-        path: "crates/fs-{{program}}-bin/src/main.rs",
-        template: tmpl!("main.rs.tmpl"),
-        class: Class::Generated,
-    },
-    Entry {
-        path: "crates/fs-{{program}}-bin/tests/start.rs",
-        template: tmpl!("start_test.rs.tmpl"),
-        class: Class::Generated,
-    },
-    Entry {
         path: "crates/fs-{{program}}-client/Cargo.toml",
         template: tmpl!("client.toml.tmpl"),
-        class: Class::Generated,
-    },
-    Entry {
-        path: "crates/fs-{{program}}-client/src/lib.rs",
-        template: tmpl!("client.rs.tmpl"),
         class: Class::Generated,
     },
     Entry {
@@ -75,18 +59,8 @@ const FILES: &[Entry] = &[
         class: Class::Seed,
     },
     Entry {
-        path: "crates/fs-{{program}}-core/src/lib.rs",
-        template: tmpl!("core_lib.rs.tmpl"),
-        class: Class::Seed,
-    },
-    Entry {
         path: "crates/fs-{{program}}-server/Cargo.toml",
         template: tmpl!("server.toml.tmpl"),
-        class: Class::Generated,
-    },
-    Entry {
-        path: "crates/fs-{{program}}-server/src/lib.rs",
-        template: tmpl!("server.rs.tmpl"),
         class: Class::Generated,
     },
     Entry {

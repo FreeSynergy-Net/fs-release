@@ -51,14 +51,13 @@ fn a_hand_change_to_a_generated_file_is_red_with_its_path_whatever_the_size_of_t
         let main = dir
             .join("crates")
             .join("fs-demo-bin")
-            .join("src")
-            .join("main.rs");
+            .join("Cargo.toml");
         let text = std::fs::read_to_string(&main).unwrap();
         std::fs::write(&main, format!("{text}{change}")).unwrap();
         let (code, out) = check(&dir);
         assert_eq!(code, 1, "{out}");
         assert!(
-            out.contains("error: generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
+            out.contains("error: generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
             "{out}"
         );
     }
@@ -68,18 +67,12 @@ fn a_hand_change_to_a_generated_file_is_red_with_its_path_whatever_the_size_of_t
 fn a_generated_file_that_was_deleted_and_a_seed_that_was_deleted_are_red() {
     let dir = made("deleted");
     std::fs::remove_file(dir.join("Cargo.toml")).unwrap();
-    std::fs::remove_file(
-        dir.join("crates")
-            .join("fs-demo-core")
-            .join("src")
-            .join("lib.rs"),
-    )
-    .unwrap();
+    std::fs::remove_file(dir.join("crates").join("fs-demo-core").join("Cargo.toml")).unwrap();
     let (code, out) = check(&dir);
     assert_eq!(code, 1, "{out}");
     assert!(
         out.contains("generated-missing{path=Cargo.toml}")
-            && out.contains("seed-missing{path=crates/fs-demo-core/src/lib.rs}"),
+            && out.contains("seed-missing{path=crates/fs-demo-core/Cargo.toml}"),
         "{out}"
     );
 }
@@ -89,22 +82,24 @@ fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_
 ) {
     let dir = made("unowned");
     let core_dir = dir.join("crates").join("fs-demo-core");
+    std::fs::create_dir_all(core_dir.join("src")).unwrap();
     std::fs::write(core_dir.join("src").join("extra.rs"), "pub fn x() {}\n").unwrap();
     let (code, out) = check(&dir);
     assert_eq!(code, 1, "{out}");
     assert!(
-        out.contains("error: file-unowned{path=crates/fs-demo-core/src/extra.rs}"),
+        out.contains("error: file-unowned{path=crates/fs-demo-core/src/extra.rs}")
+            && out.contains("error: code-in-program{path=crates/fs-demo-core/src/extra.rs}"),
         "{out}"
     );
     assert!(
-        !out.contains("fs-demo-core/src/lib.rs"),
+        !out.contains("fs-demo-core/Cargo.toml"),
         "the seed is the program's: {out}"
     );
     // the seed changed by the program and a file in a tests folder: clean again
     std::fs::remove_file(core_dir.join("src").join("extra.rs")).unwrap();
-    let lib = core_dir.join("src").join("lib.rs");
+    let lib = core_dir.join("Cargo.toml");
     let text = std::fs::read_to_string(&lib).unwrap();
-    std::fs::write(&lib, format!("{text}pub fn mine() {{}}\n")).unwrap();
+    std::fs::write(&lib, format!("{text}# mine\n")).unwrap();
     std::fs::create_dir_all(core_dir.join("tests")).unwrap();
     std::fs::write(core_dir.join("tests").join("t.rs"), "#[test]\nfn t() {}\n").unwrap();
     let (code, out) = check(&dir);
@@ -117,10 +112,10 @@ fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_
     let main = dir
         .join("crates")
         .join("fs-demo-bin")
-        .join("src")
-        .join("main.rs");
+        .join("Cargo.toml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
+    std::fs::create_dir_all(dir.join("crates").join("fs-demo-core").join("src")).unwrap();
     std::fs::write(
         dir.join("crates")
             .join("fs-demo-core")
@@ -137,7 +132,7 @@ fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_
     assert_eq!(code, 1, "{out}");
     // the drift of the generated file shows although the talk record is missing; the scaffold.toml of the repo is no longer the one the files were made from
     assert!(
-        out.contains("generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
+        out.contains("generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
         "{out}"
     );
     assert!(
@@ -156,10 +151,10 @@ fn the_drift_is_shown_together_with_a_hand_written_file_that_no_exception_covers
     let main = dir
         .join("crates")
         .join("fs-demo-bin")
-        .join("src")
-        .join("main.rs");
+        .join("Cargo.toml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
+    std::fs::create_dir_all(dir.join("crates").join("fs-demo-core").join("src")).unwrap();
     std::fs::write(
         dir.join("crates")
             .join("fs-demo-core")
@@ -171,7 +166,7 @@ fn the_drift_is_shown_together_with_a_hand_written_file_that_no_exception_covers
     let (code, out) = check(&dir);
     assert_eq!(code, 1, "{out}");
     assert!(
-        out.contains("generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
+        out.contains("generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
         "the drift is hidden by the hand-written file: {out}"
     );
     assert!(
@@ -241,8 +236,7 @@ fn the_drift_is_shown_for_an_own_type_without_a_standard_that_an_exception_with_
     let main = repo
         .join("crates")
         .join("fs-demo-bin")
-        .join("src")
-        .join("main.rs");
+        .join("Cargo.toml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
     // a hand-written file that no exception names: the structure gate must not count it (it must not hide the drift)
@@ -257,7 +251,7 @@ fn the_drift_is_shown_for_an_own_type_without_a_standard_that_an_exception_with_
     let (code, out) = cli(&["check", "--repo", &repo_s, "--talks", &docs_s, "--drift"]);
     assert_eq!(code, 1, "{out}");
     assert!(
-        out.contains("generated-changed{path=crates/fs-demo-bin/src/main.rs}"),
+        out.contains("generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
         "the drift is hidden by the type without a standard: {out}"
     );
     assert!(

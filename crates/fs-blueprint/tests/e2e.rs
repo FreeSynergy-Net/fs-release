@@ -1,34 +1,10 @@
-//! End to end: ONE blueprint becomes an empty program through the real command `fs-blueprint new`, and the program builds, starts and answers, on Linux and on Windows.
-//! The test builds the generated workspace (it needs the network for the git pins and takes minutes), so it is `#[ignore]` in the normal run; the workflow
-//! `blueprint-e2e` runs it with `--ignored` on a Linux and a Windows runner. Steps: `fs-blueprint new` (check, generate, write), `fs-blueprint check --drift` (no drift),
-//! `cargo build` and `cargo test` of the generated workspace (its own start test: version, help, wrong word, `serve` + handshake + stop), then the binary itself.
+//! End to end: ONE blueprint becomes a data package through the real command `fs-blueprint new` (no Rust source, ADR 0086), on Linux and on Windows.
+//! The test is `#[ignore]` in the normal run; the workflow `blueprint-e2e` runs it with `--ignored` on a Linux and a Windows runner.
+//! Steps: `fs-blueprint new` (check, generate, write), `fs-blueprint check --drift` (no drift), the check caller of the package is there, no crate has sources.
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 const NEW: &str = env!("CARGO_BIN_EXE_fs-blueprint");
-
-fn cargo(dir: &Path, target: &Path, args: &[&str]) {
-    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-    let out = Command::new(cargo)
-        .args(args)
-        .current_dir(dir)
-        .env("CARGO_TARGET_DIR", target)
-        .env("CARGO_TERM_COLOR", "never")
-        .output()
-        .expect("cargo starts");
-    assert!(
-        out.status.success(),
-        "cargo {args:?} failed:\n{}\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-fn exe(target: &Path) -> PathBuf {
-    target
-        .join("debug")
-        .join(format!("fs-probe{}", std::env::consts::EXE_SUFFIX))
-}
 
 fn fs_blueprint(args: &[&std::ffi::OsStr]) -> std::process::Output {
     Command::new(NEW)
@@ -80,28 +56,13 @@ fn one_blueprint_becomes_a_program_that_builds_starts_and_answers() {
         String::from_utf8_lossy(&drift.stdout)
     );
 
-    let target = root.join("target");
-    cargo(&root, &target, &["build", "--workspace"]);
-    cargo(&root, &target, &["test", "--workspace"]);
-
-    let version = Command::new(exe(&target))
-        .arg("--version")
-        .output()
-        .unwrap();
-    assert!(version.status.success());
-    assert_eq!(
-        String::from_utf8_lossy(&version.stdout).trim(),
-        "fs-probe 0.0.1"
-    );
-    let help = Command::new(exe(&target)).arg("--help").output().unwrap();
-    assert!(help.status.success());
-    assert!(String::from_utf8_lossy(&help.stdout).contains("fs-probe serve"));
-    let status = Command::new(exe(&target))
-        .args(["serve", "--help"])
-        .stdout(Stdio::null())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    // a data package: no Rust source (nothing to build); the check workflow of the package is generated
+    assert!(root
+        .join(".github")
+        .join("workflows")
+        .join("check.yml")
+        .is_file());
+    assert!(!root.join("crates").join("fs-probe-bin").join("src").exists());
 }
 
 /// The catalog of the probe: the shipped one plus the capability `probing` the probe blueprint declares.

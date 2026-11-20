@@ -201,10 +201,9 @@ fn a_file_that_appears_between_the_look_and_the_write_is_never_overwritten_and_t
         "the late file was not touched"
     );
     assert!(
-        t.join("crates")
-            .join("fs-demo-bin")
-            .join("src")
-            .join("main.rs")
+        t.join(".github")
+            .join("workflows")
+            .join("check.yml")
             .is_file(),
         "the program files are there, as the message says"
     );
