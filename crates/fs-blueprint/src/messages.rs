@@ -70,6 +70,7 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("text-syntax", "The text {$key} in {$lang} is not a simple MF2 message (plain text and variable placeholders only)", "Der Text {$key} in {$lang} ist keine einfache MF2-Nachricht (nur Text und Variablen-Platzhalter)"),
     ("fmt-changed", "The file {$path} is not in the canonical form", "Die Datei {$path} ist nicht in der kanonischen Form"),
     ("fmt-comments", "The file {$path} has comments that the canonical form cannot keep; nothing was written", "Die Datei {$path} hat Kommentare, die die kanonische Form nicht behalten kann; es wurde nichts geschrieben"),
+    ("code-in-program", "The Rust file {$path} is code in the program: a program is data, code belongs to the modules; only an exception with a talk record may keep it", "Die Rust-Datei {$path} ist Code im Programm: ein Programm besteht aus Daten, Code gehört in die Module; nur eine Ausnahme mit Gesprächsprotokoll darf sie halten"),
 ];
 
 /// The message of a code in `en` or `de`; `None` for an unknown code or language.
