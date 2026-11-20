@@ -100,7 +100,10 @@ fn no_tag_in_the_package_ci_differs_from_the_release_tag_constant() {
     ] {
         let text = workflow(path);
         let mut seen = 0;
-        for line in text.lines().filter(|l| l.contains("FreeSynergy/fs-release")) {
+        for line in text
+            .lines()
+            .filter(|l| l.contains("FreeSynergy/fs-release"))
+        {
             let pinned = if let Some((_, rest)) = line.split_once("--tag ") {
                 rest.split_whitespace().next()
             } else {

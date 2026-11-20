@@ -1,6 +1,6 @@
 # End to end for fs-blueprint on a Linux AND a Windows runner (rule: a program must build and start on both, proven by a real run, not by a Unix test alone).
-# Job 1: the whole crate's tests on the platform (paths, links/junctions, line endings). Job 2: ONE blueprint becomes an empty program, the generated workspace is built,
-# its own tests run (version, help, wrong word, `serve` + handshake + stop) and the binary says its version and help (crates/fs-blueprint/tests/e2e.rs, `#[ignore]` in the normal gates).
+# Job 1: the whole crate's tests on the platform (paths, links/junctions, line endings). Job 2: ONE blueprint becomes a data package (no Cargo.toml, no Rust source),
+# its files are there and `check --drift` on it is clean; nothing of it is built (crates/fs-blueprint/tests/e2e.rs, `#[ignore]` in the normal gates).
 # On a push to `unreviewed/**` (next to branch-ci) and by hand. No secrets.
 name: blueprint-e2e
 on:
@@ -37,7 +37,7 @@ jobs:
           cache-key: blueprint-e2e-${{ matrix.os }}
       - name: fs-blueprint tests on this platform
         run: cargo test -p fs-blueprint --locked --no-fail-fast
-      - name: one blueprint becomes a program that builds, starts and answers
+      - name: one blueprint becomes a data package that checks without drift
         run: cargo test -p fs-blueprint --locked --test e2e -- --ignored --nocapture
       - name: the command `fs-blueprint check` on the fixtures (a good repo is ok, a bad one gives exit code 1 and its codes)
         shell: bash
@@ -55,9 +55,14 @@ jobs:
           grep -q 'layout-outside-forms' bad.out
           grep -q 'talk-not-found' bad.out
           grep -q 'module-unknown' bad.out
-          # the one command: a good blueprint becomes a program, a bad one writes nothing
+          # the one command: a good blueprint becomes a data package (CI, contract text, tables, packaging; no Cargo.toml, no .rs), a bad one writes nothing
           "$bin" new crates/fs-blueprint/tests/data/repos/ok/scaffold.toml --out "$RUNNER_TEMP/made"
-          test -f "$RUNNER_TEMP/made/crates/fs-demo-bin/src/main.rs"
+          test -f "$RUNNER_TEMP/made/.github/workflows/check.yml"
+          test -f "$RUNNER_TEMP/made/schema/demo.capnp"
+          test -f "$RUNNER_TEMP/made/schema/demo.sql"
+          test -f "$RUNNER_TEMP/made/packaging/net.freesynergy.Demo.desktop"
+          test ! -e "$RUNNER_TEMP/made/Cargo.toml"
+          test ! -e "$RUNNER_TEMP/made/crates"
           rc=0
           "$bin" new crates/fs-blueprint/tests/data/repos/bad/scaffold.toml --out "$RUNNER_TEMP/not-made" > /dev/null || rc=$?
           test "$rc" = 1
@@ -65,17 +70,15 @@ jobs:
           # the example of the README (examples/leer) with the binary of THIS branch (the README itself runs the installed tag)
           "$bin" new examples/leer/scaffold.toml --out "$RUNNER_TEMP/leer"
           "$bin" check --repo "$RUNNER_TEMP/leer"
-          # the check on the program that was made: clean; then a hand change to a generated file and a file without a head under crates/ are red
+          # the check on the package that was made: clean; then a hand change to a generated file is red (the data package has no crates/ to look at)
           made="$RUNNER_TEMP/made"
           "$bin" check --repo "$made" --drift
-          printf '// hand\n' >> "$made/crates/fs-demo-bin/src/main.rs"
-          printf 'pub fn x() {}\n' > "$made/crates/fs-demo-core/src/extra.rs"
+          printf '# hand\n' >> "$made/.github/workflows/check.yml"
           rc=0
           "$bin" check --repo "$made" --drift > "$RUNNER_TEMP/drift.out" || rc=$?
           cat "$RUNNER_TEMP/drift.out"
           test "$rc" = 1
-          grep -q 'generated-changed{path=crates/fs-demo-bin/src/main.rs}' "$RUNNER_TEMP/drift.out"
-          grep -q 'file-unowned{path=crates/fs-demo-core/src/extra.rs}' "$RUNNER_TEMP/drift.out"
+          grep -q 'generated-changed{path=.github/workflows/check.yml}' "$RUNNER_TEMP/drift.out"
           echo "$bin" > .fs-blueprint-bin
       # Acceptance on the two real blueprints (informational: the branches may move; the expected red reasons are in the CHANGELOG and the report of the step S4).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

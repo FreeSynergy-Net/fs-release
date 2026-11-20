@@ -109,9 +109,18 @@ fn a_table_named_like_an_sql_key_word_is_quoted_in_every_statement() {
     for word in ["Group", "Transaction", "Commit"] {
         let lower = word.to_lowercase();
         let text = tables_of(&SHIFT.replace("Shift", word)).unwrap();
-        assert!(text.contains(&format!("CREATE TABLE \"{lower}\" (")), "{text}");
-        assert!(text.contains(&format!("REFERENCES \"{lower}\"(\"id\")")), "{text}");
-        assert!(text.contains(&format!("CREATE TABLE \"{lower}_assignee\" (")), "{text}");
+        assert!(
+            text.contains(&format!("CREATE TABLE \"{lower}\" (")),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("REFERENCES \"{lower}\"(\"id\")")),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("CREATE TABLE \"{lower}_assignee\" (")),
+            "{text}"
+        );
     }
 }
 

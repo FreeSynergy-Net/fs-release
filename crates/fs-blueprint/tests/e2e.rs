@@ -14,7 +14,7 @@ fn fs_blueprint(args: &[&std::ffi::OsStr]) -> std::process::Output {
 }
 
 #[test]
-#[ignore = "builds the generated program (network, minutes); run by the workflow blueprint-e2e with --ignored"]
+#[ignore = "runs the real command on a Linux and a Windows runner; run by the workflow blueprint-e2e with --ignored"]
 fn one_blueprint_becomes_a_data_package_that_checks_without_drift() {
     let root =
         Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("e2e-probe-{}", std::process::id()));
@@ -56,17 +56,15 @@ fn one_blueprint_becomes_a_data_package_that_checks_without_drift() {
         String::from_utf8_lossy(&drift.stdout)
     );
 
-    // a data package: no Rust source (nothing to build); the check workflow of the package is generated
-    assert!(root
-        .join(".github")
-        .join("workflows")
-        .join("check.yml")
-        .is_file());
-    assert!(!root
-        .join("crates")
-        .join("fs-probe-bin")
-        .join("src")
-        .exists());
+    // a data package: the check workflow and the packaging file are there (the probe has no types, so no contract text and no tables) ...
+    for f in [
+        ".github/workflows/check.yml",
+        "packaging/net.freesynergy.Probe.desktop",
+    ] {
+        assert!(root.join(f).is_file(), "{f} is missing");
+    }
+    // ... and there is nothing to build: no Cargo.toml, no crates folder
+    assert!(!root.join("Cargo.toml").exists() && !root.join("crates").exists());
 }
 
 /// The catalog of the probe: the shipped one plus the capability `probing` the probe blueprint declares.
