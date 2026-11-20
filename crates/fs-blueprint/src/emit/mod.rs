@@ -2,6 +2,7 @@
 //!
 //! The same blueprint gives byte-identical output: no time stamp, no machine path, no map with a random order, `/` in every path on every platform.
 
+pub mod append_only;
 pub mod artifact;
 pub mod check;
 pub mod contract;
