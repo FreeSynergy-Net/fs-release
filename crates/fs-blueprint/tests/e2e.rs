@@ -15,7 +15,7 @@ fn fs_blueprint(args: &[&std::ffi::OsStr]) -> std::process::Output {
 
 #[test]
 #[ignore = "builds the generated program (network, minutes); run by the workflow blueprint-e2e with --ignored"]
-fn one_blueprint_becomes_a_program_that_builds_starts_and_answers() {
+fn one_blueprint_becomes_a_data_package_that_checks_without_drift() {
     let root =
         Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("e2e-probe-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);

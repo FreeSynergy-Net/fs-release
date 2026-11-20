@@ -66,6 +66,28 @@ fn covers_all_is_written_as_the_word_and_a_text_with_xml_characters_is_escaped()
 }
 
 #[test]
+fn the_package_layout_read_back_as_toml_holds_exactly_the_values_of_the_blueprint() {
+    for i in 0..COUNT {
+        let bp = blueprint(i);
+        let list = generate(&bp, &FakeCatalog).unwrap();
+        let name = &bp.program.name;
+        let text = body(&list, &format!("packaging/layout/fs-{name}-layout.toml"));
+        let t: toml::Table = toml::from_str(text).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(t["package"]["program"].as_str(), Some(name.as_str()));
+        assert_eq!(
+            t["package"]["version"].as_str(),
+            Some(bp.program.version.as_str())
+        );
+        assert_eq!(t["package"]["host"].as_str(), Some("fs-forms-run"));
+        assert_eq!(
+            t["file"][0]["path"].as_str(),
+            Some(bp.frontend.layout.as_str())
+        );
+        assert_eq!(t["file"].as_array().map(Vec::len), Some(1));
+    }
+}
+
+#[test]
 fn every_blueprint_gets_its_own_two_frontend_files_and_no_frontend_crate() {
     for i in 0..COUNT {
         let bp = blueprint(i);
