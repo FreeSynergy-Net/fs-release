@@ -6,7 +6,7 @@ use fs_blueprint::Blueprint;
 use support::{edit, generate, FakeCatalog, SHIFT, TASKS};
 
 const GOLD: &str = "@0xc04d258971543477;
-# Contract 0.1 of schedules: append-only, a field only at the end of its struct.
+# Contract 0.1 of schedules: append-only, a field or method only at the end of its struct or interface.
 using Kit = import \"/fs-types/kit.capnp\";
 
 struct Shift {
@@ -63,7 +63,42 @@ fn basic_types_map_to_typed_capnp_types() {
     }
 }
 
+fn tasks_contract(src: &str) -> Option<String> {
+    let bp = Blueprint::from_toml(src).unwrap();
+    let all = generate(&bp, &FakeCatalog).unwrap();
+    all.iter()
+        .find(|a| a.path == "schema/tasks.capnp")
+        .map(|a| a.content.split_once('\n').unwrap().1.to_string())
+}
+
 #[test]
-fn a_program_without_own_types_has_no_contract_text() {
-    assert_eq!(contract_of(TASKS), None);
+fn a_program_without_own_types_and_without_provides_has_no_contract_text() {
+    let none = edit(
+        TASKS,
+        "provides = [\"dependency.evaluate\", \"dependency.cycle-check\"]\n",
+        "",
+    );
+    assert_eq!(tasks_contract(&none), None);
+}
+
+#[test]
+fn provides_gives_one_interface_with_the_methods_as_declared_numbered_in_order() {
+    let want = "@0xc04d258971543476;\n# Contract 0.1 of tasks: append-only, a field or method only at the end of its struct or interface.\n\n\
+                interface Dependency {\n  evaluate @0 () -> ();\n  cycleCheck @1 () -> ();\n}\n";
+    assert_eq!(tasks_contract(TASKS).as_deref(), Some(want));
+}
+
+#[test]
+fn a_method_added_at_the_end_keeps_the_numbers_before_it_and_a_second_interface_follows() {
+    let more = edit(
+        TASKS,
+        "\"dependency.cycle-check\"]",
+        "\"dependency.cycle-check\", \"board.move\", \"dependency.order\"]",
+    );
+    let text = tasks_contract(&more).unwrap();
+    assert!(text.contains(
+        "interface Dependency {\n  evaluate @0 () -> ();\n  cycleCheck @1 () -> ();\n  order @2 () -> ();\n}\n"
+    ));
+    assert!(text.contains("interface Board {\n  move @0 () -> ();\n}\n"));
+    assert!(text.find("interface Dependency") < text.find("interface Board"));
 }

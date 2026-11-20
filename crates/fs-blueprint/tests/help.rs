@@ -40,7 +40,8 @@ fn a_program_without_help_gets_no_help_file() {
 }
 
 #[test]
-fn a_text_missing_in_one_language_is_a_finding_in_the_check_and_in_the_generator_never_a_silent_gap() {
+fn a_text_missing_in_one_language_is_a_finding_in_the_check_and_in_the_generator_never_a_silent_gap(
+) {
     let no_de = with(&TWO.replace(", de = \"Start drücken.\"", ""));
     let r = run(&no_de, true);
     assert_eq!(only(&r, "text-pair"), 1, "{:?}", r.codes());
