@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New workflow `pruefung` (card 78, specification, the `@fs` calls have no script yet): the standard check of a finished module by a list per kind (`data | component | host | security`, common items plus the kind; each item has an id, a yes/no question, how it is verified and `auto` = `script | script-spaeter | lesen`); all items run, the check report is a data file, only the red items are fixed and checked again (at most 3 rounds), a read-through without compiling (Sonnet for NORMAL, Opus for HOCH), the CI of all workflows (Linux and Windows) at the exact head, a final report with proof. Entry in `workflows/README.md` and in the list of `tests/support/workflows.rs`. / Neuer Ablauf `pruefung` (Karte 78, Spezifikation): Standard-Prüfung eines fertigen Moduls nach Liste je Modulart, alle Punkte, Prüfbericht als Datei, nur Rotes korrigieren und neu prüfen, Durchlesen ohne Kompilieren, CI Linux + Windows am genauen Kopf, Schlussbericht mit Beleg.
+
 ## 0.0.16
 
 Released 2026-11-19 (UTC; the date of the version commit, the tag follows after the checks and the pin rounds). / Veröffentlicht am 2026-11-19 (UTC; Datum des Version-Commits, der Tag folgt nach den Prüfungen und den Pin-Runden).
