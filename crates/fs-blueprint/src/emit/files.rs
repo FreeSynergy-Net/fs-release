@@ -68,5 +68,6 @@ pub fn all() -> Vec<Box<dyn Emitter>> {
         Box::new(Program),
         Box::new(super::frontend::Frontend),
         Box::new(super::settings::Settings),
+        Box::new(super::help::HelpTexts),
     ]
 }
