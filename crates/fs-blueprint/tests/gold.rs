@@ -9,8 +9,11 @@ use support::{generate, FakeCatalog, TASKS};
 
 const HASH: &str = "167a6276086b90300ab857249fa1a2381991e2a6ab23b8115f9e4dcea298f0f4";
 
+/// The frontend files and the contract text are compared in their own tests (`frontend.rs`, `contract.rs`) with the head line masked.
 fn is_frontend_file(path: &str) -> bool {
-    path.starts_with("packaging/frontends/") || path.starts_with("packaging/layout/")
+    path.starts_with("packaging/frontends/")
+        || path.starts_with("packaging/layout/")
+        || path.starts_with("schema/")
 }
 
 fn gold_dir() -> std::path::PathBuf {
@@ -22,7 +25,7 @@ fn the_output_for_the_tasks_example_is_exactly_the_gold_bytes() {
     let bp = Blueprint::from_toml(TASKS).unwrap();
     assert_eq!(blueprint_hash(&bp).unwrap(), HASH);
     let out = generate(&bp, &FakeCatalog).unwrap();
-    assert_eq!(out.len(), 6);
+    assert_eq!(out.len(), 7);
     // the frontend files (manifest and package `layout`) are compared in `frontend.rs` with the head line masked; their gold bytes are still to be written from a run
     for a in out.iter().filter(|a| !is_frontend_file(&a.path)) {
         let want = std::fs::read(gold_dir().join(format!("{}.gold", a.path)))

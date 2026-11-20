@@ -44,17 +44,54 @@ fn write_struct(out: &mut String, t: &TypeDef) -> Result<(), Coded> {
     Ok(())
 }
 
-/// The contract text, or `None` when the program has no types of its own.
+/// `cycle-check` as `cycleCheck`: the name of a method in capnp.
+fn camel(word: &str) -> String {
+    let mut parts = word.split(['-', '.']).filter(|p| !p.is_empty());
+    let first = parts.next().unwrap_or_default().to_string();
+    parts.fold(first, |acc, p| acc + &pascal(p))
+}
+
+/// The interfaces of `[contract] provides`: an entry `<Interface>.<method>` is the method `method` of the interface (the part before the last dot,
+/// in Pascal case), numbered by its place in the list; an entry without a dot is an interface without methods. The order of the blueprint is kept.
+fn interfaces(provides: &[String]) -> Vec<(String, Vec<String>)> {
+    let mut list: Vec<(String, Vec<String>)> = Vec::new();
+    for key in provides {
+        let (name, method) = match key.rsplit_once('.') {
+            Some((i, m)) => (i, Some(camel(m))),
+            None => (key.as_str(), None),
+        };
+        let name = name.split(['-', '.']).map(pascal).collect::<String>();
+        let at = list.iter().position(|(n, _)| *n == name);
+        let slot = at.unwrap_or_else(|| {
+            list.push((name, Vec::new()));
+            list.len() - 1
+        });
+        if let Some(m) = method {
+            list[slot].1.push(m);
+        }
+    }
+    list
+}
+
+fn write_interface(out: &mut String, name: &str, methods: &[String]) {
+    let _ = writeln!(out, "\ninterface {name} {{");
+    for (n, m) in methods.iter().enumerate() {
+        let _ = writeln!(out, "  {m} @{n} () -> ();");
+    }
+    out.push_str("}\n");
+}
+
+/// The contract text, or `None` when the program has no types of its own and provides nothing.
 ///
 /// # Errors
 /// `field-kind-missing{field}` for a field without a kind.
 pub fn text(bp: &Blueprint) -> Result<Option<String>, Coded> {
     let own: Vec<&TypeDef> = bp.own_types().collect();
-    if own.is_empty() {
+    if own.is_empty() && bp.contract.provides.is_empty() {
         return Ok(None);
     }
     let mut out = format!(
-        "@{};\n# Contract {} of {}: append-only, a field only at the end of its struct.\n",
+        "@{};\n# Contract {} of {}: append-only, a field or method only at the end of its struct or interface.\n",
         bp.contract.id, bp.contract.version, bp.program.name
     );
     if own.iter().flat_map(|t| &t.field).any(|f| f.kit.is_some()) {
@@ -62,6 +99,9 @@ pub fn text(bp: &Blueprint) -> Result<Option<String>, Coded> {
     }
     for t in own {
         write_struct(&mut out, t)?;
+    }
+    for (name, methods) in interfaces(&bp.contract.provides) {
+        write_interface(&mut out, &name, &methods);
     }
     Ok(Some(out))
 }

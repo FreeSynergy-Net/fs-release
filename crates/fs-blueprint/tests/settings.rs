@@ -40,7 +40,8 @@ fn a_program_without_settings_gets_no_settings_file() {
 
 #[test]
 fn a_setting_key_twice_an_unknown_type_and_a_missing_label_are_findings() {
-    assert!(codes(&with(TWO)).is_empty(), "{:?}", codes(&with(TWO)));
+    // the fake catalog has no tag of fs-todo: the two version findings are there without any setting, the settings add nothing
+    assert_eq!(codes(&with(TWO)), codes(TASKS));
     let twice = with(TWO).replace("\"title\"", "\"theme\"");
     assert_eq!(only(&run(&twice, true), "duplicate"), 1);
     let bad_type = with(TWO).replace("type = \"text\"", "type = \"nope\"");
