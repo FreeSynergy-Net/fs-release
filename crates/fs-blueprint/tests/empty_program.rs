@@ -136,9 +136,9 @@ fn no_rust_source_is_generated_a_program_is_data() {
         let bp = blueprint(i);
         for a in generate(&bp, &FakeCatalog).unwrap() {
             assert!(
-                !std::path::Path::new(&a.path)
+                std::path::Path::new(&a.path)
                     .extension()
-                    .is_some_and(|x| x == "rs"),
+                    .is_none_or(|x| x != "rs"),
                 "{}: {}",
                 bp.program.name,
                 a.path

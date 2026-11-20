@@ -100,8 +100,12 @@ fn a_hand_written_rust_file_without_an_exception_is_code_in_the_program() {
         assert!(f.conforms());
         assert_renders(f);
     }
-    assert!(!run_with(TASKS, FakeView::standard().with_talk(), &fs_blueprint::Rules::projekt())
-        .has("code-in-program"));
+    assert!(!run_with(
+        TASKS,
+        FakeView::standard().with_talk(),
+        &fs_blueprint::Rules::projekt()
+    )
+    .has("code-in-program"));
 }
 
 fn assert_renders(c: &Coded) {

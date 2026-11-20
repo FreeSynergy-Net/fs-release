@@ -62,7 +62,11 @@ fn one_blueprint_becomes_a_program_that_builds_starts_and_answers() {
         .join("workflows")
         .join("check.yml")
         .is_file());
-    assert!(!root.join("crates").join("fs-probe-bin").join("src").exists());
+    assert!(!root
+        .join("crates")
+        .join("fs-probe-bin")
+        .join("src")
+        .exists());
 }
 
 /// The catalog of the probe: the shipped one plus the capability `probing` the probe blueprint declares.
