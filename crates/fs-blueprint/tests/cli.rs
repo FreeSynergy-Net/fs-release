@@ -115,11 +115,11 @@ fn the_drift_option_adds_the_generated_files_that_are_missing_in_the_repo() {
     let (code, out, _) = cli(&["check", "--repo", &repo("ok"), "--drift"]);
     assert_eq!(code, 1);
     assert!(
-        out.contains("error: generated-missing{path=Cargo.toml}"),
+        out.contains("error: generated-missing{path=.github/workflows/check.yml}"),
         "{out}"
     );
     assert!(
-        out.contains("error: seed-missing{path=crates/fs-demo-core/Cargo.toml}"),
+        !out.contains("seed-missing") && !out.contains("Cargo.toml"),
         "{out}"
     );
 }

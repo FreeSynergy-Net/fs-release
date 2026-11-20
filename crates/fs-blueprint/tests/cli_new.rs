@@ -61,7 +61,7 @@ fn new_checks_generates_and_writes_the_program_with_the_blueprint_and_its_forms_
     ]);
     assert_eq!((code, err.as_str()), (0, ""), "{out}");
     assert!(
-        out.contains("made demo (written 13, kept 0)") && !out.contains("cargo build"),
+        out.contains("made demo (written 8, kept 0)") && !out.contains("cargo build"),
         "{out}"
     );
     let got = files(&out_dir);
@@ -82,7 +82,7 @@ fn new_checks_generates_and_writes_the_program_with_the_blueprint_and_its_forms_
             && got.contains(&"schema/demo.sql".to_string()),
         "{got:?}"
     );
-    assert_eq!(got.len(), 15);
+    assert_eq!(got.len(), 10);
     // the second run changes nothing and says so; the repo is the output of the blueprint
     let (code, out, _) = cli(&[
         "new",
@@ -91,9 +91,33 @@ fn new_checks_generates_and_writes_the_program_with_the_blueprint_and_its_forms_
         &out_dir.to_string_lossy(),
     ]);
     assert_eq!(code, 0, "{out}");
-    assert!(out.contains("written 12, kept 1"), "{out}");
+    assert!(out.contains("written 8, kept 0"), "{out}");
     let (code, out, _) = cli(&["check", "--repo", &out_dir.to_string_lossy(), "--drift"]);
     assert_eq!(code, 0, "{out}");
+}
+
+#[test]
+fn a_package_with_own_types_is_data_only_contract_and_tables_but_no_rust_and_no_manifest() {
+    let out_dir = scratch("new-data-only");
+    let bp = fixture("ok").join("scaffold.toml");
+    let (code, out, _) = cli(&[
+        "new",
+        &bp.to_string_lossy(),
+        "--out",
+        &out_dir.to_string_lossy(),
+    ]);
+    assert_eq!(code, 0, "{out}");
+    let got = files(&out_dir);
+    let ext = |f: &String, e: &str| Path::new(f).extension().is_some_and(|x| x == e);
+    assert!(got.iter().any(|f| ext(f, "capnp")), "{got:?}");
+    assert!(got.iter().any(|f| ext(f, "sql")), "{got:?}");
+    assert!(!got.iter().any(|f| ext(f, "rs")), "{got:?}");
+    assert!(
+        !got.iter()
+            .any(|f| f == "Cargo.toml" || f.ends_with("/Cargo.toml")),
+        "{got:?}"
+    );
+    assert!(!got.iter().any(|f| f.starts_with("crates/")), "{got:?}");
 }
 
 #[test]
@@ -159,7 +183,7 @@ fn new_in_the_folder_of_the_blueprint_adds_only_the_generated_files() {
         &work.to_string_lossy(),
     ]);
     assert_eq!(code, 0, "{out}");
-    assert_eq!(files(&work).len(), 15);
+    assert_eq!(files(&work).len(), 10);
 }
 
 #[test]
@@ -195,7 +219,7 @@ fn new_without_out_makes_the_folder_fs_name_in_the_current_folder() {
         String::from_utf8_lossy(&out.stdout)
     );
     assert!(
-        work.join("fs-demo").join("Cargo.toml").is_file()
+        work.join("fs-demo").join(".gitattributes").is_file()
             && work.join("fs-demo").join("scaffold.toml").is_file()
     );
 }

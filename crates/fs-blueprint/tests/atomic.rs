@@ -63,8 +63,8 @@ fn a_successful_write_leaves_no_temporary_file_and_replaces_an_older_generated_f
 #[test]
 fn a_failure_while_writing_leaves_nothing_new_behind() {
     let root = dir("fail");
-    // a FILE where the folder `crates` should be: the files before it in the list could be written, the one under `crates` cannot
-    std::fs::write(root.join("crates"), "i am a file").unwrap();
+    // a FILE where the folder `packaging` should be: the files before it in the list could be written, the ones under `packaging` cannot
+    std::fs::write(root.join("packaging"), "i am a file").unwrap();
     let mut store = DirStore::new(&root);
     let arts = generate(&blueprint(1), &FakeCatalog).unwrap();
     let err = write(&arts, &mut store).unwrap_err();
@@ -72,11 +72,11 @@ fn a_failure_while_writing_leaves_nothing_new_behind() {
     assert_eq!(err[0].code, "write-failed");
     assert_eq!(
         names(&root),
-        ["crates"],
+        ["packaging"],
         "no new file and no temporary file"
     );
     assert_eq!(
-        std::fs::read_to_string(root.join("crates")).unwrap(),
+        std::fs::read_to_string(root.join("packaging")).unwrap(),
         "i am a file"
     );
 }

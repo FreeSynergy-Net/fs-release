@@ -5,7 +5,8 @@ use fs_blueprint::Report;
 use support::synth::{blueprint, MemStore};
 use support::{drift as check, generate, FakeCatalog, FakeView};
 
-const MAIN: &str = "crates/fs-beta-shelf-planner-bin/Cargo.toml";
+const MAIN: &str = ".github/workflows/check.yml";
+/// No emitter makes a seed any more (the manifests are gone); the machinery of the class stays and is tested with a hand-made seed artifact.
 const SEED: &str = "crates/fs-beta-shelf-planner-core/Cargo.toml";
 const ATTR: &str = ".gitattributes";
 const OWN: &str = "crates/fs-beta-shelf-planner-core/src/own1.rs";
@@ -31,7 +32,11 @@ fn texts(r: &Report) -> Vec<String> {
 #[test]
 fn a_repo_that_is_the_output_has_no_drift_and_the_exception_is_left_alone() {
     let store = written();
-    assert!(store.files.contains_key(MAIN) && store.files.contains_key(SEED));
+    assert!(store.files.contains_key(MAIN));
+    assert!(
+        !store.files.keys().any(|p| p.ends_with("Cargo.toml")),
+        "a pure data package: no manifest"
+    );
     assert!(
         !store.files.contains_key(OWN),
         "an exception is never written"
@@ -50,26 +55,13 @@ fn a_generated_file_changed_by_hand_is_drift_with_its_path() {
 }
 
 #[test]
-fn a_missing_generated_file_and_a_missing_seed_are_reported() {
+fn a_missing_generated_file_is_reported() {
     let mut store = written();
     store.files.remove(ATTR);
-    store.files.remove(SEED);
     assert_eq!(
         texts(&drift(&store)),
-        [
-            format!("generated-missing{{path={ATTR}}}"),
-            format!("seed-missing{{path={SEED}}}")
-        ]
+        [format!("generated-missing{{path={ATTR}}}")]
     );
-}
-
-#[test]
-fn a_seed_changed_by_the_program_is_not_drift() {
-    let mut store = written();
-    store
-        .files
-        .insert(SEED.to_string(), "// mine now\npub fn x() {}\n".to_string());
-    assert_eq!(texts(&drift(&store)), Vec::<String>::new());
 }
 
 #[test]
@@ -102,9 +94,20 @@ fn a_changed_blueprint_makes_the_old_output_drift() {
 fn write_twice_is_stable_and_never_overwrites_a_seed() {
     let mut store = written();
     let before = store.files.clone();
-    let arts = generate(&blueprint(1), &FakeCatalog).unwrap();
+    let mut arts = generate(&blueprint(1), &FakeCatalog).unwrap();
+    arts.push(fs_blueprint::Artifact::new(
+        SEED,
+        fs_blueprint::Class::Seed,
+        "// seed\n",
+    ));
     let out = write(&arts, &mut store).unwrap();
-    assert_eq!(store.files, before);
+    assert_eq!(out.kept, Vec::<String>::new());
+    assert_eq!(store.files[SEED], "// seed\n");
+    store.files.remove(SEED);
+    let out = write(&arts, &mut store).unwrap();
+    assert_eq!(out.kept, Vec::<String>::new());
+    assert_eq!(store.files.len(), before.len() + 1);
+    let out = write(&arts, &mut store).unwrap();
     assert_eq!(out.kept, [SEED]);
     assert_eq!(out.skipped, Vec::<String>::new());
     store

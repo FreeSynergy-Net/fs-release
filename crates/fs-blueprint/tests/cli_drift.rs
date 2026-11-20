@@ -48,35 +48,32 @@ fn a_program_made_by_new_is_clean() {
 fn a_hand_change_to_a_generated_file_is_red_with_its_path_whatever_the_size_of_the_change() {
     for (n, change) in ["// hand\n", "\n", " "].into_iter().enumerate() {
         let dir = made(&format!("hand{n}"));
-        let main = dir.join("crates").join("fs-demo-bin").join("Cargo.toml");
+        let main = dir.join(".github").join("workflows").join("check.yml");
         let text = std::fs::read_to_string(&main).unwrap();
         std::fs::write(&main, format!("{text}{change}")).unwrap();
         let (code, out) = check(&dir);
         assert_eq!(code, 1, "{out}");
         assert!(
-            out.contains("error: generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
+            out.contains("error: generated-changed{path=.github/workflows/check.yml}"),
             "{out}"
         );
     }
 }
 
 #[test]
-fn a_generated_file_that_was_deleted_and_a_seed_that_was_deleted_are_red() {
+fn a_generated_file_that_was_deleted_is_red() {
     let dir = made("deleted");
-    std::fs::remove_file(dir.join("Cargo.toml")).unwrap();
-    std::fs::remove_file(dir.join("crates").join("fs-demo-core").join("Cargo.toml")).unwrap();
+    std::fs::remove_file(dir.join(".gitattributes")).unwrap();
     let (code, out) = check(&dir);
     assert_eq!(code, 1, "{out}");
     assert!(
-        out.contains("generated-missing{path=Cargo.toml}")
-            && out.contains("seed-missing{path=crates/fs-demo-core/Cargo.toml}"),
+        out.contains("generated-missing{path=.gitattributes}") && !out.contains("seed-missing"),
         "{out}"
     );
 }
 
 #[test]
-fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_a_tests_file_are_not(
-) {
+fn a_file_without_a_head_under_crates_is_red_a_hand_written_manifest_too_but_a_tests_file_is_not() {
     let dir = made("unowned");
     let core_dir = dir.join("crates").join("fs-demo-core");
     std::fs::create_dir_all(core_dir.join("src")).unwrap();
@@ -88,15 +85,17 @@ fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_
             && out.contains("error: code-in-program{path=crates/fs-demo-core/src/extra.rs}"),
         "{out}"
     );
-    assert!(
-        !out.contains("fs-demo-core/Cargo.toml"),
-        "the seed is the program's: {out}"
-    );
-    // the seed changed by the program and a file in a tests folder: clean again
+    // a hand-written manifest is not generated any more and has no head either: it is red like any file under crates/
     std::fs::remove_file(core_dir.join("src").join("extra.rs")).unwrap();
-    let lib = core_dir.join("Cargo.toml");
-    let text = std::fs::read_to_string(&lib).unwrap();
-    std::fs::write(&lib, format!("{text}# mine\n")).unwrap();
+    std::fs::write(core_dir.join("Cargo.toml"), "# mine\n").unwrap();
+    let (code, out) = check(&dir);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("error: file-unowned{path=crates/fs-demo-core/Cargo.toml}"),
+        "{out}"
+    );
+    // only a file in a tests folder: clean again
+    std::fs::remove_file(core_dir.join("Cargo.toml")).unwrap();
     std::fs::create_dir_all(core_dir.join("tests")).unwrap();
     std::fs::write(core_dir.join("tests").join("t.rs"), "#[test]\nfn t() {}\n").unwrap();
     let (code, out) = check(&dir);
@@ -106,7 +105,7 @@ fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_
 #[test]
 fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_record() {
     let dir = made("together");
-    let main = dir.join("crates").join("fs-demo-bin").join("Cargo.toml");
+    let main = dir.join(".github").join("workflows").join("check.yml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
     std::fs::create_dir_all(dir.join("crates").join("fs-demo-core").join("src")).unwrap();
@@ -126,7 +125,7 @@ fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_
     assert_eq!(code, 1, "{out}");
     // the drift of the generated file shows although the talk record is missing; the scaffold.toml of the repo is no longer the one the files were made from
     assert!(
-        out.contains("generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
+        out.contains("generated-changed{path=.github/workflows/check.yml}"),
         "{out}"
     );
     assert!(
@@ -142,7 +141,7 @@ fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_
 #[test]
 fn the_drift_is_shown_together_with_a_hand_written_file_that_no_exception_covers() {
     let dir = made("with-unowned");
-    let main = dir.join("crates").join("fs-demo-bin").join("Cargo.toml");
+    let main = dir.join(".github").join("workflows").join("check.yml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
     std::fs::create_dir_all(dir.join("crates").join("fs-demo-core").join("src")).unwrap();
@@ -157,7 +156,7 @@ fn the_drift_is_shown_together_with_a_hand_written_file_that_no_exception_covers
     let (code, out) = check(&dir);
     assert_eq!(code, 1, "{out}");
     assert!(
-        out.contains("generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
+        out.contains("generated-changed{path=.github/workflows/check.yml}"),
         "the drift is hidden by the hand-written file: {out}"
     );
     assert!(
@@ -224,7 +223,7 @@ fn the_drift_is_shown_for_an_own_type_without_a_standard_that_an_exception_with_
     assert_eq!(code, 0, "{out}");
     let (code, out) = cli(&["check", "--repo", &repo_s, "--talks", &docs_s, "--drift"]);
     assert_eq!(code, 0, "clean with the talk record: {out}");
-    let main = repo.join("crates").join("fs-demo-bin").join("Cargo.toml");
+    let main = repo.join(".github").join("workflows").join("check.yml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
     // a hand-written file that no exception names: the structure gate must not count it (it must not hide the drift)
@@ -239,7 +238,7 @@ fn the_drift_is_shown_for_an_own_type_without_a_standard_that_an_exception_with_
     let (code, out) = cli(&["check", "--repo", &repo_s, "--talks", &docs_s, "--drift"]);
     assert_eq!(code, 1, "{out}");
     assert!(
-        out.contains("generated-changed{path=crates/fs-demo-bin/Cargo.toml}"),
+        out.contains("generated-changed{path=.github/workflows/check.yml}"),
         "the drift is hidden by the type without a standard: {out}"
     );
     assert!(

@@ -77,13 +77,17 @@ fn an_exception_over_a_former_entry_point_is_no_longer_taken_by_generate_the_che
 }
 
 #[test]
-fn an_exception_over_another_generated_file_is_path_generated_and_over_a_seed_it_is_allowed() {
+fn an_exception_over_another_generated_file_is_path_generated_and_over_a_hand_written_manifest_nothing_is_made(
+) {
     let e = generate(&with_exception(".gitattributes"), &FakeCatalog).unwrap_err();
     assert_eq!(e.to_string(), "path-generated{path=.gitattributes}");
+    // no manifest is generated any more: the path is the program's own, generate has nothing to take or to mark
     let out = generate(
         &with_exception("crates/fs-alpha-desk-core/Cargo.toml"),
         &FakeCatalog,
     )
     .unwrap();
-    assert!(out.iter().any(|a| a.class == Class::Exception));
+    assert!(out
+        .iter()
+        .all(|a| a.class != Class::Exception && !a.path.ends_with("Cargo.toml")));
 }
