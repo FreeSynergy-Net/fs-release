@@ -5,6 +5,7 @@
 
 use super::artifact::{Artifact, Class, Emitter};
 use super::shape::{of, snake, Shape};
+use super::sql_names::ident;
 use crate::error::Coded;
 use crate::kit::KitCatalog;
 use crate::model::{Blueprint, TypeDef};
@@ -32,20 +33,28 @@ fn write_tables(out: &mut String, t: &TypeDef) -> Result<(), Coded> {
     for f in &t.field {
         let (shape, list) = of(f)?;
         let name = snake(&f.name);
+        // a column `id` of the field would be the key column twice (a list field is a child table and has no column)
+        if !list && name == "id" {
+            return Err(Coded::new("column-collides")
+                .with("type", t.name.as_str())
+                .with("field", f.name.as_str()));
+        }
         if list {
             writeln!(
                 children,
-                "\nCREATE TABLE {table}_{name} (\n  owner INTEGER NOT NULL REFERENCES {table}(id),\n  pos INTEGER NOT NULL,\n  value {} NOT NULL,\n  PRIMARY KEY (owner, pos)\n);",
+                "\nCREATE TABLE {table}_{name} (\n  owner INTEGER NOT NULL REFERENCES {}(id),\n  pos INTEGER NOT NULL,\n  value {} NOT NULL,\n  PRIMARY KEY (owner, pos)\n);",
+                ident(&table),
                 sql_type(&shape)
             )
             .map_err(|_| bad())?;
         } else {
-            columns.push(format!("{name} {}", sql_type(&shape)));
+            columns.push(format!("{} {}", ident(&name), sql_type(&shape)));
         }
     }
     writeln!(
         out,
-        "\nCREATE TABLE {table} (\n  {}\n);",
+        "\nCREATE TABLE {} (\n  {}\n);",
+        ident(&table),
         columns.join(",\n  ")
     )
     .map_err(|_| bad())?;
