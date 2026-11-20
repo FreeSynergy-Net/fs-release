@@ -74,19 +74,19 @@ fn refusal(a: &Artifact, store: &dyn Store) -> Option<Coded> {
         return None;
     }
     match store.read(&a.path) {
-        Found::Missing => None,
         Found::Unreadable => Some(Coded::new("file-unreadable").with("path", path())),
         Found::Text(old) if hand_changed(&old) => {
             Some(Coded::new("generated-changed").with("path", path()))
         }
         // the contract text is append-only against the one that is there
-        Found::Text(old) if append_only::is_contract(&a.path) => append_only::broken(&old, &a.content)
-            .map(|what| {
+        Found::Text(old) if append_only::is_contract(&a.path) => {
+            append_only::broken(&old, &a.content).map(|what| {
                 Coded::new("contract-append-only")
                     .with("path", path())
                     .with("what", what)
-            }),
-        Found::Text(_) => None,
+            })
+        }
+        Found::Missing | Found::Text(_) => None,
     }
 }
 

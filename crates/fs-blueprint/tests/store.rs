@@ -101,7 +101,10 @@ fn a_column_named_like_an_sql_key_word_is_quoted_and_one_that_is_not_stays_bare(
     assert!(text.contains("CREATE TABLE shift_order ("), "{text}");
     // not a key word: no quotes anywhere
     let text = tables_of(&named_field("orderNo", "integer")).unwrap();
-    assert!(!text.contains('"') && text.contains("  order_no INTEGER\n"), "{text}");
+    assert!(
+        !text.contains('"') && text.contains("  order_no INTEGER\n"),
+        "{text}"
+    );
 }
 
 #[test]

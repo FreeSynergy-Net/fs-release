@@ -84,8 +84,7 @@ fn layout_package(bp: &Blueprint, values: &Values) -> Result<Artifact, Coded> {
         }],
     };
     // the writer of the toml crate escapes every value: a quote or a backslash in a path cannot break the file
-    let body =
-        toml::to_string(&package).map_err(|_| Coded::new("blueprint-unserializable"))?;
+    let body = toml::to_string(&package).map_err(|_| Coded::new("blueprint-unserializable"))?;
     Ok(Artifact::new(
         format!("packaging/layout/{name}.toml"),
         Class::Generated,

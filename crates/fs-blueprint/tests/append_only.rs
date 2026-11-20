@@ -63,48 +63,79 @@ fn a_deleted_field_and_a_changed_type_are_findings() {
     let mut store = put(&more);
     let int = edit(&more, "basic = \"text\"", "basic = \"integer\"");
     let err = refused(&mut store, &int);
-    assert!(err.contains("note @2 :Text; became note @2 :Int64;"), "{err}");
+    assert!(
+        err.contains("note @2 :Text; became note @2 :Int64;"),
+        "{err}"
+    );
 }
 
 #[test]
 fn a_changed_file_id_is_a_finding() {
     let mut store = put(SHIFT);
-    let err = refused(&mut store, &edit(SHIFT, "0xc04d258971543477", "0xc04d258971543478"));
+    let err = refused(
+        &mut store,
+        &edit(SHIFT, "0xc04d258971543477", "0xc04d258971543478"),
+    );
     assert!(err.contains("file id changed"), "{err}");
 }
 
 #[test]
 fn an_interface_moved_by_a_method_put_in_front_is_a_finding() {
     let mut store = put(TASKS);
-    let moved = edit(
-        TASKS,
-        "provides = [",
-        "provides = [\"board.move\", ",
-    );
+    let moved = edit(TASKS, "provides = [", "provides = [\"board.move\", ");
     let err = refused(&mut store, &moved);
-    assert!(err.contains("interface Dependency moved or removed"), "{err}");
+    assert!(
+        err.contains("interface Dependency moved or removed"),
+        "{err}"
+    );
     // a method of an interface that is put in front of the others of it: the numbers move
     let mut store = put(TASKS);
-    let front = edit(TASKS, "[\"dependency.evaluate\", ", "[\"dependency.order\", \"dependency.evaluate\", ");
+    let front = edit(
+        TASKS,
+        "[\"dependency.evaluate\", ",
+        "[\"dependency.order\", \"dependency.evaluate\", ",
+    );
     let err = refused(&mut store, &front);
-    assert!(err.contains("evaluate @0 () -> (); became order @0 () -> ();"), "{err}");
+    assert!(
+        err.contains("evaluate @0 () -> (); became order @0 () -> ();"),
+        "{err}"
+    );
 }
 
 #[test]
 fn a_struct_added_at_the_end_next_to_an_interface_is_fine_and_a_struct_in_front_is_not() {
     let old = "@0x1;\n\nstruct A {\n  x @0 :Text;\n}\n\nstruct B {\n  y @0 :Text;\n}\n\ninterface I {\n  m @0 () -> ();\n}\n";
-    let appended = format!("{old}").replace("\ninterface I", "\nstruct C {\n  z @0 :Text;\n}\n\ninterface I");
+    let appended = old.replace(
+        "\ninterface I",
+        "\nstruct C {\n  z @0 :Text;\n}\n\ninterface I",
+    );
     assert_eq!(broken(old, &appended), None);
-    let front = old.replace("\nstruct A {", "\nstruct C {\n  z @0 :Text;\n}\n\nstruct A {");
-    assert_eq!(broken(old, &front).as_deref(), Some("struct A moved or removed"));
-    let swapped = old.replace("struct A", "struct Q").replace("struct B", "struct A").replace("struct Q", "struct B");
-    assert_eq!(broken(old, &swapped).as_deref(), Some("struct A moved or removed"));
+    let front = old.replace(
+        "\nstruct A {",
+        "\nstruct C {\n  z @0 :Text;\n}\n\nstruct A {",
+    );
+    assert_eq!(
+        broken(old, &front).as_deref(),
+        Some("struct A moved or removed")
+    );
+    let swapped = old
+        .replace("struct A", "struct Q")
+        .replace("struct B", "struct A")
+        .replace("struct Q", "struct B");
+    assert_eq!(
+        broken(old, &swapped).as_deref(),
+        Some("struct A moved or removed")
+    );
 }
 
 #[test]
 fn a_hand_changed_contract_is_still_generated_changed_not_append_only() {
     let mut store = put(SHIFT);
-    store.files.get_mut("schema/schedules.capnp").unwrap().push_str("# hand\n");
+    store
+        .files
+        .get_mut("schema/schedules.capnp")
+        .unwrap()
+        .push_str("# hand\n");
     let err = refused(&mut store, SHIFT);
     assert_eq!(err, "generated-changed{path=schema/schedules.capnp}");
 }
