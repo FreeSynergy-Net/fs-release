@@ -89,5 +89,5 @@ impl Emitter for Program {
 
 #[must_use]
 pub fn all() -> Vec<Box<dyn Emitter>> {
-    vec![Box::new(Program)]
+    vec![Box::new(Program), Box::new(super::frontend::Frontend)]
 }

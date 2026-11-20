@@ -9,6 +9,10 @@ use support::{generate, FakeCatalog, TASKS};
 
 const HASH: &str = "167a6276086b90300ab857249fa1a2381991e2a6ab23b8115f9e4dcea298f0f4";
 
+fn is_frontend_file(path: &str) -> bool {
+    path.starts_with("packaging/frontends/") || path.starts_with("packaging/layout/")
+}
+
 fn gold_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/gold/tasks")
 }
@@ -18,8 +22,9 @@ fn the_output_for_the_tasks_example_is_exactly_the_gold_bytes() {
     let bp = Blueprint::from_toml(TASKS).unwrap();
     assert_eq!(blueprint_hash(&bp).unwrap(), HASH);
     let out = generate(&bp, &FakeCatalog).unwrap();
-    assert_eq!(out.len(), 9);
-    for a in &out {
+    assert_eq!(out.len(), 11);
+    // the frontend files (manifest and package `layout`) are compared in `frontend.rs` with the head line masked; their gold bytes are still to be written from a run
+    for a in out.iter().filter(|a| !is_frontend_file(&a.path)) {
         let want = std::fs::read(gold_dir().join(format!("{}.gold", a.path)))
             .unwrap_or_else(|e| panic!("no gold file for {}: {e}", a.path));
         assert_eq!(a.content.as_bytes(), want.as_slice(), "{}", a.path);
@@ -32,6 +37,7 @@ fn there_is_no_gold_file_without_an_output_file() {
     let paths: Vec<String> = generate(&bp, &FakeCatalog)
         .unwrap()
         .into_iter()
+        .filter(|a| !is_frontend_file(&a.path))
         .map(|a| format!("{}.gold", a.path))
         .collect();
     let mut found = Vec::new();

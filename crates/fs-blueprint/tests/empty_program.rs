@@ -31,6 +31,8 @@ fn the_files_of_the_empty_program_are_these_with_these_classes() {
         ("crates/fs-probe-client/Cargo.toml", g),
         ("crates/fs-probe-core/Cargo.toml", s),
         ("crates/fs-probe-server/Cargo.toml", g),
+        ("packaging/frontends/fs-probe-simple.metainfo.xml", g),
+        ("packaging/layout/fs-probe-layout.toml", g),
         ("packaging/net.freesynergy.Probe.desktop", g),
     ];
     assert_eq!(got, want.map(|(p, c)| (p.to_string(), c)));
@@ -174,7 +176,7 @@ fn the_synthetic_blueprints_all_generate_the_same_number_of_files_under_their_ow
     for i in 0..COUNT {
         let bp = blueprint(i);
         let out = generate(&bp, &FakeCatalog).unwrap();
-        assert_eq!(out.len(), 9, "{}", bp.program.name);
+        assert_eq!(out.len(), 11, "{}", bp.program.name);
         let name = &bp.program.name;
         assert!(out
             .iter()
