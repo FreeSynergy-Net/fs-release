@@ -65,19 +65,14 @@ fn with_exception(path: &str) -> Blueprint {
 }
 
 #[test]
-fn an_exception_over_the_entry_point_is_main_reserved_also_without_an_existing_main_rs() {
-    for p in [
-        "crates/fs-alpha-desk-bin/src/main.rs",
-        "crates/fs-alpha-desk-bin/",
-        "crates/fs-alpha-desk-bin/src/",
-    ] {
-        let e = generate(&with_exception(p), &FakeCatalog).unwrap_err();
-        assert_eq!(
-            e.to_string(),
-            "main-reserved{path=crates/fs-alpha-desk-bin/src/main.rs}",
-            "{p}"
-        );
-    }
+fn an_exception_over_a_former_entry_point_is_no_longer_taken_by_generate_the_check_still_reserves_main_files() {
+    // generate makes no Rust source any more: nothing generated is left to cover
+    let out = generate(
+        &with_exception("crates/fs-alpha-desk-bin/src/main.rs"),
+        &FakeCatalog,
+    )
+    .unwrap();
+    assert!(out.iter().all(|a| a.class != Class::Exception));
 }
 
 #[test]
@@ -85,7 +80,7 @@ fn an_exception_over_another_generated_file_is_path_generated_and_over_a_seed_it
     let e = generate(&with_exception(".gitattributes"), &FakeCatalog).unwrap_err();
     assert_eq!(e.to_string(), "path-generated{path=.gitattributes}");
     let out = generate(
-        &with_exception("crates/fs-alpha-desk-core/src/lib.rs"),
+        &with_exception("crates/fs-alpha-desk-core/Cargo.toml"),
         &FakeCatalog,
     )
     .unwrap();

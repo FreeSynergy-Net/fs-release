@@ -5,7 +5,7 @@ use fs_blueprint::emit::write::{write, Store};
 use support::synth::{blueprint, MemStore};
 use support::{generate, FakeCatalog};
 
-const MAIN: &str = "crates/fs-beta-shelf-planner-bin/src/main.rs";
+const MAIN: &str = "crates/fs-beta-shelf-planner-bin/Cargo.toml";
 
 #[test]
 fn the_head_line_names_the_hash_of_the_body() {
@@ -35,7 +35,7 @@ fn a_changed_body_is_not_untouched_and_neither_is_a_head_without_hash_or_a_forei
         .clone();
     assert!(untouched(&main));
     assert!(!untouched(&format!("{main}// hand\n")));
-    assert!(!untouched(&main.replace("fn main", "fn mein")));
+    assert!(!untouched(&main.replace("[package]", "[packag]")));
     assert!(!untouched(
         &main.replace("content sha256 ", "content sha257 ")
     ));

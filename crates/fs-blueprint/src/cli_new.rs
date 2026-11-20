@@ -178,7 +178,7 @@ fn run_new_with(o: &Options, out: &mut dyn Write, between: &dyn Fn()) -> Result<
     apply(&places)?;
     drop(writeln!(
         out,
-        "fs-blueprint: made {} (written {}, kept {}); next: cd {} && cargo build",
+        "fs-blueprint: made {} (written {}, kept {}); a data package, no code; next: commit {}",
         bp.program.name,
         outcome.written.len(),
         outcome.kept.len(),

@@ -8,9 +8,9 @@ use std::process::{Command, Stdio};
 use support::synth::{blueprint, MemStore};
 use support::{generate, FakeCatalog};
 
-const MAIN: &str = "crates/fs-beta-shelf-planner-bin/src/main.rs";
-const BIN_FILES: [&str; 3] = ["Cargo.toml", "src/main.rs", "tests/start.rs"];
-const SEED: &str = "crates/fs-beta-shelf-planner-core/src/lib.rs";
+const MAIN: &str = "crates/fs-beta-shelf-planner-bin/Cargo.toml";
+const BIN_FILES: [&str; 1] = ["Cargo.toml"];
+const SEED: &str = "crates/fs-beta-shelf-planner-core/Cargo.toml";
 
 fn dir(name: &str) -> PathBuf {
     let d = Path::new(env!("CARGO_TARGET_TMPDIR"))

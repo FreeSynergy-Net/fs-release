@@ -5,8 +5,8 @@ use fs_blueprint::Report;
 use support::synth::{blueprint, MemStore};
 use support::{drift as check, generate, FakeCatalog, FakeView};
 
-const MAIN: &str = "crates/fs-beta-shelf-planner-bin/src/main.rs";
-const SEED: &str = "crates/fs-beta-shelf-planner-core/src/lib.rs";
+const MAIN: &str = "crates/fs-beta-shelf-planner-bin/Cargo.toml";
+const SEED: &str = "crates/fs-beta-shelf-planner-core/Cargo.toml";
 const ATTR: &str = ".gitattributes";
 const OWN: &str = "crates/fs-beta-shelf-planner-core/src/own1.rs";
 
@@ -105,20 +105,14 @@ fn write_twice_is_stable_and_never_overwrites_a_seed() {
     let arts = generate(&blueprint(1), &FakeCatalog).unwrap();
     let out = write(&arts, &mut store).unwrap();
     assert_eq!(store.files, before);
-    assert_eq!(
-        out.kept,
-        ["crates/fs-beta-shelf-planner-core/Cargo.toml", SEED]
-    );
+    assert_eq!(out.kept, [SEED]);
     assert_eq!(out.skipped, Vec::<String>::new());
     store
         .files
         .insert(SEED.to_string(), "// mine\n".to_string());
     let out = write(&arts, &mut store).unwrap();
     assert_eq!(store.files[SEED], "// mine\n");
-    assert_eq!(
-        out.kept,
-        ["crates/fs-beta-shelf-planner-core/Cargo.toml", SEED]
-    );
+    assert_eq!(out.kept, [SEED]);
 }
 
 #[test]

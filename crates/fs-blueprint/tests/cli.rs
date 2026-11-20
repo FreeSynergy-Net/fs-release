@@ -119,7 +119,7 @@ fn the_drift_option_adds_the_generated_files_that_are_missing_in_the_repo() {
         "{out}"
     );
     assert!(
-        out.contains("error: seed-missing{path=crates/fs-demo-core/src/lib.rs}"),
+        out.contains("error: seed-missing{path=crates/fs-demo-core/Cargo.toml}"),
         "{out}"
     );
 }
