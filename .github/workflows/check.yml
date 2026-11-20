@@ -139,7 +139,7 @@ jobs:
               if k not in DEFAULTS:
                   continue
               vals[k] = ("true" if v else "false") if isinstance(v, bool) else str(v)
-          bad = [k for k, v in vals.items() if "${{" in v or "\n" in v or "\r" in v]
+          bad = [k for k, v in vals.items() if "$" + "{{" in v or "\n" in v or "\r" in v]
           if bad:
               print(f"::warning::release.yml input(s) {', '.join(bad)} are not plain values: no plan probe")
               put("probe", "false")

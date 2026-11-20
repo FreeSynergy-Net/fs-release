@@ -133,6 +133,14 @@ for i in ("release-inputs", "release-plan-probe"):
     assert f"steps.{i}.outcome" in steps[-1]["env"]["RESULTS"], i
 PY
 
+# actionlint lexes every `${{ ... }}` of a workflow, also inside a run block, and knows only '...' literals: no double quote and no literal `${{` inside check.yml's run text
+python3 -I - "$repo/.github/workflows/check.yml" <<'PY' && ok "no double quote inside a \${{ }} expression of check.yml" || bad "an expression of check.yml has a double quote (actionlint: unexpected character)"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+bad = [m.group(0) for m in re.finditer(r"\$\{\{.*?(\}\}|$)", text, re.M) if '"' in m.group(0)]
+assert not bad, bad
+PY
+
 # mutants of the reader block: each must fail at least one case
 mutant() { # <name> <python/sed -E expression>
   sed -E "$2" "$tmp/reader.sh" >"$tmp/m.sh"
@@ -146,7 +154,7 @@ mutant "kind default empty" 's/"kind": "cli"/"kind": ""/'
 mutant "tag always 0.0.0" 's/put\("tag", .*$/put("tag", "v0.0.0")/'
 mutant "probe never true" 's/put\("probe", "true"\)/put("probe", "false")/'
 mutant "no check of the called workflow" 's/startswith\("FreeSynergy\/fs-release\/.github\/workflows\/release.yml@"\)/startswith("")/'
-mutant "expressions are passed on" 's/"\$\{\{" in v or //'
+mutant "expressions are passed on" 's/"\$" \+ "\{\{" in v or //'
 mutant "booleans are passed as Python words" 's/\("true" if v else "false"\) if isinstance\(v, bool\) else str\(v\)/str(v)/'
 mutant "owner not looked for (first package)" 's/ or mine$/ or mine\nowners = mine/'
 mutant "working directory ignored" 's/workdir = os.path.join\(root, vals\["working-directory"\]\)/workdir = root/'
