@@ -30,6 +30,7 @@ fn taken(path: &str) -> Coded {
 pub fn emitters() -> Vec<Box<dyn Emitter>> {
     let mut list = files::all();
     list.push(Box::new(super::contract::Contract));
+    list.push(Box::new(super::store::Store));
     list
 }
 
