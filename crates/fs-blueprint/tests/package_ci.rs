@@ -81,10 +81,34 @@ fn the_guard_looks_for_the_cargo_toml_in_the_root_of_the_repo() {
 fn the_package_job_installs_the_command_from_the_pinned_tag() {
     let text = workflow(".github/workflows/check.yml");
     let package = job(&text, "package");
+    let tag = fs_blueprint::emit::skeleton::RELEASE_TAG;
     assert!(
-        package.contains(
-            "cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.13 --locked"
-        ),
+        package.contains(&format!(
+            "cargo install --git https://github.com/FreeSynergy/fs-release --tag {tag} --locked"
+        )),
         "{package}"
     );
+}
+
+/// Every tag the package CI pins (`--tag X`, `@X` of a fs-release workflow) is the constant of the generator, none a literal of its own.
+#[test]
+fn no_tag_in_the_package_ci_differs_from_the_release_tag_constant() {
+    let tag = fs_blueprint::emit::skeleton::RELEASE_TAG;
+    for path in [
+        ".github/workflows/check.yml",
+        ".github/workflows/windows.yml",
+    ] {
+        let text = workflow(path);
+        let mut seen = 0;
+        for line in text.lines().filter(|l| l.contains("FreeSynergy/fs-release")) {
+            let pinned = if let Some((_, rest)) = line.split_once("--tag ") {
+                rest.split_whitespace().next()
+            } else {
+                line.rsplit_once('@').map(|(_, t)| t.trim())
+            };
+            assert_eq!(pinned, Some(tag), "{path}: {line}");
+            seen += 1;
+        }
+        assert!(seen >= 2, "{path}: only {seen} pins found");
+    }
 }
