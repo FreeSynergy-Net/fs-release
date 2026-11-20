@@ -12,6 +12,12 @@ pub fn covers(a: &str, b: &str) -> bool {
     a == b || (a.ends_with('/') && b.starts_with(a))
 }
 
+fn is_rust_source(path: &str) -> bool {
+    std::path::Path::new(path)
+        .extension()
+        .is_some_and(|x| x == "rs")
+}
+
 pub fn exceptions(s: &mut Sink, bp: &Blueprint) {
     let mains = s.view.main_files();
     let mut valid: Vec<(usize, &str)> = Vec::new();
@@ -67,6 +73,10 @@ pub fn exceptions(s: &mut Sink, bp: &Blueprint) {
     files.sort();
     for f in files {
         if !valid.iter().any(|(_, p)| covers(p, &f)) {
+            // a program is data (ADR 0086): hand-written Rust without an exception is code in the program, besides being unowned
+            if is_rust_source(&f) {
+                s.err(Coded::new("code-in-program").with("path", f.as_str()));
+            }
             s.err(Coded::new("file-unowned").with("path", f));
         }
     }

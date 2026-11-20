@@ -75,6 +75,35 @@ fn b3_every_finding_has_the_parameters_of_its_code_and_renders_in_both_languages
     }
 }
 
+/// Rule `code-in-program`: a hand-written `.rs` file without an exception is code in the program; other hand-written files and covered Rust are not.
+#[test]
+fn a_hand_written_rust_file_without_an_exception_is_code_in_the_program() {
+    use support::{run_with, FakeView};
+    let mut view = FakeView::standard().with_talk();
+    view.unowned = vec![
+        "crates/fs-tasks-core/src/extra.rs".to_string(),
+        "crates/fs-tasks-core/notes.txt".to_string(),
+        "crates/fs-tasks-core/src/secret_guard.rs".to_string(),
+    ];
+    let r = run_with(TASKS, view, &fs_blueprint::Rules::projekt());
+    let got: Vec<String> = r
+        .errors
+        .iter()
+        .filter(|e| e.code == "code-in-program")
+        .map(ToString::to_string)
+        .collect();
+    assert_eq!(
+        got,
+        ["code-in-program{path=crates/fs-tasks-core/src/extra.rs}"]
+    );
+    for f in r.errors.iter().filter(|e| e.code == "code-in-program") {
+        assert!(f.conforms());
+        assert_renders(f);
+    }
+    assert!(!run_with(TASKS, FakeView::standard().with_talk(), &fs_blueprint::Rules::projekt())
+        .has("code-in-program"));
+}
+
 fn assert_renders(c: &Coded) {
     for lang in ["en", "de"] {
         let text = render(c, lang).unwrap_or_else(|| panic!("no message for {c}"));
