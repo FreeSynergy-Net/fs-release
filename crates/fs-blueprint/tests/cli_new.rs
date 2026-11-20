@@ -61,7 +61,7 @@ fn new_checks_generates_and_writes_the_program_with_the_blueprint_and_its_forms_
     ]);
     assert_eq!((code, err.as_str()), (0, ""), "{out}");
     assert!(
-        out.contains("made demo (written 14, kept 0)") && out.contains("cargo build"),
+        out.contains("made demo (written 16, kept 0)") && out.contains("cargo build"),
         "{out}"
     );
     let got = files(&out_dir);
@@ -71,7 +71,13 @@ fn new_checks_generates_and_writes_the_program_with_the_blueprint_and_its_forms_
             && got.contains(&"crates/fs-demo-bin/src/main.rs".to_string()),
         "{got:?}"
     );
-    assert_eq!(got.len(), 16);
+    // the program's own types also give the contract text and the tables
+    assert!(
+        got.contains(&"schema/demo.capnp".to_string())
+            && got.contains(&"schema/demo.sql".to_string()),
+        "{got:?}"
+    );
+    assert_eq!(got.len(), 18);
     // the second run changes nothing and says so; the repo is the output of the blueprint
     let (code, out, _) = cli(&[
         "new",
@@ -80,7 +86,7 @@ fn new_checks_generates_and_writes_the_program_with_the_blueprint_and_its_forms_
         &out_dir.to_string_lossy(),
     ]);
     assert_eq!(code, 0, "{out}");
-    assert!(out.contains("written 12, kept 2"), "{out}");
+    assert!(out.contains("written 14, kept 2"), "{out}");
     let (code, out, _) = cli(&["check", "--repo", &out_dir.to_string_lossy(), "--drift"]);
     assert_eq!(code, 0, "{out}");
 }
@@ -148,7 +154,7 @@ fn new_in_the_folder_of_the_blueprint_adds_only_the_generated_files() {
         &work.to_string_lossy(),
     ]);
     assert_eq!(code, 0, "{out}");
-    assert_eq!(files(&work).len(), 16);
+    assert_eq!(files(&work).len(), 18);
 }
 
 #[test]

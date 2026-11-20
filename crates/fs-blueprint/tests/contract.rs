@@ -38,7 +38,9 @@ fn a_new_field_at_the_end_keeps_every_number_before_it() {
         "\n[[type.field]]\nname = \"note\"\nbasic = \"text\"\nstandard = \"https://www.rfc-editor.org/rfc/rfc8984#section-4.2.1\"\nlabel = { en = \"Note\", de = \"Notiz\" }\n\n[frontend]",
     );
     let text = contract_of(&more).unwrap();
-    assert!(text.contains("  span @0 :Kit.TimeSpan;\n  assignee @1 :List(Kit.PersonRef);\n  note @2 :Text;\n"));
+    assert!(text.contains(
+        "  span @0 :Kit.TimeSpan;\n  assignee @1 :List(Kit.PersonRef);\n  note @2 :Text;\n"
+    ));
 }
 
 #[test]
