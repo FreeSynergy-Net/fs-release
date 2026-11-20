@@ -1,6 +1,6 @@
 //! Pattern: Strategy (the emitter of `[frontend]`, ADR 0099 point 12: no frontend crate, only the frontend manifest and the package `layout` that carries the exchange file).
 //!
-//! The manifest is an AppStream addon of the program (`fs:exec = fs-forms-run`, `fs:frontend-id`, `fs:covers`, `fs:contract`; ADR 0094); the package `layout` is a
+//! The manifest is an `AppStream` addon of the program (`fs:exec = fs-forms-run`, `fs:frontend-id`, `fs:covers`, `fs:contract`; ADR 0094); the package `layout` is a
 //! small data file that names the exchange file of the forms description and what it covers. Both are plain data: nothing here is code.
 
 use super::artifact::{Artifact, Class, Emitter};

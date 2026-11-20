@@ -69,7 +69,11 @@ fn new_checks_generates_and_writes_the_program_with_the_blueprint_and_its_forms_
         got.contains(&"scaffold.toml".to_string())
             && got.contains(&"forms/demo.toml".to_string())
             && got.contains(&".github/workflows/check.yml".to_string())
-            && !got.iter().any(|f| f.ends_with(".rs")),
+            && !got.iter().any(|f| {
+                std::path::Path::new(f)
+                    .extension()
+                    .is_some_and(|x| x == "rs")
+            }),
         "{got:?}"
     );
     assert_eq!(got.len(), 13);

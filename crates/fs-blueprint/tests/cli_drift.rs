@@ -48,10 +48,7 @@ fn a_program_made_by_new_is_clean() {
 fn a_hand_change_to_a_generated_file_is_red_with_its_path_whatever_the_size_of_the_change() {
     for (n, change) in ["// hand\n", "\n", " "].into_iter().enumerate() {
         let dir = made(&format!("hand{n}"));
-        let main = dir
-            .join("crates")
-            .join("fs-demo-bin")
-            .join("Cargo.toml");
+        let main = dir.join("crates").join("fs-demo-bin").join("Cargo.toml");
         let text = std::fs::read_to_string(&main).unwrap();
         std::fs::write(&main, format!("{text}{change}")).unwrap();
         let (code, out) = check(&dir);
@@ -109,10 +106,7 @@ fn a_file_without_a_head_under_crates_is_red_but_a_seed_the_program_changed_and_
 #[test]
 fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_record() {
     let dir = made("together");
-    let main = dir
-        .join("crates")
-        .join("fs-demo-bin")
-        .join("Cargo.toml");
+    let main = dir.join("crates").join("fs-demo-bin").join("Cargo.toml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
     std::fs::create_dir_all(dir.join("crates").join("fs-demo-core").join("src")).unwrap();
@@ -148,10 +142,7 @@ fn the_drift_is_shown_together_with_a_hand_written_file_and_with_a_missing_talk_
 #[test]
 fn the_drift_is_shown_together_with_a_hand_written_file_that_no_exception_covers() {
     let dir = made("with-unowned");
-    let main = dir
-        .join("crates")
-        .join("fs-demo-bin")
-        .join("Cargo.toml");
+    let main = dir.join("crates").join("fs-demo-bin").join("Cargo.toml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
     std::fs::create_dir_all(dir.join("crates").join("fs-demo-core").join("src")).unwrap();
@@ -233,10 +224,7 @@ fn the_drift_is_shown_for_an_own_type_without_a_standard_that_an_exception_with_
     assert_eq!(code, 0, "{out}");
     let (code, out) = cli(&["check", "--repo", &repo_s, "--talks", &docs_s, "--drift"]);
     assert_eq!(code, 0, "clean with the talk record: {out}");
-    let main = repo
-        .join("crates")
-        .join("fs-demo-bin")
-        .join("Cargo.toml");
+    let main = repo.join("crates").join("fs-demo-bin").join("Cargo.toml");
     let text = std::fs::read_to_string(&main).unwrap();
     std::fs::write(&main, format!("{text}// hand\n")).unwrap();
     // a hand-written file that no exception names: the structure gate must not count it (it must not hide the drift)

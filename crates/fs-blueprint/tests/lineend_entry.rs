@@ -65,7 +65,8 @@ fn with_exception(path: &str) -> Blueprint {
 }
 
 #[test]
-fn an_exception_over_a_former_entry_point_is_no_longer_taken_by_generate_the_check_still_reserves_main_files() {
+fn an_exception_over_a_former_entry_point_is_no_longer_taken_by_generate_the_check_still_reserves_main_files(
+) {
     // generate makes no Rust source any more: nothing generated is left to cover
     let out = generate(
         &with_exception("crates/fs-alpha-desk-bin/src/main.rs"),
