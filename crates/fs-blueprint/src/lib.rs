@@ -5,6 +5,7 @@
 
 pub mod catalog_file;
 pub mod check;
+pub mod check_data;
 pub mod check_exc;
 pub mod check_front;
 pub mod check_types;

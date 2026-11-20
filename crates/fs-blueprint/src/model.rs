@@ -28,6 +28,12 @@ pub struct Blueprint {
     #[serde(default)]
     pub ruleset: Vec<Ruleset>,
     pub frontend: Frontend,
+    /// The settings of the program as data (key, type, default, label); no widget, the frontend shows them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub setting: Vec<Setting>,
+    /// The help texts of the program, one per topic.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub help: Vec<Help>,
     #[serde(default)]
     pub exception: Vec<Exception>,
 }
@@ -133,6 +139,25 @@ pub struct Frontend {
     pub standard: String,
     pub layout: String,
     pub covers: Covers,
+}
+
+/// One setting: its key, the basic type of its value (a word of the catalog), the default as text and the label in both languages.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Setting {
+    pub key: String,
+    #[serde(rename = "type")]
+    pub type_name: String,
+    pub default: String,
+    pub label: Text2,
+}
+
+/// One help topic with its text in both languages (a missing language is a finding, never an empty text).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Help {
+    pub topic: String,
+    pub text: Text2,
 }
 
 /// A conversation-approved piece of hand-written code. No date field (ADR 0101 E7 with the one addition `paths`).

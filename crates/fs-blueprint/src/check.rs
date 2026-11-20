@@ -1,5 +1,6 @@
 //! Pattern: Template method (the check runs the parts in a fixed order; program, contract, modules, bundles here, types and the rest in the siblings).
 
+use crate::check_data::{help, settings};
 use crate::check_exc::exceptions;
 use crate::check_front::{frontend, rulesets};
 use crate::check_types::types;
@@ -43,6 +44,8 @@ pub fn check(
     types(&mut s, bp);
     rulesets(&mut s, bp);
     frontend(&mut s, bp);
+    settings(&mut s, bp);
+    help(&mut s, bp);
     exceptions(&mut s, bp);
     s.report
 }

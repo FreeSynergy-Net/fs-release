@@ -10,6 +10,7 @@ pub mod files;
 pub mod frontend;
 pub mod generate;
 pub mod header;
+pub mod settings;
 pub mod shape;
 pub mod skeleton;
 pub mod slot;
