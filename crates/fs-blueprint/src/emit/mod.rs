@@ -4,10 +4,12 @@
 
 pub mod artifact;
 pub mod check;
+pub mod contract;
 pub mod dirstore;
 pub mod files;
 pub mod generate;
 pub mod header;
+pub mod shape;
 pub mod skeleton;
 pub mod slot;
 pub mod write;

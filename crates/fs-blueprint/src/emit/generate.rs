@@ -28,7 +28,9 @@ fn taken(path: &str) -> Coded {
 /// The emitters of the generator, in a fixed order.
 #[must_use]
 pub fn emitters() -> Vec<Box<dyn Emitter>> {
-    files::all()
+    let mut list = files::all();
+    list.push(Box::new(super::contract::Contract));
+    list
 }
 
 /// Generates the whole output of a blueprint, sorted by path.
