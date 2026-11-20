@@ -21,16 +21,10 @@ fn get<'a>(a: &'a [fs_blueprint::Artifact], path: &str) -> &'a str {
 fn the_files_of_the_empty_program_are_these_with_these_classes() {
     let got: Vec<(String, Class)> = probe().into_iter().map(|a| (a.path, a.class)).collect();
     let g = Class::Generated;
-    let s = Class::Seed;
     let want = [
         (".gitattributes", g),
         (".github/workflows/check.yml", g),
         (".github/workflows/windows.yml", g),
-        ("Cargo.toml", g),
-        ("crates/fs-probe-bin/Cargo.toml", g),
-        ("crates/fs-probe-client/Cargo.toml", g),
-        ("crates/fs-probe-core/Cargo.toml", s),
-        ("crates/fs-probe-server/Cargo.toml", g),
         ("packaging/frontends/fs-probe-simple.metainfo.xml", g),
         ("packaging/layout/fs-probe-layout.toml", g),
         ("packaging/net.freesynergy.Probe.desktop", g),
@@ -39,7 +33,7 @@ fn the_files_of_the_empty_program_are_these_with_these_classes() {
 }
 
 #[test]
-fn every_toml_file_is_toml_and_the_workspace_names_its_members_and_the_start_version() {
+fn every_toml_file_is_toml_and_no_crate_manifest_is_made() {
     let a = probe();
     for f in a.iter().filter(|f| {
         std::path::Path::new(&f.path)
@@ -50,37 +44,13 @@ fn every_toml_file_is_toml_and_the_workspace_names_its_members_and_the_start_ver
             toml::from_str(&f.content).unwrap_or_else(|e| panic!("{}: {e}", f.path));
         assert!(!t.is_empty());
     }
-    let ws: toml::Table = toml::from_str(get(&a, "Cargo.toml")).unwrap();
-    assert_eq!(
-        ws["workspace"]["package"]["version"].as_str(),
-        Some("0.0.1")
-    );
-    let members: Vec<&str> = ws["workspace"]["members"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|m| m.as_str().unwrap())
-        .collect();
-    assert_eq!(
-        members,
-        [
-            "crates/fs-probe-core",
-            "crates/fs-probe-server",
-            "crates/fs-probe-client",
-            "crates/fs-probe-bin"
-        ]
-    );
+    // a manifest would point to Rust source that is not there (rule code-in-program)
+    assert!(a.iter().all(|f| !f.path.ends_with("Cargo.toml")));
 }
 
 #[test]
 fn the_pins_come_from_the_skeleton_table() {
     let a = probe();
-    for p in [
-        "crates/fs-probe-server/Cargo.toml",
-        "crates/fs-probe-client/Cargo.toml",
-    ] {
-        assert!(get(&a, p).contains("tag = \"v0.0.2\""), "{p}");
-    }
     for p in [
         ".github/workflows/check.yml",
         ".github/workflows/windows.yml",
@@ -176,21 +146,8 @@ fn the_synthetic_blueprints_all_generate_the_same_number_of_files_under_their_ow
     for i in 0..COUNT {
         let bp = blueprint(i);
         let out = generate(&bp, &FakeCatalog).unwrap();
-        assert_eq!(out.len(), 11, "{}", bp.program.name);
+        assert_eq!(out.len(), 6, "{}", bp.program.name);
         let name = &bp.program.name;
-        assert!(out
-            .iter()
-            .any(|a| a.path == format!("crates/fs-{name}-bin/Cargo.toml")));
-    }
-}
-
-#[test]
-fn the_version_of_the_blueprint_is_the_version_of_the_workspace() {
-    for (i, want) in [(0, "0.0.1"), (1, "0.1.1"), (2, "0.2.1"), (3, "0.3.1")] {
-        let out = generate(&blueprint(i), &FakeCatalog).unwrap();
-        assert!(
-            get(&out, "Cargo.toml").contains(&format!("version = \"{want}\"")),
-            "{i}"
-        );
+        assert!(out.iter().any(|a| a.path.contains(&format!("fs-{name}"))));
     }
 }

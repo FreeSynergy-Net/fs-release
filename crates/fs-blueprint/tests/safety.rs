@@ -8,8 +8,10 @@ use std::process::{Command, Stdio};
 use support::synth::{blueprint, MemStore};
 use support::{generate, FakeCatalog};
 
-const MAIN: &str = "crates/fs-beta-shelf-planner-bin/Cargo.toml";
-const BIN_FILES: [&str; 1] = ["Cargo.toml"];
+const MAIN: &str = ".github/workflows/check.yml";
+/// The generated files under `.github/workflows` (a folder that tests replace with a link).
+const LINKED_FILES: [&str; 2] = ["check.yml", "windows.yml"];
+/// No emitter makes a seed any more; the tests add one by hand.
 const SEED: &str = "crates/fs-beta-shelf-planner-core/Cargo.toml";
 
 fn dir(name: &str) -> PathBuf {
@@ -40,7 +42,9 @@ fn a_seed_that_is_not_utf8_is_kept_and_never_overwritten() {
     put_bytes(&root, SEED, bad);
     let mut store = DirStore::new(&root);
     assert_eq!(store.read(SEED), Found::Unreadable);
-    let out = write(&arts(), &mut store).unwrap();
+    let mut list = arts();
+    list.push(Artifact::new(SEED, Class::Seed, "// seed\n"));
+    let out = write(&list, &mut store).unwrap();
     assert_eq!(out.kept, [SEED]);
     assert_eq!(
         std::fs::read(SEED.split('/').fold(root.clone(), |p, c| p.join(c))).unwrap(),
@@ -115,17 +119,13 @@ fn paths_that_leave_the_repo_are_refused_before_anything_is_written() {
 fn a_link_in_the_path_is_refused_for_a_folder_and_for_the_file() {
     let root = dir("link");
     let outside = dir("outside");
-    std::fs::create_dir_all(root.join("crates")).unwrap();
-    std::os::unix::fs::symlink(
-        &outside,
-        root.join("crates").join("fs-beta-shelf-planner-bin"),
-    )
-    .unwrap();
+    std::fs::create_dir_all(root.join(".github")).unwrap();
+    std::os::unix::fs::symlink(&outside, root.join(".github").join("workflows")).unwrap();
     let mut store = DirStore::new(&root);
     let got = codes(write(&arts(), &mut store));
     assert_eq!(
         got,
-        BIN_FILES.map(|f| format!("path-symlink{{path=crates/fs-beta-shelf-planner-bin/{f}}}"))
+        LINKED_FILES.map(|f| format!("path-symlink{{path=.github/workflows/{f}}}"))
     );
     assert!(
         std::fs::read_dir(&outside).unwrap().next().is_none(),
@@ -176,15 +176,12 @@ fn put_itself_refuses_a_link_even_when_called_directly() {
 fn a_link_to_a_folder_on_the_way_is_refused_by_write_on_every_platform() {
     let root = dir("linkdir");
     let outside = dir("linkdir-out");
-    std::fs::create_dir_all(root.join("crates")).unwrap();
-    link_dir(
-        &root.join("crates").join("fs-beta-shelf-planner-bin"),
-        &outside,
-    );
+    std::fs::create_dir_all(root.join(".github")).unwrap();
+    link_dir(&root.join(".github").join("workflows"), &outside);
     let got = codes(write(&arts(), &mut DirStore::new(&root)));
     assert_eq!(
         got,
-        BIN_FILES.map(|f| format!("path-symlink{{path=crates/fs-beta-shelf-planner-bin/{f}}}"))
+        LINKED_FILES.map(|f| format!("path-symlink{{path=.github/workflows/{f}}}"))
     );
     assert!(std::fs::read_dir(&outside).unwrap().next().is_none());
 }
