@@ -10,8 +10,37 @@ concurrency:
   group: "${{open}} github.workflow {{close}}-${{open}} github.ref {{close}}"
   cancel-in-progress: true
 
+# A data package has no Cargo.toml: the gates of the code (fmt, clippy, test) would go red on it, so there the blueprint check (`--drift`) is the CI.
+# A repo that has a Cargo.toml keeps the gates of fs-release.
 jobs:
-  check:
+  kind:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{open}} steps.look.outputs.code {{close}}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: look
+        run: if [ -f Cargo.toml ]; then echo "code=true" >> "$GITHUB_OUTPUT"; else echo "code=false" >> "$GITHUB_OUTPUT"; fi
+  package:
+    needs: kind
+    if: needs.kind.outputs.code != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: FreeSynergy/fs-documentation
+          path: .fs-documentation
+          persist-credentials: false
+      - run: cargo install --git https://github.com/FreeSynergy/fs-release --tag {{release_tag}} --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
+      - run: '"$RUNNER_TEMP/fsbp/bin/fs-blueprint" check --repo "$PWD" --talks "$PWD/.fs-documentation" --drift'
+  code:
+    needs: kind
+    if: needs.kind.outputs.code == 'true'
     uses: FreeSynergy/fs-release/.github/workflows/check.yml@{{release_tag}}
     with:
       blueprint: warn
