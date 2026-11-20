@@ -6,6 +6,7 @@ pub mod artifact;
 pub mod check;
 pub mod dirstore;
 pub mod files;
+pub mod frontend;
 pub mod generate;
 pub mod header;
 pub mod skeleton;
