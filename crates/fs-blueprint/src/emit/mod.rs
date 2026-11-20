@@ -14,6 +14,7 @@ pub mod help;
 pub mod settings;
 pub mod shape;
 pub mod skeleton;
+pub mod sql_names;
 pub mod slot;
 pub mod store;
 pub mod write;
