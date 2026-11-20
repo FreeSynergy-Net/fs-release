@@ -30,6 +30,7 @@ fn the_shipped_catalog_is_valid_and_knows_the_basic_types_of_fs_types_and_the_co
     assert_eq!(c.skeleton_pending("9.9.9"), Vec::<String>::new());
     assert!(
         c.capability_known("tasks")
+            && c.capability_known("forms")
             && c.capability_known("people.persons")
             && !c.capability_known("nothing")
     );
