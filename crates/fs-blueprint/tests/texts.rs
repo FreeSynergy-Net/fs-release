@@ -96,7 +96,11 @@ fn every_finding_of_every_kind_of_fault_is_a_code_of_the_list_with_its_parameter
             "categories = [\"ProjectManagement\"]",
         ),
         edit(TASKS, "id = \"0xc04d258971543476\"", "id = \"0x1\""),
-        edit(TASKS, "version = \"0.1\"", "version = \"1\""),
+        edit(
+            TASKS,
+            "[contract]\nversion = \"0.1\"",
+            "[contract]\nversion = \"1\"",
+        ),
         edit(TASKS, "\"claim\"]", "\"claim\", \"ghost\"]"),
         edit(
             TASKS,

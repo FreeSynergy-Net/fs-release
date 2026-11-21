@@ -7,7 +7,7 @@ use fs_blueprint::Blueprint;
 use std::path::Path;
 use support::{generate, FakeCatalog, TASKS};
 
-const HASH: &str = "167a6276086b90300ab857249fa1a2381991e2a6ab23b8115f9e4dcea298f0f4";
+const HASH: &str = "50b64d3977a38bcf0b3d2ff8a4ba27a141b630b4cd7c8b8cd99e39a04e0b9905";
 
 /// The frontend files and the contract text are compared in their own tests (`frontend.rs`, `contract.rs`) with the head line masked.
 fn is_frontend_file(path: &str) -> bool {

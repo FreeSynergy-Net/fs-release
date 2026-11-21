@@ -5,6 +5,13 @@
 # Capability keys that programs declare today (ADR 0068; code of fs-tasks `wire_caps.rs`, fs-people).
 capabilities = ["tasks", "people", "forms", "dependency.evaluate", "dependency.cycle-check", "people.persons"]
 
+# Data kits and basic types of fs-types (tag v0.0.4, `types_capnp.rs`, enum BasicType; no kit exists in v0.0.4, ADR 0098 names them).
+kits = []
+basics = [
+    "text", "multilineText", "email", "phone", "name", "address", "place", "date", "dateTime", "language", "link", "image",
+    "key", "choice", "keywords", "reference", "integer", "duration", "flag", "whole",
+]
+
 # The contracts of fs-interfaces a program may provide (`schema/capabilities.txt` of fs-interfaces v0.0.28: key and level `major.minor`; the contract text lives
 # only there). A program names `key` + `version` in `[contract] provides`; the catalog only records that the contract exists at that level.
 [[contract]]
@@ -18,13 +25,6 @@ levels = ["0.1"]
 [[contract]]
 key = "people.persons"
 levels = ["0.1"]
-
-# Data kits and basic types of fs-types (tag v0.0.4, `types_capnp.rs`, enum BasicType; no kit exists in v0.0.4, ADR 0098 names them).
-kits = []
-basics = [
-    "text", "multilineText", "email", "phone", "name", "address", "place", "date", "dateTime", "language", "link", "image",
-    "key", "choice", "keywords", "reference", "integer", "duration", "flag", "whole",
-]
 
 # The skeleton versions (ADR 0099, `emit/skeleton.rs` holds the pins of the same versions) and the parts of the skeleton that do not exist yet (ADR 0097 decision 2).
 [[skeleton]]

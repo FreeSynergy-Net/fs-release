@@ -39,12 +39,20 @@ fn skeleton_and_capability_must_exist() {
         "capability-unknown{key=nope}"
     ));
     assert!(has(
-        &edit(TASKS, "contract = \"dependency.evaluate\"", "contract = \"dependency.ghost\""),
+        &edit(
+            TASKS,
+            "contract = \"dependency.evaluate\"",
+            "contract = \"dependency.ghost\""
+        ),
         "contract-unknown{key=dependency.ghost, version=0.1}"
     ));
     // a known contract at a level the catalog does not record is as red as an unknown contract
     assert!(has(
-        &edit(TASKS, "contract = \"dependency.evaluate\", version = \"0.1\"", "contract = \"dependency.evaluate\", version = \"7.0\""),
+        &edit(
+            TASKS,
+            "contract = \"dependency.evaluate\", version = \"0.1\"",
+            "contract = \"dependency.evaluate\", version = \"7.0\""
+        ),
         "contract-unknown{key=dependency.evaluate, version=7.0}"
     ));
 }
@@ -72,7 +80,11 @@ fn a_main_category_is_needed() {
 #[test]
 fn the_contract_has_a_major_minor_version_and_a_file_id() {
     assert!(has(
-        &edit(TASKS, "version = \"0.1\"", "version = \"0.1.0\""),
+        &edit(
+            TASKS,
+            "[contract]\nversion = \"0.1\"",
+            "[contract]\nversion = \"0.1.0\""
+        ),
         "contract-version-invalid{found=0.1.0}"
     ));
     for bad in [
