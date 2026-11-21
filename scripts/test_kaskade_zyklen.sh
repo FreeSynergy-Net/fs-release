@@ -63,7 +63,13 @@ py "$Z" --plan "$tmp/plan.json" --root "$tmp/co" >"$tmp/o6.json"; rc=$?
 chk "plan default: a cycle through repos that are not in plan.offen is found (rc 1)" [ "$rc" -eq 1 ] && chk "plan default: a cycle through repos not in plan.offen [part 2]" [ "$(q "$tmp/o6.json" 'sorted(d["cycles"][0])')" = "['fs-forms', 'fs-rpc', 'fs-starter']" ]
 printf '{"offen":[{"repo":"fs-objects"}]}' >"$tmp/plan2.json"
 py "$Z" --plan "$tmp/plan2.json" --root "$w" >"$tmp/o7.json"; rc=$?
-chk "plan default: a mentioned repo without checkout is listed as ungelesen, no cycle (rc 0)" [ "$rc" -eq 0 ] && chk "plan default: ungelesen lists fs-types [part 2]" [ "$(q "$tmp/o7.json" 'd["ungelesen"]')" = "[]" ]
+chk "plan default: the acyclic fixture through the plan input gives no cycle (rc 0)" [ "$rc" -eq 0 ] && chk "plan default: every mentioned repo of the fixture has a checkout, so ungelesen is empty [part 2]" [ "$(q "$tmp/o7.json" 'd["ungelesen"]')" = "[]" ]
+# a REAL missing checkout: fs-lonely pins fs-missing, there is no folder for fs-missing
+co fs-lonely fs-missing:v0.0.1
+printf '{"offen":[{"repo":"fs-lonely"}]}' >"$tmp/plan3.json"
+py "$Z" --plan "$tmp/plan3.json" --root "$tmp/co" >"$tmp/o8.json"; rc=$?
+chk "plan default: a pinned repo without checkout is listed as ungelesen and is no cycle (rc 0)" [ "$rc" -eq 0 ]
+chk "plan default: ungelesen names fs-missing" [ "$(q "$tmp/o8.json" 'd["ungelesen"]')" = "['fs-missing']" ]
 # ---- bad input ----
 py "$Z" >"$tmp/o.json" 2>/dev/null; rc=$?
 chk "bad input: no arguments is rc 2" [ "$rc" -eq 2 ]
