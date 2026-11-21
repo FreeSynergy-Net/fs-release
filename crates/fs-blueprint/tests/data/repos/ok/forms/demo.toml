@@ -1,1 +1,20 @@
-# the forms description of the demo program (a placeholder for the check)
+# the forms description of the demo program: the head of the exchange form, the contract it needs and the title in both languages
+schema = 1
+kind = "frontend"
+id = "board"
+extends = "net.freesynergy.Demo"
+exec = "fs-forms-run"
+title = "demo-title"
+
+[[requires]]
+contract = "people >=0.1 <0.2"
+
+[[message]]
+key = "demo-title"
+lang = "en"
+text = "Demo"
+
+[[message]]
+key = "demo-title"
+lang = "de"
+text = "Demo"

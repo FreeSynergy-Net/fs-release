@@ -78,6 +78,7 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("nested-cycle", &["type"]),
     ("nested-twice", &["type"]),
     ("table-collides", &["table"]),
+    ("layout-unreadable", &["path", "cause"]),
 ];
 
 /// One finding: a code of [`CODES`] and its named parameters.

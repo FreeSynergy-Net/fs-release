@@ -1,12 +1,10 @@
-//! Pattern: Value object table (what a skeleton version means: the tags of the building blocks the generated code is pinned to; a new skeleton version is a new row).
+//! Pattern: Value object table (what a skeleton version means: the tag the generated CI is pinned to; a new skeleton version is a new row).
 
 /// The facts of one skeleton version.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Skeleton {
     /// The version as `[program] skeleton` names it.
     pub id: &'static str,
-    /// The tag of fs-rpc (it pins fs-types, fs-interfaces and fs-objects itself).
-    pub rpc_tag: &'static str,
     /// The tag of fs-release the CI callers of the generated program are pinned to.
     pub release_tag: &'static str,
 }
@@ -17,7 +15,6 @@ pub const RELEASE_TAG: &str = "v0.0.16";
 
 const TABLE: &[Skeleton] = &[Skeleton {
     id: "0.1.0",
-    rpc_tag: "v0.0.2",
     release_tag: RELEASE_TAG,
 }];
 

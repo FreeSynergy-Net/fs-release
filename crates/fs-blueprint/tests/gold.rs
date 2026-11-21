@@ -25,7 +25,7 @@ fn the_output_for_the_tasks_example_is_exactly_the_gold_bytes() {
     let bp = Blueprint::from_toml(TASKS).unwrap();
     assert_eq!(blueprint_hash(&bp).unwrap(), HASH);
     let out = generate(&bp, &FakeCatalog).unwrap();
-    assert_eq!(out.len(), 6);
+    assert_eq!(out.len(), 7);
     // the frontend files (manifest and package `layout`) are compared in `frontend.rs` with the head line masked; their gold bytes are still to be written from a run
     for a in out.iter().filter(|a| !is_frontend_file(&a.path)) {
         let want = std::fs::read(gold_dir().join(format!("{}.gold", a.path)))

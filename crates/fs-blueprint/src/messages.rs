@@ -77,6 +77,7 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("nested-cycle", "The type {$type} is nested inside itself, directly or through other types", "Der Typ {$type} steckt in sich selbst, direkt oder über andere Typen"),
     ("nested-twice", "The type {$type} is nested by more than one field; a nested type has exactly one parent", "Der Typ {$type} wird von mehr als einem Feld verschachtelt; ein verschachtelter Typ hat genau einen Elternteil"),
     ("table-collides", "Two types or fields would make the same table {$table}", "Zwei Typen oder Felder würden dieselbe Tabelle {$table} ergeben"),
+    ("layout-unreadable", "The forms description {$path} cannot be read by the forms host: {$cause}", "Die forms-Beschreibung {$path} kann der forms-Host nicht lesen: {$cause}"),
 ];
 
 /// The message of a code in `en` or `de`; `None` for an unknown code or language.

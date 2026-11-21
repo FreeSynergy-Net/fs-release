@@ -12,6 +12,7 @@ pub mod frontend;
 pub mod generate;
 pub mod header;
 pub mod help;
+pub mod layout;
 pub mod settings;
 pub mod shape;
 pub mod skeleton;

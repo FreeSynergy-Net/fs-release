@@ -90,6 +90,14 @@ fn a_changed_blueprint_makes_the_old_output_drift() {
     assert!(!got.iter().any(|g| g.contains(SEED)));
 }
 
+/// The forms description of the blueprint is a seed too (made once by `new`).
+const LAYOUT: &str = "forms/f1.toml";
+
+fn sorted(mut v: Vec<String>) -> Vec<String> {
+    v.sort();
+    v
+}
+
 #[test]
 fn write_twice_is_stable_and_never_overwrites_a_seed() {
     let mut store = written();
@@ -101,21 +109,27 @@ fn write_twice_is_stable_and_never_overwrites_a_seed() {
         "// seed\n",
     ));
     let out = write(&arts, &mut store).unwrap();
-    assert_eq!(out.kept, Vec::<String>::new());
+    assert_eq!(out.kept, [LAYOUT]);
     assert_eq!(store.files[SEED], "// seed\n");
     store.files.remove(SEED);
     let out = write(&arts, &mut store).unwrap();
-    assert_eq!(out.kept, Vec::<String>::new());
+    assert_eq!(out.kept, [LAYOUT]);
     assert_eq!(store.files.len(), before.len() + 1);
     let out = write(&arts, &mut store).unwrap();
-    assert_eq!(out.kept, [SEED]);
+    assert_eq!(
+        sorted(out.kept),
+        sorted(vec![LAYOUT.to_string(), SEED.to_string()])
+    );
     assert_eq!(out.skipped, Vec::<String>::new());
     store
         .files
         .insert(SEED.to_string(), "// mine\n".to_string());
     let out = write(&arts, &mut store).unwrap();
     assert_eq!(store.files[SEED], "// mine\n");
-    assert_eq!(out.kept, [SEED]);
+    assert_eq!(
+        sorted(out.kept),
+        sorted(vec![LAYOUT.to_string(), SEED.to_string()])
+    );
 }
 
 #[test]
