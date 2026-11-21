@@ -16,7 +16,8 @@ do:
         rev: ${ .input.rev }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: wrapper-einbindung.pin
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent adds the foreign crate as a git dependency with a fixed revision (no copy, no fork); a needed change goes to the upstream as an issue (upstream-anfrage.yaml), or at most as `[patch]` in our own workspace root, never inside the dependency.
@@ -31,7 +32,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: wrapper-einbindung.wrapper
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent writes our own adapter crate; only the wrapper names the foreign crate, the rest of the workspace uses the wrapper's interface. Local commits ([COMMIT]), report per [BERICHT]. The loop back from `repeat` runs until check and test of the wrapper are green.
@@ -62,7 +64,8 @@ do:
         exceptions: ${ $context.license.exceptions }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: wrapper-einbindung.license-reasons
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Only when the script found exceptions - the agent writes the reason per exception (e.g. BSL-1.0, Unlicense, 0BSD, LLVM-exception) and extends the allow list of deny.toml by exactly those; the agent never decides alone whether a license is acceptable, the review reads the reasons.

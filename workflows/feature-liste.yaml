@@ -57,7 +57,8 @@ do:
       then: liste
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: feature-liste.dossier-kurz
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Haiku or Sonnet (research, reads and writes notes only, never code) - a SHORT model dossier for the program when none exists: the functions of the models, each with its official source (official documentation, release notes, manuals); what is not proven is marked [nicht belegt]; nothing is copied (ADR 0013: no code, no text, no logos taken over), no foreign pictures quoted, own words; Pictures first: pictures of the models are only referred to by source, the design of our frontend goes through reference pictures and the picture OK (`picture-acceptance`). The larger dossier with states, menus and workflows is the flow `dossier` and is not replaced by this. A short dossier has the same required sections as the large one (`Menübaum (vollständig)`, `Kontextmenüs`, `Werkzeugleiste`, `Tastenkürzel`; `nicht belegt` instead of inventing)."
@@ -71,7 +72,8 @@ do:
         branch: ${ .input.docs_branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: feature-liste.liste
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only, no slot) - writes `todo/features/<x>.md` in the format of `todo/features/people.md` lines 7-8: header with date, order, models and legend; per area a list `- [x]` built or `- [ ]` planned/missing, each line `Feature - models - state with us - priority - benefit`, PLUS the NEW field `Stufe: heute | als Nächstes | später`. Sorted per area `heute`, then `als Nächstes`, then `später`. ALL functions of the models, none left out because they are small or niche. The state with us is read from the program repo (`repo`, read only: core, trait fixpoint under `sperren/`, README \"What it can do today\"), never guessed; a function that is only in the trait or in the plan is `[ ]` marked `geplant (Trait)` or `geplant (Plan §)`, not `[x]` (the assessment `bewertung.md` found 14 wrong assignments of exactly this kind). German only. The file is not published and not checked by check-docs.sh. Local commit ([COMMIT]), report per [BERICHT]. REQUIREMENT \"Menübaum je Vorbild\": the list has a section `## Menübaum je Vorbild` (per model: main menus, entries, context menus, toolbar, shortcuts, taken from the dossier sections `Menübaum (vollständig)`, `Kontextmenüs`, `Werkzeugleiste`, `Tastenkürzel`; each entry is a feature with a stage too); a dossier without these sections is sent back (`dossier-menue-fehlt`), nothing is invented."
@@ -84,7 +86,8 @@ do:
         branch: ${ .input.docs_branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: feature-liste.bruecke
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only) - rule [BRUECKE-BEIDE-SEITEN]: a section in the same file, per program a table `Standard | Vertrag | Was fehlt` (which standard applies, e.g. AS2, JSCalendar, JSContact; which contract exists: Rust trait with fixpoint `sperren/*.sha256`, capnp in fs-interfaces `schema/`, server and client crates; what is missing in the feature list or in the head). Missing capabilities (known at the time of the plan: data, workflows, paint, decisions in fs-interfaces) are named, not hidden. Nothing invented: an entry without a source in the repo or the dossier is marked [nicht belegt]."
@@ -96,7 +99,8 @@ do:
         branch: ${ .input.docs_branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: feature-liste.index
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only) - keeps the index `todo/features/README.md`: one line per list (`- [<x>](<x>.md)`), the reference to `bewertung.md` stays; the freeze rule there stays unchanged (only the user sets the feature freeze; the lists are input, not a decision)."
@@ -111,7 +115,8 @@ do:
         as: '${ $context + { stichprobe: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: feature-liste.stichprobe
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus SAMPLE per list (the assessment found 14 wrong assignments in 5 lists): at least 8 to 10 lines against code, trait fixpoint and plan (state with us, `[x]` against `[ ]`, stage), plus the bridge table against `fs-interfaces`; every line checked has a proof (file and line). Result `red` true when a wrong assignment is found, with the list of findings; `runde` counts the red rounds (+1 on red, reset on green). Opus reads and judges, never writes the list itself."
@@ -139,7 +144,8 @@ do:
         branch: ${ .input.docs_branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: feature-liste.verweise
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only) - short references: in the user documentation `programs/apps/<x>/index.md` (de and en) the sections \"what it can do today\" and \"what comes\" are an EXCERPT of the stages `heute` and `als Nächstes` of the list (no own enumeration, `später` is not named); and a DIFF for fs-catalog (description en and de where it changes, written as a patch file in the report, NOT pushed; the catalog change itself is `catalog-bump` after a release). The feature list itself is not linked from the published pages (`todo/` is outside `docs_dir`)."

@@ -64,7 +64,8 @@ do:
         as: '${ $context + { logs: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stoerung-diagnose.logs-lesen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent READS the copies of logs and protocols (program log, journal extract, crash report, `tasks.log` style files) and the code paths named by them; it only reads: it starts nothing, changes no file outside its own report folder, calls no tool on a real server. Facts are quoted with file and line. Result `logs` (list of facts: where, what, since when, which version)."
@@ -77,7 +78,8 @@ do:
         as: '${ $context + { hypothesen: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stoerung-diagnose.hypothesen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent writes the hypotheses, each with what would PROVE it and what would REFUTE it (the lesson of the single-instance hang: 'handed over and ended' was refuted by the code, not by feeling); in a later round it takes the result of the last reproduction into account. Result `hypothesen`, the most likely first, carrying `runde` (+1 for each jump back)."
@@ -91,7 +93,8 @@ do:
         as: '${ $context + { repro: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stoerung-diagnose.reproduktion
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent reproduces the fault in its OWN directory (own worktree, temporary HOME and XDG, headless, own sockets; never a real server, never the session of the user account): it starts the program or a test exactly as the symptom says and measures (exit code, time to the hang, output). A bounded wait for every start. Commands one at a time ([BASH]), local commits only ([COMMIT]), no push. Result `repro` with `red` (true = NOT reproduced as described, or the run left leftovers) and `runde`."
@@ -121,7 +124,8 @@ do:
         as: '${ $context + { ursache: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stoerung-diagnose.ursache-belegen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent PROVES the cause: the same reproduction with and without the suspected cause (switch, patched copy in the own worktree that is NOT committed as a fix, or the code lines that wait without a deadline) gives different results. Fact, source (file and line, log line) and measured number are named. A cause without proof is `belegt: false`, never a guess in the report. Result `ursache` with `belegt`, `beleg` and `runde`."
@@ -176,7 +180,8 @@ do:
         as: '${ $context + { bericht: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stoerung-diagnose.bericht
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The agent writes the report ([BERICHT], at most 20 lines) with cause, proof (facts with source and measured numbers), the reproduction (how to repeat it in the own directory) and a PROPOSAL for the fix; it also says what is NOT proven. The report names no real server, no user data and no address."

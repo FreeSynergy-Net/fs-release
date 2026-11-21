@@ -20,7 +20,8 @@ do:
         as: '${ $context + { befund: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
@@ -119,7 +120,8 @@ do:
         lage: ${ $context.lage }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.trait-entwurf
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus reads the trait draft of the crate and completes it: traits, types, errors, standard per method. Output `traits.md`. Only an own rule or a standard may stand behind a method; no dependency upward (plan section b0)."
@@ -163,7 +165,8 @@ do:
         as: '${ $context + { urteil: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.trait-review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Own review step of Opus on `traits.md` (NOT the flow `trait-delta`: that one treats the data trait of one program, runs a compile probe and sets a lock): report, line 1 YES or NO for exactly this draft. Reads only; no build."
@@ -194,7 +197,8 @@ do:
         traits: ${ $context.urteil }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.crate-geruest
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet creates the crate in the layer repo (plan section b0) on the branch `unreviewed/geruest-<crate>`: `Cargo.toml` (licence MIT OR Apache-2.0, Claude named), `lib.rs` with the traits of `traits.md`, README, CHANGELOG. Local commit, no push."
@@ -236,7 +240,8 @@ do:
         hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.doku-hilfe
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`, default `programs/apps/<programm>/index.md`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
@@ -278,7 +283,8 @@ do:
         lage: ${ $context.lage }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.einsortieren
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet copies the modules of the sources named by the inventory key and sorts them behind the traits. Zunächst NICHT kompilieren (spart Slots): no compile, no test, no build call in this step; the build comes only in `bau-buendel`. Every copied file starts with `//! Herkunft: <repo>@<kopf>:<pfad>`; the source repos stay unchanged."
@@ -321,7 +327,8 @@ do:
         lage: ${ $context.lage }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.unklar-liste
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet writes `UNKLAR-<crate>.md`: every part that does not fit behind a trait, with reason and proposal (module / specialist module / delete / \"Schrott?\"). Nothing is dropped silently."
@@ -365,7 +372,8 @@ do:
         as: '${ $context + { vorlage: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.talk-vorbereiten
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Per unclear case: alternatives and \"to what does it fit?\"; output `talk-vorlage-<crate>.md`. The conversation reads this template."
@@ -487,7 +495,8 @@ do:
       then: bau-buendel
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-heben.bau-fix
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet fixes ALL errors of the bundled build in one pass (local commit, no push), then the bundle runs again."

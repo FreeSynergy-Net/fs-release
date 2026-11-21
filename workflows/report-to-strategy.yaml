@@ -13,7 +13,8 @@ do:
         run: ${ .input.run }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: report-to-strategy.gather
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Collects only the workflow, the run id, the result or blocker, the images and the costs; nothing else goes in.
@@ -21,7 +22,8 @@ do:
       call: list-questions:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: report-to-strategy.questions
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Open questions come last, one per line, so that the strategy can answer them one by one.
@@ -29,7 +31,8 @@ do:
       call: send-report:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: report-to-strategy.send
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Hands the report over; the state changes to sent, whatever the answer is.

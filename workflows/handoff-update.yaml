@@ -10,7 +10,8 @@ do:
       call: collect-state:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: handoff-update.collect
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Collects the open runs, decisions, open questions and what is not proven since the last update.
@@ -20,7 +21,8 @@ do:
         file: todo/handoff-strategy.md
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: handoff-update.handoff-file
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Updates todo/handoff-strategy.md; no secrets in it.
@@ -28,7 +30,8 @@ do:
       call: write-memory:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: handoff-update.memory
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Brings the memory files and the index in line with the handoff file; a wrong entry is deleted, not left.

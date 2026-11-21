@@ -40,7 +40,8 @@ do:
         as: '${ $context + { befund: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: pin-kaskade.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user): before anything is built, look whether it exists and is only extended: the lift (`fs-release lift --repo NAME=vX.Y.Z`, flow `lift`), `scripts/gates-lock.sh`, `scripts/set_components_tag.py`, the flows `ff-und-tag`, `review`, `lift-v1plus`, an earlier cascade on `unreviewed/` branches and in `.scratch`. Result `befund` = { art: vorhanden | neu, verweis, beleg }; the cascade ONLY calls the existing flows, it builds no second pin, push or tag way."
@@ -230,7 +231,8 @@ do:
         glied: ${ $context.glied }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: pin-kaskade.besonderes
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet does what is special for this Glied, from `glied.besonderes`, in the own worktree (local commit, no push): fs-interfaces - new tag, capnp regenerated, test `catalog_roundtrip`; fs-rpc - fs-starter-L1 `coded_stub`; fs-components - fs-settings lift, F1 catalog, `WITHOUT_COMPONENT` extended; a program - nothing more than its lift. Empty `besonderes` = nothing to do."
@@ -317,7 +319,8 @@ do:
         as: '${ $context + { zweig: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: pin-kaskade.push-zweig
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Ordinary push of the local commit to a NEW branch `unreviewed/pin-kaskade-<repo>-<n>` ONLY (`n` = the first number whose branch is not on the remote by `git ls-remote`, so a rebase gets a new name and never needs a force push, [REBASE-NEUER-BRANCH]; never main, never a tag, no `gh`); result `zweig` = { branch, head, basis } with the head from `git ls-remote` and `basis` = the head of main of the Glied repo (ls-remote) the review delta starts from."
@@ -365,7 +368,8 @@ do:
         as: '${ $context + { urteil: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: pin-kaskade.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The Opus review at exactly this head (sub-workflow `review`, read only) with the `delta` (`<main head of the Glied>..<branch head>`) and the `tests` of the Glied like every other caller: line 1 JA or NEIN. The one review of the Glied: `ff-und-tag` below only CHECKS the JA for this head, it asks for no second one."

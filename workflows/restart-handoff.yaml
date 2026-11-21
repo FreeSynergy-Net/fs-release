@@ -12,7 +12,8 @@ do:
         file: todo/handoff-strategy.md
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: restart-handoff.read-handoff
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads the handoff file; the state changes to read.
@@ -20,7 +21,8 @@ do:
       call: read-memory:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: restart-handoff.read-memory
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Reads the memory index and the files it names; a note that names a file or a flag is checked before it is used.
@@ -28,7 +30,8 @@ do:
       call: inform-coordinator:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: restart-handoff.inform
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Tells the coordinator that the new session is there and from which handoff it works.
@@ -40,7 +43,8 @@ do:
           version: 0.0.16
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: restart-handoff.take-over
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Takes over the running runs - one round of coordination-round.yaml shows what runs and what is finished.

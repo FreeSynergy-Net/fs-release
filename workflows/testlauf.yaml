@@ -131,7 +131,8 @@ do:
       then: fix-zaehlen
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: testlauf.fix
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent fixes the red test in its own worktree and commits locally; then the slot is checked and the targeted tests run again."

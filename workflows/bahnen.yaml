@@ -74,7 +74,8 @@ do:
         as: '${ $context + { karten: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bahnen.karten-abgleichen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Coordinator (Sonnet) - the board is made to match the real state: projects = lanes, ONE card per run, new orders become cards, the status is current (`timeout 15 fs-tasks claim <id> --as NAME`, `status <id> in-progress|done|failed --report <path>`, `note <id> \"<=500 B>\"`); a card says `done` only when `remote` proves the head. The ORDER of the cards is NEVER changed (the wish of the user), only status and notes. Result `karten` is `red` (a card contradicts the remote state or has no report) or not; carries red and runde (+1 for each jump back from `abgleich-weiche`)."
@@ -120,7 +121,8 @@ do:
         as: '${ $context + { verteilung: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bahnen.slots-verteilen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Coordinator (Sonnet) - at most 2 builds at the same time (`maximum`): the free slots (`slots.frei`) go to the cards that wait for a build, in the order of the cards; night order (`nacht == true`): all five lanes keep running; the ORDER of the work kind is: 1. finished states (ff / tag), 2. Opus reviews, 3. gates, then the lanes in the order of the input `reihenfolge` (the lane order from the reports of the strategy; today as the default: finished states, reviews, gates, lane 3 (people), lane 1 (components), lane 4, lane 5, lane 2), without it the order of the cards. SLOT RULE: an agent WRITES code (and tests, documentation, picture sketches) without a slot and BUILDS only after the release of a slot; waiting for a slot is no idle time. Result `verteilung` has `ueberbucht` (more than `maximum` planned = true) and carries runde (+1 for each jump back from `slots-weiche`)."
@@ -200,7 +202,8 @@ do:
         as: '${ $context + { meldung: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bahnen.meldung
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Coordinator (Sonnet) - ONE bundled report to the strategy, ONE entry per lane: only final states and blockers (rule [BERICHT-GEBUENDELT]); per lane line 1 of the Opus review verdict WORD FOR WORD, the conditions (Auflagen) word for word, the file path of the report, the head proven by `git ls-remote` (`remote`), the slot distribution. Questions of the lanes come last, after a marker, numbered. The flow ends here."

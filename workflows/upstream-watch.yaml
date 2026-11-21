@@ -133,7 +133,8 @@ do:
         as: '${ $context + { entwuerfe: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-watch.entwurf
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet writes per new comment ONE short answer draft: at most 5 sentences, English, friendly, to the point, no AI attribution, no address, no personal data, no promise the user has not made; the file `katalog-plan/blinc-prs/ANTWORT-<n>-<datum>.md` (<n> = number, <datum> = day of the run). After a red text gate the hits of the last round are the order for the new draft (the loop is counted by `entwurf-pruefen`). It only WRITES the file; it sends nothing. Result `entwuerfe` (files)."
@@ -175,7 +176,8 @@ do:
         as: '${ $context + { meldung: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-watch.melden
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Report step to b7 (the bundled report of the round): per new comment the number, who wrote it, the card, the path of the draft and the review state of the pull request; questions at the very end after a marker. Nothing is sent to the upstream here."

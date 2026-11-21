@@ -39,7 +39,8 @@ do:
       if: ${ $context.compare.deviates }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: cost-reconcile.explain
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Only when the log deviates from the console - the agent looks for the cause (runs without a figure, a wrong rate) and reports it; the corrected figures stay as the script wrote them.

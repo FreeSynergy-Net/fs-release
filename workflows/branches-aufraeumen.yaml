@@ -67,7 +67,8 @@ do:
         as: '${ $context + { listen: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: branches-aufraeumen.bleibt-liste
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent sorts everything found into two lists: `weg` (a branch that is merged with proof, a clone or work tree of a finished run, a target folder without an owner, an image of a finished run) and `bleibt` (a branch that is not merged, an open review, a lane that still runs, anonymous volumes and everything of other runs, everything without a proof). Every entry has its proof and the reason; when in doubt it goes to `bleibt`. The agent changes and runs nothing here. Result `listen` carrying `runde` (+1 for each jump back from `listen-weiche`)."
@@ -108,7 +109,8 @@ do:
         as: '${ $context + { skript: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: branches-aufraeumen.skript-erzeugen
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The agent WRITES (does not run) the user script `aufraeumen-<datum>.sh` and an entry in `fuer-nutzer.md`: default `--dry-run` (it only prints; the removal needs the explicit `--apply`), a header check (the script is in the right folder, the repos match), a question j/N per group, a backup list BEFORE the removal, every name of the list `weg` as ONE single name (no placeholder, no glob), a `rm -rf` only after a check of the exact absolute path (not empty, under the allowed root), `git push --delete` per single branch; the delete commands are TEXT inside this script and are NEVER run by the agent. The entry says what the script does, what stays (`bleibt`) and how to check afterwards."

@@ -34,7 +34,8 @@ do:
         as: '${ $context + { vorlage: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: ausnahme-gespraech.vorbereiten
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus checks the candidates (modules, kits, rule sets, workflows, components), formulates ALTERNATIVES and \"to what does it fit?\"; output `talk-vorlage.md`."
@@ -120,7 +121,8 @@ do:
         as: '${ $context + { modul: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: ausnahme-gespraech.modul-anlegen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sub-workflow `modul-neu` for the module the conversation decided on (existing first, users, standard)."
@@ -132,7 +134,8 @@ do:
         entscheidung: ${ $context.protokoll.entscheidung }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: ausnahme-gespraech.eintragen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "By the decision of the protocol: use the block, or the module from `modul-anlegen`, or `[[exception]]` with `what`, `why`, `checked`, `alternatives` and `talk` (path of the protocol). Output a diff of the plan (blueprint); local commit on `unreviewed/ausnahme-<programm>`, no push."
@@ -174,7 +177,8 @@ do:
       then: end
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: ausnahme-gespraech.bericht
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Report: the decision, the protocol path, the diff of the plan; what is not proven is named."

@@ -26,7 +26,8 @@ do:
         as: '${ $context + { befund: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stil-neu.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. The following steps read `befund`; nothing is built without it."
@@ -70,7 +71,8 @@ do:
         dossier: ${ .input.dossier }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stil-neu.dossier
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet writes the dossier of the model (pictures, colours, edges, depth, motion, states of the blocks) in the dossier folder; every row of the table `Zustand | belegt | Quelle` carries a source or is `[offen]` marked `ohne Vorbild` (own version). No model at all is allowed, but then the whole style is `ohne Vorbild`."
@@ -114,7 +116,8 @@ do:
         as: '${ $context + { vertrag: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stil-neu.vertrag
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent reads contracts/THEME-CONTRACT.md and blocks/*.toml and writes down the list of ALL blocks of the contract (result field `bausteine`). Rule `stil-vollstaendigkeit`: a new style has one entry for EVERY block and the 16 block_tokens, otherwise fs-components does not compile; a block missing in the list is a defect of this step."
@@ -126,7 +129,8 @@ do:
         branch: ${ .input.branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stil-neu.tokens
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent writes the colour and shape tokens of the style for light AND dark in fs-components-styles on the branch (own worktree, local commit, no push). The OLD styles are not touched; their pictures must stay byte-identical (step `bilder`)."
@@ -143,7 +147,8 @@ do:
                 branch: ${ .input.branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stil-neu.bausteine
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Every block of the contract list on its own: one entry per block in blocks/*.toml with the 16 block_tokens, light and dark; no block is left out or copied from another style without a look (the distance gate below catches a copy)."
@@ -279,7 +284,8 @@ do:
         as: '${ $context + { review: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: stil-neu.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Sub-workflow review.yaml for exactly the head hash of step `head` - the JA is bound to this hash, a new head makes it void.

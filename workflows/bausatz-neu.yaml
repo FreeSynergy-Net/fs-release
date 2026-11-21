@@ -20,7 +20,8 @@ do:
         as: '${ $context + { befund: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bausatz-neu.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
@@ -118,7 +119,8 @@ do:
         felder: ${ .input.felder }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bausatz-neu.standard-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Prove a standard URI with a section for every field."
@@ -161,7 +163,8 @@ do:
         befund: ${ $context.befund }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bausatz-neu.beschreibung
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Description of the kit in fs-types on the branch `unreviewed/bausatz-<name>` (local commit, no push): fields, form duty, media type; no duty beyond the form (a duty only in contracts)."
@@ -202,7 +205,8 @@ do:
         name: ${ .input.name }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bausatz-neu.erzeugen-plan
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Describe the storage form (1:1 column group, 1:n sub table), `accepts` and the `TypeCatalog` entry; the generation itself comes with `fs-blueprint`. Only append; no JSON or blob column."
@@ -244,7 +248,8 @@ do:
         felder: ${ .input.felder }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bausatz-neu.freigabe-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Personal data? Then a release per kit group is foreseen (ADR 0098 point 4.6); no personal data: say so."
@@ -287,7 +292,8 @@ do:
         as: '${ $context + { urteil: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bausatz-neu.trait-review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Own review step of Opus (NOT the flow `trait-delta`): report, line 1 YES or NO for the kit. Reads only; no build."
@@ -317,7 +323,8 @@ do:
       then: end
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bausatz-neu.bericht
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Report: kit, fields with standard, users, storage form, release, verdict; what is not proven is named."

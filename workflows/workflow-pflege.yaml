@@ -13,7 +13,8 @@ do:
         step: ${ .input.step }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: workflow-pflege.detect
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Looks in workflows/ for a flow with this step; none found means the work may not start, the next step writes it.
@@ -23,7 +24,8 @@ do:
         task: write or extend the flow for ${ .input.step } (Serverless Workflow 1.0 plus FS profile, no special forms, importable 1:1 into fs-workflows)
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: workflow-pflege.write
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent writes or extends the file in its own worktree and commits locally; kind per step, only steps that really happen.
@@ -47,7 +49,8 @@ do:
       if: ${ .input.new_gate_or_right }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: workflow-pflege.glance
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: A short Opus look, only when the change brings a new gate or a new right; otherwise skipped.
@@ -67,7 +70,8 @@ do:
         step: ${ .input.step }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: workflow-pflege.run-step
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Only now the work step runs, as the order says - Workflow X, step Y, parameters.

@@ -77,7 +77,8 @@ do:
         as: '${ $context + { standard: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: trait-delta.standard-recherche
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (decision b7: not Haiku, the mapping field to standard property is draft work; reads sources, writes notes only) - WHICH standard carries the data of the program (AS2, JSCalendar, JSContact, ValueFlows, ... or `eigen`, then with the reason) and the mapping: which trait field is carried by which standard property, what is an own profile (extension), what the standard does not know. Source and version of the standard with a link; the feature list names what the trait must carry (marks today / next / later). A foreign standard text is never quoted at length. Output: a note `standard.md` next to the draft; open points become QUESTIONS (at most three in the report), not guesses."
@@ -92,7 +93,8 @@ do:
         as: '${ $context + { entwurf: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: trait-delta.entwurf
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus - the draft in `ordner`: (a) the capnp schema in `fs-interfaces/schema/<x>.capnp` (always there; append-only evolution rule in the head, the standard named in lines 7-8 as in surveys.capnp) and the line in `capabilities.txt`, (b) the Rust trait folder `<trait>_v<n>/` in `ordner` (draft place; fixed place `ziel_crate`) in the layout of the existing traits (`mod.rs` with the pattern line, `api.rs`, `errors.rs`, `shared.rs`, topic files; new files instead of growing a file over 300 lines), types shared by several programs in fs-types (stand-in module until the fs-types tag), (c) the trait documentation (what it is, which capability, which rights, which standard property carries which field), (d) a delta note `<trait>-delta.md` (what is new, why, source ADR/answer). A first version may be MINIMAL (what the first frontend needs) but never wrong; later fields come append-only. Every decision cites its source."
@@ -106,7 +108,8 @@ do:
         as: '${ $context + { probebau: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: trait-delta.probe-bau
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - a throw-away probe crate under `.scratch/probe/<name>` (`#[path]` onto the draft folder, fs-types per tag, the stand-in as one module), with a null provider as `dyn` and a small FAKE plus test data that exercise the trait (the conformance rules of the draft as tests). The target lies under `.scratch/target/...`, never under /tmp. The draft itself is not changed here."
@@ -153,7 +156,8 @@ do:
         as: '${ $context + { review: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: trait-delta.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus, read only (rules [REVIEW] [BERICHT]): line 1 is `JA` or `NEIN` for the FOLDER HASH of the probe (another hash = a new review), then the findings file:line, BLOCKER against small points, the conditions word for word, not proven. Checks: the standard is carried (mapping complete, nothing invented), the contract is minimal and honest (no field without a user, no hidden state), the rules of this flow (head comment), consumed ports instead of foreign tables, evolution append-only, files and pattern lines, the report of the probe is for this hash. 2-3 rounds are expected (the trait round of groups needed six). A missing verdict or any other value is not a JA."
@@ -186,7 +190,8 @@ do:
       then: kompilierprobe
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: trait-delta.auflagen-fix
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the conditions of the review WORD FOR WORD, nothing more and nothing less; a change in meaning goes back as a question. Changes only the draft folder and its delta note; afterwards `kompilierprobe` runs again (new hash, new review) - no review of a head without a probe for this head."
@@ -269,7 +274,8 @@ do:
         as: '${ $context + { konf: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: trait-delta.konformitaet
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the conformance test and the fake in the program repo (test data crate or `draft/<trait>/` like `fs-calendars-testdata`), built AGAINST the locked folder: every rule of the trait documentation is a test, with mutants for the rules that matter; the folder is not changed. Local commits ([COMMIT]), report per [BERICHT]; missing data sources are reported, never greyed out silently."
@@ -346,7 +352,8 @@ do:
         as: '${ $context + { doku: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: trait-delta.doku
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mandatory gate (rule doku-mitziehen) - the reference in the documentation: the trait page (what it carries, which standard, which capability) in docs/de and docs/en, the user documentation of the program, the line in the capability list; where a decision changes, an ADR addendum (workflow adr-write, not invented: the existing ADRs are searched first, rules.md `ADRs zuerst prüfen`). Sub-workflow doku-mitziehen checks only places and consistency; red stops here."

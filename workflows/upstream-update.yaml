@@ -19,7 +19,8 @@ do:
         as: '${ $context + { upstream: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.check-upstream
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Is there a new upstream tag? Read the release text and the security advisories (gh api, read only), rate the severity (critical, high, medium, low, none), resolve tag to commit (gh api, the commit the tag points to, not the tag object), look at the signature state of tag and commit (unsigned stays unsigned, a change is reported). Output - tag, commit, date, severity, advisory ids, signature state. High or critical severity goes first.
@@ -30,7 +31,8 @@ do:
         to: ${ $context.upstream.tag }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.compare
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: gh api compare from...to (read only) - do the build toolchain (rust-toolchain, MSRV), the dependencies (Cargo.lock) or the build profile change? The answer goes into the report and decides whether mirror.yml needs a change.
@@ -42,7 +44,8 @@ do:
         released: ${ $context.upstream.released }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.pin
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sets mirror.toml (version, released, tag, commit, artefact names, container note), the capabilities.toml sources and version, scripts and tests that carry the old version, and the README; adds the security note (severity, advisory, fixed in). Only the pinned commit counts; never an unresolved tag.
@@ -55,7 +58,8 @@ do:
         as: '${ $context + { capabilities: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.capabilities-check
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Every capability line is checked against the book of the NEW version (page and sentence quoted in the report); a line the book does not show is marked 'not proven', never guessed; a changed support value (yes, no, unstable) is reported and decided in the review.
@@ -65,7 +69,8 @@ do:
         languages: [de, en]
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.docs
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: docs/de and docs/en are generated and adapted together (mirror.md, capabilities.md, date of the check); both languages say the same.
@@ -114,7 +119,8 @@ do:
         as: '${ $context + { doku: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.doku
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml after the local gates: mirror.md, capabilities.md and the pages that name the version are in step with the pin (de and en); without a matching docs change the gate is RED and the flow does not reach the review."
@@ -159,7 +165,8 @@ do:
         as: '${ $context + { review: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Sub-workflow review.yaml (review-request, review, verdict, bind) for exactly the head hash of step `head` - Strategy (Opus) reviews the delta and answers YES or NO bound to this hash, the approval file is written for it. A security fix with severity high or critical is reviewed the same day. Without the YES nothing is tagged, pushed or published.
@@ -281,7 +288,8 @@ do:
         program: ${ .input.upstream }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.catalog-entry
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Is the program in the catalog already? If not, the entry is created first (decision of strategy). fs-kanidm has had no release and no catalog entry so far - the first run creates both.

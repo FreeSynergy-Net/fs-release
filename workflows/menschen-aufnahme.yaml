@@ -178,7 +178,8 @@ do:
         as: '${ $context + { willkommen: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: menschen-aufnahme.willkommen-vorbereiten
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The agent PREPARES the invitation text, the welcome material (what the project is, how to reach help, how to leave, who sees what) and the privacy note, from the self-given data only; it sends nothing, stores nothing, starts no account and never agrees to anything in the name of the person ([KEINE-ZUSTIMMUNG-IM-NAMEN-DES-NUTZERS]). An AI of the project is named only as invitation with STOP-AI, never as given. Result `willkommen`."
@@ -254,7 +255,8 @@ do:
       then: end
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: menschen-aufnahme.aufnahme-beleg
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The agent writes the report: who (the reference to the person, no more data than given), role, way in, date, which consents the person gave themselves and when. No address, no data beyond the self-given ones. This flow ends."
