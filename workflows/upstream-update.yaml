@@ -245,6 +245,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
+        freesynergy.net:timebox-exempt: "waiting for the CI of the mirror build without an agent; the coordinator reports the state every 60 min"
         freesynergy.net:summary: The flow waits for the CI result of exactly this run of mirror.yml (the event carries the head hash as subject; an event of another head is ignored). A red run sends no green event; the timeout of 2 hours is an error of the task and is caught here (`try`/`catch` on the timeout error, SW 1.0) - it sets `build.timeout`, and the next step `build-weiter` sends the flow to `upstream-eskalation`; nothing is published.
   - build-weiter:
       switch:

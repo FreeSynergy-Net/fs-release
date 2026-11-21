@@ -48,7 +48,7 @@ def botseat_is_error(today=None):
     return (today or datetime.date.today()) >= datetime.date.fromisoformat(raw)
 
 
-def check_step(item, seen, where):
+def check_step(item, seen, where, rules=None):
     if not isinstance(item, dict) or len(item) != 1:
         return [f"{where}: a step is exactly one `name: task` pair"]
     ((name, task),) = item.items()
@@ -65,6 +65,7 @@ def check_step(item, seen, where):
     if not isinstance(meta, dict):
         return problems + [f"{where}: no metadata (actor and gate are required)"]
     problems += runrules.check_status_command(where, task, meta)
+    problems += runrules.check_timebox_exempt(where, task, meta, rules)
     actor = meta.get(ACTOR)
     if actor not in ACTORS:
         problems.append(f"{where}: {ACTOR} is {actor!r}, allowed: {', '.join(ACTORS)}")
@@ -125,7 +126,8 @@ def check_doc(doc, rules=None):
         return problems + ["`do` is not a non-empty list"]
     seen = set()
     for i, item in enumerate(steps):
-        problems += check_step(item, seen, f"do[{i}]")
+        problems += check_step(item, seen, f"do[{i}]", rules)
+    problems += runrules.check_timebox_exempt("document", {k: v for k, v in doc.items() if k != "do"}, head.get("metadata") if isinstance(head, dict) else None, rules)
     names = [next(iter(i)) for i in steps if isinstance(i, dict) and len(i) == 1]
     return problems + check_states(head, names, rules) + check_then(steps, seen)
 
