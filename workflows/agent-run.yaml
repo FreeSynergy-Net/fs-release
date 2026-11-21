@@ -108,6 +108,19 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The run removes its own throw-away build folder (target/) at the end, success or not.
         freesynergy.net:may-fail: a folder that is already gone is fine
+  - arbeitsliste:
+      call: work-list:0.0.16@fs
+      with:
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+      export:
+        as: '${ $context + { arbeitsliste: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Application
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY when the goal is not reached (user rule 20.11.): never report only `blocked`. The agent keeps going as far as it can and delivers a WORK LIST: (1) the concrete steps still to do, (2) the errors with file:line, error text and cause if known, (3) what is missing (decision, dependency, tool). Each entry is small enough to become the next order. The list goes into the branch report (_bericht/BERICHT.md) and every open item as a new `[ ]` line into _bericht/FEATURES.md (the coordinator copies them into .scratch/FEATURES-OFFEN.md in the fitting section, CLAUDE.md section 6). A report of an unfinished goal without this list is red; a plain `blocked` or `es klemmt` is not a result."
   - ende-weiche:
       switch:
         - ohne-publish:
