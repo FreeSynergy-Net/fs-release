@@ -68,4 +68,26 @@ FS_BOTSEAT_ERROR_FROM=2000-01-01 python3 -I "$tool" "$tmp/h" >"$tmp/o" 2>&1; r=$
 FS_BOTSEAT_ERROR_FROM=not-a-date python3 -I "$tool" "$tmp/h" >"$tmp/o" 2>&1; r=$?
 [ "$r" -eq 2 ] && grep -q "not an ISO date" "$tmp/o" && ! grep -q Traceback "$tmp/o" && ok "broken date: rc 2, clear message" || { cat "$tmp/o"; bad "broken date (rc=$r)"; }
 
+# time box of the run (CLAUDE.md 4a): an own timeout longer than rules.yaml `timebox.max-minutes` is red without `timebox-exempt`, green with it
+mkt() { # <dir> <hours> <extra metadata line>
+  mk "$1" Service "$3"; sed -i "s/^      set: {a: 1}/      set: {a: 1}\n      timeout: {after: {hours: $2}}/" "$1/w.yaml"
+}
+mkt "$tmp/t1" 2 ""
+python3 -I "$tool" "$tmp/t1" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 1 ] && grep -q "time box of the run" "$tmp/o" && ok "timeout 2 h without exemption: error (rc 1)" || { cat "$tmp/o"; bad "timebox red (rc=$r)"; }
+mkt "$tmp/t2" 2 "        freesynergy.net:timebox-exempt: background job"
+python3 -I "$tool" "$tmp/t2" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 0 ] && ok "timeout 2 h with timebox-exempt: rc 0" || { cat "$tmp/o"; bad "timebox exempt (rc=$r)"; }
+mkt "$tmp/t3" 1 ""
+python3 -I "$tool" "$tmp/t3" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 0 ] && ok "timeout of exactly 60 min: rc 0" || { cat "$tmp/o"; bad "timebox 60 min (rc=$r)"; }
+mkt "$tmp/t4" 2 "        freesynergy.net:timebox-exempt: background job"
+sed -i 's/^timebox:.*$//' "$tmp/t4/run/rules.yaml"
+python3 -I "$tool" "$tmp/t4" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 1 ] && grep -q "timebox. is missing" "$tmp/o" && ok "rule set without timebox: error (rc 1)" || { cat "$tmp/o"; bad "timebox missing (rc=$r)"; }
+mkt "$tmp/t5" 1 ""
+sed -i 's/max-minutes: 60/max-minutes: 90/' "$tmp/t5/run/rules.yaml"
+python3 -I "$tool" "$tmp/t5" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 1 ] && grep -q "max-minutes is 90" "$tmp/o" && ok "max-minutes 90 in the rule set: error (rc 1)" || { cat "$tmp/o"; bad "timebox 90 (rc=$r)"; }
+
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

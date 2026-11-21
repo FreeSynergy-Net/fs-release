@@ -26,6 +26,12 @@ Test vergleicht beides Paar für Paar). Keine Workflow-Datei wiederholt die Zust
 reason outside this list, is red (`python3 scripts/check_run_rules.py workflows/run/rules.yaml wartet [reason]`). The word `stationen` is gone
 (it is `läuft`). / `wartet` ohne Grund oder mit einem Grund außerhalb der Liste ist rot. Das Wort `stationen` entfällt (es heißt `läuft`).
 
+**Time box / Zeitbox** (`timebox` of the rule set, CLAUDE.md 4a): an order of a run takes at most `max-minutes` (60) and shows visible progress or a clear
+blocker every `visible-every-minutes` (60); over the limit the run does `on-exceed` (`stop`, `report`, `workflow-pflege`). One block for the whole run, no
+step in every flow; a flow with its own `timeout` longer than `max-minutes` needs `freesynergy.net:timebox-exempt: <reason>` (checked by
+`scripts/check_workflows.py`). / Ein Auftrag eines Laufs dauert höchstens `max-minutes` und zeigt alle `visible-every-minutes` Sichtbares oder einen Blocker; darüber
+tut der Lauf `on-exceed`. Ein Block für den ganzen Lauf; ein Fluss mit längerem eigenem `timeout` braucht `freesynergy.net:timebox-exempt: <Grund>`.
+
 **Transitions / Übergänge** (the default rules of the run; the workflow adds its station rules):
 
 | From / Von | To / Nach |
