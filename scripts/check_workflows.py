@@ -2,6 +2,7 @@
 """Schema check of the workflow files in `workflows/` (Serverless Workflow 1.0 YAML, FS profile).
 
 usage: python3 -I check_workflows.py <folder with the workflow files> [--simulate-missing-yaml]
+warnings (`warn  file: step ...`, ADR 0105) never change the exit code.
 exit 0 green, 1 red (every problem on its own line `file: reason`), 2 skipped (no PyYAML: nothing was checked).
 
 Per file: parses; `document` has dsl (1.0.x), namespace, name, version; `do` is a non-empty list; every step is one
@@ -28,6 +29,9 @@ KINDS = ("objective", "subjective")
 FLOW_WORDS = {"continue", "exit", "end"}
 ACTOR, ATYPE, GATE = "freesynergy.net:actor", "freesynergy.net:actor-type", "freesynergy.net:gate"
 KIND = "freesynergy.net:kind"
+BOTSEAT = "freesynergy.net:bot-seat"
+# Optional step metadata of ADR 0105 E1 (no value rules: the ADR states none). Unknown keys are not an error, this list documents them.
+OPTIONAL_KEYS = tuple(f"freesynergy.net:{k}" for k in ("role", "needs", "effort", "bot-seat", "separate-from", "compensate"))
 
 
 def check_step(item, seen, where):
@@ -57,6 +61,25 @@ def check_step(item, seen, where):
     if meta.get(KIND) not in KINDS:
         problems.append(f"{where}: {KIND} is {meta.get(KIND)!r}, allowed: {', '.join(KINDS)}")
     return problems
+
+
+def check_warnings(doc):
+    """Warnings (printed as `warn`, never change the exit code): ADR 0105 E1 (bot-seat) and decision 8 (ai = Service)."""
+    warns = []
+    steps = doc.get("do") if isinstance(doc, dict) else None
+    for i, item in enumerate(steps if isinstance(steps, list) else []):
+        if not isinstance(item, dict) or len(item) != 1:
+            continue
+        ((name, task),) = item.items()
+        meta = task.get("metadata") if isinstance(task, dict) else None
+        if not isinstance(meta, dict) or meta.get(ACTOR) != "ai":
+            continue
+        where = f"do[{i}] step {name!r}"
+        if not meta.get(BOTSEAT):
+            warns.append(f"{where}: ADR 0105 E1: bot-seat fehlt; ab nächstem Workflow-Release rot")
+        if meta.get(ATYPE) == "Application":
+            warns.append(f"{where}: ADR 0105 decision 8: actor-type Application for an ai step, Service expected")
+    return warns
 
 
 def check_states(head, step_names, rules):
@@ -159,6 +182,7 @@ def main(argv):
         print(f"{folder}: no workflow files")
         return 1
     bad = 0
+    warned = 0
     rules_path = os.path.join(folder, runrules.RULES_FILE)
     rules = None
     try:
@@ -190,6 +214,11 @@ def main(argv):
         for p in problems:
             print(f"{rel}: {p}")
             bad += 1
+        for w in check_warnings(doc):
+            print(f"warn  {rel}: {w}")
+            warned += 1
+    if warned:
+        print(f"{warned} warning(s) (do not change the exit code)")
     if not bad:
         print(f"{len(files)} workflow file(s) ok")
     return 1 if bad else 0
