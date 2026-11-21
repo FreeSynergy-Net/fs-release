@@ -28,7 +28,8 @@ do:
       call: write-continue-prompt:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: wip-continue.prompt
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Writes the follow-up prompt - what is done, what is open, where the WIP commit is; the new run starts from it.

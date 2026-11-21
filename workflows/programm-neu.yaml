@@ -26,7 +26,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.wessen-daten
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
         freesynergy.net:phase: P0
@@ -115,7 +116,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.standards
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P1
@@ -163,7 +165,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.kern-crate
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
         freesynergy.net:phase: P1
@@ -211,7 +214,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.umzug
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P1
@@ -259,7 +263,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.datenmodell
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P2
@@ -342,7 +347,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.schnittstelle
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P2
@@ -393,7 +399,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.manifest
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P2
@@ -441,7 +448,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.engine
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P3
@@ -492,7 +500,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.grenz-adapter
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P3
@@ -543,7 +552,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.admin-frontend
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P3
@@ -651,7 +661,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.sprache
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P4
@@ -713,7 +724,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.hub-adapter
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
         freesynergy.net:phase: P5
@@ -761,7 +773,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.sicherheit
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P5
@@ -809,7 +822,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-neu.pakete
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:phase: P5

@@ -42,7 +42,8 @@ do:
         as: '${ $context + { doku: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: release-flow.doku
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mandatory step (rule doku-mitziehen) - sub-workflow doku-mitziehen.yaml: every change of code, names, interfaces or behaviour of this release pulls the documentation in fs-documentation (de and en) along in the same run; without a matching docs change the gate is RED and the flow stops before any review. The same step covers the release of lift, frontend-round and frontend-umbau, which end here."
@@ -113,7 +114,8 @@ do:
               type: net.freesynergy.approval
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: release-flow.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews the head and writes the approval file; a new head makes a JA invalid.
@@ -237,7 +239,8 @@ do:
         as: '${ $context + { aufraeumen: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: release-flow.doku-aufraeumen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mandatory closing step (rule doku-aufraeumen): sub-workflow doku-aufraeumen.yaml checks the docs by machine (dead links, anchors, old names, temp, de/en, ADR status) and, since the mark, only the pages of THIS repo's changed topics (input repo; no AI for unchanged pages); a branch unreviewed/doku-aufraeumen-<YYYYMMDD-HHMM> only if something changed; the push is not part of this run (result `push_offen`, the person pushes after the strategy's approval). An escalated tidy-up ends this flow with `eskaliert: true` (step aufraeumen-weiter)."

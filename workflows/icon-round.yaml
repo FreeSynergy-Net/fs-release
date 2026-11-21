@@ -13,7 +13,8 @@ do:
         icons: ${ .input.icons }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: icon-round.draw
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Draws the new versions of the icons; repeat until they render and pass the format checks.
@@ -65,7 +66,8 @@ do:
           head: ${ .input.branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: icon-round.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Opus reviews exactly this head of the catalog change; JA is bound to it.

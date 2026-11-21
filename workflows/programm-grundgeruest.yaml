@@ -39,7 +39,8 @@ do:
         as: '${ $context + { stufe1: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-grundgeruest.stufe-1
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Two branches at the same time. (a) dossier-doku (Sonnet): dossier with states, menus and workflows of the model apps, documentation. (b) recherche (Haiku, only reading and writing notes, never code): standards, data model, crates, licence, state of care. Both write into the dossier folder."
@@ -109,7 +110,8 @@ do:
         as: '${ $context + { plan: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-grundgeruest.plan
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Opus writes the plan with a FIXED trait (result field `trait` = the path of the trait file; the public interface of the program as a Rust trait file, signatures final), the data model as typed tables (ADR 0086) and the split into core and frontend. Model: Opus."
@@ -205,7 +207,8 @@ do:
         as: '${ $context + { stufe3: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-grundgeruest.stufe-3
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Two Sonnet branches at the same time, each in its own worktree. (a) kern: the trait, typed storage after ADR 0086 (no JSON, no blob), the CLI. (b) frontend: first the block assignment (scripts/baustein-zuordnung), then test data against the trait, no own data model. Neither branch changes the trait."
@@ -255,7 +258,8 @@ do:
         as: '${ $context + { gates: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-grundgeruest.gates
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Targeted tests of the changed crates and test files through the flow testlauf (the full workspace run only as an end gate); the flow contains the AI step `fix`. The result carries `status`, `red`, `runde`, `eskaliert`."
@@ -341,7 +345,8 @@ do:
         as: '${ $context + { doku: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-grundgeruest.doku
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mandatory step (rule doku-mitziehen), BEFORE the review so that the doc commits are part of the reviewed head: documentation of the program in de and en, links, manifest and catalog texts; without a matching docs change the gate is RED. The sub-workflow contains an AI step; its result `status` and `eskaliert` is read by `doku-weiter`."
@@ -386,7 +391,8 @@ do:
         as: '${ $context + { review: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: programm-grundgeruest.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Opus review of exactly the head of step `kopf` (resolved after the docs; repo, branch, delta given; the delta and the file list only), one review per head; the JA is bound to this hash."

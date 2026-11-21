@@ -55,7 +55,8 @@ do:
       call: verdict-ai:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: picture-acceptance.strategy-verdict
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The strategy judges each pair - accepted or what differs; it is an opinion, not a measurement.
@@ -71,7 +72,8 @@ do:
       call: route-verdict:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: picture-acceptance.next
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The result is `accepted` or not; the calling round decides where it goes on (in frontend-round `picture-again` sends a not accepted result back to gap-list with the user's words as the order).

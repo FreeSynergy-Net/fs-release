@@ -70,7 +70,8 @@ do:
         branch: ${ .input.branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: umbenennen.umbau
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "In the worktree branch of the program (not in main) - crates `<old>-*` become `<new>-*` (Cargo.toml, imports, binary names, the link of the old binary name if ADR 0063 asks for it), CI files (release, typing-test, windows), release chain allowlist, package names; the catalog entry of the new name with `replaces = [old]` (ADR 0080, schema 2) in a branch of fs-catalog; pins in other repos only on the new tag (a later run, never a path dependency). Only what the plan lists. Own worktree, local commits ([COMMIT]), no push, no tag, no rename of a GitHub repo; gates one at a time ([GATES], [BASH]); report per [BERICHT]. (L1) Write mode (the scaffold `scripts/umbenennen rename` exists, honours `--allow`, refuses a dirty tree and leaves pin URLs `github.com/FreeSynergy/<old>` alone until step `pins`; its lock part and the FS_<X>_* environment variables are (Spezifikation, Skript folgt): the env form is only reported and not replaced, it is a decision of its own via `keep`), in this order and only with the script (not by hand): `git mv` of the crate folders `crates/<old>-*` to `crates/<new>-*`; replacement of `<old>-` and `<old>_` with word boundary in `*.toml`, `*.rs`, `*.md` and `Cargo.lock` (the `keep` entries are skipped); the lock is renamed with the crates; then `cargo metadata --locked` (step `lock` below, (Spezifikation, Skript folgt)). (L5) CI comments: in `.github/workflows/release.yml` (and the other CI files) the comments that name the old program are renamed too, otherwise the next reader finds the old name again; a branch with open work in the repo (e.g. `r4-admin`) is brought to main first (a human step, not this one)."
@@ -133,7 +134,8 @@ do:
         as: '${ $context + { doku: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: umbenennen.doku
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow doku-mitziehen.yaml - the docs in fs-documentation (de and en, links, pages, ADR status lines; ADR texts are not rewritten, `allow` names the history pages) move in the same run, grep for the old name, `mkdocs build --strict`, check-docs; a rename without the docs is RED.
@@ -241,7 +243,8 @@ do:
         as: '${ $context + { review: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: umbenennen.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Sub-workflow review.yaml for exactly the head hash of step `head` (`$context.kopf.head`, resolved after the gates, never a branch name) - the JA is bound to this hash by `bind`; a new head makes it void.

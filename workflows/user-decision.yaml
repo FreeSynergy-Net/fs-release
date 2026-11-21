@@ -25,7 +25,8 @@ do:
         known: ${ $context.adrs }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: user-decision.question
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Formulates one clear question with the options and a recommendation, naming the ADRs found (a recommendation that departs from one says so); repeat until it is clear.
@@ -41,7 +42,8 @@ do:
       call: write-memory:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: user-decision.record
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The answer goes into memory and the handoff file (handoff-update.yaml) so that it survives a session change.
@@ -49,7 +51,8 @@ do:
       call: write-order:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: user-decision.order
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Turns the answer into an order that names a workflow, a step and parameters.

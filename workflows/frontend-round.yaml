@@ -39,7 +39,8 @@ do:
         dossier: ${ .input.dossier }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-round.gap-list
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Compares dossier (states, dialogs, menus, shortcuts, workflows, gaps) with our Frontend and writes the list of what is missing.
@@ -50,7 +51,8 @@ do:
         dossier: ${ .input.dossier }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-round.stil-analyse
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Step 2 of the fixed order (after the block analysis of the dossier, before the composition) - the style analysis of the model gives tokens and style rules per block id of bausteine.md (ADR 0074, DTCG tokens, rules per named part and state); no fixed colours or spaces in the block or the Frontend; repeat until every block id of the table has its rules.
@@ -89,7 +91,8 @@ do:
         dossier: ${ .input.dossier }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-round.stil-sichern
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Every model that is rebuilt yields a style, saved as a style file (DTCG tokens plus the rule entries of the theme contract) when it does not exist yet, English name (Calm, Office, Craft ...), fair reference to the model named in the description (what it is based on), source and licence of the reference named, nothing copied (ADR 0013, ADR 0074 section 3). Own worktree, local commits, no push, no tag. Whenever a style exists or is added it styles EVERY block of the theme contract with all parts and states (an explicit entry each, no silent gaps).
@@ -201,7 +204,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-round.build
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Step 3 of the fixed order (composition) - the agent builds the gaps in its own worktree, composing only from the block ids of bausteine.md (a new block first, in the crate of its family, with the reason of the table; one block with modules instead of a second copy, ADR 0084 pattern) and the rules of stil-analyse; and commits locally ([COMMIT]); repeat until the gates are green ([GATES], commands one at a time per [BASH]), no push, no tag; report per [BERICHT]. Order - `Workflow frontend-round, step build, parameters repo, branch, head, delta, frontend` (docs/prompt-template.md).
@@ -263,7 +267,8 @@ do:
         as: '${ $context + { komponenten: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-round.frontend-nur-komponenten
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Review template frontend (rule of the user, lane 3): the frontend crate (input `frontend_crate`) contains ONLY the plugging together of components from fs-components plus theme, style, menu tree and texts: no logic, no own widgets, no data conversion. A new widget or logic is a FINDING (result `befunde`, each with file and line): a missing component is built in fs-components (or the nearest existing component stands in, marked \"vorläufig\"), logic belongs into the program or the modules through the contract. Until the frontend is a description (manifest / forms kit, read at run time) the plug-together code is a transition. Opus reads only the crate and writes the findings; it changes nothing."
@@ -315,7 +320,8 @@ do:
       if: ${ $context.acceptance.red }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-round.acceptance-red
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Only when a flow failed - the agent finds the cause and writes the order for build; the script decides green or red, not the agent.

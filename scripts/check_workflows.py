@@ -2,6 +2,7 @@
 """Schema check of the workflow files in `workflows/` (Serverless Workflow 1.0 YAML, FS profile).
 
 usage: python3 -I check_workflows.py <folder with the workflow files> [--simulate-missing-yaml]
+warnings (`warn  file: step ...`, ADR 0105) never change the exit code.
 exit 0 green, 1 red (every problem on its own line `file: reason`), 2 skipped (no PyYAML: nothing was checked).
 
 Per file: parses; `document` has dsl (1.0.x), namespace, name, version; `do` is a non-empty list; every step is one
@@ -14,6 +15,7 @@ States (standard `workflows/STATES.md`): the states belong to the RUN, once: the
 `check_run_rules.py`). A flow carries no states; it may carry rules only for its own steps (`freesynergy.net:station-rules`: who may, what
 happens on entry) and steps with a status command (`timeout`, local origin, no shell). No step may carry the name of a state.
 """
+import datetime
 import glob
 import os
 import re
@@ -22,12 +24,28 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import check_run_rules as runrules  # noqa: E402
 
-ACTORS = {"human": "Person", "ai": "Application", "machine": "Service"}
+# ADR 0105 decision 8: an ai step is a Service (bot seat). Application stays accepted during the transition (it only warns, see check_warnings).
+ACTORS = {"human": ("Person",), "ai": ("Service", "Application"), "machine": ("Service",)}
 TASK_TYPES = {"call", "do", "emit", "for", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"}
 KINDS = ("objective", "subjective")
 FLOW_WORDS = {"continue", "exit", "end"}
 ACTOR, ATYPE, GATE = "freesynergy.net:actor", "freesynergy.net:actor-type", "freesynergy.net:gate"
 KIND = "freesynergy.net:kind"
+BOTSEAT = "freesynergy.net:bot-seat"
+# Optional step metadata of ADR 0105 E1 (role, needs, effort, bot-seat, separate-from, compensate) has no value rules (the ADR states none), so it is not
+# checked here: unknown `freesynergy.net:` keys are never an error.
+# ADR 0105 decision 2=B: a missing bot-seat is a warning until the date set at the workflow release, from then on an error.
+# Set BOTSEAT_ERROR_FROM to that date (ISO `YYYY-MM-DD`, UTC) at the release; None = off (warning only). The environment variable
+# FS_BOTSEAT_ERROR_FROM overrides it (used by the self test scripts/test_check_workflows_warn.sh).
+BOTSEAT_ERROR_FROM = None
+
+
+def botseat_is_error(today=None):
+    """True from the configured date on (ADR 0105 decision 2=B); never with no date; a malformed date is a configuration error."""
+    raw = os.environ.get("FS_BOTSEAT_ERROR_FROM", BOTSEAT_ERROR_FROM)
+    if not raw:
+        return False
+    return (today or datetime.date.today()) >= datetime.date.fromisoformat(raw)
 
 
 def check_step(item, seen, where):
@@ -50,13 +68,34 @@ def check_step(item, seen, where):
     actor = meta.get(ACTOR)
     if actor not in ACTORS:
         problems.append(f"{where}: {ACTOR} is {actor!r}, allowed: {', '.join(ACTORS)}")
-    elif meta.get(ATYPE) != ACTORS[actor]:
-        problems.append(f"{where}: {ATYPE} must be {ACTORS[actor]} for actor {actor}")
+    elif meta.get(ATYPE) not in ACTORS[actor]:
+        problems.append(f"{where}: {ATYPE} must be {' or '.join(ACTORS[actor])} for actor {actor}")
     if not isinstance(meta.get(GATE), str) or not meta[GATE].strip():
         problems.append(f"{where}: {GATE} is missing (a name, or `none`)")
     if meta.get(KIND) not in KINDS:
         problems.append(f"{where}: {KIND} is {meta.get(KIND)!r}, allowed: {', '.join(KINDS)}")
+    if not meta.get(BOTSEAT) and actor == "ai" and botseat_is_error():
+        problems.append(f"{where}: ADR 0105 E1: {BOTSEAT} is missing (an error since BOTSEAT_ERROR_FROM)")
     return problems
+
+
+def check_warnings(doc):
+    """Warnings (printed as `warn`, never change the exit code): ADR 0105 E1 (bot-seat) and decision 8 (ai = Service)."""
+    warns = []
+    steps = doc.get("do") if isinstance(doc, dict) else None
+    for i, item in enumerate(steps if isinstance(steps, list) else []):
+        if not isinstance(item, dict) or len(item) != 1:
+            continue
+        ((name, task),) = item.items()
+        meta = task.get("metadata") if isinstance(task, dict) else None
+        if not isinstance(meta, dict) or meta.get(ACTOR) != "ai":
+            continue
+        where = f"do[{i}] step {name!r}"
+        if not meta.get(BOTSEAT) and not botseat_is_error():
+            warns.append(f"{where}: ADR 0105 E1: bot-seat fehlt; wird Fehler ab BOTSEAT_ERROR_FROM (Datum zum Workflow-Release, heute aus)")
+        if meta.get(ATYPE) == "Application":
+            warns.append(f"{where}: ADR 0105 decision 8: actor-type Application for an ai step, Service expected")
+    return warns
 
 
 def check_states(head, step_names, rules):
@@ -159,6 +198,7 @@ def main(argv):
         print(f"{folder}: no workflow files")
         return 1
     bad = 0
+    warned = 0
     rules_path = os.path.join(folder, runrules.RULES_FILE)
     rules = None
     try:
@@ -190,6 +230,11 @@ def main(argv):
         for p in problems:
             print(f"{rel}: {p}")
             bad += 1
+        for w in check_warnings(doc):
+            print(f"warn  {rel}: {w}")
+            warned += 1
+    if warned:
+        print(f"{warned} warning(s) (do not change the exit code)")
     if not bad:
         print(f"{len(files)} workflow file(s) ok")
     return 1 if bad else 0

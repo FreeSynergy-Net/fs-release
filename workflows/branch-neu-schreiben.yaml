@@ -60,7 +60,8 @@ do:
       then: identitaet-nach
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: branch-neu-schreiben.neu-schreiben
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "In an own worktree: author AND committer of every commit become the identity FS_ALLOWED_IDENTITY (`git rebase --exec` with `git commit --amend --no-edit --reset-author`, with the identity set by `-c user.name -c user.email`), WIP commits are removed (squashed into the commit they belong to, no commit with WIP in the subject), the messages keep the footer of the order. The content stays the same - only history changes."
@@ -74,7 +75,8 @@ do:
         allowed_identity_key: FS_ALLOWED_IDENTITY
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: branch-neu-schreiben.rebase
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "One branch of the chain onto the current main. Conflicts: CHANGELOG - first ALL entries of main, then the entries of the branch under ONE `## Unreleased`; usage.md and README (de and en) - both sides kept, no sentence lost; the file counter (FILES in tests/support/workflows.rs and every number in the texts) is COUNTED again on the result, never added up by hand. A rebase can write the LOCAL agent name as committer: therefore `--reset-author` and `--exec` with the explicit identity (`git -c user.name -c user.email`); the identity check of the next step decides, not the belief. After the rebase the gates run once (step `gates`)."
@@ -194,7 +196,8 @@ do:
         as: '${ $context + { pruefung: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: branch-neu-schreiben.neues-ja
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "A new head is a NEW head: the earlier JA is void and a new review (mode delta of `review`: only the diff old head to new head, the CI of the branch attached) decides; the new head is reported with its hash. The result is `pruefung` (`verdict`, `runde`)."

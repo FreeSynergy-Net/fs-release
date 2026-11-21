@@ -20,7 +20,8 @@ do:
         as: '${ $context + { befund: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. For scaffold crates (e.g. fs-conformance) the existing `Report` copies and conformance frames are looked at and extended first. The following steps read `befund`; nothing is built without it."
@@ -119,7 +120,8 @@ do:
         name: ${ .input.name }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.standard-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Prove the standard per method or field (URI and section) or write an own open specification; nothing is invented."
@@ -174,7 +176,8 @@ do:
         ort: ${ $context.ort }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.kommunikation
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The way by closeness (plan section b2.0): near = WebAssembly, without a program = Cap'n Proto, far away = Cap'n Proto, JSON or gRPC. The process model is named as well (supplement G2b point 4). Way, process model and reason go into the manifest."
@@ -185,7 +188,8 @@ do:
         art: ${ .input.art }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.beschreibung
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Module description: contract part, kits, `accepts`, duties (plan section b2.3: data of others only through a contract, own data with export, import, share, delete, media type, version)."
@@ -228,7 +232,8 @@ do:
         as: '${ $context + { urteil: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.trait-review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Own review step of Opus (NOT the flow `trait-delta`): report, line 1 YES or NO for the description. Reads only; no build."
@@ -259,7 +264,8 @@ do:
         befund: ${ $context.befund }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.anlegen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Create the crate in the target repo and the manifest (AppStream `addon`, `extends`, `fs:requires`) on a branch `unreviewed/modul-<name>`; local commit, no push."
@@ -300,7 +306,8 @@ do:
         name: ${ .input.name }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.katalog-vorschlag
         freesynergy.net:gate: strategie-ok
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Catalog proposal: an entry `kind = module` (ADR 0077) as a diff, not pushed; the strategy approves the entry."
@@ -342,7 +349,8 @@ do:
         hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.doku-hilfe
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`, default `programs/apps/<programm>/index.md`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
@@ -384,7 +392,8 @@ do:
       then: end
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.bericht
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Report: place (crates.io candidate or group repo), way, users, standard, the branch and the catalog diff; what is not proven is named."

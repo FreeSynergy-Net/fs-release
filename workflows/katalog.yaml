@@ -76,7 +76,8 @@ do:
         as: '${ $context + { kette: ($context.kette + { aktuell: ($context.kette.aktuell + { head: .head }) }) } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: katalog.eintrag
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "In an own worktree of fs-catalog, branch `unreviewed/catalog-<program>` (the branch of `kette.aktuell`; the result carries the NEW head, a changed entry is a new head and needs a new JA): mode `neu` adds the entry in packages.toml, `heben` raises the tag of an existing entry, `entfernen` removes the entry (with its `replaces` or retired-name note if the order says so). Only packages.toml and the docs of the repo change; the CHANGELOG gets one entry."
@@ -135,7 +136,8 @@ do:
         as: '${ $context + { pruefung: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: katalog.frische-pruefung
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Fresh review by Opus (a new instance, not the author) of exactly this head: sub-workflow `review`, the checks of the steps above attached; a JA is bound to this head (`kette.aktuell.head`, after a rebase the NEW one, never `.input.head`), a new head needs a new JA. The result is `pruefung` (`verdict`, `runde`)."

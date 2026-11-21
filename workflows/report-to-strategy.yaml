@@ -11,9 +11,12 @@ do:
       with:
         workflow: ${ .input.workflow }
         run: ${ .input.run }
+      export:
+        as: '${ $context + { report: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: report-to-strategy.gather
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Collects only the workflow, the run id, the result or blocker, the images and the costs; nothing else goes in.
@@ -21,15 +24,32 @@ do:
       call: list-questions:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: report-to-strategy.questions
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Open questions come last, one per line, so that the strategy can answer them one by one.
+  - arbeitsliste:
+      if: ${ ($context.report.goal_reached // false) | not }
+      call: work-list:0.0.16@fs
+      with:
+        workflow: ${ .input.workflow }
+        report: ${ $context.report }
+      export:
+        as: '${ $context + { arbeitsliste: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: report-to-strategy.arbeitsliste
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Runs only when the goal was not reached (`if`); MANDATORY then (user rule 20.11.): never report only `blocked`. The agent keeps going as far as it can and delivers a WORK LIST: (1) the concrete steps still to do, (2) the errors with file:line, error text and cause if known, (3) what is missing (decision, dependency, tool). Each entry is small enough to become the next order. The list goes into the branch report (_bericht/BERICHT.md) and every open item as a new `[ ]` line into _bericht/FEATURES.md (the coordinator copies them into .scratch/FEATURES-OFFEN.md in the fitting section, CLAUDE.md section 6). A report of an unfinished goal without this list is red; a plain `blocked` or `es klemmt` is not a result."
   - send:
       call: send-report:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: report-to-strategy.send
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Hands the report over; the state changes to sent, whatever the answer is.

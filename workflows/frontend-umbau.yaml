@@ -21,7 +21,8 @@ do:
         as: '${ $context + { befund: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. The following steps read `befund`; nothing is built without it."
@@ -67,7 +68,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.texte
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: First the texts, then the tokens, in the same run per crate. The agent moves every fixed text of the group to `Words` with MF2 messages (ADR 0057, not Fluent), German and English together; own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT].
@@ -117,7 +119,8 @@ do:
         as: '${ $context + { assign: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.assign
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent maps every counted value to a DTCG token and every block to its fixed contract name (WAI-ARIA, Open UI); a value without a fitting token is listed, not invented.
@@ -132,7 +135,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.bruecke
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Before a painted copy is replaced by a real Blinc block - the agent gives every Blinc block of the group its fixed contract name with parts and states (WAI-ARIA, Open UI) and the `blinc` entry (class and state selectors) and maps the DTCG tokens to the Blinc theme slots, the generated style sheet and the wrapper; nothing may stay in the Blinc default look (ADR 0074, one style for everything). Plan /srv/FreeSynergy/.scratch/plan-theme-bruecke.md. Own worktree, local commits, no push, no tag.
@@ -146,7 +150,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.alle-stile-erweitern
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Fixed step of the flow that introduces a block, part or state - a new version of the theme contract, and EVERY existing style gets an explicit entry for it (mostly only assigning tokens; no silent gaps). Own worktree, local commits, no push, no tag.
@@ -228,7 +233,8 @@ do:
         delta: ${ .input.delta }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.convert
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent replaces fixed colors, spacings and names by tokens and contract names and keeps the arrangement in its own layer. Own worktree, local commits ([COMMIT]), no push, no tag; report per [BERICHT]. The loop back from `repeat` runs until the script counts 0 fixed colors and spacings.
@@ -287,7 +293,8 @@ do:
         as: '${ $context + { komponenten: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.frontend-nur-komponenten
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Review template frontend (rule of the user, lane 3): the frontend crate (input `frontend_crate`) contains ONLY the plugging together of components from fs-components plus theme, style, menu tree and texts: no logic, no own widgets, no data conversion. A new widget or logic is a FINDING (result `befunde`, each with file and line): a missing component is built in fs-components (or the nearest existing component stands in, marked \"vorläufig\"), logic belongs into the program or the modules through the contract. Until the frontend is a description (manifest / forms kit, read at run time) the plug-together code is a transition. Opus reads only the crate and writes the findings; it changes nothing."

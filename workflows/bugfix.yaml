@@ -26,7 +26,8 @@ do:
         task: write a test that reproduces ${ .input.finding }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bugfix.reproduce
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent writes a test that fails for exactly this bug (red); repeat until it is red for the right reason. Commands one at a time ([BASH]), local commits ([COMMIT]).
@@ -40,7 +41,8 @@ do:
         task: fix the code, change no test
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: bugfix.fix
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent changes the code in its own worktree and commits locally ([COMMIT]); no push, no tag; the report follows [BERICHT] (finding, cause, fix, gates).

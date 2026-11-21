@@ -46,7 +46,8 @@ do:
         as: '${ $context + { belegt: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.belegen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent PROVES what the request says: a reproduction (steps, version, measured numbers) or the source (file and line at the pinned version and at upstream main); read only, in its own directory. Nothing unproven is asked or claimed. Result `belegt` with `belegt` (true only with a reproduction or a source) and the evidence."
@@ -72,7 +73,8 @@ do:
         as: '${ $context + { dubletten: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.dubletten
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent searches the tracker of the upstream (issues open and closed, by keywords of the request) READ ONLY: no login, no comment, no reaction, no new issue. A hit that says the same is a duplicate. Result `dubletten` with `treffer` (the list of hits with link) - the search and its keywords are named, never `none` without a search."
@@ -112,7 +114,8 @@ do:
         as: '${ $context + { draft: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.draft
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body; it names the git-bug id of the ticket; NO AI words and NO address or personal data, no pull request, no comment in a foreign issue.
@@ -240,7 +243,8 @@ do:
         channel: ${ $context.channel }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.record
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The agent notes the history - upstream, channel, issue id (none for `direct`), date, the approved text, later answers - in the report; no planning files in the upstream.

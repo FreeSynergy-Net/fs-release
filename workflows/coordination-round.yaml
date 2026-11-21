@@ -26,7 +26,8 @@ do:
       call: read-run-result:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: coordination-round.evaluate
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Evaluates every finished run - its report, its commits, what is proven and what is not.
@@ -48,7 +49,8 @@ do:
           head: ${ .input.branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: coordination-round.review
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Starts the Opus review of the finished head (review.yaml).
@@ -68,7 +70,8 @@ do:
       call: report-need:0.0.16@fs
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: coordination-round.report-need
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Decides whether the strategy needs a report; if so report-to-strategy.yaml runs. A report only on red, at a gate or when a result is finished.

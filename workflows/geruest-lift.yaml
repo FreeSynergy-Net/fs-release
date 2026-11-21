@@ -19,7 +19,8 @@ do:
         skeleton_neu: ${ .input.skeleton_neu }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-lift.bauplan-anheben
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "INACTIVE until `fs-blueprint` exists. Raise `skeleton` in the blueprint of the program to `skeleton_neu` (local commit on `unreviewed/geruest-lift-<programm>`, no push)."

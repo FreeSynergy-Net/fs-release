@@ -28,7 +28,8 @@ do:
         as: '${ $context + { befund: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP (rule of the user: before anything is built, look whether it already exists and whether it is only extended): search ALL repos, the `unreviewed/` branches, `.scratch` and the inventories (`katalog-plan/INVENTUR-*.md`). Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof. The following steps read `befund`; nothing is built without it."
@@ -92,7 +93,8 @@ do:
         dossier: ${ .input.dossier }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.recherche
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Haiku (reads and writes notes only, never code) - the model named in `.input.vorbild` (the choice of the strategy; missing: ask, never pick one yourself); a model dossier of at most one page for the FIRST frontend: states, menus, three workflows; existing dossiers under docs/*/programs/apps/<x>/frontends/ are used first. Foreign pictures are never quoted."
@@ -106,7 +108,8 @@ do:
         as: '${ $context + { features: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.feature-liste
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Runs the flow `feature-liste` (`workflows/feature-liste.yaml` of fs-release, in main): the complete feature list from the research goes to fs-documentation `todo/features/<programm>.md`, sorted into today / next / later (`- [ ]`/`- [x]`; note \"Feature-Freeze: offen (Nutzer)\"). `fenster` and `nutzer-doku` read \"today\" and \"next\" from this list (`$context.features`), not from an own input. It also delivers `vorbild` (`features.vorbild` is the model of `.input.vorbild` from the `recherche` dossier, with its pictures) and `hauptansicht` (areas and controls of the main view, from the plan table of the program) as RESULTS (`$context.features.vorbild`, `$context.features.hauptansicht`), read by `hauptansicht`. There is no own input `was_kommt`; it is a RESULT of this step. The flow `feature-liste` is in main."
@@ -119,7 +122,8 @@ do:
         as: '${ $context + { vertrag: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.vertrag-standard
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Contract and standard per program, at the same time as the basics and the frontend ([BRUECKE-BEIDE-SEITEN]): the trait or capnp schema in fs-interfaces and the standard it follows. If the contract is missing, the flow `trait-delta` is started (`workflows/trait-delta.yaml`, in main). The basics may start with a MINIMAL contract; the release of a feature run only when the lock file `sperren/<programm>_v1.sha256` exists (fixed point, set by the strategy, never by an agent; a lock is no feature freeze); `release-sperre` checks it (`art: feature`: a missing lock is red, never green; `art: grundfassung`: draft contract, visibly marked). `trait-delta.yaml` is in main."
@@ -145,7 +149,8 @@ do:
         branch: ${ .input.branch }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.frontend-crate
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (ADR 0094 draft, items 6 and 9, stage 1) - creates the crate `crates/fs-<programm>-<frontend>` with `[[bin]] fs-<programm>-<frontend>`, depending only on the client `fs-<programm>-client` and fs-components (never on -core or -server); the manifest `packaging/frontends/<frontend>.metainfo.xml` (AppStream addon with `<extends>`, `<requires>`, `fs:frontend-id`, `fs:exec`, `fs:contract`); the starter in `fs-<programm>` (secure the server, start the frontend, fallback to the standard frontend with a visible message); a handshake test with a wrong contract version (exit code 3 and a message, never silent); a `cargo tree` check that no dependency leads to -core or -server. The frontend is its own process with a frontend manifest (program, contract and version, capabilities, start command); at least one frontend is mandatory. The manifest format is AppStream per the ADR draft 0094 (the review proposed TOML `~/.local/share/freesynergy/frontend/<programm>/<id>.toml` until the ADR gap is closed: open decision). Own package `fs-<programm>-<frontend>` in the same release (deb/rpm) (stage 1)."
@@ -169,7 +174,8 @@ do:
         frontend: ${ .input.frontend }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.fenster
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - fills the crate `fs-<programm>-<frontend>` made by `frontend-crate` (no window compiled into the program) with fs-components (blocks first, none painted by hand): a window with the name, the icon and the list `was_kommt` (`$context.features.was_kommt`); PLACEHOLDER RULE (17 Nov.): a component or an icon that is missing is NOT replaced by a PNG placeholder but by the nearest EXISTING component (it may do less), honestly marked \"vorläufig\" (tooltip or hint in the window) and written into the gap list \"Lücken\" (DESIGN of the program) with the name of the missing real component (built in the background by lane 1, it replaces the stand-in later); elements that do not work yet are locked with \"kommt noch\" (ADR 0066), no grey window without a reason, STOP-KI wherever AI is used. Engine and frontend stay separate processes and crates."
@@ -182,7 +188,8 @@ do:
         ansicht: ${ $context.features.hauptansicht }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.hauptansicht
         freesynergy.net:gate: bilder-gate
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (rule AUSSEHEN-SOFORT, b7 17 Nov.; specification: the workflow `main-view-ai:0.0.16@fs` has no script yet) - adds the FIRST REAL main view in the look of the model to the crate `fs-<programm>-<frontend>` as start page next to `Start` and `Was kommt` (screen `main`, pictures `--picture --screen main|main-empty`). Plan table per program: draw = board with tool bar and canvas; messages = conversation list, history, input; resources = list and detail; forms = form list and editor view; activities = timeline; broadcast = dashboard; decisions, workflows, data, paint likewise from their model dossier. Built ONLY from existing fs-components blocks (placeholder rule: the nearest existing component, marked \"vorläufig\", gap list \"Lücken\" in DESIGN, no PNG). Example data ONLY in `fs-<programm>-<frontend>/src/preview.rs` (typed, ids with the prefix `preview:`, no real personal data, never in core, server or client, never stored, exported or sent over the contract); `mode(capabilities)` switches them off as soon as the capability to read the area is there (per area never mixed); every write action in the preview is locked with a reason. Preview marker EXACTLY ONCE: an Alert (Info, title \"Vorschau\" / \"Preview\") at the top plus the title addition; per row at most the example name. LESSONS [AUSSEHEN-LEHREN], built against the model PICTURE, not against the plan text: navigation as a LEFT bar with symbols (the title of the main area = the active filter); groups as LARGE headings; rows with type symbol left, sentence with the object name in bold, time right and NO coloured badges per row; readable font size like the model and generous white space; an empty state with symbol and explanatory text (`main-empty`). Gate (picture gate `bilder-gate`): the picture pair model | ours with the SAME filter and state, see `bildpaar`; without the pair and the picture OK of the strategy there is no tag."
@@ -193,7 +200,8 @@ do:
         beschreibung: ${ .input.beschreibung }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.manifest
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the package metadata in `Cargo.toml` (authors, description, license, repository, rust-version) and the AppStream metadata in schema 1 WITHOUT `<icon>` (the icon comes with fs-packages 0.0.19 and schema 2); no invented fields."
@@ -206,7 +214,8 @@ do:
         docs: ${ .input.docs }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.nutzer-doku
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the user documentation stub in fs-documentation, docs/de and docs/en `programs/apps/<x>/index.md`: what it is, what it can do today, what comes, picture. The picture is the real window (no PNG placeholder: what is missing in the window is a stand-in component marked \"vorläufig\" and listed under \"Lücken\" in DESIGN); own work only, no foreign logos."
@@ -217,7 +226,8 @@ do:
         hilfe_marker: ${ .input.hilfe_marker // "fs:help" }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.doku-hilfe
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Help = docs after ADR 0072 [akz.] (the manual in the wiki, blocks with purpose `help.<topic>`; supplement G2b point 1): prove that the program page in fs-documentation (`docs/en` and `docs/de`, input `programmseite`, default `programs/apps/<programm>/index.md`) has the MARKED help part, the block with purpose `help.<topic>` from the manual in the wiki (marker `hilfe_marker`, default `fs:help`); if not, a placeholder block is created. The help block reads only this part through fs-texts: one source, never a second text. No help text is written into the program repo."
@@ -258,7 +268,8 @@ do:
         repo: ${ .input.repo }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.aufrufer
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - `.github/workflows/check.yml` and `release.yml` as callers of fs-release at `@v0.0.10` (examples/callers), pinned with `scripts/pin-refs.sh --dir <repo> v0.0.10`; `release.yml` with `kind: app`; `macos: false` and `windows-targets: \"\"` (decision of the strategy: the first version is Linux only, said honestly in README and catalog: \"Linux (Windows/macOS follow)\"); ALL `uses:` lines in `release.yml` and `check.yml` at `@v0.0.10` (or the newest chain), none at an older tag."
@@ -268,7 +279,8 @@ do:
         repo: ${ .input.repo }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.lock-sources
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - `.fs-lock-sources.toml` with `strict = true` (the lock check of fs-release, ADR 0092 rule 2); a Cargo.lock with the pinned sources is checked in."
@@ -280,7 +292,8 @@ do:
         was_kommt: ${ $context.features.was_kommt }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.changelog-readme
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - README (en, de) and CHANGELOG (en, de) of the new program: a first entry, what it is, what comes (`$context.features.was_kommt`); no promise beyond it. DESIGN gets \"The basics\" and the gap list \"Lücken\" (every stand-in component marked \"vorläufig\", see `fenster`). README and catalog say \"Contract: draft\" for `art: grundfassung`; the platforms are stated honestly: \"Linux (Windows/macOS follow)\". The version is the tag (versions may currently jump, e.g. the basics directly v0.0.2; later no longer, the user announces it)."
@@ -302,7 +315,8 @@ do:
         as: '${ $context + { lehren: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.lehren-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Check points from the six basics (draw, messages, resources, forms, activities, tasks) - the result `lehren` is `red` or not, each point with evidence: (1) the `capabilities` result type of each contract (CapabilityList or flat) is read from fs-interfaces and the server answers with exactly that type; (2) `CONTRACT_VERSION` in the server when the core has none; (3) `release.yml`: ALL `uses` at `@v0.0.10` (or the newest chain); (4) `--version`, `-V`, `--help` answer BEFORE any window or socket, proven with `env -i`; (5) deb `depends = \"$auto, fs-<x>-simple (>= v)\"` (not the binary version) and the matching rpm requires; AppStream `compare=\"ge\"` in the metainfo; (6) tests: a Mutex around handshake tests (one server per process stops), ETXTBSY protection for stub starters (close and sync the file before exec); (7) Windows is said honestly (\"Linux (Windows/macOS follow)\"); (8) error texts: since the fs-rpc error codes the display uses `message_key()` and `params()` with MF2 de/en (ADR 0057), no English sentence from a library reaches the user; (9) the data folder is created only through `create_private` / `prepare_data_dir` (lesson fs-tasks: 0755); (10) the placeholder rule is kept (no PNG, stand-ins marked \"vorläufig\", gap list in DESIGN); (11) main view present (screen `main`), preview marker and `main-empty` picture exist, `mode()` test plus mutant, no real personal data in `preview.rs`, the lessons AUSSEHEN-LEHREN are met (left bar with symbols, large headings, rows without badges, readable font, empty state with symbol); (12) the test `server-unresponsive` exists and is green (missing = red); (13) the slot rule is kept (code written without a slot, built only after the release of a slot). Carries red and runde (+1 for each jump back from `gates-again`)."
@@ -350,7 +364,8 @@ do:
         as: '${ $context + { doku: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.doku
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mandatory gate (rule doku-mitziehen) as a check AFTER nutzer-doku - sub-workflow doku-mitziehen.yaml checks only places and consistency; red stops before the picture."
@@ -415,7 +430,8 @@ do:
         as: '${ $context + { komponenten: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.frontend-nur-komponenten
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Review template frontend (rule of the user, lane 3): the frontend crate (input `frontend_crate`) contains ONLY the plugging together of components from fs-components plus theme, style, menu tree and texts: no logic, no own widgets, no data conversion. A new widget or logic is a FINDING (result `befunde`, each with file and line): a missing component is built in fs-components (or the nearest existing component stands in, marked \"vorläufig\"), logic belongs into the program or the modules through the contract. Until the frontend is a description (manifest / forms kit, read at run time) the plug-together code is a transition. Opus reads only the crate and writes the findings; it changes nothing."
@@ -466,7 +482,8 @@ do:
         as: '${ $context + { verdict: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.picture-ok
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "No picture OK of the user is needed (decision b7, 17 Nov.): the STRATEGY looks at the pictures (window, main view and documentation picture, side by side with the model as a pair with the same filter and state, `bildpaar`, the `dossier` handed over like in `frontend-round`) and gives the verdict; the result is `accepted`. Pictures without a green `waechter` (`red == false`) are no evidence. Without a verdict the flow does not go on."
@@ -508,7 +525,8 @@ do:
         tag: ${ .input.tag }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.katalog-vorschlag
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - a DIFF for fs-catalog (two entries, program and frontend; for `art: grundfassung` the description and the README say \"Contract: draft\"; with `kind = frontend` and `requires` = the capability; schema 1 until fs-packages 0.0.19, description en and de), written as a patch file in the report; it is NOT pushed. The catalog change itself is `catalog-bump` after the release."
@@ -523,7 +541,8 @@ do:
         as: '${ $context + { zusammenfassung: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.zusammenfassung
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet - the result of the run: `was_kommt` (from `feature-liste`, `$context.features.was_kommt`, no own input), the gap list \"Lücken\" (every stand-in component marked \"vorläufig\" with the name of the missing real component; no PNG placeholder), the contract state (draft or locked), the version = tag (versions may currently jump, e.g. the basics directly v0.0.2; later no longer; the user announces it) and the verdict of the strategy, the state of the main view (preview marker, picture pairs `main` and `main-empty`) and the bundle answer. Honest: what is only a stand-in is said as such."
@@ -579,7 +598,8 @@ do:
         as: '${ $context + { buendel: . } }'
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: grundfassung.buendel-frage
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Decision question to the STRATEGY before every release ([BUENDEL-RELEASE], b7 17 Nov.): \"Bundle complete? Otherwise keep collecting.\" The question names the content of the bundle - the functions, the fixes and the dependencies (pins) that go out with this tag; at most ONE release per program and day. The answer is `buendel` with `vollstaendig` (true/false) and `blocker` (true only for a blocker for the user: program does not start, data loss, security). Every release costs CI time and a signing release of the user. No answer is no yes."

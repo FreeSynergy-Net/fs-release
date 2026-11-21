@@ -32,7 +32,8 @@ do:
         bericht: ${ $context.bericht }
       metadata:
         freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Application
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: release-umgebung-pruefen.melden
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Hands the table (workflow, run, result) to the strategy; names every repo that is WARN or FEHLT and the rulesets finding. The AI changes nothing on GitHub and does not call `gh` itself.
