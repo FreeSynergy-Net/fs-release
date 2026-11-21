@@ -13,14 +13,14 @@ Makes the data package of a program from a blueprint (`scaffold.toml`, schema 2,
    It writes NO `Cargo.toml`, no Rust source and no `crates/` folder (finding `code-in-program`). The example `examples/leer` in the fs-release checkout (one file, `scaffold.toml`) gives the line `made leer (written 7, kept 0)`; the tree then holds 8 files, because the blueprint itself is copied in as well.
 
    `fs-blueprint check --repo . [--drift]` checks a repo; `--talks DIR` names the folder of the talk records, `--lang de` gives the messages in German, `--catalog FILE` adds your own capabilities.
-3. Next: `cd fs-myprogram` and commit the data package. The program runs through the modules and the host `fs-starter <package-path>`, which opens the package; nothing is generated into a `-bin` crate. Code is only possible as an exception with a talk record (`code-in-program`).
+3. Next: `cd fs-myprogram` and commit the data package. The program runs through the modules and the host `fs-starter` (a separate repository, see its README), which opens the data package; no `-bin` crate is generated (ADR 0105). Code is only possible as an exception with a talk record (`code-in-program`).
 
 ## The parts of a blueprint
 
 - `[contract] provides` is a list of `{ contract = "dependency.evaluate", version = "0.1" }`. It only NAMES contracts of fs-interfaces (checked against the catalog rows `[[contract]]`: `contract-unknown`, `contract-version-invalid`). No `interface` is generated; a program without own types has no contract text.
 - Every field of an own type names exactly one of `kit`, `basic`, `nested` or `reference` (`field-kind-both`, `field-kind-missing`).
 - `nested = "<OwnType>"`: a child table `<parent>_<field>` with the columns `id`, `owner`, `pos`. A single value gets `UNIQUE (owner)`, a list `UNIQUE (owner, pos)`. In the contract text the child is a struct inside the parent, `List(Child)` when the field is `multiple`. Cycles and a type nested twice are findings (`nested-cycle`, `nested-twice`).
-- `reference = "<OwnType>|IRI"`: a column when single; when `multiple` a link table with `owner`, `pos` and `target` (`INTEGER` referencing the own table, or `TEXT` for an IRI). In the contract text `List(Int64)` for an own type, `List(Text)` for an IRI. A reference to a type that is only nested is refused (`reference-to-nested`); two types or fields that would make the same table are refused (`table-collides`); a field `id` is refused (`column-collides`).
+- `reference = "<OwnType>|IRI"`: a column when single; when `multiple` a link table with `owner`, `pos` and `target` (`INTEGER` referencing the own table, or `TEXT` for an IRI). In the contract text `List(Int64)` for an own type, `List(Text)` for an IRI. A reference to a type that is only nested is refused (`reference-to-nested`); two types or fields that would make the same table are refused (`table-collides`); `column-collides` refuses a field `id` in a top-level type, and in a nested type a field `id`, `owner` or `pos`; only fields that are neither `multiple` nor `nested` are checked.
 - A type that is only nested needs no standard, envelope or media type.
 - Tables are typed (`INTEGER`, `TEXT`, snake_case columns); there is no JSON or blob column. Every table and column name is quoted in the SQL.
 - The contract text is append-only against the one already in the target: a field, method or type may only be added at the end. Inserting, reordering, deleting or changing a type is `contract-append-only`; nothing is written then. Nested structs count as well.
@@ -33,7 +33,7 @@ The generated `check.yml` has three jobs. `kind` looks whether the repo has a `C
 
 ## Findings
 
-Every finding is a code with named parameters; the sentence comes from the message catalog (`src/messages.rs`, en and de). `skeleton-part-pending` is a warning, all others are errors.
+Every finding is a code with named parameters; the sentence comes from the message catalog (`src/messages.rs`, en and de). A finding is an error, except `skeleton-part-pending` (a warning) and a finding of a rule set to `Warn` (a warning as well); the generated CI runs the check with `blueprint: warn`.
 
 Schema, names and versions:
 
