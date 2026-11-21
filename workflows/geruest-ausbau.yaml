@@ -1,0 +1,110 @@
+# Scaffold build-out (user 20.11. ~11:30, 3 slots scaffold : 1 slot forms): bring fs-blueprint up to the E4 acceptance. Objective flow: REPEAT until the E4 check is green (rule: objective = repeat until the target is reached).
+# E1 `fs-blueprint new` creates ONLY a data package (+ check CI, rule `code-in-program`). E3 contract (capnp, fs-interfaces `schema/`) + DB tables (typed columns, ADR 0086) generated from the data types.
+# E2 host mandatory parts in fs-starter (settings, help, session, update, MCP), taken from blueprint/forms, never written by hand in a program. E4 = forms itself generated with `fs-blueprint new`, runs through fs-starter with settings, views and help; pictures.
+# While working ONLY `cargo check -p <crate>` (CLAUDE.md section 4); when a module is finished ONE `testlauf` stage `ende` for that module, bottom up. Agents never push, tag or merge (coordinator). Time box 60 min per order (section 4a).
+# Dependencies against local heads via [patch] (section 4b); tags only at the bundled release. Slots: three workers, one per track (E1, E3, E2) in own worktrees `unreviewed/scaffold-e1|e2|e3`; E4 is run by the coordinator when all three are green.
+# Order: `Workflow geruest-ausbau, step <id>, parameters spur, repo, branch` (docs/prompt-template.md). FS profile: see README.md. Every check is green only when it says so (`red == false`); a missing result is never green.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: geruest-ausbau
+  version: 0.0.17
+  title: "Scaffold build-out E1-E3 until the E4 acceptance is green: data-package generator, contract and tables, host mandatory parts"
+do:
+  - bestand:
+      call: inventory-ai:0.0.17@fs
+      with:
+        spur: ${ .input.spur }
+        repo: ${ .input.repo }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-ausbau.bestand
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Haiku (read only) - inventory per track: what of E1, E2, E3 already exists (fs-blueprint, fs-starter, fs-interfaces schema, FEATURES-OFFEN section 2), as `vorhanden | fehlt` with file and line; existing parts are extended, never rebuilt (rule: existing first). Report only."
+  - e1-new-daten:
+      call: build-ai:0.0.17@fs
+      with:
+        spur: e1
+        repo: ${ .input.repo }
+        branch: unreviewed/scaffold-e1
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-ausbau.e1-new-daten
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet worker - track E1: `fs-blueprint new` writes ONLY a data package (types, no program code) plus a check CI; a rule check `code-in-program` is red when a program repo holds code that the blueprint should generate. Nothing is written on error. `cargo check -p fs-blueprint` while working."
+  - e3-vertrag-db:
+      call: build-ai:0.0.17@fs
+      with:
+        spur: e3
+        repo: ${ .input.repo }
+        branch: unreviewed/scaffold-e3
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-ausbau.e3-vertrag-db
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet worker - track E3: from the data types of a package generate the contract (capnp in fs-interfaces `schema/`, trait fixpoint under `sperren/`) and the DB tables with typed columns (no JSON or TOML as storage). Same types give the same output (check: two runs, identical bytes)."
+  - e2-host-pflicht:
+      call: build-ai:0.0.17@fs
+      with:
+        spur: e2
+        repo: ${ .input.repo }
+        branch: unreviewed/scaffold-e2
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: geruest-ausbau.e2-host-pflicht
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sonnet worker - track E2: the host mandatory parts in fs-starter (settings, help, session, update, MCP) come from blueprint and forms descriptions; a program never writes them by hand. Starts after fs-starter v0.0.2 is tagged; until then work against the local head by [patch]."
+  - modul-test:
+      call: testlauf-ende:0.0.17@fs
+      with:
+        spur: ${ .input.spur }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script - per finished module ONE `testlauf` stage `ende`, only that module (`-p`), bottom up; then the module is frozen. `cargo check -p` while working, no tests. A missing result is red."
+  - abnahme-e4:
+      call: e4-check:0.0.17@fs
+      export:
+        as: '${ $context + { e4: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script and agent - E4 check: forms is generated with `fs-blueprint new` from its data package, builds, starts through fs-starter and shows settings, views and help; pictures are taken (`picture-acceptance`). Result `red` true or false with the list of what is missing per track `e1|e2|e3`."
+  - e4-weiche:
+      switch:
+        - runden:
+            when: '${ $context.e4.red and ($context.e4.runde // 0) >= 4 }'
+            then: eingabe-fehler
+        - red:
+            when: '${ $context.e4.red }'
+            then: bestand
+        - green:
+            then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - repeat until E4 is green: a red check goes back to `bestand` with the missing tracks (only those are worked again); from the 4th red round the person decides (`eingabe-fehler`); green ends the flow and reports pictures to the strategy."
+  - eingabe-fehler:
+      set:
+        todo: eingabe-fehler
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "E4 stayed red for four rounds; more rounds do not help, the person looks at the missing parts and the contradiction. This flow ends."

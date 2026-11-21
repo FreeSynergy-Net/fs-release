@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Workflows recovered from uncommitted edits of 20 Nov. that never reached main: `dossier` (new first step `blinc-org-bestand`: inventory of ALL `project-blinc` org repos from fresh clones, incl. no-licence and archived), `entscheidung` (new step `recherche` between evaluate and ask, with the fixed sources: workflowpatterns.com over plain HTTP, serverlessworkflow/specification `dsl-reference.md`; ai step as `Service` with bot seat `entscheidung.recherche`), `feature-liste` (new step `checkliste-abhaken` before `gates`), `koordinator-runde` (new step `checkliste-nachziehen` before `gates-pruefen`; checklist rule CLAUDE.md section 6), and the new flow `geruest-ausbau` (scaffold build-out E1 to E3 until the E4 acceptance; ai steps as `Service` with bot seat). All at version 0.0.17. / Aus nicht eingecheckten Änderungen vom 20.11. wiederhergestellt: `dossier` (Schritt `blinc-org-bestand`), `entscheidung` (Schritt `recherche` mit festen Quellen), `feature-liste` (`checkliste-abhaken`), `koordinator-runde` (`checkliste-nachziehen`) und der neue Ablauf `geruest-ausbau` (Gerüst-Ausbau E1 bis E3 bis zur E4-Abnahme).
+
 ## 0.0.17
 
 Released 2026-11-21 (UTC; the date of the version commit, the tag follows after the checks and the pin rounds). / Veröffentlicht am 2026-11-21 (UTC; Datum des Version-Commits, der Tag folgt nach den Prüfungen und den Pin-Runden).

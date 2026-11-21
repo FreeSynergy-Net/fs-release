@@ -149,6 +149,19 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet (text only) - short references: in the user documentation `programs/apps/<x>/index.md` (de and en) the sections \"what it can do today\" and \"what comes\" are an EXCERPT of the stages `heute` and `als Nächstes` of the list (no own enumeration, `später` is not named); and a DIFF for fs-catalog (description en and de where it changes, written as a patch file in the report, NOT pushed; the catalog change itself is `catalog-bump` after a release). The feature list itself is not linked from the published pages (`todo/` is outside `docs_dir`)."
+  - checkliste-abhaken:
+      call: checklist-tick:0.0.17@fs
+      with:
+        checklist: /srv/FreeSynergy/.scratch/FEATURES-OFFEN.md
+        reports: ${ .input.docs }
+      export:
+        as: '${ $context + { checkliste: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Checklist update (CLAUDE.md section 6, fixed by the strategy 20.11.): for every result FIND THE EXISTING LINE of `.scratch/FEATURES-OFFEN.md` BY ITS TEXT (the worker quotes it in `_bericht/FEATURES.md`) and tick it in place (`[ ]` -> `[x]` + date + short note). A NEW line only for something truly new, as `[ ]` in its fitting section. APPENDING A RESULTS SECTION IS FORBIDDEN (no `## ... (append-only)`, no `## <task> <date> (worker)`). A quoted line that is not found is reported, never appended as `[x]`. Check: `grep -c '^## .*append' FEATURES-OFFEN.md` = 0, otherwise RED. A report counts as finished only when the checklist is updated."
   - gates:
       call: check-docs:0.0.17@fs
       export:

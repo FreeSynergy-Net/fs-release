@@ -214,6 +214,19 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Evaluates every finished run - its report, its commits, what is proven and what is not."
+  - checkliste-nachziehen:
+      call: checklist-tick:0.0.17@fs
+      with:
+        checklist: /srv/FreeSynergy/.scratch/FEATURES-OFFEN.md
+        reports: ${ $context.berichte }
+      export:
+        as: '${ $context + { checkliste: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Checklist update (CLAUDE.md section 6, fixed by the strategy 20.11.): for every result FIND THE EXISTING LINE of `.scratch/FEATURES-OFFEN.md` BY ITS TEXT (the worker quotes it in `_bericht/FEATURES.md`) and tick it in place (`[ ]` -> `[x]` + date + short note). A NEW line only for something truly new, as `[ ]` in its fitting section. APPENDING A RESULTS SECTION IS FORBIDDEN (no `## ... (append-only)`, no `## <task> <date> (worker)`). A quoted line that is not found is reported, never appended as `[x]`. Check: `grep -c '^## .*append' FEATURES-OFFEN.md` = 0, otherwise RED. A report counts as finished only when the checklist is updated."
   - gates-pruefen:
       for:
         each: schritt
