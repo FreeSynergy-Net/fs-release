@@ -1,5 +1,6 @@
 //! Pattern: Template method (rule sets and the frontend of the blueprint).
 
+use crate::check_layout::unreadable;
 use crate::error::Coded;
 use crate::form::{is_covers_entry, is_kebab, is_repo_path};
 use crate::kit::Kind;
@@ -69,7 +70,15 @@ pub fn frontend(s: &mut Sink, bp: &Blueprint) {
         if !f.layout.starts_with(FORMS_DIR) || f.layout.len() == FORMS_DIR.len() {
             s.err(Coded::new("layout-outside-forms").with("path", f.layout.as_str()));
         }
-        if !s.view.exists(&f.layout) {
+        if s.view.exists(&f.layout) {
+            if let Some(cause) = s.view.read(&f.layout).as_deref().and_then(unreadable) {
+                s.err(
+                    Coded::new("layout-unreadable")
+                        .with("path", f.layout.as_str())
+                        .with("cause", cause),
+                );
+            }
+        } else {
             s.err(Coded::new("layout-not-found").with("path", f.layout.as_str()));
         }
     } else {

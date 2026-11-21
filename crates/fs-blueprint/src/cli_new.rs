@@ -3,9 +3,11 @@
 use crate::cli::{print, read_catalog, Options};
 use crate::emit::generate;
 use crate::emit::generate::planned_paths;
+use crate::emit::layout::is_toml;
 use crate::emit::write::{write, DirStore};
+use crate::emit::Class;
 use crate::error::Report;
-use crate::kit::KitCatalog;
+use crate::kit::{KitCatalog, RepoView};
 use crate::model::Blueprint;
 use crate::repo_fs::FsRepo;
 use crate::verified::verify;
@@ -81,6 +83,33 @@ fn apply(places: &[Place]) -> Result<(), String> {
     Ok(())
 }
 
+/// The view of the folder of the blueprint, plus the forms description that `new` makes itself (it is there for the check, with nothing to read).
+struct WithSeed<'a> {
+    repo: &'a FsRepo,
+    path: &'a str,
+}
+
+impl RepoView for WithSeed<'_> {
+    fn exists(&self, path: &str) -> bool {
+        (path == self.path && is_toml(path)) || self.repo.exists(path)
+    }
+    fn covers_generated(&self, path: &str) -> bool {
+        self.repo.covers_generated(path)
+    }
+    fn unowned_files(&self) -> Vec<String> {
+        self.repo.unowned_files()
+    }
+    fn main_files(&self) -> Vec<String> {
+        self.repo.main_files()
+    }
+    fn read(&self, path: &str) -> Option<String> {
+        self.repo.read(path)
+    }
+    fn talk_exists(&self, path: &str) -> bool {
+        self.repo.talk_exists(path)
+    }
+}
+
 fn same_folder(a: &Path, b: &Path) -> bool {
     matches!((a.canonicalize(), b.canonicalize()), (Ok(x), Ok(y)) if x == y)
 }
@@ -130,16 +159,21 @@ fn run_new_with(o: &Options, out: &mut dyn Write, between: &dyn Fn()) -> Result<
             )
         }
     };
-    let view = FsRepo::new(
+    let repo = FsRepo::new(
         source,
         planned_paths(&bp, &catalog as &dyn KitCatalog),
         o.talks.clone(),
     );
+    // `new` makes the forms description when the author brought none
+    let view = WithSeed {
+        repo: &repo,
+        path: &bp.frontend.layout,
+    };
     let verified = match verify(&bp, &catalog, &view, &o.rules) {
         Ok(v) => v,
         Err(report) => return fail(&report, out),
     };
-    let artifacts = match generate(&verified, &catalog) {
+    let mut artifacts = match generate(&verified, &catalog) {
         Ok(a) => a,
         Err(code) => {
             return fail(
@@ -151,6 +185,10 @@ fn run_new_with(o: &Options, out: &mut dyn Write, between: &dyn Fn()) -> Result<
             )
         }
     };
+    // the forms description of the author is the one that stays: the seed is only for a program that brought none
+    artifacts.retain(|a| {
+        !(a.class == Class::Seed && a.path == bp.frontend.layout && source.join(&a.path).is_file())
+    });
     let target = o
         .out_dir
         .clone()

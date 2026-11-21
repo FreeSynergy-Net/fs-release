@@ -74,6 +74,7 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("code-in-program", "The Rust file {$path} is code in the program: a program is data, code belongs to the modules; only an exception with a talk record may keep it", "Die Rust-Datei {$path} ist Code im Programm: ein Programm besteht aus Daten, Code gehört in die Module; nur eine Ausnahme mit Gesprächsprotokoll darf sie halten"),
     ("contract-append-only", "The contract text {$path} would break the earlier one ({$what}): numbers and types are append-only, a field, method or type only at the end; nothing was written", "Der Vertragstext {$path} würde den früheren brechen ({$what}): Nummern und Typen gelten nur anhängend, ein Feld, eine Methode oder ein Typ nur am Ende; es wurde nichts geschrieben"),
     ("column-collides", "The field {$field} of the type {$type} would be a second column id next to the key column", "Das Feld {$field} des Typs {$type} wäre eine zweite Spalte id neben der Schlüsselspalte"),
+    ("layout-unreadable", "The forms description {$path} cannot be read by the forms host: {$cause}", "Die forms-Beschreibung {$path} kann der forms-Host nicht lesen: {$cause}"),
 ];
 
 /// The message of a code in `en` or `de`; `None` for an unknown code or language.

@@ -79,6 +79,19 @@ jobs:
           cat "$RUNNER_TEMP/drift.out"
           test "$rc" = 1
           grep -q 'generated-changed{path=.github/workflows/check.yml}' "$RUNNER_TEMP/drift.out"
+          # rule `code-in-program`: a hand-written .rs in the data package is red (the finding is the proof, exit code 1)
+          mkdir -p "$made/crates/x/src"
+          printf 'fn main() {}\n' > "$made/crates/x/src/lib.rs"
+          rc=0
+          "$bin" check --repo "$made" > "$RUNNER_TEMP/code.out" || rc=$?
+          cat "$RUNNER_TEMP/code.out"
+          test "$rc" = 1
+          grep -q 'code-in-program{path=crates/x/src/lib.rs}' "$RUNNER_TEMP/code.out"
+          rm -r "$made/crates"
+          # the forms description that `new` made for the example without one is readable by the head check (examples/leer ships none)
+          test -f "$RUNNER_TEMP/leer/forms/simple.toml"
+          # fs-starter (the host that opens the description) is NOT a part of this repo and is not installed here: no call, no stand-in. The window proof
+          # (`fs-starter --check` over the output of `new`) belongs to the starter's own CI against this output; a fake call here would prove nothing.
           echo "$bin" > .fs-blueprint-bin
       # Acceptance on the two real blueprints (informational: the branches may move; the expected red reasons are in the CHANGELOG and the report of the step S4).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

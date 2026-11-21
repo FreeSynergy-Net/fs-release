@@ -24,9 +24,7 @@ pub enum Slot {
     ContractId,
     /// `0.0.1`: the version of the program (`[program] version`)
     Version,
-    /// `v0.0.2`: the tag of fs-rpc of the skeleton version
-    PinRpc,
-    /// `v0.0.16`: the tag of fs-release of the skeleton version
+    /// The tag of fs-release of the skeleton version (the constant `skeleton::RELEASE_TAG`)
     ReleaseTag,
     /// The summary in English, on one line
     SummaryEn,
@@ -39,7 +37,7 @@ pub enum Slot {
 }
 
 impl Slot {
-    pub const ALL: [Slot; 15] = [
+    pub const ALL: [Slot; 14] = [
         Slot::Program,
         Slot::Kebab,
         Slot::Snake,
@@ -49,7 +47,6 @@ impl Slot {
         Slot::ContractVersion,
         Slot::ContractId,
         Slot::Version,
-        Slot::PinRpc,
         Slot::ReleaseTag,
         Slot::SummaryEn,
         Slot::SummaryDe,
@@ -70,7 +67,6 @@ impl Slot {
             Slot::ContractVersion => "contract_version",
             Slot::ContractId => "contract_id",
             Slot::Version => "version",
-            Slot::PinRpc => "pin_rpc",
             Slot::ReleaseTag => "release_tag",
             Slot::SummaryEn => "summary_en",
             Slot::SummaryDe => "summary_de",
@@ -134,7 +130,6 @@ impl Values {
             Slot::ContractVersion => bp.contract.version.clone(),
             Slot::ContractId => bp.contract.id.clone(),
             Slot::Version => bp.program.version.clone(),
-            Slot::PinRpc => skeleton.rpc_tag.to_string(),
             Slot::ReleaseTag => skeleton.release_tag.to_string(),
             Slot::SummaryEn => one_line(bp.program.summary.en.as_deref()),
             Slot::SummaryDe => one_line(bp.program.summary.de.as_deref()),

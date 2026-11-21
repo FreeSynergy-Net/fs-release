@@ -1,0 +1,20 @@
+# created by fs-blueprint 0.0.16; from now on this file belongs to the program and is never overwritten
+schema = 1
+kind = "frontend"
+id = "board"
+extends = "net.freesynergy.Tasks"
+exec = "fs-forms-run"
+title = "tasks-title"
+
+[[requires]]
+contract = "tasks >=0.1 <0.2"
+
+[[message]]
+key = "tasks-title"
+lang = "en"
+text = "Tasks"
+
+[[message]]
+key = "tasks-title"
+lang = "de"
+text = "Tasks"

@@ -25,6 +25,8 @@ fn the_files_of_the_empty_program_are_these_with_these_classes() {
         (".gitattributes", g),
         (".github/workflows/check.yml", g),
         (".github/workflows/windows.yml", g),
+        // the forms description is made once and then the author's
+        ("forms/simple.toml", Class::Seed),
         ("packaging/frontends/fs-probe-simple.metainfo.xml", g),
         ("packaging/layout/fs-probe-layout.toml", g),
         ("packaging/net.freesynergy.Probe.desktop", g),
@@ -149,8 +151,8 @@ fn the_synthetic_blueprints_all_generate_the_same_number_of_files_under_their_ow
     for i in 0..COUNT {
         let bp = blueprint(i);
         let out = generate(&bp, &FakeCatalog).unwrap();
-        // the five files of the program and the contract text of its own types
-        assert_eq!(out.len(), 6, "{}", bp.program.name);
+        // the six files of the program, the forms description and the contract text of its own types
+        assert_eq!(out.len(), 7, "{}", bp.program.name);
         let name = &bp.program.name;
         assert!(out.iter().any(|a| a.path.contains(&format!("fs-{name}"))));
     }
