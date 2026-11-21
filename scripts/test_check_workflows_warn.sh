@@ -54,4 +54,14 @@ sed -i 's/kind: objective/kind: bogus/' "$tmp/d/w.yaml"
 python3 -I "$tool" "$tmp/d" >"$tmp/o" 2>&1; r=$?
 [ "$r" -eq 1 ] && ok "a real error is still rc 1" || { cat "$tmp/o"; bad "error not rc 1 (rc=$r)"; }
 
+# decision 2=B switch: off by default (warning above); a past date makes the missing bot-seat an error, a future date keeps the warning
+mk "$tmp/g" Service ""
+FS_BOTSEAT_ERROR_FROM=2000-01-01 python3 -I "$tool" "$tmp/g" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 1 ] && grep -q "bot-seat.*is missing" "$tmp/o" && ok "date reached: missing bot-seat is an error (rc 1)" || { cat "$tmp/o"; bad "switch on (rc=$r)"; }
+FS_BOTSEAT_ERROR_FROM=2999-01-01 python3 -I "$tool" "$tmp/g" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 0 ] && grep -q "warn  w.yaml:.*bot-seat fehlt" "$tmp/o" && ok "date in the future: still a warning, rc 0" || { cat "$tmp/o"; bad "switch future (rc=$r)"; }
+mk "$tmp/h" Service "        freesynergy.net:bot-seat: x"
+FS_BOTSEAT_ERROR_FROM=2000-01-01 python3 -I "$tool" "$tmp/h" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 0 ] && ok "date reached, bot-seat present: rc 0" || { cat "$tmp/o"; bad "switch on, seat present (rc=$r)"; }
+
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
