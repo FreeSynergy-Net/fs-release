@@ -19,6 +19,7 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("capability-unknown", "The capability {$key} is not in the list of capabilities", "Die Fähigkeit {$key} steht nicht in der Liste der Fähigkeiten"),
     ("category-main-missing", "At least one main category of the desktop menu is needed", "Mindestens eine Hauptkategorie des Desktop-Menüs fehlt"),
     ("contract-version-invalid", "{$found} is no contract version major.minor", "{$found} ist keine Vertragsversion Haupt.Neben"),
+    ("contract-unknown", "The contract {$key} at level {$version} is not in the catalog (the contract lives in fs-interfaces)", "Der Vertrag {$key} in Stufe {$version} steht nicht im Katalog (der Vertrag liegt in fs-interfaces)"),
     ("contract-id-invalid", "{$found} is no file id (0x and 16 hexadecimal digits)", "{$found} ist keine Datei-ID (0x und 16 Hexadezimalziffern)"),
     ("module-unknown", "The module {$name} is not in the catalog", "Das Modul {$name} steht nicht im Katalog"),
     ("bundle-unknown", "The bundle {$name} is not in the catalog", "Der Bausatz {$name} steht nicht im Katalog"),

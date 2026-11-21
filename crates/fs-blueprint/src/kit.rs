@@ -56,6 +56,8 @@ pub trait KitCatalog {
     /// Parts of the skeleton that do not exist yet in this version (reported, never silently left out).
     fn skeleton_pending(&self, version: &str) -> Vec<String>;
     fn capability_known(&self, key: &str) -> bool;
+    /// True when the catalog records the contract `key` of fs-interfaces at the level `version` (`major.minor`).
+    fn contract_known(&self, key: &str, version: &str) -> bool;
     fn module(&self, name: &str) -> Option<ModuleInfo>;
     fn bundle(&self, name: &str) -> Option<BundleInfo>;
     fn kit_known(&self, name: &str) -> bool;

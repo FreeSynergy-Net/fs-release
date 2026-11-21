@@ -21,6 +21,7 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("category-main-missing", &[]),
     ("contract-version-invalid", &["found"]),
     ("contract-id-invalid", &["found"]),
+    ("contract-unknown", &["key", "version"]),
     ("module-unknown", &["name"]),
     ("bundle-unknown", &["name"]),
     ("version-unknown", &["module", "version"]),

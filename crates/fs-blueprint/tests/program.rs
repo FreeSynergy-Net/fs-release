@@ -39,8 +39,13 @@ fn skeleton_and_capability_must_exist() {
         "capability-unknown{key=nope}"
     ));
     assert!(has(
-        &edit(TASKS, "\"dependency.evaluate\"", "\"dependency.ghost\""),
-        "capability-unknown{key=dependency.ghost}"
+        &edit(TASKS, "contract = \"dependency.evaluate\"", "contract = \"dependency.ghost\""),
+        "contract-unknown{key=dependency.ghost, version=0.1}"
+    ));
+    // a known contract at a level the catalog does not record is as red as an unknown contract
+    assert!(has(
+        &edit(TASKS, "contract = \"dependency.evaluate\", version = \"0.1\"", "contract = \"dependency.evaluate\", version = \"7.0\""),
+        "contract-unknown{key=dependency.evaluate, version=7.0}"
     ));
 }
 

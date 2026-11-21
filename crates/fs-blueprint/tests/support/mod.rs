@@ -37,6 +37,9 @@ impl KitCatalog for FakeCatalog {
         ]
         .contains(&key)
     }
+    fn contract_known(&self, key: &str, version: &str) -> bool {
+        version == "0.1" && ["dependency.evaluate", "dependency.cycle-check"].contains(&key)
+    }
     fn module(&self, name: &str) -> Option<ModuleInfo> {
         let (kind, tags, words, presets): (Kind, &[&str], &[&str], &[&str]) = match name {
             "fs-todo" => (Kind::Standard, &[], &[], &[]),
@@ -208,6 +211,9 @@ impl KitCatalog for Lenient {
         Vec::new()
     }
     fn capability_known(&self, _: &str) -> bool {
+        true
+    }
+    fn contract_known(&self, _: &str, _: &str) -> bool {
         true
     }
     fn module(&self, _: &str) -> Option<ModuleInfo> {

@@ -3,7 +3,7 @@ mod support;
 use fs_blueprint::emit::append_only::broken;
 use fs_blueprint::emit::write::write;
 use support::synth::MemStore;
-use support::{edit, generate, FakeCatalog, SHIFT, TASKS};
+use support::{edit, generate, FakeCatalog, SHIFT};
 
 const NOTE: &str = "[[type.field]]\nname = \"note\"\nbasic = \"text\"\nstandard = \"https://x.org/a#b\"\nlabel = { en = \"Note\", de = \"Notiz\" }\n\n";
 
@@ -80,35 +80,9 @@ fn a_changed_file_id_is_a_finding() {
 }
 
 #[test]
-fn an_interface_moved_by_a_method_put_in_front_is_a_finding() {
-    let mut store = put(TASKS);
-    let moved = edit(TASKS, "provides = [", "provides = [\"board.move\", ");
-    let err = refused(&mut store, &moved);
-    assert!(
-        err.contains("interface Dependency moved or removed"),
-        "{err}"
-    );
-    // a method of an interface that is put in front of the others of it: the numbers move
-    let mut store = put(TASKS);
-    let front = edit(
-        TASKS,
-        "[\"dependency.evaluate\", ",
-        "[\"dependency.order\", \"dependency.evaluate\", ",
-    );
-    let err = refused(&mut store, &front);
-    assert!(
-        err.contains("evaluate @0 () -> (); became order @0 () -> ();"),
-        "{err}"
-    );
-}
-
-#[test]
-fn a_struct_added_at_the_end_next_to_an_interface_is_fine_and_a_struct_in_front_is_not() {
-    let old = "@0x1;\n\nstruct A {\n  x @0 :Text;\n}\n\nstruct B {\n  y @0 :Text;\n}\n\ninterface I {\n  m @0 () -> ();\n}\n";
-    let appended = old.replace(
-        "\ninterface I",
-        "\nstruct C {\n  z @0 :Text;\n}\n\ninterface I",
-    );
+fn a_struct_added_at_the_end_is_fine_and_a_struct_in_front_is_not() {
+    let old = "@0x1;\n\nstruct A {\n  x @0 :Text;\n}\n\nstruct B {\n  y @0 :Text;\n}\n";
+    let appended = format!("{old}\nstruct C {{\n  z @0 :Text;\n}}\n");
     assert_eq!(broken(old, &appended), None);
     let front = old.replace(
         "\nstruct A {",

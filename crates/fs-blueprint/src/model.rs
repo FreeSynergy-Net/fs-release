@@ -64,8 +64,17 @@ pub struct Program {
 pub struct Contract {
     pub version: String,
     pub id: String,
+    /// The contracts of fs-interfaces this program provides: only the NAME (the capability key) and the level, never the contract itself.
     #[serde(default)]
-    pub provides: Vec<String>,
+    pub provides: Vec<Provide>,
+}
+
+/// A reference to a contract of fs-interfaces (`capabilities.txt`: key plus level `major.minor`); the contract text lives there, in one place.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Provide {
+    pub contract: String,
+    pub version: String,
 }
 
 /// A module of kind `standard`, `toolkit` or `component`; `kind` stays a word here so the check can name a wrong one.

@@ -41,6 +41,13 @@ struct BundleRow {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct ContractRow {
+    key: String,
+    levels: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct File {
     #[serde(default)]
     skeleton: Vec<SkeletonRow>,
@@ -50,6 +57,8 @@ struct File {
     kits: Vec<String>,
     #[serde(default)]
     basics: Vec<String>,
+    #[serde(default)]
+    contract: Vec<ContractRow>,
     #[serde(default)]
     module: Vec<ModuleRow>,
     #[serde(default)]
@@ -102,6 +111,12 @@ impl KitCatalog for FileCatalog {
     }
     fn capability_known(&self, key: &str) -> bool {
         self.file.capabilities.iter().any(|c| c == key)
+    }
+    fn contract_known(&self, key: &str, version: &str) -> bool {
+        self.file
+            .contract
+            .iter()
+            .any(|c| c.key == key && c.levels.iter().any(|l| l == version))
     }
     fn module(&self, name: &str) -> Option<ModuleInfo> {
         let m = self.file.module.iter().find(|m| m.name == name)?;

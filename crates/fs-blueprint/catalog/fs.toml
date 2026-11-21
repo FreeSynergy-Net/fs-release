@@ -5,6 +5,20 @@
 # Capability keys that programs declare today (ADR 0068; code of fs-tasks `wire_caps.rs`, fs-people).
 capabilities = ["tasks", "people", "forms", "dependency.evaluate", "dependency.cycle-check", "people.persons"]
 
+# The contracts of fs-interfaces a program may provide (`schema/capabilities.txt` of fs-interfaces v0.0.28: key and level `major.minor`; the contract text lives
+# only there). A program names `key` + `version` in `[contract] provides`; the catalog only records that the contract exists at that level.
+[[contract]]
+key = "dependency.evaluate"
+levels = ["0.1"]
+
+[[contract]]
+key = "dependency.cycle-check"
+levels = ["0.1"]
+
+[[contract]]
+key = "people.persons"
+levels = ["0.1"]
+
 # Data kits and basic types of fs-types (tag v0.0.4, `types_capnp.rs`, enum BasicType; no kit exists in v0.0.4, ADR 0098 names them).
 kits = []
 basics = [

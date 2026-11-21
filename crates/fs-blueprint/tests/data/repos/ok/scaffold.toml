@@ -12,7 +12,7 @@ categories = ["Office"]
 [contract]
 version = "0.1"
 id = "0xc04d258971543411"
-provides = ["people.persons"]
+provides = [{ contract = "people.persons", version = "0.1" }]
 
 [[module]]
 name = "board"

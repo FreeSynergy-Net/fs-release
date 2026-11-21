@@ -128,11 +128,15 @@ fn contract(s: &mut Sink, bp: &Blueprint) {
     if !is_file_id(&c.id) {
         s.err(Coded::new("contract-id-invalid").with("found", c.id.as_str()));
     }
-    for key in &c.provides {
-        if !s.catalog.capability_known(key) {
+    for p in &c.provides {
+        if !is_major_minor(&p.version) {
+            s.err(Coded::new("contract-version-invalid").with("found", p.version.as_str()));
+        } else if !s.catalog.contract_known(&p.contract, &p.version) {
             s.rule(
                 Rule::ExistingOnly,
-                Coded::new("capability-unknown").with("key", key.as_str()),
+                Coded::new("contract-unknown")
+                    .with("key", p.contract.as_str())
+                    .with("version", p.version.as_str()),
             );
         }
     }

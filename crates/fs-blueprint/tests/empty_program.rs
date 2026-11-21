@@ -149,8 +149,8 @@ fn the_synthetic_blueprints_all_generate_the_same_number_of_files_under_their_ow
     for i in 0..COUNT {
         let bp = blueprint(i);
         let out = generate(&bp, &FakeCatalog).unwrap();
-        // the five files of the program and the contract text with the interface of `provides`
-        assert_eq!(out.len(), 7, "{}", bp.program.name);
+        // the five files of the program and the contract text of its own types
+        assert_eq!(out.len(), 6, "{}", bp.program.name);
         let name = &bp.program.name;
         assert!(out.iter().any(|a| a.path.contains(&format!("fs-{name}"))));
     }

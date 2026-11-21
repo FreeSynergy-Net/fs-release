@@ -6,7 +6,7 @@ use fs_blueprint::Blueprint;
 use support::{edit, generate, FakeCatalog, SHIFT, TASKS};
 
 const GOLD: &str = "@0xc04d258971543477;
-# Contract 0.1 of schedules: append-only, a field or method only at the end of its struct or interface.
+# Contract 0.1 of schedules: append-only, a field only at the end of its struct.
 using Kit = import \"/fs-types/kit.capnp\";
 
 struct Shift {
@@ -72,33 +72,20 @@ fn tasks_contract(src: &str) -> Option<String> {
 }
 
 #[test]
-fn a_program_without_own_types_and_without_provides_has_no_contract_text() {
-    let none = edit(
-        TASKS,
-        "provides = [\"dependency.evaluate\", \"dependency.cycle-check\"]\n",
-        "",
-    );
-    assert_eq!(tasks_contract(&none), None);
+fn a_program_without_own_types_has_no_contract_text_also_when_it_provides_contracts() {
+    // `provides` only NAMES contracts of fs-interfaces (one source): nothing of them is written into the program
+    assert!(TASKS.contains("provides = [{ contract"));
+    assert_eq!(tasks_contract(TASKS), None);
 }
 
 #[test]
-fn provides_gives_one_interface_with_the_methods_as_declared_numbered_in_order() {
-    let want = "@0xc04d258971543476;\n# Contract 0.1 of tasks: append-only, a field or method only at the end of its struct or interface.\n\n\
-                interface Dependency {\n  evaluate @0 () -> ();\n  cycleCheck @1 () -> ();\n}\n";
-    assert_eq!(tasks_contract(TASKS).as_deref(), Some(want));
-}
-
-#[test]
-fn a_method_added_at_the_end_keeps_the_numbers_before_it_and_a_second_interface_follows() {
-    let more = edit(
-        TASKS,
-        "\"dependency.cycle-check\"]",
-        "\"dependency.cycle-check\", \"board.move\", \"dependency.order\"]",
-    );
-    let text = tasks_contract(&more).unwrap();
-    assert!(text.contains(
-        "interface Dependency {\n  evaluate @0 () -> ();\n  cycleCheck @1 () -> ();\n  order @2 () -> ();\n}\n"
-    ));
-    assert!(text.contains("interface Board {\n  move @0 () -> ();\n}\n"));
-    assert!(text.find("interface Dependency") < text.find("interface Board"));
+fn no_generated_file_carries_an_interface_of_a_provided_contract() {
+    let bp = Blueprint::from_toml(TASKS).unwrap();
+    for a in generate(&bp, &FakeCatalog).unwrap() {
+        assert!(!a.content.contains("interface "), "{}", a.path);
+    }
+    let bp = Blueprint::from_toml(SHIFT).unwrap();
+    for a in generate(&bp, &FakeCatalog).unwrap() {
+        assert!(!a.content.contains("interface "), "{}", a.path);
+    }
 }
