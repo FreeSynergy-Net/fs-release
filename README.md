@@ -35,8 +35,8 @@ fs-blueprint check --repo fs-leer
 ```
 
 1. `cargo install` builds the command from the tag (`--locked` keeps the versions of the tag; the Rust toolchain of `RUST_VERSION`).
-2. `examples/leer/` (in this repo: `scaffold.toml` and the folder `forms/`) is the smallest valid blueprint, an empty program. Copy it and change it; the `capability` must be a key of the catalog that comes with the command.
-3. `fs-blueprint new scaffold.toml --out fs-<name>` checks the blueprint first and writes the program only when it is clean; the catalog of the command is enough. The line `made leer (written 14, ...)` counts the files that the generator made; the blueprint itself and its `forms/` folder are copied into the new repo in addition (the tree holds two files more than the count). `--catalog FILE` is only for your OWN capabilities (your own catalog file); without it a blueprint that names an unknown capability is refused and nothing is written.
+2. `examples/leer/` (in this repo: the one file `scaffold.toml`) is the smallest valid blueprint, an empty program. Copy it and change it; the `capability` must be a key of the catalog that comes with the command.
+3. `fs-blueprint new scaffold.toml --out fs-<name>` checks the blueprint first and writes the program only when it is clean; the catalog of the command is enough. The line `made leer (written 7, ...)` counts the files that the generator made (among them `forms/simple.toml`, a minimal forms description that `new` seeds because the example brings none); the blueprint itself is copied into the new repo in addition (the tree holds one file more than the count). `--catalog FILE` is only for your OWN capabilities (your own catalog file); without it a blueprint that names an unknown capability is refused and nothing is written.
 4. `fs-blueprint check --repo fs-<name>` checks the made program (`--repo` names the folder; the three warnings `skeleton-part-pending` for session, update and mcp-switch are expected). `fs-blueprint --help` lists all words.
 
 ## What is not there yet

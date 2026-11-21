@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `examples/leer/forms/simple.toml` is removed: the README installs v0.0.17, whose generator seeds the forms description itself, so the example is the one file `scaffold.toml`; the step of `blueprint-e2e` now proves that the example folder has no such file and that `new` writes it (the seed); README (steps 2 and 3) and the comment of `scaffold.toml` follow (the example needs no `forms/` folder; the line `made leer` counts 7). / `examples/leer/forms/simple.toml` entfällt: die README installiert v0.0.17, dessen Generator die Forms-Beschreibung selbst anlegt; das Beispiel ist die eine Datei `scaffold.toml`; der Schritt in `blueprint-e2e` belegt, dass der Ordner die Datei nicht hat und `new` sie schreibt; README und Kommentar der `scaffold.toml` angepasst.
+
 ## 0.0.17
 
 Released 2026-11-21 (UTC; the date of the version commit, the tag follows after the checks and the pin rounds). / Veröffentlicht am 2026-11-21 (UTC; Datum des Version-Commits, der Tag folgt nach den Prüfungen und den Pin-Runden).

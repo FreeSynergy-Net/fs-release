@@ -88,8 +88,8 @@ jobs:
           test "$rc" = 1
           grep -q 'code-in-program{path=crates/x/src/lib.rs}' "$RUNNER_TEMP/code.out"
           rm -r "$made/crates"
-          # the forms description of the example (examples/leer/forms/simple.toml, the seed that `new` would write; it ships because the README installs an OLDER tag whose
-          # generator does not seed it; remove it once the README tag is >= the release with the seed) is kept by `new` and readable by the head check
+          # the example folder brings NO forms description: the file in the made package is the seed that `new` writes
+          test ! -e examples/leer/forms/simple.toml
           test -f "$RUNNER_TEMP/leer/forms/simple.toml"
           # fs-starter (the host that opens the description) is NOT a part of this repo and is not installed here: no call, no stand-in. The window proof
           # (`fs-starter --check` over the output of `new`) belongs to the starter's own CI against this output; a fake call here would prove nothing.

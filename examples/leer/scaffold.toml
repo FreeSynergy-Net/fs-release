@@ -1,7 +1,7 @@
 # The smallest valid blueprint: an EMPTY program (no types, no modules, no functions).
 # It runs with the catalog that comes with fs-blueprint, without `--catalog`:
 #   fs-blueprint new scaffold.toml --out fs-leer
-# Copy this file AND the folder `forms/` next to it, then change `name`, `summary`, `description`, `categories`.
+# Copy this file, then change `name`, `summary`, `description`, `categories`.
 # `capability` must be a key of the catalog (crates/fs-blueprint/catalog/fs.toml); a new key needs your own catalog (`--catalog FILE`).
 schema = 2
 
