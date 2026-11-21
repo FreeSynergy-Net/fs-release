@@ -9,6 +9,9 @@ states: [offen, läuft, wartet, pausiert, fehlgeschlagen, abgebrochen, erledigt,
 final: [erledigt, abgebrochen, archiviert]
 reopen: [erledigt, abgebrochen]
 archive-from: [erledigt, abgebrochen, fehlgeschlagen]
+# The time box of an order (CLAUDE.md 4a, question 75) belongs to the RUN like the states, not to every flow file: at most `max-minutes` per
+# order, visible progress (picture, binary, merge) or a clear blocker every `visible-every-minutes`; over the limit the run does `on-exceed`.
+timebox: {max-minutes: 60, visible-every-minutes: 60, on-exceed: [stop, report, workflow-pflege]}
 reasons:
   wartet: [auf-entscheidung, auf-anfrage, in-prüfung]
 transitions:

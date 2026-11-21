@@ -19,6 +19,7 @@ ROLE = {"start": "offen", "run": "läuft", "pause": "pausiert", "abort": "abgebr
 RULES_FILE = "run/rules.yaml"
 RULE_SET_NAME = "freesynergy"
 META_RULES, META_STATUS, META_RUN_RULES = "freesynergy.net:station-rules", "freesynergy.net:status-command", "freesynergy.net:run-rules"
+META_EXEMPT = "freesynergy.net:timebox-exempt"
 META_ALLOW, META_ORIGIN = "freesynergy.net:allow", "freesynergy.net:origin"
 ON_ENTER = ("assign-role", "run-status-command", "create-decision", "set-wait-reason")
 RULE_KEYS = {"allow", "on-enter", "from", "confirm"}
@@ -32,6 +33,8 @@ INTERPRETERS = {"perl", "ruby", "node", "nodejs", "deno", "bun", "awk", "gawk", 
 INTERPRETER_RE = re.compile(r"python[0-9.]*|pypy[0-9.]*|perl[0-9.]*|ruby[0-9.]*")
 SHELL_CHARS = re.compile(r"[;&|`$<>(){}\n\r\\]")
 MAX_TIMEOUT = 3600
+MAX_TIMEBOX = 60
+TIMEBOX_ACTIONS = ("stop", "report", "workflow-pflege")
 
 
 def is_str_list(x):
@@ -118,6 +121,22 @@ def check_rules(rules):
                           (ROLE["pause"], ROLE["run"], "continue at the same station"), (ROLE["run"], ROLE["wait"], "a station waits")):
         if isinstance(trans.get(src), list) and tgt not in trans[src]:
             p.append(f"transition {src!r} -> {tgt!r} is missing ({why})")
+    return p + check_timebox(rules.get("timebox"))
+
+
+def check_timebox(tb):
+    """The `timebox` block of the run rule set (CLAUDE.md 4a): positive integer minutes, at most MAX_TIMEBOX, and the actions on exceed."""
+    if not isinstance(tb, dict):
+        return ["`timebox` is missing (max-minutes, visible-every-minutes, on-exceed)"]
+    p = []
+    for key in ("max-minutes", "visible-every-minutes"):
+        v = tb.get(key)
+        if type(v) is not int or not 1 <= v <= MAX_TIMEBOX:
+            p.append(f"`timebox` {key} is {v!r}, it must be a whole number of minutes 1..{MAX_TIMEBOX}")
+    if tb.get("on-exceed") != list(TIMEBOX_ACTIONS):
+        p.append(f"`timebox` on-exceed is {tb.get('on-exceed')!r}, it must be {list(TIMEBOX_ACTIONS)}")
+    if set(tb) - {"max-minutes", "visible-every-minutes", "on-exceed"}:
+        p.append("`timebox` has only max-minutes, visible-every-minutes, on-exceed")
     return p
 
 
@@ -194,6 +213,30 @@ def seconds(t):
     if isinstance(after, dict) and after and set(after) <= {"hours", "minutes", "seconds"} and all(type(v) is int and v >= 0 for v in after.values()):
         return after.get("hours", 0) * 3600 + after.get("minutes", 0) * 60 + after.get("seconds", 0)
     return None
+
+
+def timeouts(node):
+    """Every Serverless Workflow `timeout` (a mapping with `after`) below a node: [(seconds or None)]."""
+    found = []
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "timeout" and isinstance(v, dict) and "after" in v:
+                found.append(seconds(v))
+            else:
+                found += timeouts(v)
+    elif isinstance(node, list):
+        for v in node:
+            found += timeouts(v)
+    return found
+
+
+def check_timebox_exempt(where, node, meta, rules):
+    """A `timeout` longer than `timebox.max-minutes` of the rule set needs `freesynergy.net:timebox-exempt: <reason>`."""
+    limit = ((rules or {}).get("timebox") or {}).get("max-minutes")
+    if type(limit) is not int or META_EXEMPT in (meta or {}) and str(meta[META_EXEMPT]).strip():
+        return []
+    return [f"{where}: a `timeout` of {s} s is longer than the time box of the run ({limit} min, run/rules.yaml); add {META_EXEMPT}: <reason>"
+            for s in timeouts({k: v for k, v in node.items() if k != "metadata"}) if s is not None and s > limit * 60]
 
 
 def check_status_command(where, task, meta):

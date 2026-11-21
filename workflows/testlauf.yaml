@@ -22,7 +22,7 @@
 #  3. Order: the small/lower modules first, then the bigger ones above them; each module alone (`-p`), never a whole-workspace run for one module. (`ende-regeln`)
 #  4. Hard limit 1: a release is built ONLY by the CI, fresh from the tag, with its end test; never a locally built or cached binary. (`release-nur-ci`)
 #  5. Hard limit 2: security modules (login, rights, crypto, sockets, MCP "human only") get the full test AND an Opus review before the release. (`sicherheit-test`, `sicherheit-weiche`)
-#  6. Time box (CLAUDE.md 4a, question 75): every order at most 60 min with a fixed budget; over it = stop, report the state, improve the workflow; every 60 min visible progress (picture, binary, merge) or a clear blocker to the strategy. (`zeitbox`)
+#  6. Time box (CLAUDE.md 4a, question 75): every order at most 60 min with a fixed budget; over it = stop, report the state, improve the workflow; every 60 min visible progress (picture, binary, merge) or a clear blocker to the strategy. ONE source: `workflows/run/rules.yaml` `timebox` (the time box belongs to the run, not to this file; a longer own `timeout` needs `freesynergy.net:timebox-exempt`, see `voll-ende`).
 # [NEXTEST-PROFILES] description only (the file `.config/nextest.toml` and the cargo profile `fast` live in the component repos, see fs-components branch unreviewed/w2 786f9f8; not copied here).
 #  Tool: cargo-nextest has no dnf package; agents install per WERKZEUGE-OHNE-DNF.md (`cargo install cargo-nextest --locked`), no installation by this flow.
 #  Call: `cargo nextest run -p <crate> --profile <name> [--cargo-profile fast]` (via build-slot.sh). The names are the stages of this flow:
@@ -62,19 +62,6 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Starts the fix counter of the run at 0 (`fixrunden.runde`); `fix-zaehlen` raises it, `gezielt-again` reads it. The loop goes back to `slot`, never to this step, so the counter is not reset by a fix."
-  - zeitbox:
-      set:
-        zeitbox:
-          max_minuten: 60
-          sichtbar_alle_minuten: 60
-      export:
-        as: '${ $context + { zeitbox: .zeitbox } }'
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Time box (CLAUDE.md 4a, question 75): the order runs at most 60 minutes with a fixed budget; over it the flow stops, reports the state and the workflow is improved (`workflow-pflege`). Every 60 minutes visible progress (picture, binary, merge) or a clear blocker goes to the strategy. The limit is data for the runner and the report, not a polling loop."
   - nur-check:
       set:
         waehrend_arbeit:
@@ -286,6 +273,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
+        freesynergy.net:timebox-exempt: "background job without an agent; the coordinator reports the state every 60 min"
         freesynergy.net:summary: "Waits for the result file of the background run of exactly this head: `scripts/workspace-test-background wait` blocks on the lock of the run (no sleep loop, nobody polls) and prints {head, red, runde, seconds, exit, summary}. The wait has a timeout of 2 hours (task timeout and script rc 3). `catch` has NO error filter on purpose: EVERY error of the wait - the timeout, rc 3, rc 2 (run died without a result, head changed) - is caught; it sets `voll.timeout` and `voll-weiter` sends the flow to `eskalation`. A result for another head does not count (`voll-weiter`)."
   - voll-weiter:
       switch:
