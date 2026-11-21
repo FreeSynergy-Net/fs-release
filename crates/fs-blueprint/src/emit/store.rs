@@ -101,8 +101,12 @@ impl Tables<'_> {
             }
         }
         self.names = children.names;
-        if matches!(parent, Some((_, true))) {
-            columns.push(format!("UNIQUE ({})", ident("owner")));
+        if let Some((_, single)) = parent {
+            columns.push(if single {
+                format!("UNIQUE ({})", ident("owner"))
+            } else {
+                format!("UNIQUE ({}, {})", ident("owner"), ident("pos"))
+            });
         }
         writeln!(
             self.out,

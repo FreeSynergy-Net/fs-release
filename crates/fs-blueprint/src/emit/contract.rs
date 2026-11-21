@@ -78,7 +78,12 @@ pub fn text(bp: &Blueprint) -> Result<Option<String>, Coded> {
         "@{};\n# Contract {} of {}: append-only, a field only at the end of its struct.\n",
         bp.contract.id, bp.contract.version, bp.program.name
     );
-    if own.iter().flat_map(|t| &t.field).any(|f| f.kit.is_some()) {
+    // nested types stand inside their parent but use the import as well
+    if bp
+        .own_types()
+        .flat_map(|t| &t.field)
+        .any(|f| f.kit.is_some())
+    {
         let _ = writeln!(out, "using Kit = import \"{KIT_IMPORT}\";");
     }
     for t in own {

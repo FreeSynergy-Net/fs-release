@@ -64,4 +64,8 @@ mk "$tmp/h" Service "        freesynergy.net:bot-seat: x"
 FS_BOTSEAT_ERROR_FROM=2000-01-01 python3 -I "$tool" "$tmp/h" >"$tmp/o" 2>&1; r=$?
 [ "$r" -eq 0 ] && ok "date reached, bot-seat present: rc 0" || { cat "$tmp/o"; bad "switch on, seat present (rc=$r)"; }
 
+# a broken date is a configuration error: rc 2 with a clear message, no traceback
+FS_BOTSEAT_ERROR_FROM=not-a-date python3 -I "$tool" "$tmp/h" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 2 ] && grep -q "not an ISO date" "$tmp/o" && ! grep -q Traceback "$tmp/o" && ok "broken date: rc 2, clear message" || { cat "$tmp/o"; bad "broken date (rc=$r)"; }
+
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

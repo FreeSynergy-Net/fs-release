@@ -113,3 +113,12 @@ fn a_hand_changed_contract_is_still_generated_changed_not_append_only() {
     let err = refused(&mut store, SHIFT);
     assert_eq!(err, "generated-changed{path=schema/schedules.capnp}");
 }
+
+#[test]
+fn an_old_interface_block_is_dropped_without_a_finding() {
+    // by design (E3 decision 3): the contract lives in fs-interfaces, the generator no longer writes `interface`; an old target text that has one loses it silently
+    let old =
+        "@0x1;\n\nstruct A {\n  x @0 :Text;\n}\n\ninterface Api {\n  get @0 () -> (a :A);\n}\n";
+    let new = "@0x1;\n\nstruct A {\n  x @0 :Text;\n}\n";
+    assert_eq!(fs_blueprint::emit::append_only::broken(old, new), None);
+}

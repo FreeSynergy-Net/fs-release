@@ -12,8 +12,8 @@ basics = [
     "key", "choice", "keywords", "reference", "integer", "duration", "flag", "whole",
 ]
 
-# The contracts of fs-interfaces a program may provide (`schema/capabilities.txt` of fs-interfaces v0.0.28: key and level `major.minor`; the contract text lives
-# only there). A program names `key` + `version` in `[contract] provides`; the catalog only records that the contract exists at that level.
+# The contracts of fs-interfaces a program may provide (the keys are those of `schema/capabilities.txt` of fs-interfaces v0.0.28; the level `major.minor` is set by hand,
+# `capabilities.txt` records none; the contract text lives only there). A program names `key` + `version` in `[contract] provides`; the catalog only records that the contract exists at that level.
 [[contract]]
 key = "dependency.evaluate"
 levels = ["0.1"]

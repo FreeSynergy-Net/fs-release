@@ -15,6 +15,14 @@ pub fn target(s: &mut Sink, bp: &Blueprint, f: &Field) {
     if let Some(r) = f.reference.as_deref().filter(|r| !is_iri(r) && !known(r)) {
         s.err(Coded::new("type-unknown").with("name", r));
     }
+    // a nested type has no table of its own name (it is `<parent>_<field>`): a key to it would point nowhere
+    if let Some(r) = f
+        .reference
+        .as_deref()
+        .filter(|r| !is_iri(r) && bp.is_nested(r))
+    {
+        s.err(Coded::new("reference-to-nested").with("name", r));
+    }
 }
 
 /// The nesting as a whole: a type is nested by one field only (`nested-twice`) and never inside itself, directly or through others (`nested-cycle`).

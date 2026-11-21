@@ -77,6 +77,7 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("column-collides", &["type", "field"]),
     ("nested-cycle", &["type"]),
     ("nested-twice", &["type"]),
+    ("reference-to-nested", &["name"]),
     ("table-collides", &["table"]),
     ("layout-unreadable", &["path", "cause"]),
 ];

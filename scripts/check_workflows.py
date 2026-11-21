@@ -192,6 +192,11 @@ def main(argv):
     except ImportError:
         print("skipped: PyYAML (python3 yaml module) is not installed, the workflow files were NOT checked")
         return 2
+    try:
+        botseat_is_error()
+    except ValueError as e:
+        print(f"configuration error: FS_BOTSEAT_ERROR_FROM / BOTSEAT_ERROR_FROM is not an ISO date YYYY-MM-DD ({e})")
+        return 2
     folder = argv[1]
     files = sorted(glob.glob(os.path.join(folder, "*.yaml")) + glob.glob(os.path.join(folder, "*.yml")))
     if not files:

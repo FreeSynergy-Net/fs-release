@@ -28,7 +28,7 @@ fn the_example_passes_the_check_and_a_nested_only_type_needs_no_envelope() {
 #[test]
 fn a_nested_type_is_a_child_table_and_a_reference_list_a_link_table() {
     let text = file(SURVEY, ".sql");
-    assert!(text.contains("CREATE TABLE \"question_choices\" (\n  \"id\" INTEGER PRIMARY KEY,\n  \"owner\" INTEGER NOT NULL REFERENCES \"question\"(\"id\"),\n  \"pos\" INTEGER NOT NULL,\n  \"key\" TEXT,\n  \"label\" TEXT\n);"), "{text}");
+    assert!(text.contains("CREATE TABLE \"question_choices\" (\n  \"id\" INTEGER PRIMARY KEY,\n  \"owner\" INTEGER NOT NULL REFERENCES \"question\"(\"id\"),\n  \"pos\" INTEGER NOT NULL,\n  \"key\" TEXT,\n  \"label\" TEXT,\n  UNIQUE (\"owner\", \"pos\")\n);"), "{text}");
     // a single nested value: at most one child per owner
     assert!(
         text.contains("CREATE TABLE \"question_condition\" ("),
@@ -38,7 +38,12 @@ fn a_nested_type_is_a_child_table_and_a_reference_list_a_link_table() {
         text.contains("  \"equals\" TEXT,\n  UNIQUE (\"owner\")\n);"),
         "{text}"
     );
-    assert_eq!(text.matches("UNIQUE").count(), 1, "{text}");
+    // a nested LIST: one child per (owner, pos)
+    assert!(
+        text.contains("  \"label\" TEXT,\n  UNIQUE (\"owner\", \"pos\")\n);"),
+        "{text}"
+    );
+    assert_eq!(text.matches("UNIQUE").count(), 2, "{text}");
     assert!(
         text.contains("\"question\" INTEGER REFERENCES \"question\"(\"id\")"),
         "{text}"
@@ -192,5 +197,34 @@ fn a_removed_nested_struct_and_a_changed_nested_member_are_breaks() {
     assert_eq!(
         broken(OLD, &changed).as_deref(),
         Some("nested struct A.C: k @0 :Text; became k @0 :Int64;")
+    );
+}
+
+#[test]
+fn a_kit_field_of_a_nested_type_brings_the_import() {
+    // only the nested type has the kit field: the import is still needed (`Kit.X` without it does not compile)
+    let nested = edit(
+        SURVEY,
+        "[[type.field]]\nname = \"key\"\nbasic = \"text\"",
+        "[[type.field]]\nname = \"key\"\nkit = \"timeSpan\"",
+    );
+    assert_eq!(codes(&nested), Vec::<&str>::new());
+    let text = file(&nested, ".capnp");
+    assert!(text.contains("Kit."), "{text}");
+    assert!(text.contains("using Kit = import"), "{text}");
+}
+
+#[test]
+fn a_reference_to_a_nested_type_is_refused() {
+    // a nested type has no table of its own name: the key would point nowhere
+    let bad = edit(
+        SURVEY,
+        "name = \"questions\"\nreference = \"Question\"",
+        "name = \"questions\"\nreference = \"Choice\"",
+    );
+    assert!(
+        codes(&bad).contains(&"reference-to-nested"),
+        "{:?}",
+        codes(&bad)
     );
 }
