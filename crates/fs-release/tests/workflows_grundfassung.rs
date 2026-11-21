@@ -55,9 +55,14 @@ fn picture_verdict_is_the_strategys_and_gated_on_accepted() {
     let t = read("grundfassung");
     assert!(picture_by_strategy(&t) && accepted_gate(&t));
     let human = t.replacen(
-        "freesynergy.net:actor: ai\n        freesynergy.net:actor-type: Application\n        freesynergy.net:gate: none\n        freesynergy.net:kind: subjective",
+        "freesynergy.net:actor: ai\n        freesynergy.net:actor-type: Service\n        freesynergy.net:bot-seat: grundfassung.picture-ok\n        freesynergy.net:gate: none\n        freesynergy.net:kind: subjective",
         "freesynergy.net:actor: human\n        freesynergy.net:actor-type: Person\n        freesynergy.net:gate: bild-ok\n        freesynergy.net:kind: subjective",
         1,
+    );
+    // The mutation must really change the text (ADR 0105 d8: AI steps carry actor-type Service + bot-seat).
+    assert_ne!(
+        human, t,
+        "mutation did not apply: step metadata layout changed"
     );
     assert!(!picture_by_strategy(&human));
     let no_gate = t.replace("then: bild-eskalation", "then: continue");
