@@ -4,6 +4,7 @@
 # One run per block group = per crate (input.group); in it first the texts (`texte`, ADR 0057 Words/MF2, de+en, gate texts-check), then the tokens. Agents never push, tag or merge. Order: `Workflow frontend-umbau, step <id>, parameters contract, tag, repo,
 # branch, head, delta, group, frontend_crate` (docs/prompt-template.md). FS profile: see README.md.
 # Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
+# Further inputs: `block` (host-block), `dossier` (same-pictures), `alt_crate` (alt-entfernen). Host line (decision /srv/FreeSynergy/.scratch/entscheid-simple-2026-11-21.md): host-block before convert, same-pictures = picture comparison with verdict, alt-entfernen after the picture OK.
 # Review template frontend: step `frontend-nur-komponenten` (input `frontend_crate`) before the picture acceptance: only component calls; logic or a widget is a finding (conversation `frontend-befund-talk`).
 # Mandatory first step `vorhanden-pruefen` (rule of the user): look whether it exists or is only extended; the result `befund` (with proof) is read by the following steps.
 document:
@@ -222,6 +223,23 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Renders the images of the group before the change (the reference for the pixel comparison).
+  - host-block:
+      call: host-block-ai:0.0.17@fs
+      with:
+        befund: ${ $context.befund }
+        group: ${ .input.group }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+        block: ${ .input.block }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.host-block
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Host step BEFORE `convert` for a block that stands in the contract but that the host does not draw yet (it would become the skeleton area \"place (block)\"), e.g. `text-view`. The agent lets the host draw it like `text-view`: carries the text of the placement (`text_key`) through to the view and adds the drawing; no change of the contract (`accepts` stays), no new block name. Own worktree, local commits ([COMMIT]), no push, no tag; at most 60 min, Sonnet; during the work only `cargo check -p <host crate>`, at the end one `testlauf` run, step `ende`, for this one crate; report per [BERICHT]. When the host already draws every block of the group the step ends at once with the proof (result `nichts-zu-tun`)."
   - convert:
       call: convert-ai:0.0.17@fs
       with:
@@ -260,18 +278,37 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: scripts/gates.sh ([GATES]), the one definition of the checks; the result is `red` or not.
-  - same-pictures:
-      call: pixel-compare:0.0.17@fs
+  - after:
+      call: render-images:0.0.17@fs
       with:
         group: ${ .input.group }
-      export:
-        as: '${ $context + { pictures: . } }'
+        state: after
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: Script - renders the images after the change and compares them pixel by pixel with the before images; the conversion must not change the look (default theme); the result is `different` or not.
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: Renders the images of the group after the change (same views, same default theme as `before`); whatever they look like, the state changes to rendered.
+  - same-pictures:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: picture-acceptance
+          version: 0.0.17
+        input:
+          programm: ${ .input.group }
+          dossier: ${ .input.dossier }
+          model: ${ $context.before }
+          ours: ${ $context.after }
+          waechter: ${ $context.gates }
+      export:
+        as: '${ $context + { pictures: { different: (.accepted != true) } } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Picture comparison with a verdict instead of a pixel gate (a different host shell never draws pixel-identical): the images before | after side by side (`before` as model, `after` as ours), Opus judges each pair (`strategy-verdict`, accepted or what differs), then the user (`user-verdict`), see picture-acceptance.yaml. Result `pictures.different` is true unless `accepted == true`; `repeat` reads it. The verdict is taken as it is; a red guard (`gates`) shows no pictures."
   - repeat:
       switch:
         - again:
@@ -308,7 +345,7 @@ do:
             then: frontend-befund-talk
         - sauber:
             when: '${ $context.komponenten.befunde != null and ($context.komponenten.befunde | length) == 0 }'
-            then: release
+            then: alt-entfernen
         - ohne-ergebnis:
             then: umbau-eskalation
       metadata:
@@ -316,7 +353,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a finding goes to the conversation `frontend-befund-talk` (at most two repeats, then the escalation); only an empty list (not a missing result) goes on; a missing result goes to the escalation, never on."
+        freesynergy.net:summary: "Control flow - a finding goes to the conversation `frontend-befund-talk` (at most two repeats, then the escalation); only an empty list (not a missing result) goes on to `alt-entfernen`; a missing result goes to the escalation, never on."
   - frontend-befund-talk:
       call: talk:0.0.17@fs
       with:
@@ -329,6 +366,22 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Conversation of the user and Opus about every finding (logic or widget in the frontend crate): move it into fs-components or into the program, or decide otherwise; the protocol `talk-<programm>-frontend-<datum>.md` holds the decision. No agent decides it alone. Then the check runs again."
+  - alt-entfernen:
+      call: old-crate-remove-ai:0.0.17@fs
+      with:
+        alt_crate: ${ .input.alt_crate }
+        befund: ${ $context.befund }
+        repo: ${ .input.repo }
+        branch: ${ .input.branch }
+        head: ${ .input.head }
+        delta: ${ .input.delta }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-umbau.alt-entfernen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Only AFTER the picture OK (`pictures.different == false`) and the clean component check: the hand-written Frontend crate (input `alt_crate`) goes away in ONE commit, together with its entry in the workspace (`Cargo.toml` members and dependencies), the `bin-deb` and `rpm` depends, `packaging.rs`, the `@BIN@` placeholder and the manifest line `fs:exec fs-forms-run` that replaces it. Afterwards `cargo check -p <host crate>` and one `testlauf` run, step `ende`, only for the host crate and the packaging; nothing else is rebuilt. Own worktree, local commit ([COMMIT]), no push, no tag, no force; at most 60 min, Sonnet; report per [BERICHT]. Without a picture OK the step does not start."
   - release:
       then: end
       run:
