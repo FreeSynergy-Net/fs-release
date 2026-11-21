@@ -6,11 +6,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: branch-neu-schreiben
-  version: 0.0.16
+  version: 0.0.17
   title: Rewrite an own branch (identity, WIP) or rebase a chain of branches - lease, equal content, new head, new JA
 do:
   - ketten-plan:
-      call: chain-plan:0.0.16@fs
+      call: chain-plan:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branches: ${ .input.kette }
@@ -25,7 +25,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mode chain (input kette, a list; empty = a single branch): the ORDER of the branches is fixed here (the one that others build on first; CHANGELOG, usage and README conflict in the same lines, so never in parallel), the base is the CURRENT remote main (`git ls-remote`), not the one of the order's day. Result `kette` with `aktuell` (object `branch`, `head`; for a single branch the branch of the order), `rest` and `modus` (einzel | kette). From here EVERY step works on `$context.kette.aktuell.branch`, never on `.input.branch` (the chain goes on with the next branch)."
   - alter-kopf:
-      call: ls-remote-head:0.0.16@fs
+      call: ls-remote-head:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ $context.kette.aktuell.branch }
@@ -51,7 +51,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a chain rebases onto the new main (`rebase`), a single branch is rewritten in place (`neu-schreiben`)."
   - neu-schreiben:
-      call: rewrite:0.0.16@fs
+      call: rewrite:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ $context.kette.aktuell.branch }
@@ -66,7 +66,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "In an own worktree: author AND committer of every commit become the identity FS_ALLOWED_IDENTITY (`git rebase --exec` with `git commit --amend --no-edit --reset-author`, with the identity set by `-c user.name -c user.email`), WIP commits are removed (squashed into the commit they belong to, no commit with WIP in the subject), the messages keep the footer of the order. The content stays the same - only history changes."
   - rebase:
-      call: chain-rebase:0.0.16@fs
+      call: chain-rebase:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ $context.kette.aktuell.branch }
@@ -81,7 +81,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "One branch of the chain onto the current main. Conflicts: CHANGELOG - first ALL entries of main, then the entries of the branch under ONE `## Unreleased`; usage.md and README (de and en) - both sides kept, no sentence lost; the file counter (FILES in tests/support/workflows.rs and every number in the texts) is COUNTED again on the result, never added up by hand. A rebase can write the LOCAL agent name as committer: therefore `--reset-author` and `--exec` with the explicit identity (`git -c user.name -c user.email`); the identity check of the next step decides, not the belief. After the rebase the gates run once (step `gates`)."
   - identitaet-nach:
-      call: identity-check:0.0.16@fs
+      call: identity-check:0.0.17@fs
       with:
         range: main..HEAD
         allowed_identity_key: FS_ALLOWED_IDENTITY
@@ -94,7 +94,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "`git log --format='%ae %ce' main..HEAD | sort -u` is exactly ONE line, the identity FS_ALLOWED_IDENTITY (author and committer, also after a rebase); the check names the commit, never an address."
   - wip-weg:
-      call: wip-check:0.0.16@fs
+      call: wip-check:0.0.17@fs
       with:
         range: main..HEAD
       export:
@@ -106,7 +106,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "No commit of the range has WIP, fixup or squash in its subject; no unfinished marker (conflict marks) in the files."
   - inhaltsgleich:
-      call: content-check:0.0.16@fs
+      call: content-check:0.0.17@fs
       with:
         repo: ${ .input.repo }
         old: ${ $context.alt.head }
@@ -133,7 +133,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red check is not repaired by hand in the branch: the person decides (the third round at the latest); only green goes on."
   - gates:
-      call: gates:0.0.16@fs
+      call: gates:0.0.17@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -143,7 +143,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "scripts/gates.sh on the NEW head (after a rebase the gates of the old head are worth nothing); a result for exactly this head is reused by the review."
   - lease-pruefen:
-      call: lease-check:0.0.16@fs
+      call: lease-check:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ $context.kette.aktuell.branch }
@@ -155,7 +155,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The push may be a forced one ONLY on an own `unreviewed/*` branch and ONLY with the lease: `--force-with-lease=<branch>:<old head>` with the old head of `alter-kopf` as the SHA; `--force` alone is refused; main, `release-*`, tags and foreign branches are refused (red)."
   - push-lease:
-      call: push-lease:0.0.16@fs
+      call: push-lease:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ $context.kette.aktuell.branch }
@@ -167,7 +167,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The person or the coordinator pushes with `--force-with-lease` and the lease SHA; if the remote head is not the old head (somebody pushed in between) the push fails and nothing is overwritten. Agents never push."
   - ls-remote-beleg:
-      call: ls-remote-proof:0.0.16@fs
+      call: ls-remote-proof:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ $context.kette.aktuell.branch }
@@ -184,7 +184,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.16
+          version: 0.0.17
         input:
           repo: ${ .input.repo }
           branch: ${ $context.kette.aktuell.branch }
@@ -228,7 +228,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a chain goes on with the next branch only after the earlier one is on main; a single branch ends here."
   - vorgaenger-ff:
-      call: merge-ff:0.0.16@fs
+      call: merge-ff:0.0.17@fs
       with:
         into: main
         branch: ${ $context.kette.aktuell.branch }
@@ -240,7 +240,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The earlier branch of the chain is fast-forwarded into main (flow `ff-und-tag`, the person or the coordinator); only then the next branch is rebased onto this NEW main."
   - ketten-naechster:
-      call: chain-next:0.0.16@fs
+      call: chain-next:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branches: ${ .input.kette }

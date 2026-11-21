@@ -1,4 +1,4 @@
-# created by fs-blueprint 0.0.16; from now on this file belongs to the program and is never overwritten
+# created by fs-blueprint 0.0.17; from now on this file belongs to the program and is never overwritten
 schema = 1
 kind = "frontend"
 id = "board"

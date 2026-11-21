@@ -11,7 +11,7 @@ on:
       software-gpu: { type: boolean, default: false, description: "Repos with window tests: installs lavapipe (software Vulkan adapter) and the fonts the tests need; merged with apt-packages" }
       blueprint: { type: string, default: "off", description: "Blueprint check (ADR 0099, step S5): off = not run; warn = `fs-blueprint check --drift` runs when the repo has a scaffold.toml and shows its findings (the job stays green); block = a finding fails the job" }
       # blueprint-rev: empty (the default) = the commit of THIS workflow file (the context `job.workflow_sha` of a reusable workflow is the commit of the called file, read below out of
-      # `toJSON(job)`): a caller that pins `check.yml@v0.0.16` builds the command from the tag commit itself, so the command always fits the tag and no SHA has to stand in the file
+      # `toJSON(job)`): a caller that pins `check.yml@v0.0.17` builds the command from the tag commit itself, so the command always fits the tag and no SHA has to stand in the file
       # (the tag commit cannot name itself). A full commit SHA given here wins. Never a branch or a tag name.
       blueprint-rev: { type: string, default: "", description: "Commit of fs-release the command `fs-blueprint` is built from: a full SHA, or empty = the commit of this workflow file (for a caller pinned to a tag: the tag commit)" }
       full: { type: boolean, default: false, description: "On branches unreviewed/* the test gate runs only the crates changed against main and their dependants; true forces the whole workspace (main and tags always test everything)" }

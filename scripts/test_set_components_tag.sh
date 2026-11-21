@@ -25,7 +25,7 @@ mkfx() {
 members = ["crates/*"]
 [workspace.dependencies]
 fs-types = { git = "$IFC", tag = "v0.0.2" }
-fs-interfaces = { git = "$IFC", tag = "v0.0.16" }
+fs-interfaces = { git = "$IFC", tag = "v0.0.17" }
 TOML
   printf '[package]\nname = "a"\nversion = "0.0.0"\n[dependencies]\nfs-types.workspace = true\nfs-interfaces.workspace = true\n' >"$1/crates/a/Cargo.toml"
   cat >"$1/crates/b/Cargo.toml" <<TOML
@@ -38,7 +38,7 @@ tag = "v0.0.2"
 features = ["x"]
 [dependencies.fs-interfaces]
 git = "$IFC"
-tag = "v0.0.16"
+tag = "v0.0.17"
 TOML
   cat >"$1/crates/c/Cargo.toml" <<TOML
 [package]
@@ -46,7 +46,7 @@ name = "c"
 version = "0.0.0"
 [dependencies]
 types = { package = "fs-types", git = "$IFC", rev = "abc1234" }
-ifc = { package = "fs-interfaces", git = "$IFC", tag = "v0.0.16" }
+ifc = { package = "fs-interfaces", git = "$IFC", tag = "v0.0.17" }
 serde = "1"
 TOML
 }
@@ -90,7 +90,7 @@ suite() { # <script> -> runs every case; uses $fails
   [ "$rc" = 0 ] && ok "--move fs-types rc 0" || bad "--move rc=$rc: $(cat "$tmp/o")"
   [ "$(grep -c "fs-types=$TYP@v0.0.1$" <<<"$after")" = 3 ] && ok "all 3 fs-types entries (workspace, table, alias) on the fs-types repo at v0.0.1, rev gone" || bad "after --move: $after"
   grep -q 'fs-types=.*fs-interfaces' <<<"$after" && bad "a fs-types still points at fs-interfaces" || ok "no fs-types points at fs-interfaces any more"
-  [ "$(grep -c "fs-interfaces=$IFC@v0.0.16" <<<"$after")" = 3 ] && ok "--move leaves the 3 fs-interfaces entries alone" || bad "fs-interfaces touched: $after"
+  [ "$(grep -c "fs-interfaces=$IFC@v0.0.17" <<<"$after")" = 3 ] && ok "--move leaves the 3 fs-interfaces entries alone" || bad "fs-interfaces touched: $after"
   grep -q 'features = \["x"\]' "$d/crates/b/Cargo.toml" && grep -q 'fs-types.workspace = true' "$d/crates/a/Cargo.toml" && ok "other fields and \`.workspace = true\` stay" || bad "layout lost"
   python3 -I "$t" --move fs-types v0.0.1 "$d" >"$tmp/o" 2>&1; rc=$?
   [ "$rc" = 0 ] && grep -q 'already on v0.0.1' "$tmp/o" && [ "$(facts "$d")" = "$after" ] && ok "second --move run: already on the tag, nothing changed" || bad "idempotence: rc=$rc $(cat "$tmp/o")"

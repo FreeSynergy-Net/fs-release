@@ -178,7 +178,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "fs-blueprint"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "serde",
  "sha2",
@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "fs-release"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "clap",
  "fs-release-chain",
@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "fs-release-chain"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "clap",
  "serde",

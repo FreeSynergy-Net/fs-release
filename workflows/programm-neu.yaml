@@ -13,11 +13,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: programm-neu
-  version: 0.0.16
+  version: 0.0.17
   title: Build a new program from the test question to the user acceptance
 do:
   - wessen-daten:
-      call: classify-ai:0.0.16@fs
+      call: classify-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -34,7 +34,7 @@ do:
         freesynergy.net:adr: '0076, 0061'
         freesynergy.net:summary: "Step 1 - the test question 'whose data?' (ADR 0076): the agent writes einordnung.md with exactly one outcome Programm, Facette, Modul or Suite and the reason (own data and own rules = Programm; a fixed filter on another program's data = Facette, ADR 0061; a part inside a program = Modul; several programs = Suite). The outcome is a decision, so the gate is opus-ja and it carries the decision (the script check below tests only the form: one outcome, a reason). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step wessen-daten, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - ausgang-check:
-      call: einordnung-check:0.0.16@fs
+      call: einordnung-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -75,7 +75,7 @@ do:
         freesynergy.net:adr: '0076'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to wessen-daten; then `ausgang` branches (below): Facette, Modul and Suite leave this flow at their stub, only Programm continues."
   - katalog-suche:
-      call: catalog-lookup:0.0.16@fs
+      call: catalog-lookup:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -107,7 +107,7 @@ do:
         freesynergy.net:adr: '0068'
         freesynergy.net:summary: "Control flow - a failed lookup goes to `katalog-fehler` (the person); the capability exists already: to `vorhanden-bericht` (report and the human gate, then the flow ends; the existing package is used or extended in its own workflow); otherwise it goes on to P1."
   - standards:
-      call: standards-research-ai:0.0.16@fs
+      call: standards-research-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -124,7 +124,7 @@ do:
         freesynergy.net:adr: '0014'
         freesynergy.net:summary: "Step 3 - standards first (ADR 0014): for every data type of the program the agent names the standard (AS2 as the common base, JSContact, JSCalendar ...) with its official test collections (conformance suites); an own format only where no standard exists, with the proof of the search; nothing is copied (ADR 0013). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step standards, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - standards-check:
-      call: standards-check:0.0.16@fs
+      call: standards-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -156,7 +156,7 @@ do:
         freesynergy.net:adr: '0014'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to standards."
   - kern-crate:
-      call: core-crate-ai:0.0.16@fs
+      call: core-crate-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -173,7 +173,7 @@ do:
         freesynergy.net:adr: '0015, 0014'
         freesynergy.net:summary: "Step 4 - search the core crate: candidates with licence (list of allowed licences), maturity (releases, maintenance, tests) and the way in (wrapper with a Git pin and an adapter, never a fork; flow wrapper-einbindung); no suitable crate means an own core: the outcome `eigener-kern` with the reason and the list of the rejected candidates (each with the reason), written to kern.md. The choice of a dependency is a decision, so the gate is opus-ja. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step kern-crate, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - kern-check:
-      call: core-check:0.0.16@fs
+      call: core-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -205,7 +205,7 @@ do:
         freesynergy.net:adr: '0015'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to kern-crate."
   - umzug:
-      call: migration-ai:0.0.16@fs
+      call: migration-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -222,7 +222,7 @@ do:
         freesynergy.net:adr: '0014, 0046, 0085'
         freesynergy.net:summary: "Step 5 - fix the formats and the way of moving house: the formats of the widespread programs of this topic (read and write their files) with sample files as fixtures, and for every time and every person field the inner form per ADR 0085 (draft): times in UTC plus IANA zone id where the local meaning counts, all-day dates without time, persons as references to People (frozen extract only for bookings, invoices, contracts); the import and export commands and the round trip over the fixtures are built and checked only in step 9a (grenz-adapter, grenz-check); export is its own command, not saving (ADR 0046). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step umzug, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - umzug-check:
-      call: format-check:0.0.16@fs
+      call: format-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -254,7 +254,7 @@ do:
         freesynergy.net:adr: '0046'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to umzug."
   - datenmodell:
-      call: datamodel-ai:0.0.16@fs
+      call: datamodel-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -271,7 +271,7 @@ do:
         freesynergy.net:adr: '0014, 0046, 0076, 0085'
         freesynergy.net:summary: "Step 6 - the data model on the standards: types and fields map to the standards of step 3 (time and person fields as in step 5, ADR 0085 draft: UTC plus zone id, date only, person reference), storage through fs-objects, history as AS2 activities through fs-activities, saving is not exporting (ADR 0046: work on the database copy, export is separate). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step datenmodell, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - modell-check:
-      call: model-check:0.0.16@fs
+      call: model-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -303,7 +303,7 @@ do:
         freesynergy.net:adr: '0046'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell."
   - speicher-check:
-      call: storage-typed-check:0.0.16@fs
+      call: storage-typed-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -338,7 +338,7 @@ do:
         freesynergy.net:adr: '0086'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to datenmodell (typed columns, no JSON or blob); only `red == false` goes on, a missing result goes to eskalation."
   - schnittstelle:
-      call: interface-ai:0.0.16@fs
+      call: interface-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -355,7 +355,7 @@ do:
         freesynergy.net:adr: '0045, 0066'
         freesynergy.net:summary: "Step 7 - the topic interface in fs-interfaces: a capnp schema plus a trait; what a backend cannot do answers Unsupported (ADR 0045, an interface is a target, a change is a jump); every command carries `supported` (ADR 0066) and the type description reports fields, base types and commands. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step schnittstelle, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - schnittstelle-check:
-      call: interface-check:0.0.16@fs
+      call: interface-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -390,7 +390,7 @@ do:
         freesynergy.net:adr: '0045'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise a model fault (flag `modell`) goes back to datenmodell, any other red to schnittstelle."
   - manifest:
-      call: manifest-ai:0.0.16@fs
+      call: manifest-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -407,7 +407,7 @@ do:
         freesynergy.net:adr: '0068, 0074'
         freesynergy.net:summary: "Step 8 - the manifest: the functions and objects the program publishes for menus (ADR 0074) and what it provides and requires as capabilities (ADR 0068, AppStream provides/requires, no own format). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step manifest, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - manifest-check:
-      call: manifest-check:0.0.16@fs
+      call: manifest-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -439,7 +439,7 @@ do:
         freesynergy.net:adr: '0068'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to manifest."
   - engine:
-      call: engine-ai:0.0.16@fs
+      call: engine-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -456,7 +456,7 @@ do:
         freesynergy.net:adr: '0021, 0045, 0014'
         freesynergy.net:summary: "Step 9 - the engine against the interface: the engine implements the trait; the contract tests (same for every backend) and the standard test collection of step 3 run against it ([GATES]). Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step engine, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - engine-check:
-      call: contract-tests:0.0.16@fs
+      call: contract-tests:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -491,7 +491,7 @@ do:
         freesynergy.net:adr: '0045'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise a contract fault goes back to schnittstelle, any other red to engine."
   - grenz-adapter:
-      call: boundary-adapter-ai:0.0.16@fs
+      call: boundary-adapter-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -508,7 +508,7 @@ do:
         freesynergy.net:adr: '0085, 0014, 0046'
         freesynergy.net:summary: "Step 9a - importers and exporters as border adapters (ADR 0085, draft): every importer reads a foreign format and normalizes it into the inner model (times to UTC plus IANA zone id, all-day dates stay dates, person names become references to People or to the small local store); every exporter converts for the target and is its own command, not saving (ADR 0046); what cannot be mapped is kept as the original and reported. Tests with the sample files of step 5 and a round trip. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step grenz-adapter, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - grenz-check:
-      call: boundary-check:0.0.16@fs
+      call: boundary-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -543,7 +543,7 @@ do:
         freesynergy.net:adr: '0085'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise a model fault (flag `modell`, e.g. a field of the model cannot take the inner form) goes back to datenmodell, any other red to grenz-adapter."
   - admin-frontend:
-      call: admin-frontend-ai:0.0.16@fs
+      call: admin-frontend-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -560,7 +560,7 @@ do:
         freesynergy.net:adr: '0061, 0066'
         freesynergy.net:summary: "Step 10 - the admin Frontend generated from the type description (Fiori idea, ADR 0066: all fields, all settings, all commands; mandatory for program and facet, ADR 0061); no data of its own. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step admin-frontend, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - admin-check:
-      call: admin-check:0.0.16@fs
+      call: admin-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -599,7 +599,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: dossier
-          version: 0.0.16
+          version: 0.0.17
         input:
           vorbild: ${ .input.vorbild }
           bestand: ${ .input.bestand }
@@ -620,7 +620,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: frontend-round
-          version: 0.0.16
+          version: 0.0.17
         input:
           contract: ${ .input.contract }
           tag: ${ .input.tag }
@@ -652,7 +652,7 @@ do:
         freesynergy.net:adr: '0074, 0084'
         freesynergy.net:summary: "Step 12 - sub-workflow frontend-round.yaml in its fixed order: block assignment (baustein-zuordnung), then the look (style analysis), then composition, then the objective menue-vergleich against the dossier; red there goes back inside that flow. It holds the pictures and the one review per head, so the step carries its human gate. Input `release: false`: frontend-round does NOT release here; the one release comes in the step `release` after language, security and packages."
   - sprache:
-      call: texts-ai:0.0.16@fs
+      call: texts-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -669,7 +669,7 @@ do:
         freesynergy.net:adr: '0057, 0074 (blocks only; accessibility: [kein ADR])'
         freesynergy.net:summary: "Step 13 - language and accessibility: every fixed text of program and Frontend as an MF2 message in German and English (ADR 0057, not Fluent), accessible names, roles and keyboard use for every block. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step sprache, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - texte-check:
-      call: texts-check:0.0.16@fs
+      call: texts-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -683,7 +683,7 @@ do:
         freesynergy.net:adr: '0057'
         freesynergy.net:summary: "Script - the gate texts-check: no fixed text left, every message in de and en, valid MF2. The result carries `red` (true = back) and `runde` (the red rounds of this step so far, counted by the script in its state file; from the third red round the flow goes to `eskalation`)."
   - a11y-check:
-      call: a11y-check:0.0.16@fs
+      call: a11y-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -715,7 +715,7 @@ do:
         freesynergy.net:adr: '0057, 0074 (blocks only; accessibility: [kein ADR])'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red texts or red accessibility go back to sprache."
   - hub-adapter:
-      call: hub-adapter-ai:0.0.16@fs
+      call: hub-adapter-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -732,7 +732,7 @@ do:
         freesynergy.net:adr: '0082, 0056, 0068'
         freesynergy.net:summary: "Step 14 - registration at the hub and the fs-server adapter (ADR 0082): rights through Kanidm groups (a Kanidm flat list where it must, ADR 0056), settings readable and settable from outside, online. Agents work ONLY locally against test instances and mocks; nothing on a real server, no SSH or root for an agent; the script for a real run is written for the human. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step hub-adapter, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - adapter-check:
-      call: adapter-test:0.0.16@fs
+      call: adapter-test:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -764,7 +764,7 @@ do:
         freesynergy.net:adr: '0082'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to hub-adapter."
   - sicherheit:
-      call: security-ai:0.0.16@fs
+      call: security-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -781,7 +781,7 @@ do:
         freesynergy.net:adr: '0054, 0056, 0067'
         freesynergy.net:summary: "Step 15 - security and privacy: AI participants are marked and can be shut out completely (ADR 0054), agents are never admin and run in their own sandbox (ADR 0056), secrets only through the vault fs-vault (ADR 0067), nothing secret in the repo; personal data as in the privacy notes of the program. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step sicherheit, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - sicherheit-check:
-      call: security-check:0.0.16@fs
+      call: security-check:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -813,7 +813,7 @@ do:
         freesynergy.net:adr: '0067'
         freesynergy.net:summary: "Control flow - from the third red round the flow goes to `eskalation` (the person decides); otherwise red goes back to sicherheit."
   - pakete:
-      call: package-ai:0.0.16@fs
+      call: package-ai:0.0.17@fs
       with:
         programm: ${ .input.programm }
         repo: ${ .input.repo }
@@ -830,7 +830,7 @@ do:
         freesynergy.net:adr: '0077, 0068'
         freesynergy.net:summary: "Step 16 - packages and catalog: rpm and deb, the catalog entry with `kind` (ADR 0077) and provides/requires (ADR 0068), documentation and help in German and English (official docs always current), release notes for release-flow. Own worktree, local commits ([COMMIT]), no push, no tag; gates one at a time ([GATES], [BASH]); no secrets ([BERICHT] names none); report per [BERICHT]. Order - `Workflow programm-neu, step pakete, parameters repo, branch, head, delta, programm` (docs/prompt-template.md)."
   - pakete-check:
-      call: check-docs:0.0.16@fs
+      call: check-docs:0.0.17@fs
       with:
         programm: ${ .input.programm }
       export:
@@ -866,7 +866,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: release-flow
-          version: 0.0.16
+          version: 0.0.17
         input:
           repo: ${ .input.repo }
           tag: ${ .input.tag }
@@ -886,7 +886,7 @@ do:
         freesynergy.net:adr: '0077'
         freesynergy.net:summary: "After language, security and packages (the Frontend round did not release, `release: false`): release-flow.yaml holds the one Opus review of this head (opus-ja), then CI, then the human or the coordinator merges and releases; there is no second review here, agents never merge, push or tag. The documentation moves along inside release-flow (its step `doku`, rule doku-mitziehen, before the review; the docs main branch is pushed there only after the approval), so programm-neu has no own `doku` step."
   - server-lauf:
-      call: server-run-human:0.0.16@fs
+      call: server-run-human:0.0.17@fs
       with:
         programm: ${ .input.programm }
       metadata:
@@ -898,7 +898,7 @@ do:
         freesynergy.net:adr: '0082, 0079'
         freesynergy.net:summary: Only after the release, the person runs the script of hub-adapter on the real server (VPS or home PC, with or without a domain) and logs it; no agent ever has SSH or root there, the workflow part itself runs without AI. Skipped by the person when the program needs no server. The result of the run is what it is (subjective).
   - abnahme:
-      call: user-acceptance:0.0.16@fs
+      call: user-acceptance:0.0.17@fs
       with:
         programm: ${ .input.programm }
         dossier: ${ .input.dossier }
@@ -937,7 +937,7 @@ do:
               workflow:
                 namespace: freesynergy.net
                 name: bugfix
-                version: 0.0.16
+                version: 0.0.17
               input:
                 finding: ${ $befund }
                 tag: ${ .input.tag }

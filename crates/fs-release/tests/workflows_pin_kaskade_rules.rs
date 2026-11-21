@@ -67,7 +67,7 @@ fn the_seven_scripts_exist_are_called_by_the_workflow_and_are_executable() {
             .mode();
         assert!(mode & 0o111 != 0, "scripts/{name} is not executable");
         assert!(
-            t.contains(&format!("call: {name}:0.0.16@fs")),
+            t.contains(&format!("call: {name}:0.0.17@fs")),
             "the workflow does not call {name}"
         );
         assert!(

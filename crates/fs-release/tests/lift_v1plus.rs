@@ -30,7 +30,7 @@ fn world_with_workflows() -> World {
         "jobs:\n  c:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n",
     )
     .unwrap();
-    fs::write(wf.join("release.yml"), "jobs:\n  r:\n    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.16\n  s:\n    uses: FreeSynergy/fs-release/actions/sbom@main\n").unwrap();
+    fs::write(wf.join("release.yml"), "jobs:\n  r:\n    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.17\n  s:\n    uses: FreeSynergy/fs-release/actions/sbom@main\n").unwrap();
     git(&w.work(), &["add", "-A"]);
     git(&w.work(), &["commit", "--quiet", "-m", "workflows"]);
     w
@@ -43,16 +43,16 @@ fn pins_never_lowers_a_line_that_is_on_a_higher_tag() {
     assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
     let check = w.read(".github/workflows/check.yml");
     let release = w.read(".github/workflows/release.yml");
-    assert!(check.contains("check.yml@v0.0.16\n"), "{check}");
-    assert!(release.contains("release.yml@v0.0.16\n"), "{release}");
-    assert!(release.contains("actions/sbom@v0.0.16\n"), "{release}");
+    assert!(check.contains("check.yml@v0.0.17\n"), "{check}");
+    assert!(release.contains("release.yml@v0.0.17\n"), "{release}");
+    assert!(release.contains("actions/sbom@v0.0.17\n"), "{release}");
 }
 
 #[test]
 fn the_pin_tag_is_an_input_not_a_constant() {
     let w = world_with_workflows();
     let mut o = w.opts();
-    o.env.push(("FS_LIFT_PIN_TAG".into(), "v0.0.16".into()));
+    o.env.push(("FS_LIFT_PIN_TAG".into(), "v0.0.17".into()));
     let (r, _) = run(&w, &o);
     assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
     let all = format!(
@@ -60,7 +60,7 @@ fn the_pin_tag_is_an_input_not_a_constant() {
         w.read(".github/workflows/check.yml"),
         w.read(".github/workflows/release.yml")
     );
-    assert_eq!(all.matches("@v0.0.16\n").count(), 3, "{all}");
+    assert_eq!(all.matches("@v0.0.17\n").count(), 3, "{all}");
     // Not a tag: ignored, the default is the version of this crate (the release tag).
     let w = world_with_workflows();
     let mut o = w.opts();

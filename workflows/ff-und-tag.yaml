@@ -9,11 +9,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: ff-und-tag
-  version: 0.0.16
+  version: 0.0.17
   title: Fast-forward a reviewed head to main and tag it - checklist, proofs, release watch
 do:
   - zweig-ci:
-      call: branch-ci:0.0.16@fs
+      call: branch-ci:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -49,7 +49,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes to the person (the cause comes from the log, `bugfix` or `agent-run` for exactly that run; lesson fs-packages typing-test: a hanging job is not a green one); a hang goes to ONE restart, a second hang escalates; ONLY `status == green` goes on, explicitly to `secrets-pruefen` (it never falls through to the restart step `ci-neustart`, which only `haengt-erstmals` reaches) - every other status (running, unknown, empty) escalates (standing rule ZWEIG-CI: red OR unknown = no ff)."
   - ci-neustart:
-      call: ci-restart:0.0.16@fs
+      call: ci-restart:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -64,7 +64,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "A run without progress for more than 30 minutes is cancelled and started ONCE again (counted in `neustarts`), then the CI is read again; never a second restart, never a rerun that hides a red job."
   - secrets-pruefen:
-      call: secret-names:0.0.16@fs
+      call: secret-names:0.0.17@fs
       with:
         repo: ${ .input.repo }
         names: GPG_PRIVATE_KEY,GPG_PASSPHRASE
@@ -75,7 +75,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Before the push: the repository holds the signing entries GPG_PRIVATE_KEY and GPG_PASSPHRASE (read only: the NAMES from the list of repository entries, never a value, nothing is printed or copied). A missing name stops the flow before any push - an unsigned release cannot be repaired afterwards."
   - erwartete-laeufe:
-      call: expected-runs:0.0.16@fs
+      call: expected-runs:0.0.17@fs
       with:
         repo: ${ .input.repo }
         head: ${ .input.head }
@@ -105,7 +105,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - ONLY `status == green` with an empty `fehlend` goes on to the clone and the tag; a missing, red or unknown run escalates (standing rule ZWEIG-CI: red OR unknown OR missing = no ff, no tag)."
   - klon:
-      call: fresh-clone:0.0.16@fs
+      call: fresh-clone:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -119,7 +119,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Fresh blobless clone in the own work folder (input workdir; no wildcard path, the folder is new and empty), so that no old state of an agent worktree flows into the check."
   - kopf-und-ff:
-      call: head-ff-check:0.0.16@fs
+      call: head-ff-check:0.0.17@fs
       with:
         head: ${ .input.head }
       metadata:
@@ -129,7 +129,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The head of the clone equals the head of the order and of the approval; main of the remote (`git ls-remote`) is an ancestor of this head (`git merge-base --is-ancestor`), so the push is a pure fast-forward without a merge commit."
   - identitaet:
-      call: identity-check:0.0.16@fs
+      call: identity-check:0.0.17@fs
       with:
         range: main..HEAD
         allowed_identity_key: FS_ALLOWED_IDENTITY
@@ -140,7 +140,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Step `adresse-pruefen` of release-flow on the fresh clone: only the identity in FS_ALLOWED_IDENTITY is author and committer in the range (`git log --format='%ae %ce' main..HEAD | sort -u` shows exactly one line); every other address is a hit, the check names the commit and never an address; red goes to `branch-neu-schreiben`."
   - version:
-      call: version-check:0.0.16@fs
+      call: version-check:0.0.17@fs
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -151,7 +151,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Version = crate version in Cargo.toml = Cargo.lock entry of the own crates = first heading of CHANGELOG.md (lesson fs-people v0.0.11: the lock check is mandatory, a lock with the old version is red); the tag is `v<version>`; `lock-pruefung` of release-flow runs on the clone too."
   - tag-frei:
-      call: tag-free:0.0.16@fs
+      call: tag-free:0.0.17@fs
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -162,7 +162,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "`git ls-remote --tags` shows no tag of this name (also no tag with another case), and the local clone has none; an existing tag is never moved."
   - diff-pfade:
-      call: diff-paths:0.0.16@fs
+      call: diff-paths:0.0.17@fs
       with:
         repo: ${ .input.repo }
         allow: ${ .input.allow }
@@ -173,7 +173,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "`git diff --name-only main..HEAD` lists only the paths of the order (input allow); an unexpected path is red (the head is not the one that was reviewed)."
   - ja-fuer-kopf:
-      call: approval-check:0.0.16@fs
+      call: approval-check:0.0.17@fs
       with:
         head: ${ .input.head }
       metadata:
@@ -183,7 +183,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The Opus approval names exactly this head. A JA is void for every other head: new head, new JA (rule of `review`); no JA, no push. No tag as long as a delta or re-look result for this head has an open condition: line 1 of the Opus result file must be `JA` for EXACTLY this head; a later NEIN or condition blocks the tag (lesson fs-messages v0.0.3: a condition that came after the tag left an outdated sentence in the release)."
   - push-ff:
-      call: push-ff:0.0.16@fs
+      call: push-ff:0.0.17@fs
       with:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
@@ -195,7 +195,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The person or the coordinator (the strategy's push helper) pushes the head to main as a pure fast-forward, WITHOUT force and without a merge commit; agents never push. A rejected push is never forced: it goes back to `kopf-und-ff`."
   - tag:
-      call: tag-annotated:0.0.16@fs
+      call: tag-annotated:0.0.17@fs
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -207,7 +207,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "ANNOTATED tag v<version> on the pushed head (`git tag -a`), written with the project identity (author and committer = FS_ALLOWED_IDENTITY), message = the first CHANGELOG heading; then the tag is pushed alone, never forced."
   - ls-remote-beleg:
-      call: ls-remote-proof:0.0.16@fs
+      call: ls-remote-proof:0.0.17@fs
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -221,7 +221,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Proof by `git ls-remote`: refs/heads/main equals the head, refs/tags/<tag> exists and its peeled commit (`^{}`) equals the head; both lines are the result `beleg` (`zeilen`) and appear in the `output` of the flow."
   - release-beobachten:
-      call: release-watch:0.0.16@fs
+      call: release-watch:0.0.17@fs
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -274,7 +274,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The CI is red, hangs twice or has an unknown status, a check is red or the release is not green: the flow ends with `eskaliert: true` (after the tidy-up); the person decides. Nothing was forced."
   - aufraeumen:
-      call: clean-workdir:0.0.16@fs
+      call: clean-workdir:0.0.17@fs
       with:
         dir: ${ .input.workdir }
         created: ${ $context.klon != null }

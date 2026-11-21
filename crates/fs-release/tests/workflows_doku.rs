@@ -43,7 +43,7 @@ fn gate_is_sound(text: &str) -> bool {
         ],
     ) && gate.contains("actor: machine")
         && gate.contains("kind: objective")
-        && gate.contains("doku-mitziehen:0.0.16@fs")
+        && gate.contains("doku-mitziehen:0.0.17@fs")
         && gate.contains("docs_base")
         // R8': the gate measures the head of the agent's branch, resolved per step
         && gate.contains("head: ${ $context.kopf.head }")
@@ -75,8 +75,8 @@ fn the_sub_workflow_has_the_checks_a_red_loop_and_a_human_publish() {
 fn counter_a_gate_by_the_agent_or_without_escalation_is_caught() {
     let t = read("doku-mitziehen");
     let by_ai = t.replacen(
-        "call: doku-mitziehen:0.0.16@fs",
-        "call: docs-ai:0.0.16@fs",
+        "call: doku-mitziehen:0.0.17@fs",
+        "call: docs-ai:0.0.17@fs",
         1,
     );
     assert!(!gate_is_sound(&by_ai));
@@ -89,8 +89,8 @@ fn counter_a_gate_by_the_agent_or_without_escalation_is_caught() {
         &t.replace("head: ${ $context.kopf.head }", "zz: 1")
     ));
     assert!(!gate_is_sound(&t.replace(
-        "call: resolve-head:0.0.16@fs",
-        "call: other:0.0.16@fs"
+        "call: resolve-head:0.0.17@fs",
+        "call: other:0.0.17@fs"
     )));
     assert!(!gate_is_sound(
         &t.replace("proof_base: ${ .input.docs_base }", "zz: 1")

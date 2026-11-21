@@ -11,7 +11,7 @@ pub struct Skeleton {
 
 /// The tag of fs-release that holds this generator: the one place the generated CI callers and the `cargo install` of fs-blueprint take it from.
 /// It must name the release that contains this code; the drift check of an older tag cannot match the output of this one.
-pub const RELEASE_TAG: &str = "v0.0.16";
+pub const RELEASE_TAG: &str = "v0.0.17";
 
 const TABLE: &[Skeleton] = &[Skeleton {
     id: "0.1.0",
