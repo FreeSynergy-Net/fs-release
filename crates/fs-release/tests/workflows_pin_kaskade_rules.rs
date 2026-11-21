@@ -1,5 +1,5 @@
 //! Pattern: none (test). `pin-kaskade`, conditions B1-B4: the lock switches in the INPUT of both lock steps (mutant M11), the rev-pin edges and foreign sources, the build rules, the
-//! Windows caller without exception; the seven scripts exist and their shell self tests are green. Counter-tests on changed copies.
+//! Windows caller without exception; the eight scripts exist and their shell self tests are green. Counter-tests on changed copies.
 
 mod support;
 use support::kaskade::SCRIPTS;
@@ -56,7 +56,7 @@ fn counter_lock_env_foreign_sources_build_rules_and_windows_caller_are_caught() 
 }
 
 #[test]
-fn the_seven_scripts_exist_are_called_by_the_workflow_and_are_executable() {
+fn the_eight_scripts_exist_are_called_by_the_workflow_and_are_executable() {
     use std::os::unix::fs::PermissionsExt;
     let t = read("pin-kaskade");
     for name in SCRIPTS {
@@ -90,6 +90,7 @@ fn the_shell_self_tests_of_the_scripts_are_green() {
         "test_kaskade_plan.sh",
         "test_kaskade_pins.sh",
         "test_kaskade_gates.sh",
+        "test_kaskade_zyklen.sh",
     ] {
         let out = std::process::Command::new("bash")
             .arg(root().join("scripts").join(t))

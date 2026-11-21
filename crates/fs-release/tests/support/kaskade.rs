@@ -58,6 +58,7 @@ pub const SCRIPTS: &[&str] = &[
     "kaskade-fremde-pins",
     "lock-gleich",
     "gates-komplett",
+    "kaskade-zyklen",
 ];
 
 /// The text after `prefix` of every line of `text` that starts with it.

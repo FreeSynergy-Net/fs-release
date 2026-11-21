@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+# Pattern: none (script of the pin cascade).
+"""Cycle check of the pin cascade (call `kaskade-zyklen` of the workflow `pin-kaskade`, step `zyklen-check`). READ ONLY, no network.
+
+  python3 -I scripts/kaskade-zyklen (--repos DIR[,DIR...] | --list FILE | --plan JSON|FILE|- --root DIR) [--root DIR] [--fremdquellen FILE]
+
+SCOPE DECISION (open point of the checklist, decided here, widest list): the repos to read are
+  1. `--repos`: checkouts (one folder per repo, the repo name = the folder name), or `--list FILE` (one folder per line, `#` lines skipped), or
+  2. the default: ALL repos named in the cascade plan input (`--plan`, the result of `kaskade-plan`, key `offen`) as `--root/<repo>`, AND every repo that
+     the pins mention (a FreeSynergy git dependency of a scanned repo) whose checkout exists in `--root` (read transitively), so a cycle such as
+     fs-starter <-> fs-forms is found even when one side is no Glied. A mentioned repo without a checkout is a node without outgoing edges (`ungelesen`).
+Edges: repo -> owner repo of EVERY FreeSynergy git dependency (`tag` and `rev`, every Cargo.toml of the checkout, via `kcargo.git_deps`); known foreign sources
+(workflows/kaskade-fremdquellen.txt) are no edges; `[patch]` is not read. Cycles = strongly connected components of more than one repo, and a repo that pins itself.
+Result JSON: {status, red, cycles:[[repo, ...]], repos, edges, ungelesen}. rc 0 = no cycle, 1 = at least one cycle, 2 = bad input.
+"""
+import argparse
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "kaskade_lib"))
+import kcargo  # noqa: E402
+import kgit  # noqa: E402
+import kio  # noqa: E402
+
+
+def read_edges(folder, fremd):
+    """Set of owner repos that the Cargo.toml files of one checkout pin (FreeSynergy git dependencies, foreign sources left out)."""
+    out = set()
+    for f in kcargo.cargo_files(folder):
+        with open(f, encoding="utf-8") as fh:
+            for d in kcargo.git_deps(fh.read()):
+                if d["owner"].lower() == kcargo.ORG.lower() and not kcargo.is_fremd(d, fremd):
+                    out.add(d["repo"])
+    return out
+
+
+def sccs(graph):
+    """Tarjan (iterative): list of components, each a list of repos in graph order."""
+    index, low, on, stack, out, n = {}, {}, set(), [], [], [0]
+    for root in graph:
+        if root in index:
+            continue
+        work = [(root, iter(graph[root]))]
+        index[root] = low[root] = n[0]; n[0] += 1; stack.append(root); on.add(root)
+        while work:
+            v, it = work[-1]
+            for w in it:
+                if w not in index:
+                    index[w] = low[w] = n[0]; n[0] += 1; stack.append(w); on.add(w)
+                    work.append((w, iter(graph[w])))
+                    break
+                if w in on:
+                    low[v] = min(low[v], index[w])
+            else:
+                work.pop()
+                if work:
+                    low[work[-1][0]] = min(low[work[-1][0]], low[v])
+                if low[v] == index[v]:
+                    comp = []
+                    while True:
+                        w = stack.pop(); on.discard(w); comp.append(w)
+                        if w == v:
+                            break
+                    out.append(comp)
+    return out
+
+
+def find_cycles(graph):
+    order = {r: i for i, r in enumerate(graph)}
+    cyc = [sorted(c, key=order.get) for c in sccs(graph) if len(c) > 1 or c[0] in graph[c[0]]]
+    return sorted(cyc, key=lambda c: order[c[0]])
+
+
+def main(argv):
+    p = argparse.ArgumentParser()
+    p.add_argument("--repos")
+    p.add_argument("--list")
+    p.add_argument("--plan")
+    p.add_argument("--root")
+    p.add_argument("--fremdquellen", default=os.path.join(HERE, "..", "workflows", "kaskade-fremdquellen.txt"))
+    try:
+        a = p.parse_args(argv)
+    except SystemExit:
+        return 2
+    try:
+        fremd = kcargo.fremdquellen(a.fremdquellen)
+        folders, discover = {}, False  # repo -> folder
+        if a.repos or a.list:
+            paths = [x for x in (a.repos or "").split(",") if x]
+            if a.list:
+                with open(a.list, encoding="utf-8") as f:
+                    paths += [ln.split("#", 1)[0].strip() for ln in f if ln.split("#", 1)[0].strip()]
+            for d in paths:
+                name = os.path.basename(os.path.normpath(d))
+                if not os.path.isdir(d) or not kgit.REPO.match(name):
+                    raise ValueError(f"not a checkout folder: {d!r}")
+                folders[name] = d
+        elif a.plan and a.root:
+            plan = kio.load_json(a.plan)
+            names = [g["repo"] for g in plan["offen"]]
+            if not isinstance(names, list) or not all(isinstance(x, str) and kgit.REPO.match(x) for x in names):
+                raise ValueError("plan.offen: repo names required")
+            for r in names:
+                d = os.path.join(a.root, r)
+                if not os.path.isdir(d):
+                    raise ValueError(f"no checkout of the plan repo {r}: {d}")
+                folders[r] = d
+            discover = True
+        else:
+            raise ValueError("give --repos DIR[,DIR...], --list FILE or --plan JSON with --root DIR")
+        if not folders:
+            raise ValueError("no repos")
+        graph, ungelesen, todo = {}, set(), list(folders)
+        while todo:
+            r = todo.pop(0)
+            if r in graph:
+                continue
+            graph[r] = sorted(read_edges(folders[r], fremd))
+            if discover:
+                for m in graph[r]:
+                    d = os.path.join(a.root, m)
+                    if m not in folders and os.path.isdir(d):
+                        folders[m] = d
+                        todo.append(m)
+        for r in list(graph):
+            for m in graph[r]:
+                if m not in graph:
+                    ungelesen.add(m)
+        full = {**graph, **{m: [] for m in sorted(ungelesen)}}
+    except (ValueError, OSError, KeyError, TypeError, UnicodeDecodeError) as e:
+        return kio.skipped(f"input: {e}")
+    except Exception as e:  # tomllib.TOMLDecodeError: a broken Cargo.toml is bad input, nothing is guessed
+        if type(e).__name__ == "TOMLDecodeError":
+            return kio.skipped(f"input: Cargo.toml: {e}")
+        raise
+    cycles = find_cycles(full)
+    kio.emit({"status": "ok", "red": bool(cycles), "cycles": cycles, "repos": len(graph), "edges": sum(len(v) for v in graph.values()),
+              "ungelesen": sorted(ungelesen)})
+    return 1 if cycles else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
