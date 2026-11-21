@@ -23,7 +23,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import check_run_rules as runrules  # noqa: E402
 
-ACTORS = {"human": "Person", "ai": "Application", "machine": "Service"}
+# ADR 0105 decision 8: an ai step is a Service (bot seat). Application stays accepted during the transition (it only warns, see check_warnings).
+ACTORS = {"human": ("Person",), "ai": ("Service", "Application"), "machine": ("Service",)}
 TASK_TYPES = {"call", "do", "emit", "for", "fork", "listen", "raise", "run", "set", "switch", "try", "wait"}
 KINDS = ("objective", "subjective")
 FLOW_WORDS = {"continue", "exit", "end"}
@@ -54,8 +55,8 @@ def check_step(item, seen, where):
     actor = meta.get(ACTOR)
     if actor not in ACTORS:
         problems.append(f"{where}: {ACTOR} is {actor!r}, allowed: {', '.join(ACTORS)}")
-    elif meta.get(ATYPE) != ACTORS[actor]:
-        problems.append(f"{where}: {ATYPE} must be {ACTORS[actor]} for actor {actor}")
+    elif meta.get(ATYPE) not in ACTORS[actor]:
+        problems.append(f"{where}: {ATYPE} must be {' or '.join(ACTORS[actor])} for actor {actor}")
     if not isinstance(meta.get(GATE), str) or not meta[GATE].strip():
         problems.append(f"{where}: {GATE} is missing (a name, or `none`)")
     if meta.get(KIND) not in KINDS:

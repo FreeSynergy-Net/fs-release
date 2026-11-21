@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self test of the warning level of scripts/check_workflows.py (ADR 0105 E1): an ai step without bot-seat warns and stays rc 0,
-# an ai step with actor-type Application warns (the existing error rule still demands Application, decision 8 only warns), a real error is still rc 1.
+# an ai step with actor-type Application warns (Application is still accepted, decision 8 only warns), ai + Service + bot-seat is clean, a real error is still rc 1.
 #   bash scripts/test_check_workflows_warn.sh
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,6 +40,14 @@ python3 -I "$tool" "$tmp/b" >"$tmp/o" 2>&1; r=$?
 mk "$tmp/c" Application "        freesynergy.net:bot-seat: x"
 python3 -I "$tool" "$tmp/c" >"$tmp/o" 2>&1; r=$?
 [ "$r" -eq 0 ] && grep -q "warn  w.yaml:.*decision 8" "$tmp/o" && ok "ai + Application: warning, rc 0" || { cat "$tmp/o"; bad "Application (rc=$r)"; }
+
+mk "$tmp/e" Service "        freesynergy.net:bot-seat: x"
+python3 -I "$tool" "$tmp/e" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 0 ] && ! grep -q "warn " "$tmp/o" && ok "ai + Service + bot-seat: no warning, rc 0" || { cat "$tmp/o"; bad "ai+Service (rc=$r)"; }
+
+mk "$tmp/f" Person "        freesynergy.net:bot-seat: x"
+python3 -I "$tool" "$tmp/f" >"$tmp/o" 2>&1; r=$?
+[ "$r" -eq 1 ] && ok "ai + Person is an error (rc 1)" || { cat "$tmp/o"; bad "ai+Person (rc=$r)"; }
 
 mk "$tmp/d" Application ""
 sed -i 's/kind: objective/kind: bogus/' "$tmp/d/w.yaml"
