@@ -149,6 +149,8 @@ do:
       call: kaskade-zyklen:0.0.17@fs
       with:
         plan: ${ $context.plan }
+        root: ${ .input.worktrees // "/srv/FreeSynergy/.scratch/api-runner/wt" }
+        prefix: pk-
       export:
         as: '${ $context + { zyklen: . } }'
       metadata:
@@ -156,7 +158,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script `scripts/kaskade-zyklen` (read only, no network; Python, rc 0 no cycle / 1 cycle / 2 bad input): no repo pins a tag of a repo that (transitively) pins it back. Builds the directed graph repo -> repo from EVERY FreeSynergy git dependency (`tag` and `rev`) in every Cargo.toml of the checkouts of ALL repos of the cascade (the repos of `plan.offen` in the work folder (OPEN: the `with:` of this step passes only `plan`; the script's default mode also needs `--root <work folder with the checkouts>`, so the step cannot run in a real cascade until `with:` gives a root) AND every repo the pins mention that has a checkout there; known foreign sources are no edge), not only the Glieder (so a cycle such as fs-starter <-> fs-forms is found even when one side is no Glied), and searches it for cycles (depth-first, strongly connected components of more than one repo, or a repo that pins itself). Result `zyklen` = { red: true when at least one cycle exists, cycles: [[repo, ..., repo]], repos, edges, ungelesen }; red lists every cycle with its repos. Self test `scripts/test_kaskade_zyklen.sh` (2-cycle, 3-cycle, self edge, rev pin, bad input, mutants)."
+        freesynergy.net:summary: "Script `scripts/kaskade-zyklen` (read only, no network; Python, rc 0 no cycle / 1 cycle / 2 bad input): no repo pins a tag of a repo that (transitively) pins it back. Builds the directed graph repo -> repo from EVERY FreeSynergy git dependency (`tag` and `rev`) in every Cargo.toml of the checkouts of ALL repos of the cascade (the repos of `plan.offen` in the work folder (the work folder is `root` = `input.worktrees`, default /srv/FreeSynergy/.scratch/api-runner/wt, with `prefix` `pk-`: the checkout of repo R is `<root>/pk-R`, the same folders as the worktrees of the Glieder; the repo name in the graph is the pin's repo name) AND every repo the pins mention that has a checkout there; known foreign sources are no edge), not only the Glieder (so a cycle such as fs-starter <-> fs-forms is found even when one side is no Glied), and searches it for cycles (depth-first, strongly connected components of more than one repo, or a repo that pins itself). Result `zyklen` = { red: true when at least one cycle exists, cycles: [[repo, ..., repo]], repos, edges, ungelesen }; red lists every cycle with its repos. Self test `scripts/test_kaskade_zyklen.sh` (2-cycle, 3-cycle, self edge, rev pin, bad input, mutants)."
   - zyklen-weiter:
       switch:
         - zyklus:

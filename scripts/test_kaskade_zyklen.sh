@@ -70,6 +70,13 @@ printf '{"offen":[{"repo":"fs-lonely"}]}' >"$tmp/plan3.json"
 py "$Z" --plan "$tmp/plan3.json" --root "$tmp/co" >"$tmp/o8.json"; rc=$?
 chk "plan default: a pinned repo without checkout is listed as ungelesen and is no cycle (rc 0)" [ "$rc" -eq 0 ]
 chk "plan default: ungelesen names fs-missing" [ "$(q "$tmp/o8.json" 'd["ungelesen"]')" = "['fs-missing']" ]
+# ---- --prefix: the checkouts are folders pk-<repo> in the root (the worktrees folder of the cascade) ----
+mkdir -p "$tmp/pk"; for r in fs-forms fs-rpc fs-starter; do cp -r "$tmp/co/$r" "$tmp/pk/pk-$r"; done
+py "$Z" --plan "$tmp/plan.json" --root "$tmp/pk" --prefix pk- >"$tmp/o9.json"; rc=$?
+chk "--prefix pk-: a cycle through pk-<repo> folders is found (rc 1)" [ "$rc" -eq 1 ]
+chk "--prefix pk-: the cycle names the repos, not the prefixed folders" [ "$(q "$tmp/o9.json" 'sorted(d["cycles"][0])')" = "['fs-forms', 'fs-rpc', 'fs-starter']" ]
+py "$Z" --plan "$tmp/plan.json" --root "$tmp/pk" >"$tmp/o.json"; rc=$?
+chk "--prefix missing: the pk- folders are not found without the prefix (rc 2)" [ "$rc" -eq 2 ]
 # ---- bad input ----
 py "$Z" >"$tmp/o.json" 2>/dev/null; rc=$?
 chk "bad input: no arguments is rc 2" [ "$rc" -eq 2 ]
@@ -103,6 +110,9 @@ chk "mutant (every repo is a cycle) turns the acyclic case red (rc 1)" [ "$rc" -
 mutate "$Z" 'if d["owner"].lower() == kcargo.ORG.lower() and not kcargo.is_fremd(d, fremd):' 'if d["owner"].lower() == kcargo.ORG.lower() and not kcargo.is_fremd(d, fremd) and not d["rev"]:' "$m" || bad "mutant rev not applied"
 py "$m" --repos "$tmp/co/fs-forms,$tmp/co/fs-rpc,$tmp/co/fs-starter" >/dev/null; rc=$?
 chk "mutant (rev pins not read) misses the fs-starter cycle, so the rev case bites (rc $rc, not 1)" [ "$rc" -eq 0 ]
+mutate "$Z" 'd = os.path.join(a.root, a.prefix + r)' 'd = os.path.join(a.root, r)' "$m" || bad "mutant prefix not applied"
+py "$m" --plan "$tmp/plan.json" --root "$tmp/pk" --prefix pk- >/dev/null; rc=$?
+chk "mutant (prefix ignored) turns the --prefix case red (rc $rc, not 1)" [ "$rc" -eq 2 ]
 # the failure counter of THIS script (shared test scripts/test_kaskade_counter.sh)
 # shellcheck source=scripts/test_kaskade_counter.sh
 source "$here/test_kaskade_counter.sh"; counter_selftest "${BASH_SOURCE[0]}"

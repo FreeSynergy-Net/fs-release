@@ -2,13 +2,16 @@
 # Pattern: none (script of the pin cascade).
 """Cycle check of the pin cascade (call `kaskade-zyklen` of the workflow `pin-kaskade`, step `zyklen-check`). READ ONLY, no network.
 
-  python3 -I scripts/kaskade-zyklen (--repos DIR[,DIR...] | --list FILE | --plan JSON|FILE|- --root DIR) [--root DIR] [--fremdquellen FILE]
+  python3 -I scripts/kaskade-zyklen (--repos DIR[,DIR...] | --list FILE | --plan JSON|FILE|- --root DIR) [--prefix P] [--fremdquellen FILE]
 
 SCOPE DECISION (open point of the checklist, decided here, widest list): the repos to read are
   1. `--repos`: checkouts (one folder per repo, the repo name = the folder name), or `--list FILE` (one folder per line, `#` lines skipped), or
   2. the default: ALL repos named in the cascade plan input (`--plan`, the result of `kaskade-plan`, key `offen`) as `--root/<repo>`, AND every repo that
      the pins mention (a FreeSynergy git dependency of a scanned repo) whose checkout exists in `--root` (read transitively), so a cycle such as
      fs-starter <-> fs-forms is found even when one side is no Glied. A mentioned repo without a checkout is a node without outgoing edges (`ungelesen`).
+ROOT RULE: `--root` is the folder whose subfolders are the checkouts, the checkout of repo R is `--root/<prefix>R` (`--prefix`, default none). In the cascade the step passes
+the worktrees folder (`input.worktrees`, default /srv/FreeSynergy/.scratch/api-runner/wt) and prefix `pk-`, because the worktree of a Glied is `<worktrees>/pk-<repo>`.
+The repo name in the graph is always the pin's repo name, never the prefixed folder name.
 Edges: repo -> owner repo of EVERY FreeSynergy git dependency (`tag` and `rev`, every Cargo.toml of the checkout, via `kcargo.git_deps`); known foreign sources
 (workflows/kaskade-fremdquellen.txt) are no edges; `[patch]` is not read. Cycles = strongly connected components of more than one repo, and a repo that pins itself.
 Result JSON: {status, red, cycles:[[repo, ...]], repos, edges, ungelesen}. rc 0 = no cycle, 1 = at least one cycle, 2 = bad input.
@@ -78,6 +81,7 @@ def main(argv):
     p.add_argument("--list")
     p.add_argument("--plan")
     p.add_argument("--root")
+    p.add_argument("--prefix", default="")
     p.add_argument("--fremdquellen", default=os.path.join(HERE, "..", "workflows", "kaskade-fremdquellen.txt"))
     try:
         a = p.parse_args(argv)
@@ -102,7 +106,7 @@ def main(argv):
             if not isinstance(names, list) or not all(isinstance(x, str) and kgit.REPO.match(x) for x in names):
                 raise ValueError("plan.offen: repo names required")
             for r in names:
-                d = os.path.join(a.root, r)
+                d = os.path.join(a.root, a.prefix + r)
                 if not os.path.isdir(d):
                     raise ValueError(f"no checkout of the plan repo {r}: {d}")
                 folders[r] = d
@@ -119,7 +123,7 @@ def main(argv):
             graph[r] = sorted(read_edges(folders[r], fremd))
             if discover:
                 for m in graph[r]:
-                    d = os.path.join(a.root, m)
+                    d = os.path.join(a.root, a.prefix + m)
                     if m not in folders and os.path.isdir(d):
                         folders[m] = d
                         todo.append(m)
