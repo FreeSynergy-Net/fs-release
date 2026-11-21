@@ -1,5 +1,5 @@
 # Scaffold build-out (user 20.11. ~11:30, 3 slots scaffold : 1 slot forms): bring fs-blueprint up to the E4 acceptance. Objective flow: REPEAT until the E4 check is green (rule: objective = repeat until the target is reached).
-# E1 `fs-blueprint new` creates ONLY a data package (+ check CI, rule `code-in-program`). E3 contract (capnp, fs-interfaces `schema/`) + DB tables (typed columns, ADR 0086) generated from the data types.
+# E1 `fs-blueprint new` creates ONLY a data package (+ check CI, rule `code-in-program`). E3 DB tables (typed columns, ADR 0086) and the capnp structs of the program's OWN types, generated from the data types incl. nested types (child table with parent key) and reference lists (link table); the contract itself lives in fs-interfaces (one source): the program package only NAMES it as `provides = { contract, version }`, the catalog records "program X provides contract Y@version", no `interface` is generated (ADR 0105 decisions 2 and 3).
 # E2 host mandatory parts in fs-starter (settings, help, session, update, MCP), taken from blueprint/forms, never written by hand in a program. E4 = forms itself generated with `fs-blueprint new`, runs through fs-starter with settings, views and help; pictures.
 # While working ONLY `cargo check -p <crate>` (CLAUDE.md section 4); when a module is finished ONE `testlauf` stage `ende` for that module, bottom up. Agents never push, tag or merge (coordinator). Time box 60 min per order (section 4a).
 # Dependencies against local heads via [patch] (section 4b); tags only at the bundled release. Slots: three workers, one per track (E1, E3, E2) in own worktrees `unreviewed/scaffold-e1|e2|e3`; E4 is run by the coordinator when all three are green.
@@ -48,7 +48,7 @@ do:
         freesynergy.net:bot-seat: geruest-ausbau.e3-vertrag-db
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Sonnet worker - track E3: from the data types of a package generate the contract (capnp in fs-interfaces `schema/`, trait fixpoint under `sperren/`) and the DB tables with typed columns (no JSON or TOML as storage). Same types give the same output (check: two runs, identical bytes)."
+        freesynergy.net:summary: "Sonnet worker - track E3: from the data types of a package generate the capnp structs of its own types (nested struct / List(...)) and the DB tables with typed columns (child table `<parent>_<field>` for nested types, link table for reference lists; no JSON or TOML as storage). The contract is NOT generated into the program: it lives in fs-interfaces and the package only names it (`provides` as reference, check `contract-unknown`). Same types give the same output (check: two runs, identical bytes; append-only guard for the contract numbers)."
   - e2-host-pflicht:
       call: build-ai:0.0.17@fs
       with:
@@ -61,7 +61,7 @@ do:
         freesynergy.net:bot-seat: geruest-ausbau.e2-host-pflicht
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Sonnet worker - track E2: the host mandatory parts in fs-starter (settings, help, session, update, MCP) come from blueprint and forms descriptions; a program never writes them by hand. Starts after fs-starter v0.0.2 is tagged; until then work against the local head by [patch]."
+        freesynergy.net:summary: "Sonnet worker - track E2: the host mandatory parts in fs-starter (settings, help, session, update, MCP) come from blueprint and forms descriptions; a program never writes them by hand. The host is fs-starter (v0.0.3 is tagged and released, ADR 0105 (a): one executable host started with the path of the data package, it calls fs-forms-run as a library); work against the tags, not against local heads."
   - modul-test:
       call: testlauf-ende:0.0.17@fs
       with:
