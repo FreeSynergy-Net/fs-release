@@ -1,7 +1,7 @@
 # pin-kaskade: ONE cascade of the pins after a new tag of fs-types (trigger, here v0.0.3), in the order of the DAG (ADR 0092/0093; plan
 # `katalog-plan/PLAN-baukasten-architektur.md`, user priority "Grundsystem fertig"). Order: `Workflow pin-kaskade, parameters ausloeser-tag, glieder, ab, workdir` (docs/prompt-template.md). FS profile: see README.md.
 # Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy).
-# SCRIPTS: seven `@fs` calls are REAL scripts in `scripts/` (Python, JSON on stdout, rc 0 green / 1 red / 2 bad input; self tests `scripts/test_kaskade_plan.sh`, `test_kaskade_pins.sh`, `test_kaskade_gates.sh` with mutants): `kaskade-lage`, `kaskade-plan`, `kaskade-glied`, `kaskade-glied-fertig`, `kaskade-fremde-pins`, `lock-gleich`, `gates-komplett`. SPECIFICATION: the other `@fs` calls (`vorhanden-pruefen-ai`, `befund-beleg`, `board-card`, `kaskade-plan-regeln`, `kaskade-besonderes-ai`, `lock-sources-strict`, `push-unreviewed`, `branch-ci`, `report-write`, `windows-aufrufer`) have no script yet, and a whole real run is not proven. Agents never push to main, tag or merge; ordinary push only to `unreviewed/pin-kaskade-<repo>-<n>` (a NEW number after every rebase, never a force push, [REBASE-NEUER-BRANCH]); no `gh` call; reports per [BERICHT]; one board card (fs-tasks, project `bahn5-crates`).
+# SCRIPTS: seven `@fs` calls are REAL scripts in `scripts/` (Python, JSON on stdout, rc 0 green / 1 red / 2 bad input; self tests `scripts/test_kaskade_plan.sh`, `test_kaskade_pins.sh`, `test_kaskade_gates.sh` with mutants): `kaskade-lage`, `kaskade-plan`, `kaskade-glied`, `kaskade-glied-fertig`, `kaskade-fremde-pins`, `lock-gleich`, `gates-komplett`. SPECIFICATION: the other `@fs` calls (`vorhanden-pruefen-ai`, `befund-beleg`, `board-card`, `kaskade-plan-regeln`, `kaskade-zyklen`, `kaskade-besonderes-ai`, `lock-sources-strict`, `push-unreviewed`, `branch-ci`, `report-write`, `windows-aufrufer`) have no script yet, and a whole real run is not proven. Agents never push to main, tag or merge; ordinary push only to `unreviewed/pin-kaskade-<repo>-<n>` (a NEW number after every rebase, never a force push, [REBASE-NEUER-BRANCH]); no `gh` call; reports per [BERICHT]; one board card (fs-tasks, project `bahn5-crates`).
 # Order of the Glieder (ADR 0093 rule 1: fs-types -> {fs-interfaces, fs-objects, fs-jscalendar, fs-components} -> fs-rpc -> programs), DERIVED from the real dependencies, not from a fixed list (step `plan`): the table below is the evidence (Cargo.toml of main of every Glied repo, `git clone --depth 1`, read 17.11.2026; `A <- B, C` = A depends on B and C); the test `workflows_pin_kaskade.rs` keeps the table, the order and its own copy of the edges in step.
 # GLIEDER-ORDER: fs-interfaces, fs-objects, fs-jscalendar, fs-rpc, fs-components, fs-people, fs-tasks, fs-calendars
 # DAG: fs-interfaces <- fs-types
@@ -145,6 +145,34 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `plan` (at most two repeats), from the third red round to `eskalation`; only `red == false` goes on; a missing result goes to `eskalation`, never to green."
+  - zyklen-check:
+      call: kaskade-zyklen:0.0.16@fs
+      with:
+        plan: ${ $context.plan }
+      export:
+        as: '${ $context + { zyklen: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (specification, no script yet): no repo pins a tag of a repo that (transitively) pins it back. Builds the directed graph repo -> repo from EVERY FreeSynergy git dependency (`tag` and `rev`) in the Cargo.toml of main of ALL repos of the cascade, not only the Glieder (so a cycle such as fs-starter <-> fs-forms is found even when one side is no Glied), and searches it for cycles (depth-first, strongly connected components of more than one repo, or a repo that pins itself). Result `zyklen` = { red: true when at least one cycle exists, zyklen: [[repo, ..., repo]] }; red lists every cycle with its repos in order."
+  - zyklen-weiter:
+      switch:
+        - zyklus:
+            when: '${ $context.zyklen.red == true }'
+            then: eskalation
+        - green:
+            when: '${ $context.zyklen.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a dependency cycle between repos stops the cascade at once (`eskalation`, no repeat: a cycle is not solved by planning again, the pins must be cut by a decision); only `red == false` goes on; a missing result goes to `eskalation`."
   - glied-weiche:
       switch:
         - fertig:
