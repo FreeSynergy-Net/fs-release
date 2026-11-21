@@ -9,6 +9,19 @@ document:
   version: 0.0.17
   title: Research a Frontend into a dossier and publish it to the docs
 do:
+  - blinc-org-bestand:
+      call: blinc-org-inventory:0.0.17@fs
+      with:
+        org: project-blinc
+        out: ${ .input.blinc }
+      export:
+        as: '${ $context + { blinc_org: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (no AI, read only, GET only) - the Blinc inventory (`blinc` input) is NEVER taken from the main checkout alone: `gh api orgs/project-blinc/repos --paginate` lists ALL org repos (e.g. blinc_node_editor, blinc_canvas_kit, blinc_portal_ui, blinc_input, blinc_game_kit, ...), each with last push date, licence (NO licence given, e.g. blinc_game_kit = do not use, listed as `nicht nutzbar`), archived flag (e.g. blinc_input = archived, listed as `archiviert`), tags (none = pin to a commit) and the layer it belongs to; every repo is read from a FRESH shallow clone under .scratch/blinc-org/<repo> (the local blinc checkout may be old or hold uncommitted work and is never pulled, reset or changed). The result `blinc` lists repos and widgets (node/flow graph, canvas, portal ui, Gantt-like) with file:line. A missing network or `gh` is `skipped` and named in the report, never an inventory without the org repos; an inventory that only names the main checkout is RED (the gap found 20.11.: the node editor was missed)."
   - research:
       call: research-ai:0.0.17@fs
       with:

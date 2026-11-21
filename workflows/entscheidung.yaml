@@ -33,6 +33,21 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: The strategy reads the hits. A decision that exists applies and is followed; the result is `open` only for a departure from an ADR or for a missing decision, with the ADR numbers and the reason.
+  - recherche:
+      call: standard-research-ai:0.0.17@fs
+      with:
+        topic: ${ .input.topic }
+        sources: ${ .input.sources }
+        out: ${ .input.out }
+      export:
+        as: '${ $context + { recherche: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: entscheidung.recherche
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Optional, only when the topic needs EXTERNAL standards or reference programs (e.g. workflow levels, process views): Haiku reads and inventories (text only, no build slot, no code, ADR 0013: nothing copied, own words), one report per part under `out` (e.g. .scratch/recherche-workflow-ebenen/), each with sources; a gap list per item as `covered | partial | missing` against OUR state (DSL in fs-release/workflows, ADRs, repos); not proven = `[nicht belegt]`. The ADR draft (`adr-write`, step `draft`, Opus) comes only after this step and cites the reports. Time box 60 min per order. Fixed sources: workflow patterns = http://workflowpatterns.com/ (PLAIN HTTP only, the https certificate fails; index pages /patterns/control/, /patterns/data/, /patterns/resource/, /patterns/exception/, single patterns as wcp*/wdp*/wrp*/wep*.php with ids WCP/WDP/WRP); Serverless Workflow = GitHub serverlessworkflow/specification, file dsl-reference.md (the open-workflow-specification.org path gives 404). A page that cannot be read is reported to the strategy (the user offered to copy the content), never filled from memory."
   - ask:
       run:
         workflow:
