@@ -26,7 +26,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # full history AND tags: released_changelog_sections_equal_their_tags (scripts/test_changelog_released.sh) reads every tag
-      - uses: FreeSynergy/fs-release/actions/setup-rust@89df64ec85e6d362708e1b433b46448fe27b8bd4
+      - uses: FreeSynergy/fs-release/actions/setup-rust@ef832bf2ca93b941d567c2b2116331d0ee7e2a6d
         with:
           toolchain: pinned
           components: rustfmt,clippy
