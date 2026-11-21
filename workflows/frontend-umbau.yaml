@@ -306,17 +306,17 @@ do:
           ours: ${ $context.after }
           waechter: ${ $context.gates }
       export:
-        as: '${ $context + { pictures: { different: (.accepted != true) } } }'
+        as: '${ $context + { pictures: . } }'
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Picture comparison with a verdict instead of a pixel gate (a different host shell never draws pixel-identical): the images before | after side by side (`before` as model, `after` as ours), Opus judges each pair (`strategy-verdict`, accepted or what differs), then the user (`user-verdict`), see picture-acceptance.yaml. Result `pictures.different` is true unless `accepted == true`; `repeat` reads it. The verdict is taken as it is; a red guard (`gates`) shows no pictures."
+        freesynergy.net:summary: "Picture comparison with a verdict instead of a pixel gate (a different host shell never draws pixel-identical): the images before | after side by side (`before` as model, `after` as ours), Opus judges each pair (`strategy-verdict`, accepted or what differs), then the user (`user-verdict`), see picture-acceptance.yaml. Result `pictures.accepted`; `repeat` reads it (not `accepted == true` goes back to `convert`). The verdict is taken as it is; a red guard (`gates`) shows no pictures."
   - repeat:
       switch:
         - again:
-            when: '${ $context.recount.fixed > 0 or $context.gates.red or $context.pictures.different }'
+            when: '${ $context.recount.fixed > 0 or $context.gates.red or $context.pictures.accepted != true }'
             then: convert
         - done:
             then: continue
@@ -325,7 +325,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - fixed values left, red gates or a changed picture go back to convert, otherwise on to the release.
+        freesynergy.net:summary: Control flow - fixed values left, red gates or a not accepted picture go back to convert, otherwise on to the release.
   - frontend-nur-komponenten:
       call: frontend-nur-komponenten:0.0.17@fs
       with:
@@ -385,7 +385,7 @@ do:
         freesynergy.net:bot-seat: frontend-umbau.alt-entfernen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Only AFTER the picture OK (`pictures.different == false`) and the clean component check: the hand-written Frontend crate (input `alt_crate`) goes away in ONE commit, together with its entry in the workspace (`Cargo.toml` members and dependencies), the `bin-deb` and `rpm` depends, `packaging.rs`, the `@BIN@` placeholder and the manifest line `fs:exec fs-forms-run` that replaces it. Afterwards `cargo check -p <host crate>` and one `testlauf` run, step `ende`, only for the host crate and the packaging; nothing else is rebuilt. Own worktree, local commit ([COMMIT]), no push, no tag, no force; at most 60 min, Sonnet; report per [BERICHT]. Without a picture OK the step does not start."
+        freesynergy.net:summary: "Only AFTER the picture OK (`pictures.accepted == true`) and the clean component check: the hand-written Frontend crate (input `alt_crate`) goes away in ONE commit, together with its entry in the workspace (`Cargo.toml` members and dependencies), the `bin-deb` and `rpm` depends, `packaging.rs`, the `@BIN@` placeholder and the manifest line `fs:exec fs-forms-run` that replaces it. Afterwards `cargo check -p <host crate>` and one `testlauf` run, step `ende`, only for the host crate and the packaging; nothing else is rebuilt. Own worktree, local commit ([COMMIT]), no push, no tag, no force; at most 60 min, Sonnet; report per [BERICHT]. Without a picture OK the step does not start."
   - release:
       then: end
       run:
