@@ -43,6 +43,25 @@ impl Blueprint {
     pub fn own_types(&self) -> impl Iterator<Item = &TypeDef> {
         self.types.iter().filter(|t| t.module.is_none())
     }
+
+    /// The own types that are written at the top level of the contract: all but those that are only nested into another type (those stand inside their parent).
+    pub fn top_types(&self) -> impl Iterator<Item = &TypeDef> {
+        self.own_types().filter(|t| !self.is_nested(&t.name))
+    }
+
+    /// True when a field of an own type nests the type `name`.
+    #[must_use]
+    pub fn is_nested(&self, name: &str) -> bool {
+        self.own_types()
+            .flat_map(|t| &t.field)
+            .any(|f| f.nested.as_deref() == Some(name))
+    }
+
+    /// The own type of that name.
+    #[must_use]
+    pub fn own_type(&self, name: &str) -> Option<&TypeDef> {
+        self.own_types().find(|t| t.name == name)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -116,6 +135,10 @@ pub struct Field {
     pub name: String,
     pub kit: Option<String>,
     pub basic: Option<String>,
+    /// An own type that lives inside this one (a child table, a struct inside the struct).
+    pub nested: Option<String>,
+    /// An own type or the IRI of a type of a standard: a link to something that lives on its own (a link table for a list).
+    pub reference: Option<String>,
     pub standard: Option<String>,
     #[serde(default)]
     pub multiple: bool,

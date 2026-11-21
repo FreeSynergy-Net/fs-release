@@ -1,5 +1,6 @@
 //! Pattern: Template method (types and their fields, rule sets and the frontend of the blueprint).
 
+use crate::check_nested;
 use crate::error::Coded;
 use crate::form::{is_camel, is_iri, is_media_type, is_pascal, is_standard_uri, AS2_TYPES};
 use crate::kit::Kind;
@@ -8,6 +9,7 @@ use crate::rules::Rule;
 use crate::sink::Sink;
 
 pub fn types(s: &mut Sink, bp: &Blueprint) {
+    check_nested::graph(s, bp);
     s.unique("type", bp.types.iter().map(|t| t.name.as_str()));
     for t in &bp.types {
         if !is_pascal(&t.name) {
@@ -84,8 +86,10 @@ fn has_exception(s: &Sink, bp: &Blueprint, ty: &str) -> bool {
 
 /// A program's own type: standard, envelope, media type and label are mandatory, and so is the standard reference of every field.
 fn own(s: &mut Sink, bp: &Blueprint, t: &TypeDef) {
+    // a type that only lives inside another one is no document of its own: no standard, envelope or media type needed
+    let nested = bp.is_nested(&t.name);
     match &t.standard {
-        None if has_exception(s, bp, &t.name) => {}
+        None if nested || has_exception(s, bp, &t.name) => {}
         None => missing(s, "standard"),
         Some(u) if !is_standard_uri(u) => s.rule(
             Rule::StandardEvidence,
@@ -96,6 +100,7 @@ fn own(s: &mut Sink, bp: &Blueprint, t: &TypeDef) {
         Some(_) => {}
     }
     match &t.envelope {
+        None if nested => {}
         None => missing(s, "envelope"),
         Some(e) if !AS2_TYPES.contains(&e.as_str()) && !is_iri(e) => s.err(
             Coded::new("envelope-invalid")
@@ -105,6 +110,7 @@ fn own(s: &mut Sink, bp: &Blueprint, t: &TypeDef) {
         Some(_) => {}
     }
     match &t.media_type {
+        None if nested => {}
         None => missing(s, "media_type"),
         Some(m) if !is_media_type(m) => s.err(
             Coded::new("media-type-invalid")
@@ -132,11 +138,16 @@ fn field(s: &mut Sink, bp: &Blueprint, t: &TypeDef, f: &Field) {
                 .with("found", f.name.as_str()),
         );
     }
-    match (&f.kit, &f.basic) {
-        (Some(_), Some(_)) => s.err(Coded::new("field-kind-both").with("field", f.name.as_str())),
-        (None, None) => s.err(Coded::new("field-kind-missing").with("field", f.name.as_str())),
-        _ => {}
+    let kinds = [&f.kit, &f.basic, &f.nested, &f.reference]
+        .iter()
+        .filter(|k| k.is_some())
+        .count();
+    match kinds {
+        0 => s.err(Coded::new("field-kind-missing").with("field", f.name.as_str())),
+        1 => {}
+        _ => s.err(Coded::new("field-kind-both").with("field", f.name.as_str())),
     }
+    check_nested::target(s, bp, f);
     if let Some(k) = f.kit.as_deref().filter(|k| !s.catalog.kit_known(k)) {
         s.rule(
             Rule::ExistingOnly,

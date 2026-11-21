@@ -34,8 +34,8 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("standard-missing", "Field {$field} of type {$type} has no standard reference", "Feld {$field} des Typs {$type} hat keinen Standardbeleg"),
     ("standard-invalid", "{$found} is no standard address with a section (type {$type})", "{$found} ist keine Standard-Adresse mit Abschnitt (Typ {$type})"),
     ("media-type-invalid", "{$found} is no media type (type {$type})", "{$found} ist kein Medientyp (Typ {$type})"),
-    ("field-kind-both", "Field {$field} names a kit and a basic type; exactly one is allowed", "Feld {$field} nennt Bausatz und Grundtyp; erlaubt ist genau eins"),
-    ("field-kind-missing", "Field {$field} names neither a kit nor a basic type", "Feld {$field} nennt weder Bausatz noch Grundtyp"),
+    ("field-kind-both", "Field {$field} names more than one of kit, basic type, nested type and reference; exactly one is allowed", "Feld {$field} nennt mehr als eins von Bausatz, Grundtyp, verschachteltem Typ und Verweis; erlaubt ist genau eins"),
+    ("field-kind-missing", "Field {$field} names none of kit, basic type, nested type and reference", "Feld {$field} nennt weder Bausatz, Grundtyp, verschachtelten Typ noch Verweis"),
     ("kit-unknown", "The data kit {$name} does not exist", "Den Datenbausatz {$name} gibt es nicht"),
     ("basic-unknown", "The basic type {$name} does not exist", "Den Grundtyp {$name} gibt es nicht"),
     ("words-unknown", "The word list {$ref} does not exist or is not allowed here", "Die Wortliste {$ref} gibt es nicht oder sie ist hier nicht erlaubt"),
@@ -74,6 +74,9 @@ pub const MESSAGES: &[(&str, &str, &str)] = &[
     ("code-in-program", "The Rust file {$path} is code in the program: a program is data, code belongs to the modules; only an exception with a talk record may keep it", "Die Rust-Datei {$path} ist Code im Programm: ein Programm besteht aus Daten, Code gehört in die Module; nur eine Ausnahme mit Gesprächsprotokoll darf sie halten"),
     ("contract-append-only", "The contract text {$path} would break the earlier one ({$what}): numbers and types are append-only, a field, method or type only at the end; nothing was written", "Der Vertragstext {$path} würde den früheren brechen ({$what}): Nummern und Typen gelten nur anhängend, ein Feld, eine Methode oder ein Typ nur am Ende; es wurde nichts geschrieben"),
     ("column-collides", "The field {$field} of the type {$type} would be a second column id next to the key column", "Das Feld {$field} des Typs {$type} wäre eine zweite Spalte id neben der Schlüsselspalte"),
+    ("nested-cycle", "The type {$type} is nested inside itself, directly or through other types", "Der Typ {$type} steckt in sich selbst, direkt oder über andere Typen"),
+    ("nested-twice", "The type {$type} is nested by more than one field; a nested type has exactly one parent", "Der Typ {$type} wird von mehr als einem Feld verschachtelt; ein verschachtelter Typ hat genau einen Elternteil"),
+    ("table-collides", "Two types or fields would make the same table {$table}", "Zwei Typen oder Felder würden dieselbe Tabelle {$table} ergeben"),
 ];
 
 /// The message of a code in `en` or `de`; `None` for an unknown code or language.

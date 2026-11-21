@@ -21,10 +21,11 @@ pub fn path_of(bp: &Blueprint) -> String {
 
 fn capnp_type(shape: &Shape, list: bool) -> String {
     let base = match shape {
-        Shape::Text => "Text".to_string(),
-        Shape::Int => "Int64".to_string(),
+        Shape::Text | Shape::Ref { own: false } => "Text".to_string(),
+        Shape::Int | Shape::Ref { own: true } => "Int64".to_string(),
         Shape::Bool => "Bool".to_string(),
         Shape::Kit(k) => format!("Kit.{}", pascal(k)),
+        Shape::Nested(n) => n.clone(),
     };
     if list {
         format!("List({base})")
@@ -33,14 +34,33 @@ fn capnp_type(shape: &Shape, list: bool) -> String {
     }
 }
 
-fn write_struct(out: &mut String, t: &TypeDef) -> Result<(), Coded> {
+/// The deepest nesting that is written (the check refuses a cycle; this is the stop for a blueprint that was not checked).
+const MAX_DEPTH: usize = 16;
+
+/// A struct with its fields, then the structs of its nested types inside it (so a field appended later keeps every earlier line where it was).
+fn write_struct(out: &mut String, bp: &Blueprint, t: &TypeDef, depth: usize) -> Result<(), Coded> {
     let bad = || Coded::new("blueprint-unserializable");
-    writeln!(out, "\nstruct {} {{", t.name).map_err(|_| bad())?;
+    if depth > MAX_DEPTH {
+        return Err(Coded::new("nested-cycle").with("type", t.name.as_str()));
+    }
+    let pad = "  ".repeat(depth);
+    writeln!(out, "\n{pad}struct {} {{", t.name).map_err(|_| bad())?;
+    let mut inner = Vec::new();
     for (n, f) in t.field.iter().enumerate() {
         let (shape, list) = of(f)?;
-        writeln!(out, "  {} @{n} :{};", f.name, capnp_type(&shape, list)).map_err(|_| bad())?;
+        writeln!(out, "{pad}  {} @{n} :{};", f.name, capnp_type(&shape, list))
+            .map_err(|_| bad())?;
+        if let Shape::Nested(name) = shape {
+            inner.push(
+                bp.own_type(&name)
+                    .ok_or_else(|| Coded::new("type-unknown").with("name", name.as_str()))?,
+            );
+        }
     }
-    out.push_str("}\n");
+    for child in inner {
+        write_struct(out, bp, child, depth + 1)?;
+    }
+    writeln!(out, "{pad}}}").map_err(|_| bad())?;
     Ok(())
 }
 
@@ -50,7 +70,7 @@ fn write_struct(out: &mut String, t: &TypeDef) -> Result<(), Coded> {
 /// # Errors
 /// `field-kind-missing{field}` for a field without a kind.
 pub fn text(bp: &Blueprint) -> Result<Option<String>, Coded> {
-    let own: Vec<&TypeDef> = bp.own_types().collect();
+    let own: Vec<&TypeDef> = bp.top_types().collect();
     if own.is_empty() {
         return Ok(None);
     }
@@ -62,7 +82,7 @@ pub fn text(bp: &Blueprint) -> Result<Option<String>, Coded> {
         let _ = writeln!(out, "using Kit = import \"{KIT_IMPORT}\";");
     }
     for t in own {
-        write_struct(&mut out, t)?;
+        write_struct(&mut out, bp, t, 0)?;
     }
     Ok(Some(out))
 }

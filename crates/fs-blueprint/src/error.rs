@@ -75,6 +75,9 @@ pub const CODES: &[(&str, &[&str])] = &[
     ("code-in-program", &["path"]),
     ("contract-append-only", &["path", "what"]),
     ("column-collides", &["type", "field"]),
+    ("nested-cycle", &["type"]),
+    ("nested-twice", &["type"]),
+    ("table-collides", &["table"]),
 ];
 
 /// One finding: a code of [`CODES`] and its named parameters.

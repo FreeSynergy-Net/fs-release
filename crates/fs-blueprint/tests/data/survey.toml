@@ -1,0 +1,117 @@
+schema = 2
+
+[program]
+name = "surveys"
+version = "0.0.1"
+skeleton = "0.1.0"
+capability = "shifts"
+summary = { en = "Shift plans", de = "Schichtpläne" }
+description = { en = "Plan shifts and assign people.", de = "Schichten planen und Menschen einteilen." }
+categories = ["Office"]
+
+[contract]
+version = "0.1"
+id = "0xc04d258971543477"
+
+[[type]]
+name = "Survey"
+standard = "https://x.org/a#b"
+envelope = "Question"
+media_type = "application/vnd.freesynergy.survey"
+label = { en = "Survey", de = "Survey" }
+
+[[type.field]]
+name = "title"
+basic = "text"
+standard = "https://x.org/a#b"
+label = { en = "title", de = "title" }
+
+[[type.field]]
+name = "minGroup"
+basic = "number"
+standard = "https://x.org/a#b"
+label = { en = "minGroup", de = "minGroup" }
+
+[[type.field]]
+name = "scope"
+reference = "https://www.w3.org/ns/activitystreams#Object"
+multiple = true
+standard = "https://x.org/a#b"
+label = { en = "scope", de = "scope" }
+
+[[type.field]]
+name = "creator"
+reference = "https://www.w3.org/ns/activitystreams#Person"
+multiple = true
+standard = "https://x.org/a#b"
+label = { en = "creator", de = "creator" }
+
+[[type.field]]
+name = "questions"
+reference = "Question"
+multiple = true
+standard = "https://x.org/a#b"
+label = { en = "questions", de = "questions" }
+
+[[type]]
+name = "Question"
+standard = "https://x.org/a#b"
+envelope = "Question"
+media_type = "application/vnd.freesynergy.question"
+label = { en = "Question", de = "Question" }
+
+[[type.field]]
+name = "text"
+basic = "text"
+standard = "https://x.org/a#b"
+label = { en = "text", de = "text" }
+
+[[type.field]]
+name = "choices"
+nested = "Choice"
+multiple = true
+standard = "https://x.org/a#b"
+label = { en = "choices", de = "choices" }
+
+[[type.field]]
+name = "condition"
+nested = "Condition"
+standard = "https://x.org/a#b"
+label = { en = "condition", de = "condition" }
+
+[[type]]
+name = "Choice"
+label = { en = "Choice", de = "Choice" }
+
+[[type.field]]
+name = "key"
+basic = "text"
+standard = "https://x.org/a#b"
+label = { en = "key", de = "key" }
+
+[[type.field]]
+name = "label"
+basic = "text"
+standard = "https://x.org/a#b"
+label = { en = "label", de = "label" }
+
+[[type]]
+name = "Condition"
+label = { en = "Condition", de = "Condition" }
+
+[[type.field]]
+name = "question"
+reference = "Question"
+standard = "https://x.org/a#b"
+label = { en = "question", de = "question" }
+
+[[type.field]]
+name = "equals"
+basic = "text"
+standard = "https://x.org/a#b"
+label = { en = "equals", de = "equals" }
+
+[frontend]
+standard = "list"
+layout = "forms/list.toml"
+covers = "all"
