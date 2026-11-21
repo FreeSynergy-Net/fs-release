@@ -21,11 +21,13 @@ fn approval_before_send(text: &str) -> bool {
         && position(text, "approval") < position(text, "send")
 }
 
-/// The counts, the pixel comparison and the gates are scripts (`actor: machine`), never the agent's word.
+/// The counts, the image renders and the gates are scripts (`actor: machine`), never the agent's word;
+/// `same-pictures` is a picture comparison with a verdict (picture-acceptance, a person decides).
 fn counts_are_scripts(text: &str) -> bool {
-    ["count", "recount", "before", "gates", "same-pictures"]
+    ["count", "recount", "before", "after", "gates"]
         .iter()
         .all(|s| step_body(text, s).contains("actor: machine"))
+        && step_body(text, "same-pictures").contains("name: picture-acceptance")
 }
 
 /// The license step is in the flow before the gates and names the GitHub CI (cargo-deny runs there, not locally).

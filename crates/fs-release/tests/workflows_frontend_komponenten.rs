@@ -7,7 +7,7 @@ use support::workflows::{in_order, read, step_body};
 const WHERE: [(&str, &str); 3] = [
     ("grundfassung", "picture-ok"),
     ("frontend-round", "acceptance"),
-    ("frontend-umbau", "release"),
+    ("frontend-umbau", "alt-entfernen"),
 ];
 
 fn ok(text: &str, anchor: &str) -> bool {

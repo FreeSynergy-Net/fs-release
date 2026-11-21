@@ -217,6 +217,8 @@ do:
       with:
         group: ${ .input.group }
         state: before
+      export:
+        as: '${ $context + { before: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -283,6 +285,8 @@ do:
       with:
         group: ${ .input.group }
         state: after
+      export:
+        as: '${ $context + { after: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
