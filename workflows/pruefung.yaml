@@ -1,7 +1,7 @@
 # STATUS: SPECIFICATION, NOT RUNNABLE - the `@fs` names below have no script yet; the structure is checked by the workflow tests of fs-release, no SW 1.0 run exists.
 # Card 78 (user, 20 Nov., via strategy 86): ONE standard check of a finished module before review and release, instead of a free-hand check per order.
 # Order: `Workflow pruefung, step <id>, parameters repo, branch, head, delta, kind, klasse`.
-#   kind   = data | component | host | security   (which list is run besides the common one)
+#   kind   = data | Datenpaket | component | host | security   (which list is run besides the common one)
 #   klasse = NORMAL | HOCH                        (rules.md [REVIEW-KLASSE]: NORMAL is read by a Sonnet, HOCH by an Opus; security is always HOCH)
 # Flow: (1) the check list of the kind, (2) ALL items are run, each answer yes or no, a NO does not stop the run, (3) the check report is written as a file (data),
 #   (4) only the RED items are fixed, (5) only those are checked again until green, (6) read-through WITHOUT compiling (a finding goes back to the fix),
@@ -59,6 +59,7 @@ do:
           - { id: A10, name: zeittests, frage: "Do tests with a time, signal or concurrency part run at least 10 times with the result of EACH run in the log, and do they have a timeout that turns them red (never hanging)?", pruefung: "read the log; marked tests only, all others run once ([PRUEFUNG-SCHLANK], [TEST-MEHRFACH], [TEST-TIMEOUT])", auto: lesen }
           - { id: A11, name: doku, frage: "Are version, CHANGELOG and README consistent, and are open points named honestly?", pruefung: "read the three files against Cargo.toml; a version check is a script later", auto: script-spaeter }
           - { id: A12, name: namen, frage: "Do all program names follow the naming rule (plural, lower case, fs prefix; no old or singular forms)?", pruefung: "grep for the forbidden old forms against namensregel.md; a script later", auto: script-spaeter }
+          - { id: A13, name: adr-abweichungen, frage: "Are all departures from an ADR that the change makes or leaves (a rule of an ADR that the code does not follow, or an ADR rule that a newer ADR replaced) listed in the ADR that decides it, and do the older ADRs point to it?", pruefung: "read the ADRs the change touches and the list of departures (`Abweichungen`) of the newer one; a departure that is only in the code or only in a draft is NO", auto: lesen }
         daten:
           - { id: D1, name: quelle, frage: "Is there ONE source of truth and no JSON or blob column except `original`?", pruefung: "speicher-check of programm-grundgeruest, or read the storage code", auto: script }
           - { id: D2, name: vertrag, frage: "Is the contract (capnp schema, trait) only appended - ordinals unchanged, file id unchanged, generated file equal to the official one?", pruefung: "the test `generated_matches_official` and the diff of the schema; the fixpoint hash is moved only by the strategy", auto: script }
@@ -66,6 +67,11 @@ do:
           - { id: D4, name: kanonisch, frage: "Is there one canonical text form (equal value = equal text)?", pruefung: "test with two spellings of the same value", auto: script }
           - { id: D5, name: einzeln, frage: "Does the data module compile alone (`-p`) without a UI dependency?", pruefung: "`cargo check -p <crate>` and the dependency list ([EINZELN-KOMPILIERBAR])", auto: script }
           - { id: D6, name: daten-wege, frage: "Is there no way to data or rights that the order did not ask for (a count over metadata alone is a card, not a blocker)?", pruefung: "read the diff for reads and writes outside the contract ([NICHT-PARANOID-REVIEW])", auto: lesen }
+        Datenpaket:
+          - { id: P1, name: kein-code, frage: "Does the package hold only data (blueprint, schema, forms, layout) - no Cargo.toml, no hand-written .rs without a named exception?", pruefung: "`fs-blueprint check` (finding `code-in-program`) and a file list of the diff", auto: script }
+          - { id: P2, name: bauplan, frage: "Is the blueprint canonical and free of drift (`fs-blueprint fmt --check`, `check --drift`), and is the contract text append-only?", pruefung: "the two commands with rc shown; `contract-append-only` finding", auto: script }
+          - { id: P3, name: layout, frage: "Does the package carry a forms description that the one host can open (layout file inside `forms/`, valid, not only a comment)?", pruefung: "`scaffold.toml` `[frontend] layout` read, the file read; `fs-starter --check <package>` once the host exists", auto: lesen }
+          - { id: P4, name: veroeffentlichung, frage: "Is it stated how the data package is published (no binary), and does the README/CHANGELOG name only workspace members that exist?", pruefung: "read README, CHANGELOG and the CI files of the package against the workspace members", auto: lesen }
         component:
           - { id: C1, name: nur-komponenten, frage: "Is a frontend only a description (forms) and no hand-made frontend crate, no own widget, no logic or data conversion?", pruefung: "read the diff: new widget or logic is a finding that goes to a talk card ([FRONTENDS-MIT-FORMS])", auto: lesen }
           - { id: C2, name: texte, frage: "Does no picture show a raw text key (every shown text resolves to a real text)?", pruefung: "picture test with all texts resolved, and a read of the pictures", auto: script-spaeter }
@@ -93,7 +99,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The standard lists as data: `gemeinsam` for every kind, plus `daten`, `component`, `host` or `security`. Every item has an `id`, a short `name`, a yes or no question (`frage`), how it is verified (`pruefung`) and `auto` (script | script-spaeter | lesen = what is automatable later). The questions are asked so that YES is the good answer; an item that cannot be checked is answered `nicht pruefbar` and counts as NO, never as yes."
+        freesynergy.net:summary: "The standard lists as data: `gemeinsam` for every kind, plus `daten`, `Datenpaket`, `component`, `host` or `security`. Every item has an `id`, a short `name`, a yes or no question (`frage`), how it is verified (`pruefung`) and `auto` (script | script-spaeter | lesen = what is automatable later). The questions are asked so that YES is the good answer; an item that cannot be checked is answered `nicht pruefbar` and counts as NO, never as yes."
   - auswahl:
       call: select-checks:0.0.16@fs
       with:
