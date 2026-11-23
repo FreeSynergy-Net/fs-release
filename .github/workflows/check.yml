@@ -66,8 +66,8 @@ jobs:
           g() { git --no-replace-objects "$@"; }
           g rev-parse --verify -q "$base^{commit}" >/dev/null || { echo "identity FAILED: base $base not found (fetch it, never skip)" >&2; exit 2; }
           # Fields are separated by TAB (%x09), never by blank: an address with a blank must not shift the fields. A TAB or line break inside an address changes the line or field count: red as well.
-          # pull_request in CI: the checkout may be the merge commit of GitHub (committer GitHub); then the tip is the PR head, its 2nd parent, the same range as the job identity
-          tip=HEAD; if [ "$ci" = 1 ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ] && g rev-parse --verify -q 'HEAD^2^{commit}' >/dev/null; then tip='HEAD^2'; fi
+          # pull_request in CI: the checkout may be the merge commit of GitHub (committer GitHub); then (only if HEAD is GITHUB_SHA, the merge commit of GitHub) the tip is the PR head, its 2nd parent, the same range as the job identity
+          tip=HEAD; if [ "$ci" = 1 ] && [ "${GITHUB_EVENT_NAME:-}" = pull_request ] && [ "$(g rev-parse HEAD)" = "${GITHUB_SHA:-}" ] && g rev-parse --verify -q 'HEAD^2^{commit}' >/dev/null; then tip='HEAD^2'; fi
           hits="$(g log --format='%h%x09%ae%x09%ce' "$base..$tip")" || exit 2
           n="$(g rev-list --count "$base..$tip")" || exit 2
           bad="$(awk -F'\t' -v ok="$allowed" 'NF != 3 || $2 != ok || $3 != ok { print $1 }' <<<"$hits")"

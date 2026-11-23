@@ -104,7 +104,16 @@ mc() { echo "$1" >"$tmp/m/$1"; M add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK
 M init -q -b main; mc base; M checkout -q -b pr; mc prc; M checkout -q main; mc m1; M update-ref refs/remotes/origin/main HEAD
 GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK GIT_COMMITTER_NAME=GitHub GIT_COMMITTER_EMAIL=noreply@github.com M -c commit.gpgsign=false merge -q --no-ff -m merge pr
 mrun() { env "$@" bash "$tool" "$tmp/m" >"$tmp/o" 2>&1; }
-mrun CI=true GITHUB_EVENT_NAME=pull_request; chk "9f: pull_request, merge commit of GitHub, PR head clean: green (rc 0)" test $? -eq 0
+mrun CI=true GITHUB_EVENT_NAME=pull_request GITHUB_SHA="$(M rev-parse HEAD)"; chk "9f: pull_request, merge commit of GitHub, PR head clean: green (rc 0)" test $? -eq 0
 mrun CI=true GITHUB_EVENT_NAME=push; chk "9f: the same merge commit on another event: red (the tip stays HEAD)" test $? -eq 1
-sed "s/tip='HEAD^2'/tip=HEAD/" "$tool" >"$tmp/mutpr"; env CI=true GITHUB_EVENT_NAME=pull_request bash "$tmp/mutpr" "$tmp/m" >/dev/null 2>&1; chk "9f mutant (tip stays HEAD): the pull_request case turns red (the test sees it)" test $? -eq 1
+sed "s/tip='HEAD^2'/tip=HEAD/" "$tool" >"$tmp/mutpr"; env CI=true GITHUB_EVENT_NAME=pull_request GITHUB_SHA="$(M rev-parse HEAD)" bash "$tmp/mutpr" "$tmp/m" >/dev/null 2>&1; chk "9f mutant (tip stays HEAD): the pull_request case turns red (the test sees it)" test $? -eq 1
+# --- M1 (r1 review): the PR head itself is a merge commit (GitHub "Update branch" / local `git merge main`) with a foreign identity in a feature commit; HEAD is then NOT GITHUB_SHA, the tip must stay HEAD ---
+mkdir "$tmp/h"; H() { git -C "$tmp/h" "$@"; }
+hc() { echo "$1" >"$tmp/h/$1"; H add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=${2:-$OK} GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL=${2:-$OK} H -c commit.gpgsign=false commit -q -m "$1"; }
+H init -q -b main; hc base; H checkout -q -b feat; hc bad agents@Beelink.hnc; H checkout -q main; hc m1; H update-ref refs/remotes/origin/main HEAD; H checkout -q feat
+GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL=$OK H -c commit.gpgsign=false merge -q --no-ff -m "merge main" main
+hrun() { env "$@" bash "$tool" "$tmp/h" >"$tmp/o" 2>&1; }
+hrun CI=true GITHUB_EVENT_NAME=pull_request GITHUB_SHA=0000000000000000000000000000000000000000; chk "M1: pull_request, PR head is itself a merge commit (HEAD != GITHUB_SHA), foreign identity inside: red (rc 1)" test $? -eq 1
+sed 's/ && \[ "\$(g rev-parse HEAD)" = "\${GITHUB_SHA:-}" \]//' "$tool" >"$tmp/mutsha"; cmp -s "$tool" "$tmp/mutsha" && chk "M1 mutant: the GITHUB_SHA condition was found in the tool" false
+env CI=true GITHUB_EVENT_NAME=pull_request GITHUB_SHA=0000000000000000000000000000000000000000 bash "$tmp/mutsha" "$tmp/h" >/dev/null 2>&1; chk "M1 mutant (no GITHUB_SHA condition): the merge-head case turns green (the test sees it)" test $? -eq 0
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi
