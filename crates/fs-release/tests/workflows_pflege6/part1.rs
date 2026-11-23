@@ -73,7 +73,7 @@ fn the_place_of_rules_md_is_named_where_the_orders_are_explained() {
 /// Look up first, evaluate, ask only on `open`, write down; the question step of `user-decision` also starts with the search.
 pub(super) fn decision_flow(text: &str) -> bool {
     let ask = step_body(text, "ask");
-    step_names(text) == ["adr-search", "evaluate", "recherche", "ask", "record"]
+    step_names(text) == ["adr-search", "evaluate", "recherche", "cut", "ask", "record"]
         && step_body(text, "adr-search").contains("actor: machine")
         && step_body(text, "adr-search").contains("call: adr-search:")
         && step_body(text, "evaluate").contains("actor: ai")
