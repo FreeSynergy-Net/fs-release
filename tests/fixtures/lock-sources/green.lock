@@ -20,4 +20,4 @@ dependencies = ["fs-types"]
 [[package]]
 name = "fs-types"
 version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-types?tag=v0.0.1#3333333333333333333333333333333333333333"
+source = "git+https://github.com/FreeSynergy-Net/fs-types?tag=v0.0.1#3333333333333333333333333333333333333333"

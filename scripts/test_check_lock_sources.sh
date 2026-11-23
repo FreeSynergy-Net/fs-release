@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self test of scripts/check_lock_sources.py and scripts/gates-lock.sh (fixtures: tests/fixtures/lock-sources/): one source is green, two sources of a
-# library are red with a message that names both sources and who pulls them, V1+ (fs-types only from FreeSynergy/fs-types) is red only with
+# library are red with a message that names both sources and who pulls them, V1+ (fs-types only from FreeSynergy-Net/fs-types, old org name and foreign org are red) is red only with
 # the switch, a mutant (library list emptied) lets the red lock through = the test would be red, the gate warns first and fails with `strict`.
 #   bash scripts/test_check_lock_sources.sh
 set -uo pipefail
@@ -27,9 +27,12 @@ has "red message names the packages that pull them" 'pulled by: demo-app 0.1.0 (
 has "red message names a second puller" 'demo-people 0.1.0'
 expect "V1+ lock without the switch is green" 0 "$fx/red-v1plus.lock"
 expect "V1+ lock with the switch (--only-from) is red" 1 --only-from "$fx/red-v1plus.lock"
-has "V1+ message names the allowed repo" 'allows only https://github.com/FreeSynergy/fs-types'
+has "V1+ message names the allowed repo" 'allows only https://github.com/FreeSynergy-Net/fs-types'
 FS_LOCK_ONLY_FROM=1 python3 -I "$tool" "$fx/red-v1plus.lock" >"$tmp/o" 2>&1 && bad "env switch FS_LOCK_ONLY_FROM=1 must be red" || ok "env switch FS_LOCK_ONLY_FROM=1 is red"
 expect "green stays green with the V1+ switch" 0 --only-from "$fx/green.lock"
+expect "V1+: fs-types from the OLD org name FreeSynergy/ is red" 1 --only-from "$fx/red-old-org.lock"
+expect "V1+: fs-types from a foreign org is red" 1 --only-from "$fx/red-foreign-org.lock"
+expect "V1+: fs-types from FreeSynergy-Net/ is green" 0 --only-from "$fx/green.lock"
 expect "stdin" 1 - < "$fx/red-two-sources.lock"
 expect "missing file is rc 2" 2 "$tmp/none.lock"
 # repo root: every Cargo.lock outside target/ is found

@@ -1,0 +1,11 @@
+version = 4
+
+[[package]]
+name = "demo-app"
+version = "0.1.0"
+dependencies = ["fs-types"]
+
+[[package]]
+name = "fs-types"
+version = "0.0.26"
+source = "git+https://github.com/EvilOrg/fs-types?tag=v0.0.26#4444444444444444444444444444444444444444"

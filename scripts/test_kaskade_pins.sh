@@ -60,7 +60,7 @@ chk "mutant pins (foreign source not left alone) is caught by the green case" [ 
 
 # ---- lock-gleich ----
 # fs-interfaces v0.0.2: lock on fs-types v0.0.3 from FreeSynergy/fs-types (green). fs-objects v0.0.2: lock on fs-types v0.0.2 (a second version). fs-tasks v0.0.9: a left rev pin and fs-types from the repo fs-interfaces.
-lock fs-objects "git+$GH/fs-types?tag=v0.0.2#cccccccccccccccccccccccccccccccccccccccc" >"$tmp/work/fs-objects/Cargo.lock"
+lock fs-objects "git+${GH}-Net/fs-types?tag=v0.0.2#cccccccccccccccccccccccccccccccccccccccc" >"$tmp/work/fs-objects/Cargo.lock"
 printf "strict = true\nonly_from_enabled = true\n" >"$tmp/work/fs-objects/.fs-lock-sources.toml"
 commit_push fs-objects lock; tag_push fs-objects v0.0.2
 tag_push fs-tasks v0.0.9
@@ -81,7 +81,7 @@ chk "lock-gleich: no done Glied is never green (rc 2)" [ "$rc" -eq 2 ]
 py "$here/lock-gleich" --plan "$(plan '{"repo":"fs-interfaces","tag":"v9.9.9","beleg":"b"}')" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?
 chk "lock-gleich: a tag that is not on the remote is no green (rc 2)" [ "$rc" -eq 2 ]
 # a Glied at a tag without the strict tool file is red even when the lock itself is fine
-newrepo fs-nolock; printf '[package]\nname = "x"\n' >"$tmp/work/fs-nolock/Cargo.toml"; lock fs-nolock "git+$GH/fs-types?tag=v0.0.3#dddddddddddddddddddddddddddddddddddddddd" >"$tmp/work/fs-nolock/Cargo.lock"
+newrepo fs-nolock; printf '[package]\nname = "x"\n' >"$tmp/work/fs-nolock/Cargo.toml"; lock fs-nolock "git+${GH}-Net/fs-types?tag=v0.0.3#dddddddddddddddddddddddddddddddddddddddd" >"$tmp/work/fs-nolock/Cargo.lock"
 commit_push fs-nolock one; tag_push fs-nolock v0.0.1
 nl='{"repo":"fs-nolock","tag":"v0.0.1","beleg":"b"}'
 py "$here/lock-gleich" --plan "$(plan "$nl")" --ausloeser v0.0.3 >"$tmp/o.json"; rc=$?

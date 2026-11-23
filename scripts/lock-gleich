@@ -5,8 +5,8 @@
   python3 -I scripts/lock-gleich --plan JSON|FILE|- --ausloeser vX.Y.Z [--env "FS_LOCK_STRICT=1 FS_LOCK_ONLY_FROM=1"]
 
 Per done Glied (`plan.erledigt`, at its tag, not at main): (1) `scripts/gates-lock.sh` (= `check_lock_sources.py` with the switches of `--env`): ONE source per library of scripts/lock-sources.toml, and with
-FS_LOCK_ONLY_FROM=1 fs-types ONLY from FreeSynergy/fs-types; (2) EVERY crate of the repo fs-types in the Cargo.lock (fs-types, fs-conformance, ...) stands on the trigger tag from the repo
-FreeSynergy/fs-types: the same version in every lock; (3) the tool file `.fs-lock-sources.toml` of the Glied has `strict = true` and `only_from_enabled = true`; (4) no `rev` pin to a FreeSynergy repo is left in any Cargo.toml (also `fs-people-directory`); known foreign sources
+FS_LOCK_ONLY_FROM=1 fs-types ONLY from FreeSynergy-Net/fs-types; (2) EVERY crate of the repo fs-types in the Cargo.lock (fs-types, fs-conformance, ...) stands on the trigger tag from the repo
+FreeSynergy-Net/fs-types: the same version in every lock; (3) the tool file `.fs-lock-sources.toml` of the Glied has `strict = true` and `only_from_enabled = true`; (4) no `rev` pin to a FreeSynergy repo is left in any Cargo.toml (also `fs-people-directory`); known foreign sources
 (workflows/kaskade-fremdquellen.txt) are skipped. One differing version, a second source or a left `rev` pin is red. Both switches are REQUIRED in `--env` (a call without them is bad input: the strict check
 must not be weakened by the caller). Result JSON: {status, red, ausloeser, glieder:[{repo, tag, fs_types_tags, lock_rc, lock_text, rev_pins}], befunde}. rc 0 / 1 red / 2 bad input or no remote.
 """
@@ -24,7 +24,7 @@ import kcargo  # noqa: E402
 import kgit  # noqa: E402
 import kio  # noqa: E402
 
-TYPES_URL = "github.com/freesynergy/fs-types"
+TYPES_URL = "github.com/freesynergy-net/fs-types"
 REQUIRED = ("FS_LOCK_STRICT=1", "FS_LOCK_ONLY_FROM=1")
 
 
