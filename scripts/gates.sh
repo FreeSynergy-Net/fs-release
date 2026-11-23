@@ -9,7 +9,7 @@ set -euo pipefail
 # Every gate prints its rc; a failing one prints its line and rc on stderr (the ERR trap). Never cut a gate output with `tail`/`head`
 # (a pipe into them hides the exit code of the gate): rule [GATE-PIPEFAIL], pinned by crates/fs-release/tests/workflows_pflege12.rs.
 trap 'echo "gates FAILED: line $LINENO: rc=$?" >&2' ERR
-like_ci=""; repo_arg=""
+like_ci=""; repo_arg=""; gates_run_tmp=""
 for a in "$@"; do # [GATE-BELEG] --like-ci (anywhere) also runs the lint job of CI, its self tests and MSRV; the Beleg (a "ja" verdict does not exist) is printed in every mode
   case "$a" in --like-ci) like_ci=1 ;; -*) echo "gates FAILED: unknown option $a" >&2; exit 2 ;; *) [ -z "$repo_arg" ] || { echo "gates FAILED: second path $a" >&2; exit 2; }; repo_arg="$a" ;; esac
 done
@@ -24,7 +24,18 @@ cd "$root"
 if [ -n "${GATES_ONLY_GUARD:-}" ] && [ -n "${GITHUB_ACTIONS:-}" ]; then echo "gates FAILED: GATES_ONLY_GUARD must not be set in CI (it skips every gate)" >&2; exit 2; fi
 if [ -z "${CI:-}" ]; then
   export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
-  export TMPDIR="${TMPDIR_GATES:-/srv/FreeSynergy/.scratch}"
+  # [GATES-TMP] The tests (tempfile) write to TMPDIR. A folder of its own per run, removed by the EXIT trap below, so what a test
+  # leaves behind (killed run, process::exit, a panic in a Drop) goes with the run and not into the shared base. The base is not
+  # /tmp (RAM) and is not changed here. A run killed by SIGKILL leaves its folder; the next run sweeps folders of dead PIDs.
+  gates_tmp_base="${TMPDIR_GATES:-/srv/FreeSynergy/.scratch}"
+  for old in "$gates_tmp_base"/gates-run.*; do
+    [ -d "$old" ] || continue
+    old_pid="${old##*/gates-run.}"; old_pid="${old_pid%%.*}"
+    case "$old_pid" in ''|*[!0-9]*) continue ;; esac
+    kill -0 "$old_pid" 2>/dev/null || rm -rf "$old"
+  done
+  gates_run_tmp="$(mktemp -d "$gates_tmp_base/gates-run.$$.XXXXXX")"
+  export TMPDIR="$gates_run_tmp"
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     echo "gates FAILED: uncommitted changes in $root" >&2
     exit 1
@@ -38,7 +49,7 @@ fi
 gates_guard_lock "$root" || exit 1
 guard_snap=""
 finding_work="$(mktemp -d "${TMPDIR:-/tmp}/gates-list.XXXXXX")"
-trap 'gates_guard_unlock "$root"; if [ -n "$guard_snap" ]; then rm -f "$guard_snap" "$guard_snap.end"; fi; rm -rf "$finding_work"' EXIT
+trap 'gates_guard_unlock "$root"; if [ -n "$guard_snap" ]; then rm -f "$guard_snap" "$guard_snap.end"; fi; rm -rf "$finding_work"; if [ -n "$gates_run_tmp" ]; then rm -rf "$gates_run_tmp"; fi' EXIT
 # The snapshot lives in <git dir>/gates-guard/ (inside the worktree's own .git: not in /tmp = RAM, invisible to the tree hash).
 # A run killed by SIGKILL leaves its snapshot there; the next run sweeps snapshots of dead PIDs (own folder only).
 guard_dir="$(gates_guard_snapdir "$root")"

@@ -158,6 +158,14 @@ jobs:
         id: gates-guard-self
         continue-on-error: true
         run: bash scripts/test_gates_guard.sh
+      - name: gates temp folder self test (own TMPDIR folder per run, removed on ok, red and SIGTERM; sweep; mutant)
+        id: gates-tmp
+        continue-on-error: true
+        run: bash scripts/test_gates_tmp.sh
+      - name: draft-release footer file self test (removed on every exit; stub gh; mutant)
+        id: draft-tmp
+        continue-on-error: true
+        run: bash scripts/test_draft_tmp.sh
       - name: gates error list and partial check self test (stub cargo; two errors, injection, mutants)
         id: gates-error-list
         continue-on-error: true
@@ -216,6 +224,8 @@ jobs:
             apt-packages-step ${{ steps.apt-packages-step.outcome }}
             identity-job ${{ steps.identity-job.outcome }}
             gates-guard-self ${{ steps.gates-guard-self.outcome }}
+            gates-tmp ${{ steps.gates-tmp.outcome }}
+            draft-tmp ${{ steps.draft-tmp.outcome }}
             gates-error-list ${{ steps.gates-error-list.outcome }}
             licence-gate-self ${{ steps.licence-gate-self.outcome }}
             gates-like-ci ${{ steps.gates-like-ci.outcome }}
@@ -248,7 +258,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # the pins name commits of the history
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@da28d83f5d5598a484ea4904c3b45d2be0e7bba6
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@90d3a88c1e1af8ff06e418c453be258f3dab3c5f
         with:
           toolchain: pinned
           cache-key: lint-pin-chain
