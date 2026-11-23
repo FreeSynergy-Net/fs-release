@@ -275,3 +275,52 @@ fn aufrufer_nachher_runs_the_rule_on_the_same_repos() {
         "neutral without clone is an error"
     );
 }
+
+/// Caller repo whose only workflow has the given file name (for example a non-ASCII one).
+fn caller_named(name: &str, uses: &[String]) -> tempfile::TempDir {
+    let t = caller(&[]);
+    fs::remove_file(t.path().join(".github/workflows/ci.yml")).unwrap();
+    let body: String = uses
+        .iter()
+        .map(|u| format!("      - uses: {u}\n"))
+        .collect();
+    fs::write(t.path().join(".github/workflows").join(name), body).unwrap();
+    git(t.path(), &["add", "-A"]);
+    git(t.path(), &["commit", "-q", "-m", "y"]);
+    t
+}
+
+fn cli_dir(f: &Fix, dir: &Path) -> i32 {
+    main_with(
+        [
+            "fs-release",
+            "address",
+            "aufrufer",
+            "--neutral",
+            &f.neutral,
+            "--fs-release",
+            &f.dir.path().display().to_string(),
+            &dir.display().to_string(),
+        ]
+        .map(String::from)
+        .to_vec(),
+    )
+}
+
+#[test]
+fn aufrufer_subfolder_of_a_repo_is_an_error_not_green() {
+    let f = fixture();
+    let c = caller(&[u("FreeSynergy", "main")]);
+    assert_eq!(cli_dir(&f, c.path()), 1, "root: red");
+    let sub = c.path().join(".github");
+    assert_eq!(cli_dir(&f, &sub), 2, "subfolder: rc 2");
+}
+
+#[test]
+fn aufrufer_non_ascii_workflow_name_is_read() {
+    let f = fixture();
+    let c = caller_named("ä.yml", &[u("FreeSynergy", &f.l)]);
+    assert_eq!(cli_dir(&f, c.path()), 1, "ä.yml with the old owner is red");
+    let ok = caller_named("ä.yml", &[u(NEW, &f.l)]);
+    assert_eq!(cli_dir(&f, ok.path()), 0);
+}

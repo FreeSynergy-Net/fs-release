@@ -162,13 +162,26 @@ impl Ctx {
         if !ok.status.success() {
             return Err(format!("{repo}: FEHLT ref {git_ref}"));
         }
-        let ls = git(dir, &["ls-tree", "-r", "--name-only", git_ref])?;
+        // The dir must be the root of the repo: a subfolder would list only its subtree (silent green).
+        let top = git(dir, &["rev-parse", "--show-toplevel"])?;
+        let top = PathBuf::from(String::from_utf8_lossy(&top.stdout).trim());
+        if !matches!((top.canonicalize(), dir.canonicalize()), (Ok(a), Ok(b)) if a == b) {
+            return Err(format!(
+                "{repo}: {} ist nicht die Wurzel des Repos",
+                dir.display()
+            ));
+        }
+        // `-z`: no quoting of non-ASCII names; `--full-tree`: paths from the root, whatever the cwd.
+        let ls = git(
+            dir,
+            &["ls-tree", "-r", "-z", "--full-tree", "--name-only", git_ref],
+        )?;
         if !ls.status.success() {
             return Err(format!("{repo}: git ls-tree fehlgeschlagen"));
         }
         let mut found: Vec<(Line, String)> = Vec::new();
         for path in String::from_utf8_lossy(&ls.stdout)
-            .lines()
+            .split('\0')
             .filter(|p| is_caller_file(p))
         {
             let show = git(dir, &["show", &format!("{git_ref}:{path}")])?;
