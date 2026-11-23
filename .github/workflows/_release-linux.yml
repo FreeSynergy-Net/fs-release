@@ -31,21 +31,21 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@057aa69092bbb2f881a78ed7d2551a8e3460c9f5
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@e6f91179ad7e8779f1dba2215786dbe97201e4b9
         with:
           toolchain: pinned
           targets: ${{ matrix.triple }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
           cache-key: release-${{ matrix.arch }}
       - if: contains(fromJSON(inputs.plan).linux_formats, 'deb')
-        uses: FreeSynergy-Net/fs-release/actions/install-tools@057aa69092bbb2f881a78ed7d2551a8e3460c9f5
+        uses: FreeSynergy-Net/fs-release/actions/install-tools@e6f91179ad7e8779f1dba2215786dbe97201e4b9
         with:
           tools: cargo-deb@3.8.0
       - if: contains(fromJSON(inputs.plan).linux_formats, 'rpm')
-        uses: FreeSynergy-Net/fs-release/actions/install-tools@057aa69092bbb2f881a78ed7d2551a8e3460c9f5
+        uses: FreeSynergy-Net/fs-release/actions/install-tools@e6f91179ad7e8779f1dba2215786dbe97201e4b9
         with:
           tools: cargo-generate-rpm@0.21.1
-      - uses: FreeSynergy-Net/fs-release/actions/package-linux@057aa69092bbb2f881a78ed7d2551a8e3460c9f5
+      - uses: FreeSynergy-Net/fs-release/actions/package-linux@e6f91179ad7e8779f1dba2215786dbe97201e4b9
         with:
           plan: ${{ inputs.plan }}
           arch: ${{ matrix.arch }}
@@ -70,7 +70,7 @@ jobs:
         with:
           name: dist-linux-x86_64
           path: dist
-      - uses: FreeSynergy-Net/fs-release/actions/package-arch@057aa69092bbb2f881a78ed7d2551a8e3460c9f5
+      - uses: FreeSynergy-Net/fs-release/actions/package-arch@e6f91179ad7e8779f1dba2215786dbe97201e4b9
         with:
           plan: ${{ inputs.plan }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -99,7 +99,7 @@ jobs:
         with:
           name: dist-linux-${{ matrix.entry.arch }}
           path: dist
-      - uses: FreeSynergy-Net/fs-release/actions/smoke@057aa69092bbb2f881a78ed7d2551a8e3460c9f5
+      - uses: FreeSynergy-Net/fs-release/actions/smoke@e6f91179ad7e8779f1dba2215786dbe97201e4b9
         with:
           plan: ${{ inputs.plan }}
           format: deb
