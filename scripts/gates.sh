@@ -10,7 +10,7 @@ set -euo pipefail
 # (a pipe into them hides the exit code of the gate): rule [GATE-PIPEFAIL], pinned by crates/fs-release/tests/workflows_pflege12.rs.
 trap 'echo "gates FAILED: line $LINENO: rc=$?" >&2' ERR
 like_ci=""; repo_arg=""
-for a in "$@"; do # [GATE-BELEG] --like-ci (anywhere) also runs the lint job of CI and MSRV; "CI-gleich: ja" needs it; the Beleg is printed in every mode
+for a in "$@"; do # [GATE-BELEG] --like-ci (anywhere) also runs the lint job of CI, its self tests and MSRV; the Beleg (a "ja" verdict does not exist) is printed in every mode
   case "$a" in --like-ci) like_ci=1 ;; -*) echo "gates FAILED: unknown option $a" >&2; exit 2 ;; *) [ -z "$repo_arg" ] || { echo "gates FAILED: second path $a" >&2; exit 2; }; repo_arg="$a" ;; esac
 done
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

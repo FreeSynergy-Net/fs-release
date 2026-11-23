@@ -7,6 +7,7 @@
 # [EIGENES-SKRIPT-EIGENER-ORDNER] (decision b7): scripts and logs only in the own TMPDIR under a unique name, never in the shared scratchpad;
 # the order names the files to read; mode DELTA (a recheck after conditions or after a new head): only the diff since the last JA/NEIN is read,
 # the parameter delta is `<last reviewed head>..<new head>`, the rest of the earlier verdict stays (the JA itself is void for the new head); mechanics is a script of the coordinator; after a timeout find the cause first (rc=124).
+# [GATE-BELEG] a local gate run (`scripts/gates.sh --like-ci`) is never proof of CI: its `gates-beleg:` block says `CI-gleich: NEIN` and lists what ran / did NOT run; the proof for a JA, a tag or an ff is the branch CI at the exact head incl. the windows job.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net

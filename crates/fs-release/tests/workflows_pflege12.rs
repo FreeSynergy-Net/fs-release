@@ -93,13 +93,19 @@ fn the_gate_beleg_rule_is_in_gates_sh_the_flows_and_the_docs() {
     assert!(!g
         .replace("gates_beleg \"$root\"", "")
         .contains("gates_beleg \"$root\""));
-    assert!(file("scripts/lib_gates_list.sh").contains("CI-gleich: NEIN"));
+    let lib = file("scripts/lib_gates_list.sh");
+    assert!(lib.contains("CI-gleich: NEIN"));
+    // a local run never says "ja": the word must not be in the code (the proof is the branch CI)
+    assert!(!lib.contains("CI-gleich: ja") && !g.contains("CI-gleich: ja"));
     for t in [
         read("agent-run"),
         read("testlauf"),
+        read("review"),
+        read("release-flow"),
         file("docs/usage.md"),
         file("docs/prompt-template.md"),
     ] {
-        assert!(t.contains("GATE-BELEG") && t.contains("CI-gleich"));
+        assert!(t.contains("GATE-BELEG") && t.contains("CI-gleich: NEIN"));
+        assert!(!t.contains("CI-gleich: ja") && !t.contains("CI-gleich ja"));
     }
 }

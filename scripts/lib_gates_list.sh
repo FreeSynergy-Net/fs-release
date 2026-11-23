@@ -8,7 +8,7 @@ gates_read_rc() {
   if [[ "$v" =~ ^[0-9]+$ ]]; then echo "$v"; else echo 1; fi
 }
 
-# --- [GATE-BELEG]: the proof that goes into every worker report; sourced by gates.sh. Local gates = CI: one source (RUST_VERSION, this script, the shellcheck line of lint.yml), and a run that is NOT CI-equal says so, never silently green. "ja" only when EVERY CI step really ran.
+# --- [GATE-BELEG]: the report block of every worker report; sourced by gates.sh. A local run is NEVER "CI-equal": it prints `CI-gleich: NEIN` plus what ran and what did NOT run; the proof is the branch CI at the exact head (incl. windows).
 ACTIONLINT_PIN=1.7.12 # the version lint.yml installs
 # gates_tool_version <tool>: first line of its version output, or "missing".
 gates_tool_version() { command -v "$1" >/dev/null 2>&1 && "$1" "${2:---version}" 2>&1 | sed -n 1,2p | tr '\n' ' ' || echo missing; }
@@ -19,20 +19,21 @@ gates_windows_target() {
   local t root; root="$(rustc --print sysroot 2>/dev/null)"
   for t in x86_64-pc-windows-msvc x86_64-pc-windows-gnu; do if [ -d "$root/lib/rustlib/$t" ]; then echo "$t"; return 0; fi; done
 }
-# gates_ci_diff <want> <have> <root> <like>: one line per reason why this run is not CI-equal (empty = CI-equal).
+# gates_ci_diff <want> <have> <root> <like>: one line per thing that did NOT run here / differs from CI (never empty: the Windows job never runs locally).
 gates_ci_diff() {
-  case "$2" in "rustc $1 "*) ;; *) echo "toolchain: Toolchain $1 nicht verfuegbar -> NICHT CI-gleich (local '$2'; rustup missing: RUSTUP_TOOLCHAIN has no effect); lints of the other toolchain are not CI lints (clippy runs with the local one PLUS the counter-probe)" ;; esac
-  [ -n "$4" ] || echo "mode standard: the lint job (shellcheck, actionlint) and the MSRV check did not run (use --like-ci)"
+  case "$2" in "rustc $1 "*) ;; *) echo "toolchain: Toolchain $1 nicht verfuegbar -> NICHT CI-gleich (local '$2'; rustup missing: RUSTUP_TOOLCHAIN has no effect); lints of the other toolchain are not CI lints (clippy ran with the local one PLUS the counter-probe)" ;; esac
+  [ -n "$4" ] || echo "mode standard: the lint job (shellcheck, actionlint, self tests) and the MSRV check (use --like-ci)"
   [ -z "${FS_GATES_SKIP_TEST:-}" ] || echo "test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST)"
   [ -z "${FS_GATES_DIFF_BASE:-}" ] || echo "test scope narrowed (FS_GATES_DIFF_BASE=$FS_GATES_DIFF_BASE): not the whole workspace"
-  git -C "$3" merge-base HEAD origin/main >/dev/null 2>&1 || echo "NICHT GEPRUEFT: origin/main fehlt (changed files unknown: clippy findings cannot be assigned to the branch)"
-  if gates_has_windows_cfg "$3" && [ -z "$(gates_windows_target)" ]; then echo "NICHT GEPRUEFT: Windows-cfg nicht lokal pruefbar (no windows target installed for rustc): Zweig-CI Pflicht (windows)"; fi
+  git -C "$3" merge-base HEAD origin/main >/dev/null 2>&1 || echo "origin/main fehlt (NICHT GEPRUEFT: changed files unknown, clippy findings cannot be assigned to the branch)"
+  if [ -n "$(gates_windows_target)" ]; then echo "Windows job (native fmt/clippy/TEST on Windows: locally at most clippy --target $(gates_windows_target); cargo test, cfg!(windows), unix-only cfg and target dependencies are not run)"
+  else echo "Windows job (native fmt/clippy/TEST on Windows; no windows target installed: cfg(windows) code, cfg!(windows), unix-only cfg, target dependencies unchecked): Zweig-CI Pflicht (windows)"; fi
   command -v shellcheck >/dev/null 2>&1 || echo "NICHT GEPRUEFT: shellcheck fehlt (CI job lint)"
   if [ -d "$3/.github/workflows" ]; then
     if ! command -v actionlint >/dev/null 2>&1; then echo "NICHT GEPRUEFT: actionlint fehlt (CI job lint)"
     elif ! gates_tool_version actionlint -version | grep -q "$ACTIONLINT_PIN"; then echo "actionlint version differs from the CI pin $ACTIONLINT_PIN"; fi
   fi
-  if grep -qE '^rust-version[[:space:]]*=' "$3/Cargo.toml" 2>/dev/null && ! command -v rustup >/dev/null 2>&1; then echo "NICHT GEPRUEFT: MSRV (rust-version in Cargo.toml; no rustup; CI takes the msrv INPUT of the caller, which may differ from Cargo.toml)"; fi
+  if grep -qE '^rust-version[[:space:]]*=' "$3/Cargo.toml" 2>/dev/null && ! command -v rustup >/dev/null 2>&1; then echo "MSRV (rust-version in Cargo.toml; no rustup; CI takes the msrv INPUT of the caller, which may differ from Cargo.toml)"; fi
 }
 # gates_lint_shell / gates_lint_actions <root>: the lint job of CI: the shellcheck line of .github/workflows/lint.yml itself (same files, same flags), else all tracked *.sh; actionlint over the workflows.
 gates_lint_shell() {
@@ -41,17 +42,33 @@ gates_lint_shell() {
   if [ -n "$cmd" ]; then bash -c "$cmd"; else git ls-files -z '*.sh' | xargs -0 -r shellcheck -x -S warning; fi
 }
 gates_lint_actions() { cd "$1" && actionlint; }
-# gates_lint_selftests <root>: every self test / compile line of the CI jobs in lint.yml (`run: bash scripts/test_*.sh`, `scripts/test-packaging.sh`, `python3 -I -m py_compile ...`), same lines, run one by one;
-# the rc of each is printed, the step is red when one failed. (CI runs them in the jobs lint, changelog-released, packaging-tests.) Byte code goes to the scratch folder, never into the tree.
+# gates_lint_selftests <root>: every self test / compile command of lint.yml: single-line `run:` AND `run: |` blocks whose lines are all of the allowed forms (`bash scripts/test_*.sh`, `scripts/test-packaging.sh`,
+# `python3 -I scripts/...`, `python3 -I -m py_compile ...`), run one by one with their rc; any other block/line (curl, apt-get, grep, collecting step ...) is listed as `selftest-skipped: <step name> (mehrzeilig)` and
+# ends in the Beleg as "lokal NICHT gelaufen", never silently skipped. The step is red when one failed. Byte code goes to the scratch folder, never into the tree.
 # shellcheck disable=SC2154 # finding_work is set by gates.sh (sourced)
 gates_lint_selftests() {
-  local c bad=0 n=0; cd "$1" || return 1
-  while read -r c; do
-    n=$((n + 1)); local rc=0
+  local c kind bad=0 n=0 rc; cd "$1" || return 1
+  while IFS=$'\t' read -r kind c; do
+    if [ "$kind" = SKIP ]; then echo "selftest-skipped: $c"; continue; fi
+    n=$((n + 1)); rc=0
     PYTHONPYCACHEPREFIX="$finding_work/pyc" bash -c "$c" >"$finding_work/st.out" 2>&1 || rc=$?
     if [ "$rc" != 0 ]; then bad=1; cat "$finding_work/st.out"; fi
     echo "selftest rc=$rc: $c" | cut -c1-150
-  done < <(sed -nE 's/^ *run: (bash scripts\/test_[A-Za-z0-9_]+\.sh|scripts\/test-packaging\.sh|python3 -I -m py_compile .*)$/\1/p' .github/workflows/lint.yml 2>/dev/null)
+  done < <(awk '
+    function ind(s) { match(s, /^ */); return RLENGTH }
+    function ok(l) { return l ~ /^ *(bash scripts\/test_[A-Za-z0-9_]+\.sh|scripts\/test-packaging\.sh|python3 -I scripts\/[A-Za-z0-9_.\/-]+( [A-Za-z0-9_.\/-]+)*|python3 -I -m py_compile [A-Za-z0-9_.\/ -]+)$/ }
+    function flush(   i, all) {
+      if (!blk) return
+      all = (n > 0); for (i = 1; i <= n; i++) if (!ok(L[i])) all = 0
+      if (all) { for (i = 1; i <= n; i++) { sub(/^ */, "", L[i]); print "RUN\t" L[i] } } else print "SKIP\t" name " (mehrzeilig)"
+      blk = 0
+    }
+    blk { if ($0 ~ /^[ ]*$/ || ind($0) > bi) { if ($0 !~ /^[ ]*(#|$)/) L[++n] = $0; next } flush() }
+    /^ *- uses:/ { name = "(uses)" }
+    /^ *- name:/ { name = $0; sub(/^ *- name: */, "", name) }
+    /^ *run: *[|>]/ { blk = 1; bi = ind($0); n = 0; next }
+    /^ *run: / { c = $0; sub(/^ *run: */, "", c); if (c ~ /^shellcheck /) next; if (ok(c)) print "RUN\t" c; else print "SKIP\t" name; next }
+    END { flush() }' .github/workflows/lint.yml 2>/dev/null)
   echo "selftests run: $n"
   return "$bad"
 }
@@ -81,16 +98,19 @@ gates_clippy_probe() {
   done
   for l in "${!bad[@]}"; do echo "gates-beleg:   lint in a CHANGED file, not allowed: clippy::$l"; done
 }
-# gates_beleg <root> <want> <have> <like-ci> <step rcs...>: the Beleg block: head + time (a Beleg of an old head cannot pass), toolchain, tool versions, flags, every step with its rc, `CI-gleich: ja/NEIN` + reasons; NEIN = the branch CI at the head is the proof.
+# gates_beleg <root> <want> <have> <like-ci> <step rcs...>: the Beleg block: head + time (a Beleg of an old head cannot pass), tool versions, flags, `CI-gleich: NEIN` ALWAYS (no "ja" exists), what ran with its rc, what did NOT run.
 gates_beleg() {
-  local root="$1" want="$2" have="$3" like="$4" diff
+  local root="$1" want="$2" have="$3" like="$4" diff l
   shift 4
   diff="$(gates_ci_diff "$want" "$have" "$root" "$like")"
   echo "gates-beleg: head=$(git -C "$root" rev-parse HEAD 2>/dev/null || echo unknown); time=$(date -u +%Y-%m-%dT%H:%M:%SZ); mode=$([ -n "$like" ] && echo like-ci || echo standard)"
-  echo "gates-beleg: rustc=${have}; ci-toolchain=${want}; shellcheck=$(gates_tool_version shellcheck); actionlint=$(gates_tool_version actionlint -version); clippy=--workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic; steps: $*"
-  if [ -z "$diff" ]; then echo "gates-beleg: CI-gleich: ja"; return 0; fi
-  echo "gates-beleg: CI-gleich: NEIN"
-  printf 'gates-beleg: grund: %s\n' "$diff"
+  echo "gates-beleg: rustc=${have}; ci-toolchain=${want}; shellcheck=$(gates_tool_version shellcheck); actionlint=$(gates_tool_version actionlint -version); clippy=--workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic"
+  echo "gates-beleg: CI-gleich: NEIN - Zweig-CI am genauen Kopf (inkl. windows) ist der Beleg"
+  echo "gates-beleg: lokal gelaufen: $*"
+  while read -r l; do [ -z "$l" ] || echo "gates-beleg: lokal NICHT gelaufen: $l"; done <<<"$diff"
+  if [ -r "${finding_work:-/nonexistent}/selftests.out" ]; then
+    while read -r l; do echo "gates-beleg: lokal NICHT gelaufen: ${l#selftest-skipped: }"; done < <(grep '^selftest-skipped: ' "$finding_work/selftests.out")
+  fi
   case "$diff" in *toolchain:*) gates_clippy_probe "$root" ;; esac
-  echo "gates-beleg: green here is NOT proof of a green CI: the branch CI at the head is the proof; the report names what did not run here and the CI run id"
+  echo "gates-beleg: green here is NOT proof of a green CI; the report names what did not run here and the CI run id of the branch CI at the head"
 }
