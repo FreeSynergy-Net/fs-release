@@ -9,8 +9,10 @@ libraries = ["fs-types", "fs-objects", "fs-interfaces", "fs-rpc", "fs-jscalendar
 strict = false
 
 # V1+ addition: `fs-types` may come ONLY from the registry `freesynergy` (git index repo FreeSynergy-Net/fs-crates; ENTSCHEID-kaskade B2, K-3): the index URL, as in
-# `registry+<URL>` of the lock. A fs-types from git (any repo, also FreeSynergy-Net/fs-types) is red then. OFF until the wave K-5 is done, so today's repos do not turn red. Env: FS_LOCK_ONLY_FROM=1.
+# `registry+<URL>` of the lock. TRANSITION until the wave K-5 is done: the git repo FreeSynergy-Net/fs-types is still allowed (lift and `lock-gleich` of the running cascade
+# check against it); K-5 DELETES that second entry, then a git fs-types is red (self test: scripts/test_check_lock_sources.sh, config with the index URL only).
+# OFF until then, so today's repos do not turn red. Env: FS_LOCK_ONLY_FROM=1.
 only_from_enabled = false
 
 [only_from]
-fs-types = "https://github.com/FreeSynergy-Net/fs-crates"
+fs-types = ["https://github.com/FreeSynergy-Net/fs-crates", "https://github.com/FreeSynergy-Net/fs-types"]
