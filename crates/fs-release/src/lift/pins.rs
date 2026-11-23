@@ -35,8 +35,8 @@ pub fn tag(env: &LiftEnv) -> String {
 }
 
 /// `scripts/pin-refs.sh --dir <repo> <tag>`: (owner rewritten to FreeSynergy-Net) every `uses: FreeSynergy-Net/fs-release/...@<ref>` of the repo's `.github/workflows/*.yml`
-/// (`@main`, an older tag or a commit) becomes `@<tag>`; other actions stay. No workflows = skipped. A pin is never lowered, line by
-/// line: the script checks in the fs-release clone that the tag equals or descends from every existing pin (git merge-base --is-ancestor); a lower, unrelated or unknown pin = red (rc 3), nothing written. It changes
+/// (`@main`, an older tag or a commit) becomes `@<tag>`; other actions stay. No workflows = skipped. A pin is never lowered, the whole run is red (not line by
+/// line): the script checks (`FS_RELEASE_REPO`, default its own repo) in the fs-release clone that the tag equals or descends from every existing pin (git merge-base --is-ancestor); a lower, unrelated or unknown pin = red (rc 3), nothing written. It changes
 /// files; the step `commit` takes them along.
 pub struct Pins;
 
