@@ -122,7 +122,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@78992eea0128a9871117ae0af81ae68cb275d61f
         with:
           toolchain: pinned
           components: rustfmt,clippy
@@ -156,7 +156,7 @@ jobs:
       - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
         id: gates-fmt-clippy
         continue-on-error: true
-        uses: FreeSynergy-Net/fs-release/actions/gates@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
+        uses: FreeSynergy-Net/fs-release/actions/gates@78992eea0128a9871117ae0af81ae68cb275d61f
         with:
           working-directory: ${{ inputs.working-directory }}
           diff-base: ${{ (!inputs.full && startsWith(github.ref, 'refs/heads/unreviewed/')) && 'origin/main' || '' }}
@@ -248,7 +248,7 @@ jobs:
         id: release-plan-probe
         continue-on-error: true
         if: steps.release-inputs.outputs.probe == 'true'
-        uses: FreeSynergy-Net/fs-release/actions/plan@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
+        uses: FreeSynergy-Net/fs-release/actions/plan@78992eea0128a9871117ae0af81ae68cb275d61f
         with:
           tag: ${{ steps.release-inputs.outputs.tag }}
           name: ${{ steps.release-inputs.outputs.name }}
