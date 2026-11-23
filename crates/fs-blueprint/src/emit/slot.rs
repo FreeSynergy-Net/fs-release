@@ -82,7 +82,7 @@ impl Slot {
 }
 
 /// `my-task` becomes `MyTask`.
-fn pascal(name: &str) -> String {
+pub(crate) fn pascal(name: &str) -> String {
     name.split('-')
         .filter(|p| !p.is_empty())
         .map(|p| {

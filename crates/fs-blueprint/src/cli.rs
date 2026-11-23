@@ -19,7 +19,7 @@ const HELP: &str = "fs-blueprint new BAUPLAN [--out DIR] [--catalog FILE] [--tal
 fs-blueprint check [--repo DIR] [--catalog FILE] [--talks DIR] [--lang en|de] [--drift] [--rules NAME]\n\
 fs-blueprint fmt [BAUPLAN] [--check] [--lang en|de]\n\
   fmt        write BAUPLAN (default scaffold.toml) in its canonical form (atomic); --check only says whether it is; comments are kept (they move with the line below them)\n\
-fs-blueprint --version | --help\n\
+fs-blueprint package rpm BAUPLAN [--out DIR] [--starter-min V] [--rpm-release N] [--source-date SECS]\n  package rpm  make the noarch RPM fs-<name> of a program (data below /usr/share/freesynergy/programs/<name>, .desktop, Requires from the blueprint); never signed\nfs-blueprint package release --key PUBKEY --pages-url URL [--out DIR] [--pkg-version V]\n  package release  make freesynergy-release (dnf source: stable on, nightly off; the public key)\nfs-blueprint --version | --help\n\
   check      read DIR/scaffold.toml and check it: structure, building blocks (catalog), files of the repo\n\
   --repo     the root of the repo (default: the current folder)\n\
   --catalog  a catalog file (default: the one shipped with the tool)\n\
@@ -169,6 +169,16 @@ pub fn run(words: &[String], out: &mut dyn Write, err: &mut dyn Write) -> i32 {
             0
         }
         Some("new") => match parse(&words[1..]).and_then(|o| crate::cli_new::run_new(&o, out)) {
+            Ok(code) => code,
+            Err(m) => {
+                drop(writeln!(
+                    err,
+                    "fs-blueprint: {m}\nTry `fs-blueprint --help`."
+                ));
+                2
+            }
+        },
+        Some("package") => match crate::cli_package::run_package(&words[1..], out) {
             Ok(code) => code,
             Err(m) => {
                 drop(writeln!(
