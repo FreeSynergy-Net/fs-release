@@ -57,7 +57,9 @@ pin_file() {
 check_no_lower() {
   local repo=${FS_RELEASE_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)} old n o rc=0
   n=$(git -C "$repo" rev-parse --verify -q "$ref^{commit}") || { echo "pin-refs: target $ref not found in $repo" >&2; return 3; }
-  for old in $(cat "$@" | grep -E "^[[:space:]]*(-[[:space:]]+)?uses:" | grep -oE "($owners)/fs-release/[A-Za-z0-9_./-]+@[A-Za-z0-9_.-]+" | sed 's/.*@//' | sort -u); do
+  local olds
+  mapfile -t olds < <(cat "$@" | grep -E "^[[:space:]]*(-[[:space:]]+)?uses:" | grep -oE "($owners)/fs-release/[A-Za-z0-9_./-]+@[A-Za-z0-9_.-]+" | sed 's/.*@//' | sort -u)
+  for old in "${olds[@]}"; do
     if [ "$old" = main ] || [ "$old" = "$ref" ]; then continue; fi
     o=$(git -C "$repo" rev-parse --verify -q "$old^{commit}") || { echo "pin-refs: existing pin @$old not resolvable in $repo (not overwritten)" >&2; rc=3; continue; }
     [ "$o" = "$n" ] || git -C "$repo" merge-base --is-ancestor "$o" "$n" || { echo "pin-refs: $ref is older than or unrelated to the existing pin @$old (never lowered)" >&2; rc=3; }
