@@ -84,7 +84,14 @@ fn plan_and_finalize_run_the_main_check_on_a_full_checkout() {
         check < finalize.find("actions/sign-files@").unwrap(),
         "the check comes before signing"
     );
-    assert!(wf("actions/plan/action.yml").contains("tag-on-main/check.sh"));
+    let plan_action = wf("actions/plan/action.yml");
+    let at = plan_action.find("tag-on-main/check.sh").unwrap();
+    assert!(
+        plan_action[..at].ends_with("run: bash \"$GITHUB_ACTION_PATH/../")
+            && plan_action[..at].contains("TAG: ${{ inputs.tag }}"),
+        "plan: the tag-on-main step gets the tag"
+    );
+    assert!(finalize.contains("TAG: ${{ fromJSON(inputs.plan).tag }}"));
     let release = wf(".github/workflows/release.yml");
     let plan = &release[release.find("  plan:").unwrap()..release.find("  linux:").unwrap()];
     assert!(

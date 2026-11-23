@@ -30,6 +30,8 @@ runs:
   steps:
     # a binary release only from a commit of main (the caller's checkout has fetch-depth 0)
     - shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
       run: bash "$GITHUB_ACTION_PATH/../tag-on-main/check.sh"
     - id: plan
       shell: bash
