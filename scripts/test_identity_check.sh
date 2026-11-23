@@ -84,7 +84,7 @@ chk "N1c static: step identity exists exactly once" test "$(grep -c '^  step ide
 # dynamic: a workspace whose stub cargo does what a hostile build.rs would do (origin/main := HEAD); origin/main stands before a foreign commit
 GK="$tmp/gk"; mkdir -p "$GK/scripts" "$GK/bin"
 cp "$here/gates.sh" "$here/lib_gates_guard.sh" "$here/lib_gates_list.sh" "$tool" "$GK/scripts/"
-echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; : >"$GK/scripts/check_rust_rules.py"
+echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/licence-gate.sh"; : >"$GK/scripts/check_rust_rules.py"
 printf '#!/usr/bin/env bash\ngit -C "$FIXTURE" update-ref refs/remotes/origin/main HEAD\nexit 0\n' >"$GK/bin/cargo"
 printf '#!/usr/bin/env bash\necho rustc 0\n' >"$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
 cp -r "$tmp/c" "$tmp/e"; git -C "$tmp/e" update-ref refs/remotes/origin/main "$(git -C "$tmp/e" rev-parse HEAD~2)"; git -C "$tmp/e" config --local --unset freesynergy.identity-test-base 2>/dev/null

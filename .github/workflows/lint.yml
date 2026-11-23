@@ -162,6 +162,10 @@ jobs:
         id: gates-error-list
         continue-on-error: true
         run: bash scripts/test_gates_sammelliste.sh
+      - name: licence gate self test (stub cargo-deny, the pinned cargo-deny on an AGPL and an MIT-or-Apache fixture, mutants)
+        id: licence-gate-self
+        continue-on-error: true
+        run: bash scripts/test_licence_gate.sh
       - name: gates --like-ci and Beleg self test (301-line test file, foreign toolchain, mutants)
         id: gates-like-ci
         continue-on-error: true
@@ -213,6 +217,7 @@ jobs:
             identity-job ${{ steps.identity-job.outcome }}
             gates-guard-self ${{ steps.gates-guard-self.outcome }}
             gates-error-list ${{ steps.gates-error-list.outcome }}
+            licence-gate-self ${{ steps.licence-gate-self.outcome }}
             gates-like-ci ${{ steps.gates-like-ci.outcome }}
             ci-collecting-step ${{ steps.ci-collecting-step.outcome }}
             pin-kaskade-scripts ${{ steps.pin-kaskade-scripts.outcome }}

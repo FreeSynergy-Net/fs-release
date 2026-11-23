@@ -1,0 +1,11 @@
+# Fixture of scripts/test_licence_gate.sh: a workspace of its own (not a member of the fs-release workspace); no registry, no network.
+[workspace]
+
+[package]
+name = "licence-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+dep-ok = { path = "dep-ok" }
