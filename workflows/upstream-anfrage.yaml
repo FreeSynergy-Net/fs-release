@@ -3,19 +3,19 @@
 # Rule of the Blinc permission (98): a request to Blinc goes through git-bug in OUR repo WITHOUT asking the user, but only when it is PROVEN (reproduction or source), the DUPLICATES are checked (the tracker of the upstream, read only), the
 # text is ENGLISH, has NO AI words and NO addresses or personal data, and carries the git-bug id. NEVER a pull request and NEVER a comment in a foreign issue or thread. Other upstreams keep the approval of the person (step `approval`).
 # The agent only prepares the text and the git-bug id; the helper of the strategy sends (agents never call gh or a browser login). Loops are counted: from the third round (`runde` >= 3) `eskalation`.
-# Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence, art`. FS profile: see README.md.
+# Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence, art, absender` (required, otherwise held back; optional: `nachfrage`, `bedingung`, `erstkontakt_datei`). FS profile: see README.md.
 # TEXTS TO THE OUTSIDE (mandatory for EVERY text that leaves us: issue, PR text, mail, request to Blinc or another upstream; other workflows point here):
 # (a) read the rules of the target (CONTRIBUTING, AI stance, issue template) and cite the place (`ziel-regeln-lesen`); (b) INFORM, do not advertise, do not nag (decision of the user, 23.11.2026):
 # the AI note stands CLEARLY ONCE at the FIRST contact with a project, as ONE honest sentence or short paragraph inside the text (never a signature, trailer or footer); afterwards only where it makes sense
 # (code contribution, pull request or crate; the rules of the target ask for it; somebody asks). Never hidden when asked, never denied. The memory is ONE list, `workflows/upstream-erstkontakt.txt` (one line per
 # target project: first contact date, source, reaction; step `erstkontakt-lesen`; `erstkontakt-vermerken` sets or updates it after the text was SENT). `ki-haltung-weiche` decides by that entry. A target that
-# rejects AI contributions (example: Kanidm) gets NOTHING sent and NOTHING prepared without the explicit word of the user. (b2) WHO sends is named in the order (`absender`: `mensch` | `bot`). The FIRST contact
-# is always written and sent by the human, in the voice of the user. From the second contact on the bot (Claude) usually writes and sends itself: then the sender is OPENLY the bot and the text is NEVER in the voice of the
+# rejects AI contributions (example: Kanidm) gets a DRAFT prepared (copy block + preview), but agents and bot NEVER send there: the human sends (user decision 23.11.2026; `send` is blocked by its `if:`). (b2) WHO sends is named in the order (`absender`: `mensch` | `bot`). The FIRST contact
+# is drafted by the agent, read against and sent by the human, in the voice of the user (the bot never sends it). From the second contact on the bot (Claude) usually writes and sends itself: then the sender is OPENLY the bot and the text is NEVER in the voice of the
 # user. The bot sends only where that is allowed (Blinc: rule 98, git-bug; a target that refuses AI: never; Kanidm: agents and bot NEVER send, the user does; any other target only when its rules cited in `ziel.bot` allow a bot).
 # (c) finished as a copy block in the format of the target; the LOOK is a mandatory gate: the preview in the target format is checked (`kopierblock`, `vorschau-weiche`), without a checked preview nothing goes to the user;
-# (d) the sender reads it against and only then it goes out (gate human, when a human sends). An agent never sends itself except by (b2).
+# (d) the sender reads it against and only then it goes out (gate human, when a human sends). An agent never sends itself except by (b2): only the sender `bot` at a target that allows it.
 # Blinc and (d) (decision of the strategy): "the sender reads against" holds when a HUMAN is the sender (every other upstream: steps `approval`, `choose-channel`). At Blinc WE are
-# the sender by THEIR rules and the permission (98) stays: no approval step for Blinc. The steps (a) `ziel-regeln-lesen` and (c) `kopierblock` (format of the target) apply to Blinc too
+# the sender (bot) by THEIR rules and the permission (98) stays: no approval for the sender `bot` at Blinc; with `absender: mensch` the approval and the channel choice run at Blinc too. The steps (a) `ziel-regeln-lesen` and (c) `kopierblock` (format of the target) apply to Blinc too
 # and are never skipped; the gates before them (rules, text gate, proof, duplicates) replace the reading-against there.
 document:
   dsl: 1.0.3
@@ -79,7 +79,7 @@ do:
   - ki-haltung-weiche:
       switch:
         - ki-nein:
-            when: '${ $context.ziel.ki == null or $context.ziel.fundstellen == null or ($context.ziel.fundstellen | length) == 0 or (["erlaubt", "verlangt", "ohne-vermerk", "abgelehnt"] | index($context.ziel.ki)) == null or ($context.ziel.ki == "abgelehnt" and .input.nutzerwort_ki != true) }'
+            when: '${ $context.ziel.ki == null or $context.ziel.fundstellen == null or ($context.ziel.fundstellen | length) == 0 or (["erlaubt", "verlangt", "ohne-vermerk", "abgelehnt"] | index($context.ziel.ki)) == null }'
             then: ki-abgelehnt
         - weiter:
             then: continue
@@ -88,7 +88,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (a) and (b)) - no `fundstellen` (missing or empty: the rules count as NOT read), a missing `ziel` result or a `ki` value outside the fixed set `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt`; so does a target that rejects AI contributions: nothing is sent and nothing is prepared (no ticket, no draft), unless the explicit word of the user for exactly this target stands in `nutzerwort_ki` (only for `abgelehnt`; the missing citation is never overridden). Only a cited result with a value of the set goes on. The AI note for the text is decided right after by `ki-hinweis` from the entry of `erstkontakt-lesen` (first contact: the note stands once, clearly; later only on a condition)."
+        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (a) and (b)) - no `fundstellen` (missing or empty: the rules count as NOT read), a missing `ziel` result or a `ki` value outside the fixed set `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt` (the rules are NOT read: nothing is prepared). A target that REJECTS AI contributions (`ki == abgelehnt`, Kanidm) is NOT stopped here (user decision 23.11.2026): the draft IS prepared up to the copy block and the preview, but afterwards ONLY the human sends it (`send` is blocked by its `if:`, the person uses `hand-text`). Only a cited result with a value of the set goes on. The AI note for the text is decided right after by `ki-hinweis` from the entry of `erstkontakt-lesen` (first contact: the note stands once, clearly; later only on a condition)."
   - ki-hinweis:
       call: ai-note-decide:0.0.17@fs
       with:
@@ -250,7 +250,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - a hit of `rules` or `text-gate` (a missing `hits` result counts as a hit) goes back to draft with the hits as the order, from the third round (`runde` >= 3) to `eskalation`; a clean draft goes on to the approval.
+        freesynergy.net:summary: Control flow - a hit of `rules` or `text-gate` (a missing `hits` result counts as a hit) goes back to draft with the hits as the order, from the third round (`runde` >= 3) to `eskalation`; a clean draft goes on to the copy block (`kopierblock`) and the preview gate.
   - kopierblock:
       call: copy-block:0.0.17@fs
       with:
@@ -284,24 +284,26 @@ do:
         upstream: ${ .input.upstream }
       export:
         as: '${ $context + { channel: . } }'
-      if: '${ .input.upstream == "blinc" }'
+      if: '${ .input.upstream == "blinc" and .input.absender == "bot" }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - for Blinc the channel is `git-bug` and nothing else, set by the rule of the Blinc permission (98): no approval of the user is asked for a proven, duplicate-free, English text without AI words (the gate above), no pull request, no comment. Result `channel`."
+        freesynergy.net:summary: "Script - for Blinc with the sender `bot` the channel is `git-bug` and nothing else, set by the rule of the Blinc permission (98): no approval of the user is asked for a proven, duplicate-free, English text without AI words (the gate above), no pull request, no comment. Result `channel`."
   - approval:
       call: approve:0.0.17@fs
       with:
         block: ${ $context.block }
+      export:
+        as: '${ $context + { freigabe: . } }'
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: TEXTS TO THE OUTSIDE (d) - the SENDER (the user) reads the copy block `block` against the preview and the cited rules of the target, and gives the YES for exactly this text, beforehand; without it nothing is sent, a changed text needs a new YES. A bot or agent never sends itself.
-      if: '${ .input.upstream != "blinc" }'
+        freesynergy.net:summary: TEXTS TO THE OUTSIDE (d) - the SENDER (the user) reads the copy block `block` against the preview and the cited rules of the target, and gives the YES for exactly this text, beforehand; without it nothing is sent, a changed text needs a new YES. Result `freigabe` (`ja`); only `ja == true` lets a human sender go to `send`. The approval is skipped ONLY for the sender `bot` at Blinc (rule 98, we are the sender there, the bot, by THEIR rules); a human sender at Blinc ALSO goes through it, so no text goes out in the voice of the user unread.
+      if: '${ (.input.upstream == "blinc" and .input.absender == "bot") | not }'
   - choose-channel:
       call: choose-channel:0.0.17@fs
       with:
@@ -314,10 +316,10 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The person chooses the channel for this upstream - `tracker` (the upstream's own issue tracker, e.g. a GitHub issue under the user's account, only after the user's release for exactly this channel), `git-bug` (only if we have write access to the upstream's repository; `git-bug push` over SSH fails otherwise) or `direct` (Discord or mail, the user writes it themselves with the approved text as the template). Without a choice nothing is sent.
-      if: '${ .input.upstream != "blinc" }'
+      if: '${ (.input.upstream == "blinc" and .input.absender == "bot") | not }'
   - send:
       call: send-issue:0.0.17@fs
-      if: '${ $context.channel != "direct" }'
+      if: '${ $context.channel != "direct" and .input.upstream != "kanidm" and $context.ziel.ki != "abgelehnt" and (.input.absender == "bot" or $context.freigabe.ja == true) }'
       with:
         upstream: ${ .input.upstream }
         block: ${ $context.block }
@@ -329,10 +331,10 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Script - sends by the chosen channel, only the approved copy block `block` (exactly what the sender read), only after the YES and the choice (for Blinc without a YES, by rule 98 and the gates above); `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The helper of the strategy runs it; an agent never calls gh or a browser login. WHO sends is `absender` - a human (first contact always) or, from the second contact on and only where allowed (step `absender-weiche`), openly the bot.
+        freesynergy.net:summary: Script - sends by the chosen channel, only the approved copy block `block` (exactly what the sender read), only after the YES and the choice (for Blinc without a YES, by rule 98 and the gates above); `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The step is BLOCKED by its `if:` for Kanidm and every target with `ziel.ki == abgelehnt` (agents and bot never send there, the person does by `hand-text`) and for a human sender without the YES (`freigabe.ja`). The helper of the strategy runs it; an agent never calls gh or a browser login. WHO sends is `absender` - a human (first contact always) or, from the second contact on and only where allowed (step `absender-weiche`), openly the bot.
   - hand-text:
       call: hand-text:0.0.17@fs
-      if: '${ $context.channel == "direct" }'
+      if: '${ $context.channel == "direct" or .input.upstream == "kanidm" or $context.ziel.ki == "abgelehnt" or ($context.freigabe.ja != true and .input.absender != "bot") }'
       with:
         block: ${ $context.block }
       metadata:
@@ -340,7 +342,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Direct contact (Discord, mail) - the person writes and sends the message themselves, with the approved copy block `block` as the template; the machine sends nothing and the agent does nothing in this step.
+        freesynergy.net:summary: Direct contact (Discord, mail) and EVERY send at Kanidm or at a target that refuses AI, or by a human without the YES - the person writes and sends the message themselves, with the approved copy block `block` as the template; the machine sends nothing and the agent does nothing in this step.
   - erstkontakt-vermerken:
       call: first-contact-note:0.0.17@fs
       with:
@@ -354,7 +356,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Script - AFTER the text was SENT (or the person confirmed that they sent it by `direct`): sets the line of this target project in `workflows/upstream-erstkontakt.txt` when there was none (`erstkontakt=<UTC date>`, `quelle=<issue id or direct>`, `reaktion=offen`), otherwise only updates it; the `reaktion` is added later when an answer arrives (also by `upstream-watch`). One list, one source; nothing is written when nothing was sent."
+        freesynergy.net:summary: "Script - AFTER the text was SENT (by `send`, or the person confirmed that they sent it themselves by `hand-text`): sets the line of this target project in `workflows/upstream-erstkontakt.txt` when there was none (`erstkontakt=<UTC date>`, `quelle=<issue id or direct>`, `reaktion=offen`), otherwise only updates it; the `reaktion` is added later when an answer arrives (also by `upstream-watch`). One list, one source; nothing is written when nothing was sent. The file is part of the checked-in repo fs-release: the write lands as a change in a worker branch (or the working copy of the coordinator) and goes through review like any change; agents never push, tag or merge it themselves."
   - link-ins-ticket:
       call: ticket-link:0.0.17@fs
       with:
@@ -400,7 +402,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (b): the target refuses AI contributions (example: Kanidm) or its rules were NOT read (no citation, no result, unknown value - not the same as a refusal; the report says which of the two). Nothing is sent and nothing is prepared; only the explicit word of the user for exactly this target (`nutzerwort_ki`) starts the flow again. This flow ends."
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (b): the rules of the target were NOT read (no citation, no result, unknown value). Nothing is prepared and nothing is sent; the rules must be read and cited first (a refusal of AI contributions is NOT this state: that target gets a prepared draft that only the human sends). This flow ends."
   - eskalation:
       set:
         todo: eskalation
