@@ -1,7 +1,8 @@
 # An upstream program has a new release: check it (severity, tag to commit, signature state), pin it in the mirror, check capabilities against the new book,
 # review, tag and push, start the mirror build by hand, publish the draft as Pre-release, raise in the catalog. Security fixes (high, critical) go first.
 # Agents never push, tag or merge. The mirror build only makes a DRAFT; publishing is a step of its own.
-# Order: `Workflow upstream-update, step check-upstream, parameters upstream, repo, from, book, branch, delta, docs, docs_base, old, new, allow` (the last five feed `doku`; `head` only on re-entry at step `head` or `review`).
+# HANDLAUF: the sub-workflows pin-lesen, check-upstream, compare-versions, pin-mirror, capabilities-check, docs-sync, repo-gates and resolve-head have NO script. Their `summary` is the described hand run (a checklist of read commands - gh api, git ls-remote, git rev-parse, openssl - and the existing gates of the repo: scripts/repo_tool.py check, secret scan); it is done by hand, every point with its output in the report, no new script (rule 7). Where a script is really needed the point says "Skript folgt (Rust)". A point not done is written as not done, never as green.
+# Order: `Workflow upstream-update, step pin-lesen, parameters upstream, repo, from, book, branch, delta, docs, docs_base, old, new, allow` (the last five feed `doku`; `head` only on re-entry at step `head` or `review`).
 # `head` is the commit hash of the mirror branch under review (never a branch name); it is created by `pin` and resolved by the step `head`; the input `head` exists only when the run re-enters at `head` or `review`. The YES of the review is bound to exactly this hash. An escalation of `doku` ends in `upstream-eskalation`; the docs main branch is pushed only after the approval (`doku-veroeffentlichen`). FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -10,6 +11,17 @@ document:
   version: 0.0.17
   title: Take over a new upstream release into the mirror and the catalog, security fixes first
 do:
+  - pin-lesen:
+      call: pin-lesen:0.0.17@fs
+      export:
+        as: '${ $context + { pin: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-update.pin-lesen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "FIRST step, HANDLAUF (no script; read only). Read the pin that is really on origin/main and never believe the local clone or NEUE-VERSIONEN.md - gh api repos/<our mirror repo>/contents/mirror.toml?ref=main --jq .content | base64 -d, then read upstream version, [source] tag and commit from it; also gh api repos/<our mirror repo>/commits/main --jq .sha for the head of main. Compare with the local clone (git -C <clone> rev-parse HEAD against that sha) and with the list; a difference is reported first (example - the pin 1.12.1 was already on main although the list said open). Output - pinned version, tag, commit, main head, local head, equal yes/no. If the pin on main already equals the new tag, the run goes on as a check of an existing pin (review after the fact), it does not pin again."
   - check-upstream:
       call: check-upstream:0.0.17@fs
       with:
@@ -23,7 +35,7 @@ do:
         freesynergy.net:bot-seat: upstream-update.check-upstream
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Is there a new upstream tag? Read the release text and the security advisories (gh api, read only), rate the severity (critical, high, medium, low, none), resolve tag to commit (gh api, the commit the tag points to, not the tag object), look at the signature state of tag and commit (unsigned stays unsigned, a change is reported). Output - tag, commit, date, severity, advisory ids, signature state. High or critical severity goes first.
+        freesynergy.net:summary: "HANDLAUF (no script, read commands only; sub-workflow check-upstream@fs has no script yet). Checklist, every point with its output in the report. (1) Release text and advisories: gh api repos/<repo>/releases/tags/<tag>, gh api repos/<repo>/security-advisories (403 or empty = say so, never guess); rate severity critical, high, medium, low, none, with the sentence of the text that proves it. (2) TAG TO COMMIT: gh api repos/<repo>/git/ref/tags/<tag>; if .object.type is tag, follow gh api repos/<repo>/git/tags/<sha> until a commit (annotated tag), else the ref sha IS the commit (lightweight tag); write down both shas and the type; only the commit counts. (3) SIGNATURE STATE: gh api repos/<repo>/commits/<commit> --jq .commit.verification and, for annotated tags, git/tags/<sha> --jq .verification; record verified, reason, signer; unsigned stays unsigned (never claimed signed), a change against mirror.toml tag_signed is reported. SIGNER IDENTITY: if verified, write verification.reason and the signer (key id or user) and compare with the key fingerprint named in mirror.toml and the key that mirror.yml verifies against (step Verify our signatures: verify-mirror.sh with release-signing-key.asc fetched from fs-release, fingerprint from mirror.toml [signing].key_fingerprint); NOTE mirror.yml has no cosign step - it signs with OpenPGP and checks with verify-mirror.sh, plus SLSA attestation; the signer proof is made against THAT check, which is never loosened, skipped or made optional, not for a rush and not for a security fix. Our own signature is only ever our key; an upstream signer is recorded, never trusted by name alone. (4) FIX COMMIT IS IN THE TAG RANGE: name the fix commit or PR of the advisory (from release text or advisory), then gh api repos/<repo>/compare/<fix-commit>...<commit> --jq .status; status ahead or identical = the fix is contained, behind or diverged = NOT contained, stop and report (a fix on a release branch that is not on upstream master is a finding of its own). (5) IS THE MIRROR ALREADY PUBLISHED: gh release list -R <our mirror repo>, gh run list -R <our mirror repo> --workflow mirror.yml --limit 10; a release or draft for this tag, or a green run for this commit, is reported before anything is pinned again. Output - tag, tag object, commit, date, severity, advisory ids, signature state, fix-contained yes/no, mirror state. Card - Skript folgt (Rust): one read-only tool for points 2 to 5 (tag to commit, signature, fix in range, mirror state); until then hand work. High or critical goes first."
   - compare:
       call: compare-versions:0.0.17@fs
       with:
@@ -35,7 +47,7 @@ do:
         freesynergy.net:bot-seat: upstream-update.compare
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: gh api compare from...to (read only) - do the build toolchain (rust-toolchain, MSRV), the dependencies (Cargo.lock) or the build profile change? The answer goes into the report and decides whether mirror.yml needs a change.
+        freesynergy.net:summary: "HANDLAUF (no script; compare-versions@fs). gh api repos/<repo>/compare/<from>...<to> --jq '.files[].filename' (read only), then look at exactly these files and say changed or unchanged for each - rust-toolchain.toml (MSRV), Cargo.lock (list added, removed, bumped crates by gh api contents at both tags), the build profile and Cargo.toml [profile.*], the container and packaging files. The answer goes into the report and decides whether mirror.yml needs a change; an unchecked file is written as not checked, never as unchanged. If the compare is too large (truncated file list) say so and read both trees by tag. A real change of toolchain or lock is an open decision for the review, not a silent pass."
   - pin:
       call: pin-mirror:0.0.17@fs
       with:
@@ -48,7 +60,7 @@ do:
         freesynergy.net:bot-seat: upstream-update.pin
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Sets mirror.toml (version, released, tag, commit, artefact names, container note), the capabilities.toml sources and version, scripts and tests that carry the old version, and the README; adds the security note (severity, advisory, fixed in). Only the pinned commit counts; never an unresolved tag.
+        freesynergy.net:summary: "HANDLAUF (no script; pin-mirror@fs), done by hand in the branch worktree, local commits only, identity FreeSynergy. After step pin-lesen and check-upstream. Edit mirror.toml (upstream version, released, [source] tag, tag_signed, commit = the COMMIT of the check, never the tag object; artefact names carry the version), capabilities.toml (sources and version), every script, test and the README that carry the old version (grep -rn for the old version number and the old commit; every hit is changed or named as kept on purpose), and add the security note (severity, advisory, fixed in). Do not raise the version or crate of fs-release. Own read-only proof before commit - git ls-remote <upstream> refs/tags/<tag> refs/tags/<tag>^{} shows exactly the pinned commit (the same check mirror.yml makes). Only the pinned commit counts; never an unresolved tag."
   - capabilities-check:
       call: capabilities-check:0.0.17@fs
       with:
@@ -62,7 +74,7 @@ do:
         freesynergy.net:bot-seat: upstream-update.capabilities-check
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Every capability line is checked against the book of the NEW version (page and sentence quoted in the report); a line the book does not show is marked 'not proven', never guessed; a changed support value (yes, no, unstable) is reported and decided in the review.
+        freesynergy.net:summary: "HANDLAUF (no script; capabilities-check@fs). For EVERY capability line of capabilities.toml - open the book (the user guide of the NEW version, gh api contents at the tag or the published book of that version), find the page and the sentence that proves the line, quote page and sentence in the report. A line the book does not show is marked not proven, never guessed. A changed support value (yes, no, unstable) is listed old value, new value, sentence, and decided in the review. Table in the report - line, old value, new value, proof or not proven. Card - Skript folgt (Rust): a tool that lists the capability lines and checks each quoted sentence against the book text; until then this is hand work."
   - docs:
       call: docs-sync:0.0.17@fs
       with:
@@ -73,7 +85,7 @@ do:
         freesynergy.net:bot-seat: upstream-update.docs
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: docs/de and docs/en are generated and adapted together (mirror.md, capabilities.md, date of the check); both languages say the same.
+        freesynergy.net:summary: "HANDLAUF (no script; docs-sync@fs). docs/de and docs/en are generated by the repo own tool, not edited by hand where generated: run python3 -I scripts/repo_tool.py docs and python3 -I scripts/repo_tool.py export (existing commands of the repo, they write docs and export from mirror.toml and capabilities.toml; no new script), then adapt by hand what is not generated (date of the check, security note). Check by reading - both languages name the same version, the same date and the same capability values (diff the two tables line by line); placeholders are gone (repo_tool.py check reports them). Card - Skript folgt (Rust): a de/en parity check."
   - local-gates:
       call: repo-gates:0.0.17@fs
       export:
@@ -83,7 +95,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The local gates of the repo (verify-mirror selftest, repo_tool.py checks, rust rules where they apply), once per head.
+        freesynergy.net:summary: "HANDLAUF (no script; repo-gates@fs) with the gates the repo already has, once per head, output kept whole (pipefail, exit code written down, never cut). (1) bash scripts/test_verify_mirror.sh (selftest of verify-mirror). (2) python3 -I scripts/repo_tool.py check. (3) the secret scan - the command of secrets-scan.yml, gitleaks git --redact --no-banner --verbose . (locally only if gitleaks is installed; otherwise the CI run at this head is the proof, read it yourself and say so). (4) git diff --check and the identity of the commits (FreeSynergy, support@freesynergy.net). (5) Rust rules only where the repo has Rust code. Red goes to back-to-pin. Existing scripts are called, nothing new is written (rule 7: no new Python)."
   - back-to-pin:
       switch:
         - rounds:
@@ -148,7 +160,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Resolves the branch to the commit hash of its tip (git rev-parse, read only; the output is the object `{ head: <sha> }`, kept as `$context.kopf`) after the local gates. In a run from step 1 there is no input `head` (the head only exists since `pin`): the resolved hash is `$context.kopf.head`. Only when the run re-enters at `head` or `review` and the input `head` is given must the hash equal it, otherwise the flow stops. From here on only this hash counts, never the branch name."
+        freesynergy.net:summary: "HANDLAUF (no script; resolve-head@fs). git rev-parse HEAD in the branch worktree gives the FULL 40-character hash of the tip (output object { head: <sha> }, kept as $context.kopf); then git ls-remote origin refs/heads/<branch> to prove the same hash is the one on the remote; read the CI at exactly this hash yourself - gh run list -R <repo> --commit <sha> --json workflowName,status,conclusion and gh run view for each run; a missing or red run at this hash is a finding, a run of an older hash does not count. In a run from step 1 there is no input head (the head is created by pin); on re-entry at head or review the input head is checked against the branch tip and a difference stops the run."
   - review:
       run:
         workflow:
