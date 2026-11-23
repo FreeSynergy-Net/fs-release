@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# adresse-wechseln: owner swap in GitHub addresses (workflow adresse-wechseln). Short caller, no Cargo pins (classes a+b are never touched here).
+# usage: OLD=FreeSynergy NEW=FreeSynergy-Net [REF=origin/main] [ALLOW=file-of-path-regexes] scripts/adresse-wechseln bestand|ersetzen <repo-dir>...
+# bestand: read only, counts hits of OLD per repo and class (a Cargo.toml, b Cargo.lock, c .github, d scripts, e catalog data, f docs, g workflows/, h rest) on origin/main.
+# ersetzen: rewrites the work tree of each dir (c, d, f, g, h; never Cargo.toml / Cargo.lock; files matching ALLOW are skipped; no commit, no push).
+set -euo pipefail
+mode=${1:?bestand|ersetzen}; shift; : "${OLD:?}" "${NEW:?}"; allow=${ALLOW:-/dev/null}
+pre='github\.com[:/]|githubusercontent\.com/|repos/|uses:[ ]+|ORG=|OWNER=|org = "'
+hits() { git -C "$1" grep -nIE "($pre|ghcr\.io/)$OLD([^-A-Za-z0-9_.]|\$)" "${REF:-origin/main}" 2>/dev/null | grep -vF "$NEW" | grep -vEf "$allow" || true; }
+for d in "$@"; do
+  git -C "$d" rev-parse --git-dir >/dev/null || { echo "no git repo: $d" >&2; exit 2; }
+  if [ "$mode" = bestand ]; then
+    hits "$d" | awk -F: -v r="$(basename "$d")" '{p=$2; c="h"; if(p~/(^|\/)Cargo\.toml$/)c="a"; else if(p~/(^|\/)Cargo\.lock$/)c="b"; else if(p~/^\.github\//)c="c"; else if(p~/^scripts\//)c="d"; else if(p~/(catalog|packages).*\.(xml|toml)$/)c="e"; else if(p~/^workflows\//)c="g"; else if(p~/\.md$|^docs\//)c="f"; n[c]++} END{for(c in n)print r, c, n[c]}' | sort
+  else
+    git -C "$d" grep -lIE "($pre)$OLD([^-A-Za-z0-9_.]|\$)" HEAD | sed 's/^HEAD://' | grep -vE '(^|/)Cargo\.(toml|lock)$' | grep -vEf "$allow" |
+      while read -r f; do sed -i -E "s#($pre)$OLD([^-A-Za-z0-9_.]|\$)#\1$NEW\2#g" "$d/$f"; done
+  fi
+done
