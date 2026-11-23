@@ -41,7 +41,7 @@
 #   ("local toolchain, not in the diff"); the CI at the exact head decides. A finding in a file the branch changed is never dismissed this way ([GATE-BELEG] of `testlauf`). CARD (not built): the gates should compare `rustc --version`
 #   with `RUST_VERSION` themselves and print the deviation as a visible line (`toolchain: lokal 1.100.0, CI 1.99.1`), so nobody has to find it in the log. Occasions: K-4-r1 (fmt red only local), pin-dag-r1 (clippy local only).
 # [NICHT-GELAUFEN-NIE-GRUEN] (card 2) A gate of a Glied that did not run, has no `rc` or no result is red, never green (see `ff-und-tag` and `testlauf`); `gates-weiter` already treats a missing result as red.
-# Inputs: `ausloeser-tag` (tag of fs-types, e.g. v0.0.3), `glieder` (list of { repo, art, tag, allow, besonderes } in DAG order), `ab` (optional resume: name of the Glied to start at), `workdir` (own folder for the fresh clones of `ff-und-tag`), `worktrees` (optional, default /srv/FreeSynergy/.scratch/api-runner/wt: the worktree of a Glied is `<worktrees>/pk-<repo>`).
+# Inputs: `ausloeser-tag` (tag of fs-types, e.g. v0.0.3), `glieder` (list of { repo, art, tag, allow, besonderes } in DAG order; optional per Glied, passed on to `ff-und-tag` (r1, S4): `pakete` (true = builds rpm and deb), `registry_crate` (true | false; not set = list in `ff-und-tag`: fs-types, fs-conformance, fs-records), `erstkette_ok`, `rot_freigabe` = { run_ids, grund, wort }), `ab` (optional resume: name of the Glied to start at), `workdir` (own folder for the fresh clones of `ff-und-tag`), `worktrees` (optional, default /srv/FreeSynergy/.scratch/api-runner/wt: the worktree of a Glied is `<worktrees>/pk-<repo>`).
 # Loops: a red check step with repeats jumps back at most twice, the third red round goes to `eskalation`; the Glied steps do NOT repeat: red = abort.
 document:
   dsl: 1.0.3
@@ -447,6 +447,10 @@ do:
           tag: ${ $context.glied.tag }
           allow: ${ $context.glied.allow }
           workdir: ${ .input.workdir }
+          pakete: ${ $context.glied.pakete }
+          registry_crate: ${ $context.glied.registry_crate }
+          erstkette_ok: ${ $context.glied.erstkette_ok }
+          rot_freigabe: ${ $context.glied.rot_freigabe }
       export:
         as: '${ $context + { ff: . } }'
       metadata:
@@ -454,7 +458,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The existing sub-workflow `ff-und-tag` UNCHANGED, the ONLY way to main and tag (no own push or tag way in this flow): branch CI, signing entries, expected runs, fresh clone, identity, version, approval for this head, ff push (the push helper of the strategy, `gate: human`), annotated tag, ls-remote proof, release watch."
+        freesynergy.net:summary: "The existing sub-workflow `ff-und-tag` (r1: with its new inputs passed on from the Glied entry), the ONLY way to main and tag (no own push or tag way in this flow): derivation of the inputs, branch CI, signing entries, expected runs, fresh clone, identity, version, package names (only with `pakete: true`), approval for this head, CI of ALL workflows (red only with `rot_freigabe` for exactly the red runs), fresh reading of main, ff push (the push helper of the strategy, `gate: human`), CI on main, first-release knowledge (`erstkette_ok`), annotated tag, ls-remote proof, release watch, index line of a registry crate."
   - ff-weiter:
       switch:
         - fertig:

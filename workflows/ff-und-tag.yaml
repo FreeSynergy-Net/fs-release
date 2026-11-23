@@ -1,14 +1,14 @@
 # ff-und-tag: the push of a reviewed head to main and the annotated tag - what the push helper of the strategy does by hand today. The
-# order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (docs/prompt-template.md). Specification (the @fs calls
+# order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (required) and, optional, `pakete` (true = the repo builds rpm and deb, then `paketname-gleich` runs; not set = skipped, named in the output), `registry_crate` (true | false; not set = taken from the list), `registry_crates` (list of repo names, default fs-types, fs-conformance, fs-records), `erstkette_ok` (true = the user knows the FIRST release chain of this repo), `rot_freigabe` (`{ run_ids, grund, wort }`: the run ids of EXACTLY the red runs), `index_wait_wired`, `index_warten_minuten` (default 10), `main_ci_warten_minuten` (default 30) (docs/prompt-template.md). Specification (the @fs calls
 # have no script yet, like the other specification steps). It is the procedure behind the steps `tag`, `push`, `ci` and `main-ff` of
 # `release-flow` (those stay, they follow the code of `fs-release flow`); the checklist here is the hands-on side with the proofs.
-# Order of the end: branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, the expected runs per repo (each one there and green for the head), fresh
+# Order of the end (r1: erst-release stands directly before the tag, main-vor-push directly before the push): branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, the expected runs per repo (each one there and green for the head), fresh
 # clone, checklist, approval for exactly this head, push without force, annotated tag, ls-remote proof, watch the release, tidy up.
 # Agents never push or tag. FS profile: see README.md.
 # KNOWN GAP (ENTSCHEID-ref, 23.11.): the case repo = fs-release does not fit this flow yet: fs-release has no release run for a tag (`release.yml` and `_release-*.yml` are `workflow_call` only; a tag push starts only `lint.yml`), so `erwartete-laeufe`/`release-beobachten` would be red or unknown and nothing is signed. A step for the case fs-release (no release run expected, check `lint.yml` and the tag proof only) is to be added later by `workflow-pflege`, before the tag v0.0.18.
 # RULES ADDED BY workflow-pflege-1 (23.11.2026, cards of the strategy; each rule names its occasion):
 # [LANDUNG-ALLE-GRUEN] A push to main only when ALL CI workflows of the exact head (check, windows, semver, lint, every workflow the repo runs on the branch) are green (step `alle-workflows-gruen`).
-#   A deliberately red gate is allowed only with the explicit release of the strategy, named in the report with run id and reason (input `rot_freigabe`). Occasion: fs-types main 6f1ebcf0 landed with semver RED
+#   A deliberately red gate is allowed only with the explicit release of the strategy, named in the report with run id and reason (input `rot_freigabe`, with the run ids of exactly the red runs). Occasion: fs-types main 6f1ebcf0 landed with semver RED
 #   (run 45253040919) after an Opus JA, without asking the strategy - a JA covers the code, not a red workflow.
 # [NICHT-GELAUFEN-NIE-GRUEN] For ALL gates (gates.sh, semver, every check script): a gate that did not run, was skipped or cancelled, has no result or says `NotRun` is NEVER green; it is red or unknown and stops.
 #   Occasion: K-2-r2 M2 (a semver check that returned `NotRun` was counted GREEN). Written once here, repeated in `testlauf`, `review` and `pin-kaskade`.
@@ -17,7 +17,8 @@
 # [INDEX-ZEILE] After the tag of a registry crate (fs-types, fs-conformance, fs-records) the index line in the repo fs-crates is checked (step `index-zeile`, by hand for now; later `fs-crate-index wait`, step `index-warten`).
 # [ERSTE-KETTE] The FIRST release of a repo (first tag, public pre-release) is user knowledge (step `erst-release`): secrets are only read for "set or not" (names, never values), a dry run comes first.
 #   Occasion: fs-capnpc v0.2.3 - first real release chain of that repo, GPG secrets not proven, decision to the user.
-# [KOPF-NEU-LESEN] Every review promise names "exactly this head"; right before a push `main` of the remote is read again (`git ls-remote`), because every new main costs one CI round (steps `kopf-und-ff`, `ja-fuer-kopf`).
+# [KOPF-NEU-LESEN] Every review promise names "exactly this head"; right before a push `main` of the remote is read again (`git ls-remote`), because every new main costs one CI round (steps `kopf-und-ff` first reading, `main-vor-push` directly before `push-ff`; `ja-fuer-kopf`).
+# [BEDROHUNGSMODELL] (r1, K5) `rot_freigabe` and `erstkette_ok` open a gate and are TEXT in the order: whoever writes the order opens the gate (the strategy by the word of the user). Nothing more is claimed: no signature, no proof of the word; the check binds the release only to the run ids it names (`alle-weiter`, `main-ci-weiter`). Same known limit as `check-approval`.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -25,6 +26,20 @@ document:
   version: 0.0.18
   title: Fast-forward a reviewed head to main and tag it - checklist, proofs, release watch
 do:
+  - eingaben-ableiten:
+      set:
+        registry: '${ if .input.registry_crate != null then (.input.registry_crate == true) else (((.input.registry_crates // ["fs-types", "fs-conformance", "fs-records"]) | index(.input.repo | split("/") | last)) != null) end }'
+        pakete: '${ .input.pakete == true }'
+        erstkette_ok: '${ .input.erstkette_ok == true }'
+        hinweise: '${ [ (if .input.pakete == true then "paketname-gleich: runs" else "paketname-gleich: SKIPPED, input pakete is not true (a repo that builds rpm and deb sets pakete: true)" end), (if (if .input.registry_crate != null then (.input.registry_crate == true) else (((.input.registry_crates // ["fs-types", "fs-conformance", "fs-records"]) | index(.input.repo | split("/") | last)) != null) end) then "index-zeile: runs (registry crate)" else "index-zeile: not applicable, the repo is not a registry crate (input registry_crate or the list registry_crates)" end) ] }'
+      export:
+        as: '${ $context + { eingaben: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control data (workflow-pflege-1 r1, M3/M4; specification like the rest). Decides ONCE, visibly, which checks apply: `registry` = true when the order says `registry_crate: true`, or when it says nothing and the repo name is in the list `registry_crates` (default: fs-types, fs-conformance, fs-records); `registry_crate: false` in the order is respected. `pakete` = true only when the order says `pakete: true` (the repo builds rpm and deb); not set = the package name check is skipped. A skipped check is never silent: the lines in `hinweise` go into the `output` of the flow (`eingaben`). Callers pass `pakete` and `registry_crate` (pin-kaskade: from the Glied entry; lib-umzug: from the target repo)."
   - zweig-ci:
       call: branch-ci:0.0.18@fs
       with:
@@ -140,7 +155,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The head of the clone equals the head of the order and of the approval; main of the remote (`git ls-remote`) is an ancestor of this head (`git merge-base --is-ancestor`), so the push is a pure fast-forward without a merge commit. [KOPF-NEU-LESEN] `main` of the remote is read AGAIN right before the push (a new main since the last read = new check of the ff and, as a rule, a new CI round for the head); the other agents of the same repo move main too, a stale reading is not a proof."
+        freesynergy.net:summary: "The head of the clone equals the head of the order and of the approval; main of the remote (`git ls-remote`) is an ancestor of this head (`git merge-base --is-ancestor`), so the push is a pure fast-forward without a merge commit. [KOPF-NEU-LESEN] this is the FIRST reading; `main` is read AGAIN in the step `main-vor-push` directly before `push-ff` (a new main since the last read = new check of the ff and, as a rule, a new CI round for the head); the other agents of the same repo move main too, a stale reading is not a proof."
   - identitaet:
       call: identity-check:0.0.18@fs
       with:
@@ -165,7 +180,7 @@ do:
         freesynergy.net:summary: "Version = crate version in Cargo.toml = Cargo.lock entry of the own crates = first heading of CHANGELOG.md (lesson fs-people v0.0.11: the lock check is mandatory, a lock with the old version is red); the tag is `v<version>`; `lock-pruefung` of release-flow runs on the clone too. [VERSION-GLEICH-TAG] MANDATORY BEFORE the tag for EVERY repo, not only `kind: library` (a program repo, a tool repo, an action repo too); a version that differs from the tag is red, nothing is tagged (occasion: fs-types Cargo.toml 0.0.5 at the tag v0.0.6, found only afterwards: the pin showed 0.0.5 for tag v0.0.6; ADR 0064 supplement 23.11.2026, no. 5)."
   - paketname-gleich:
       call: package-name-check:0.0.18@fs
-      if: ${ .input.pakete != false }
+      if: ${ $context.eingaben.pakete == true }
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -175,34 +190,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "SPECIFICATION (no script yet; the package-probe of fs-release already checks both formats). [VERSION-GLEICH-TAG] part 2, before the tag, for every repo that builds packages (input `pakete`, default true): the package NAME and VERSION are the same for rpm AND deb (and equal the crate name and the tag version); one of the two missing or different is red, no tag. Occasion: condition on fs-starter 0.0.8 (the name of the deb differed from the rpm; package-probe checks both)."
-  - erst-release:
-      call: first-release-check:0.0.18@fs
-      with:
-        repo: ${ .input.repo }
-        tag: ${ .input.tag }
-        nutzerwissen: ${ .input.erstkette_ok // false }
-      export:
-        as: '${ $context + { erst: . } }'
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "SPECIFICATION (no script yet). [ERSTE-KETTE] Finds out by `git ls-remote --tags` and the release list whether this repo has a release at all (public pre-release or not). Result `erst` with `erstes` (true | false) and `ok`. For the FIRST release of a repo the whole release chain (release.yml caller, signing, attestation, packages) has never run: that is USER KNOWLEDGE - the flow goes on only with `erstkette_ok: true` in the order (the user or the strategy by the user's word), after a DRY RUN (every job of the chain on a branch or with `workflow_dispatch` as far as it exists, nothing published) and with the secrets read only for `set or not` (`secrets-pruefen`: names, never values). Otherwise it goes to `eskalation`. Occasion: fs-capnpc v0.2.3 (first release chain of that repo, GPG secrets not proven; the landing was done, the TAG waited for the user's decision)."
-  - erst-weiter:
-      switch:
-        - erstes-ohne-wissen:
-            when: '${ ($context.erst.erstes == null) or (($context.erst.erstes == true) and ($context.erst.ok != true)) }'
-            then: eskalation
-        - sonst:
-            then: continue
-      metadata:
-        freesynergy.net:actor: machine
-        freesynergy.net:actor-type: Service
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the first release of a repo without the knowledge of the user (and a dry run) escalates; every other repo goes on (a missing result of `erst` is `erstes` unknown and is NOT ok: it escalates too)."
+        freesynergy.net:summary: "SPECIFICATION (no script yet, and NO proof yet: the `package-probe.yml` lives in the repo fs-starter, not in fs-release; that it builds both formats is read there, that it COMPARES the names is NOT proven). [VERSION-GLEICH-TAG] part 2, before the tag, ONLY for a repo that builds packages (input `pakete: true`; not set = the step is skipped and the skip is named in `eingaben.hinweise` of the output - a library without rpm and deb is never red for this): the package NAME and VERSION are the same for rpm AND deb (and equal the crate name and the tag version); one of the two missing or different is red, no tag. Occasion: condition on fs-starter 0.0.8 (the name of the deb differed from the rpm)."
   - tag-frei:
       call: tag-free:0.0.18@fs
       with:
@@ -260,14 +248,14 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "SPECIFICATION (no script yet; reads `gh run list --commit <head>` through the push helper, read only). [LANDUNG-ALLE-GRUEN] BEFORE the push to main: EVERY workflow the repo runs for the exact head (not only `check` and `windows`: also `semver`, `lint`, and any other) exists and is green; the list comes from `laeufe.erwartet` PLUS `gh run list` of the head, so a workflow that nobody expected is seen too. Result `alle` with `status` green | red | unknown, `rote` (run id, workflow, conclusion) and `freigabe`. [NICHT-GELAUFEN-NIE-GRUEN]: skipped, cancelled, queued, NotRun or missing is not green. A deliberately red gate counts only with `rot_freigabe` (text of the strategy: run id + reason + the word of the strategy); the run id and reason go into the report. Occasion: fs-types main 6f1ebcf0, semver run 45253040919 RED accepted without asking the strategy."
+        freesynergy.net:summary: "SPECIFICATION (no script yet; reads `gh run list --commit <head>` through the push helper, read only). [LANDUNG-ALLE-GRUEN] BEFORE the push to main: EVERY workflow the repo runs for the exact head (not only `check` and `windows`: also `semver`, `lint`, and any other) exists and is green; the list comes from `laeufe.erwartet` PLUS `gh run list` of the head, so a workflow that nobody expected is seen too. Result `alle` with `status` green | red | unknown, `rote` (run id, workflow, conclusion) and `freigabe`. [NICHT-GELAUFEN-NIE-GRUEN]: skipped, cancelled, queued, NotRun or missing is not green. A deliberately red gate counts only with `rot_freigabe` (text of the strategy: `run_ids` of exactly the red runs + reason + the word of the strategy; see `alle-weiter`); the run ids and reason go into the report. Occasion: fs-types main 6f1ebcf0, semver run 45253040919 RED accepted without asking the strategy."
   - alle-weiter:
       switch:
         - gruen:
             when: '${ $context.alle.status == "green" }'
             then: continue
         - rot-mit-freigabe:
-            when: '${ ($context.alle.status == "red") and (($context.alle.freigabe.run_id // "") != "") and (($context.alle.freigabe.grund // "") != "") }'
+            when: '${ ($context.alle.status == "red") and (($context.alle.rote // []) | length) > 0 and (($context.alle.rote // []) | all(.conclusion == "failure")) and (($context.alle.freigabe.grund // "") != "") and (((($context.alle.rote // []) | map(.run_id | tostring)) - (($context.alle.freigabe.run_ids // []) | map(tostring))) | length) == 0 }'
             then: continue
         - sonst:
             then: eskalation
@@ -276,7 +264,32 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - ONLY all workflows green goes on to the push; a red one goes on ONLY with the release of the strategy that names run id AND reason (both in the report of the flow); every other result (unknown, missing, a not-run workflow, a release without run id or reason) escalates. No push to main with a red or unknown workflow."
+        freesynergy.net:summary: "Control flow - ONLY all workflows green goes on to the push; a red one goes on ONLY with the release of the strategy that is bound to EXACTLY these runs: `rot_freigabe` = `{ run_ids: [...], grund, wort }`, every run id in `alle.rote` must be named in `run_ids` (run ids of the release SUPERSET OF `alle.rote`), the reason is not empty, and every red run has the conclusion `failure` (a second red run that the release does not name, a skipped, cancelled, queued or not-run workflow never passes; [LANDUNG-ALLE-GRUEN], [NICHT-GELAUFEN-NIE-GRUEN]); run ids and reason go into the report. THREAT MODEL (K5): `rot_freigabe` is text in the order; whoever writes the order opens this gate, no protection beyond that is claimed; every other result (unknown, missing, a not-run workflow, a release without run id or reason) escalates. No push to main with a red or unknown workflow."
+  - main-vor-push:
+      call: head-ff-check:0.0.18@fs
+      with:
+        head: ${ .input.head }
+      export:
+        as: '${ $context + { vor_push: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "SPECIFICATION (workflow-pflege-1 r1, S5; same call as `kopf-und-ff`, no new call name). [KOPF-NEU-LESEN] DIRECTLY before `push-ff`: `main` of the remote is read again (`git ls-remote`); result `vor_push` with `ff` (true = main is still an ancestor of the head, the push stays a pure fast-forward). The reading in `kopf-und-ff` is many steps older (the CI of all workflows lies between); this one is the fresh one. A push that is rejected anyway is never forced (see `push-ff`)."
+  - vor-push-weiter:
+      switch:
+        - ff:
+            when: '${ $context.vor_push.ff == true }'
+            then: continue
+        - sonst:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - main moved since the check (no longer an ancestor) or no result: `eskalation`, nothing is pushed; the new main needs a new check of the ff and, as a rule, a new CI round for the head (a new run of the flow), because the green CI was for the old base."
   - push-ff:
       call: push-ff:0.0.18@fs
       with:
@@ -296,6 +309,8 @@ do:
         head: ${ .input.head }
         ref: main
         warten: true
+        warten_minuten: ${ .input.main_ci_warten_minuten // 30 }
+        rot_freigabe: ${ .input.rot_freigabe // null }
       export:
         as: '${ $context + { main_ci: . } }'
       metadata:
@@ -303,12 +318,18 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "SPECIFICATION (no script yet). After the landing, BEFORE the tag: the runs that the push started on main (`ci`, `msrv`, `semver` ... all that `gh run list --commit <head>` shows) are read for the exact head and must be ALL green; running = wait (poll after 3-5 minutes, never a long pause), not-run or missing = not green ([NICHT-GELAUFEN-NIE-GRUEN]). Result `main_ci` with `status`. The tag is set ONLY after the landing with all workflows green (occasion: fs-types main 6f1ebcf0, semver red after the landing; the tag would have carried a red head)."
+        freesynergy.net:summary: "SPECIFICATION (no script yet). After the landing, BEFORE the tag: the runs that the push started on main (`ci`, `msrv`, `semver` ... all that `gh run list --commit <head>` shows) are read for the exact head and must be ALL green; running = wait (poll after 3-5 minutes, never a long pause) up to `main_ci_warten_minuten` (default 30); a run that is still running after that limit has status `hung` (no endless wait); not-run or missing = not green ([NICHT-GELAUFEN-NIE-GRUEN]). `rot_freigabe` is passed on (S2): a release bound to exactly the red runs (see `alle-weiter`) is valid for the main runs too; a red run that it does not name stays red. Result `main_ci` with `status` (green | red | hung | unknown), `rote`, `freigabe`. The tag is set ONLY after the landing with all workflows green (occasion: fs-types main 6f1ebcf0, semver red after the landing; the tag would have carried a red head)."
   - main-ci-weiter:
       switch:
         - gruen:
             when: '${ $context.main_ci.status == "green" }'
             then: continue
+        - rot-mit-freigabe:
+            when: '${ ($context.main_ci.status == "red") and (($context.main_ci.rote // []) | length) > 0 and (($context.main_ci.rote // []) | all(.conclusion == "failure")) and (($context.main_ci.freigabe.grund // "") != "") and (((($context.main_ci.rote // []) | map(.run_id | tostring)) - (($context.main_ci.freigabe.run_ids // []) | map(tostring))) | length) == 0 }'
+            then: continue
+        - haengt:
+            when: '${ $context.main_ci.status == "hung" }'
+            then: eskalation
         - sonst:
             then: eskalation
       metadata:
@@ -316,7 +337,34 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the tag only after the landing with ALL workflows green on main; red, unknown or missing escalates (main stays as landed, nothing is forced, no tag)."
+        freesynergy.net:summary: "Control flow - the tag only after the landing with ALL workflows green on main, or red ONLY for exactly the runs that the `rot_freigabe` names (same binding as `alle-weiter`, S2: otherwise a released red head would land and then always escalate at the tag); `hung` (still running after the limit, S3), red without a matching release, unknown or missing escalates (main stays as landed, nothing is forced, no tag)."
+  - erst-release:
+      call: first-release-check:0.0.18@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+        nutzerwissen: ${ .input.erstkette_ok // false }
+      export:
+        as: '${ $context + { erst: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "SPECIFICATION (no script yet). [ERSTE-KETTE] Finds out by `git ls-remote --tags` and the release list whether this repo has a release at all (public pre-release or not). Result `erst` with `erstes` (true | false) and `ok`. For the FIRST release of a repo the whole release chain (release.yml caller, signing, attestation, packages) has never run: that is USER KNOWLEDGE - the flow goes on only with `erstkette_ok: true` in the order (the user or the strategy by the user's word), after a DRY RUN (every job of the chain on a branch or with `workflow_dispatch` as far as it exists, nothing published) and with the secrets read only for `set or not` (`secrets-pruefen`: names, never values). Otherwise it goes to `eskalation`. Occasion: fs-capnpc v0.2.3 (first release chain of that repo, GPG secrets not proven; the landing was done, the TAG waited for the user's decision). r1 (S1): this step stands DIRECTLY BEFORE `tag`, after the landing and the green main CI: the landing is NOT held back by the missing knowledge, only the TAG (the first tag of a repo is a public release). THREAT MODEL (K5): `erstkette_ok` is text in the order; whoever writes the order opens this gate; no protection beyond that is claimed (same known limit as `check-approval`)."
+  - erst-weiter:
+      switch:
+        - erstes-ohne-wissen:
+            when: '${ ($context.erst.erstes == null) or (($context.erst.erstes == true) and ($context.erst.ok != true)) }'
+            then: eskalation
+        - sonst:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - directly before `tag`: the first release of a repo without the knowledge of the user (and a dry run) escalates (main stays as landed, no tag); every other repo goes on (a missing result of `erst` is `erstes` unknown and is NOT ok: it escalates too)."
   - tag:
       call: tag-annotated:0.0.18@fs
       with:
@@ -371,7 +419,7 @@ do:
         freesynergy.net:summary: "Control flow - a release that is not completely green (job red, draft, signature or attestation missing) escalates to the person; the catalog follows only after a green release (`katalog`)."
   - index-zeile:
       call: crate-index-line-check:0.0.18@fs
-      if: ${ .input.registry_crate == true }
+      if: ${ $context.eingaben.registry == true }
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -384,10 +432,10 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "[INDEX-ZEILE] MANDATORY STEP for the tag of a registry crate (input `registry_crate`: fs-types, fs-conformance, fs-records): the index line of this version is checked in the repo fs-crates (the file of the crate in the index, `vers` = the tag version, `cksum` = the sum of the `.crate` of the tag, the repo of the tag). BY HAND for now (the push helper reads `gh api` / a clone of fs-crates; max. one read per 4-5 minutes because of the GitHub limit, up to `warten_minuten`). Result `index` with `status` green | missing | late, `zeile`. The index workflow in fs-crates is a PULL job (schedule + dispatch, no bot token): when the line is missing or late, the BLOCKER is named in the report - `Index workflow in fs-crates is disabled / late` - together with the ONE click of the user: Actions of fs-crates, `Enable workflow`, then `Run workflow`. Nobody works around it (no hand-written index line). Occasion: K-2 (PULL way chosen for the index), decision of the strategy 23.11.2026 06:50 (mandatory step in the run list)."
+        freesynergy.net:summary: "[INDEX-ZEILE] MANDATORY STEP for the tag of a registry crate (decided in `eingaben-ableiten`: input `registry_crate`, or the list `registry_crates`, default fs-types, fs-conformance, fs-records; a repo that is not one is named in `eingaben.hinweise`, never skipped silently): the index line of this version is checked in the repo fs-crates (the file of the crate in the index, `vers` = the tag version, `cksum` = the sum of the `.crate` of the tag, the repo of the tag). BY HAND for now (the push helper reads `gh api` / a clone of fs-crates; max. one read per 4-5 minutes because of the GitHub limit, up to `warten_minuten`). Result `index` with `status` green | missing | late, `zeile`. The index workflow in fs-crates is a PULL job (schedule + dispatch, no bot token): when the line is missing or late, the BLOCKER is named in the report - `Index workflow in fs-crates is disabled / late` - together with the ONE click of the user: Actions of fs-crates, `Enable workflow`, then `Run workflow`. Nobody works around it (no hand-written index line). Occasion: K-2 (PULL way chosen for the index), decision of the strategy 23.11.2026 06:50 (mandatory step in the run list)."
   - index-warten:
       call: fs-crate-index-wait:0.0.18@fs
-      if: ${ .input.registry_crate == true and .input.index_wait_wired == true }
+      if: ${ $context.eingaben.registry == true and .input.index_wait_wired == true }
       with:
         repo: ${ .input.repo }
         tag: ${ .input.tag }
@@ -403,7 +451,7 @@ do:
   - index-weiter:
       switch:
         - nicht-registry:
-            when: '${ .input.registry_crate != true }'
+            when: '${ $context.eingaben.registry != true }'
             then: continue
         - gruen:
             when: '${ $context.index.status == "green" }'
@@ -415,7 +463,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a registry crate goes on only with the index line there (`index.status == green`); missing, late or no result escalates with the blocker text and the one user click; every other repo goes on."
+        freesynergy.net:summary: "Control flow - a registry crate goes on only with the index line there (`index.status == green`); missing, late or no result escalates with the blocker text and the one user click; every other repo goes on (the reason is named in `eingaben.hinweise`)."
   - fertig:
       set:
         status: done
@@ -456,4 +504,4 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Reached from `fertig` AND from `eskalation`: removes the own work folder of the clone (exactly the named folder, never a pattern, never an empty or placeholder name) and the temp files of this run - ONLY a clone that `klon` made itself (`created`); an escalation before `klon` removes nothing; foreign folders and agent worktrees are never touched. The output keeps the proof lines."
 output:
-  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), head: ($context.ergebnis.head // null), tag: ($context.ergebnis.tag // null), beleg: ($context.beleg // null) } }'
+  as: '${ { status: ($context.ergebnis.status // "skipped"), eskaliert: ($context.ergebnis.eskaliert // false), head: ($context.ergebnis.head // null), tag: ($context.ergebnis.tag // null), beleg: ($context.beleg // null), eingaben: ($context.eingaben // null) } }'

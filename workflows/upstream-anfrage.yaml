@@ -3,7 +3,7 @@
 # Rule of the Blinc permission (98): a request to Blinc goes through git-bug in OUR repo WITHOUT asking the user, but only when it is PROVEN (reproduction or source), the DUPLICATES are checked (the tracker of the upstream, read only), the
 # text is ENGLISH, has NO AI words and NO addresses or personal data, and carries the git-bug id. NEVER a pull request and NEVER a comment in a foreign issue or thread. Other upstreams keep the approval of the person (step `approval`).
 # The agent only prepares the text and the git-bug id; the helper of the strategy sends (agents never call gh or a browser login). Loops are counted: from the third round (`runde` >= 3) `eskalation`.
-# Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence, art, absender` (required, otherwise held back; optional: `nachfrage`, `bedingung`, `erstkontakt_datei`). FS profile: see README.md.
+# Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence, art, absender` (required, otherwise held back; `absender` = `mensch` | `bot`; for `art: korrektur` also `text_url`; optional: `nachfrage`, `bedingung`, `erstkontakt_datei`). FS profile: see README.md.
 # TEXTS TO THE OUTSIDE (mandatory for EVERY text that leaves us: issue, PR text, mail, request to Blinc or another upstream; other workflows point here):
 # (a) read the rules of the target (CONTRIBUTING, AI stance, issue template) and cite the place (`ziel-regeln-lesen`); (b) INFORM, do not advertise, do not nag (decision of the user, 23.11.2026):
 # the AI note stands CLEARLY ONCE at the FIRST contact with a project, as ONE honest sentence or short paragraph inside the text (never a signature, trailer or footer); afterwards only where it makes sense
@@ -22,11 +22,11 @@
 # openly in the text where `ki_hinweis` says so, BUT at Blinc NO AI attribution (house rule, line 2). The pull request goes through the SAME gates as an issue (rules read, duplicates, text gate, copy block with a checked preview; steps
 # `pr-dubletten`, `pr-text-gate`, `pr-kopierblock`, `pr-vorschau-weiche`) and never gets less checking than an issue; sent only from the account of the user after their YES (gate human). Until then the PR stays red (`pr-wartet`). Optional parameters of a PR: `issue`, `frist_tage`, `pr_text`.
 # CORRECTION OF A TEXT TO THE OUTSIDE (workflow-pflege-1, card 5, 23.11.2026): a text that is ALREADY out (issue text, PR text, README or docs text of a repo of ours or of a target) is corrected by `art: korrektur`
-# (steps `korrektur-lesen` ... `korrektur-eintragen`, after `record`). It goes through the SAME rules (a)-(d) above and never gets less checking than a new text. Rules of the correction: (1) NEVER polish: the corrected text says what is
-# true, also when it is less flattering; a claim that is not proven is deleted or marked `[nicht belegt]`, not softened; numbers and line numbers (`209 hits in 68 files`, `file:line`) only with the proof (command, run id, file) in the report; (2) AI work is named
+# (steps `korrektur-lesen` ... `korrektur-eintragen`, after `record`). WAY (r1, M1): `art-weiche` lets a correction CONTINUE through `ziel-regeln-lesen` (a), `erstkontakt-lesen`, `ki-haltung-weiche`, `ki-hinweis` (b), `absender-weiche` (b2) and `belegen` / `belegt-weiche`; `korrektur-abzweig` then jumps to `korrektur-lesen`. So the data `ziel`, `ki_hinweis`, `belegt` exist when `korrektur-entwurf`, `korrektur-pruefung` and `korrektur-kopierblock` read them. NOT run for a correction: the duplicate search and the steps of a new issue (`dubletten` ... `record`). It goes through the rules (a)-(d) above (the copy block with a checked preview is `korrektur-kopierblock`, the read-against is `korrektur-freigabe`) and never gets less checking than a new text, except the duplicate search. Optional parameters of a correction: `text_url` (REQUIRED for `art: korrektur`: the place of the text that is corrected; without it `korrektur-lesen` has nothing to read and the flow goes to `eskalation`). Rules of the correction: (1) NEVER polish: the corrected text says what is
+# true, also when it is less flattering; a claim that is not proven is deleted or marked `[nicht belegt]`, not softened; numbers and line numbers (`N hits in M files`, `file:line`) only with the proof (command, run id, file) in the report; (2) AI work is named
 # openly, ONE honest sentence once in the text (not a signature or footer) where the rules of the target allow it, e.g. `Written with AI tools (Claude) and reviewed by a second AI model; a human reads and merges this pull request.`; a claim
 # that does not hold (`reviewed by humans` where only a second AI reviewed) is a HIT and is searched in the templates too (list to the strategy); (3) voice of the sender: a text of the user is written in the voice of the user, a text of the bot openly as the bot, never mixed
-# (copy block in the target format, only then to the user); (4) search for the OLD organisation URL: `github.com/FreeSynergy/` NOT followed by `-Net` (209 hits in 68 files on 22.11.2026: fs-documentation README/docs, fs-release docs/templates/workflows,
+# (copy block in the target format, only then to the user); (4) search for the OLD organisation URL: `github.com/FreeSynergy/` NOT followed by `-Net` (the count of 22.11.2026 "209 hits in 68 files" was given without a command or a file as source and is NOT used here; every run names its own count with the command; places: fs-documentation README/docs, fs-release docs/templates/workflows,
 # copy blocks in .scratch; code pins are only counted, they change in the pin wave) - every hit in the text is replaced by the `FreeSynergy-Net` URL; (5) the sender is named in the order (`absender`): at a target that refuses AI or a bot (Kanidm) and in every foreign issue/thread
 # only the human sends, a bot corrects only its OWN text in a repo of ours. Occasions: fs-crates PR #1 (AI sentence, `reviewed by humans`, CODEOWNERS text) and the draft for the capnproto-rust issue (AI note, numbers, old org URLs).
 
@@ -54,7 +54,7 @@ do:
       switch:
         - korrektur:
             when: '${ $context.art.art == "korrektur" }'
-            then: korrektur-lesen
+            then: continue
         - pr:
             when: '${ $context.art.art == "pr" }'
             then: pr-nach-antwort
@@ -166,6 +166,19 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - an unproven statement (or a missing result) is held back: `abgelehnt`; only `belegt == true` goes on to the duplicate search."
+  - korrektur-abzweig:
+      switch:
+        - korrektur:
+            when: '${ $context.art.art == "korrektur" }'
+            then: korrektur-lesen
+        - sonst:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow (workflow-pflege-1 r1, M1) - a correction (`art.art == korrektur`) has walked through the steps `ziel-regeln-lesen` (result `ziel`), `erstkontakt-lesen`, `ki-haltung-weiche`, `ki-hinweis` (result `ki_hinweis`), `absender-weiche` and `belegen` / `belegt-weiche` (proof of every claim and number) by now, so `korrektur-entwurf`, `korrektur-pruefung` and `korrektur-kopierblock` read `$context.ki_hinweis`, `$context.ziel` and `$context.ziel.format` from a filled context; only NOW it jumps to `korrektur-lesen`. It skips ONLY the duplicate search and the new-issue steps (`dubletten`, `ticket`, `draft`, ... `record`): a correction of an own text is no new issue in a foreign tracker. Every other kind goes on to `dubletten`."
   - dubletten:
       call: search-duplicates-ai:0.0.18@fs
       with:
