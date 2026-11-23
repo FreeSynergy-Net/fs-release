@@ -10,6 +10,7 @@ use std::process::Command;
 use fs_release::lift::LiftOpts;
 use tempfile::TempDir;
 
+pub mod aufrufer;
 pub mod flow;
 pub mod flowcheck;
 pub mod gh;

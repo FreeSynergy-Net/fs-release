@@ -1,91 +1,13 @@
 //! Pattern: none (test). `fs-release address aufrufer`: green/red/error cases and the mutants (rule 4 off, rule 5 off,
 //! case-insensitive owner) that the suite must catch.
 
-use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use fs_release::address::aufrufer::{Ctx, Report, Rules};
 use fs_release::cli::main_with;
 
-fn git(dir: &Path, args: &[&str]) -> String {
-    let o = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "-c",
-            "commit.gpgsign=false",
-        ])
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(o.status.success(), "git {args:?}");
-    String::from_utf8_lossy(&o.stdout).trim().to_string()
-}
-
-fn commit(dir: &Path, msg: &str) -> String {
-    fs::write(dir.join("f.txt"), msg).unwrap();
-    git(dir, &["add", "-A"]);
-    git(dir, &["commit", "-q", "-m", msg]);
-    git(dir, &["rev-parse", "HEAD"])
-}
-
-/// fs-release clone: old (tag v0.0.17) -> neutral -> l (main) -> later (tag v0.0.19); `side` branches off l, not on main.
-struct Fix {
-    dir: tempfile::TempDir,
-    old: String,
-    neutral: String,
-    l: String,
-    side: String,
-}
-
-fn fixture() -> Fix {
-    let t = tempfile::tempdir().unwrap();
-    let d = t.path();
-    git(d, &["init", "-q", "-b", "main"]);
-    let old = commit(d, "old");
-    git(d, &["tag", "v0.0.17"]);
-    let neutral = commit(d, "neutral");
-    let l = commit(d, "l");
-    git(d, &["checkout", "-q", "-b", "side"]);
-    let side = commit(d, "side");
-    git(d, &["checkout", "-q", "main"]);
-    commit(d, "later");
-    git(d, &["tag", "v0.0.19"]);
-    git(d, &["update-ref", "refs/remotes/origin/main", "main"]);
-    // HEAD of the clone is NOT main: a mutant that judges against HEAD instead of origin/main turns red here.
-    git(d, &["checkout", "-q", "side"]);
-    Fix {
-        dir: t,
-        old,
-        neutral,
-        l,
-        side,
-    }
-}
-
-/// Caller repo with one workflow file holding the given `uses:` lines.
-fn caller(uses: &[String]) -> tempfile::TempDir {
-    let t = tempfile::tempdir().unwrap();
-    git(t.path(), &["init", "-q", "-b", "main"]);
-    fs::create_dir_all(t.path().join(".github/workflows")).unwrap();
-    let body: String = uses
-        .iter()
-        .map(|u| format!("      - uses: {u}\n"))
-        .collect();
-    fs::write(t.path().join(".github/workflows/ci.yml"), body).unwrap();
-    git(t.path(), &["add", "-A"]);
-    git(t.path(), &["commit", "-q", "-m", "x"]);
-    t
-}
-
-fn u(owner: &str, r: &str) -> String {
-    format!("{owner}/fs-release/.github/workflows/check.yml@{r}")
-}
+mod support;
+use support::aufrufer::{caller, cli, fixture, u, Fix, NEW};
 
 fn red_count(f: &Fix, rules: Rules, uses: &[String]) -> usize {
     let c = caller(uses);
@@ -97,28 +19,6 @@ fn red_count(f: &Fix, rules: Rules, uses: &[String]) -> usize {
     ctx.check_repo(c.path(), "HEAD", &mut rep).unwrap();
     rep.red()
 }
-
-fn cli(f: &Fix, uses: &[String], neutral: &str) -> i32 {
-    let c = caller(uses);
-    let a: Vec<String> = [
-        "fs-release",
-        "address",
-        "aufrufer",
-        "--neutral",
-        neutral,
-        "--fs-release",
-    ]
-    .iter()
-    .map(ToString::to_string)
-    .chain([
-        f.dir.path().display().to_string(),
-        c.path().display().to_string(),
-    ])
-    .collect();
-    main_with(a)
-}
-
-const NEW: &str = "FreeSynergy-Net";
 
 #[test]
 fn aufrufer_green_new_at_l_and_new_at_tag_after_l() {
@@ -276,115 +176,4 @@ fn aufrufer_nachher_runs_the_rule_on_the_same_repos() {
         2,
         "neutral without clone is an error"
     );
-}
-
-/// Caller repo whose only workflow has the given file name (for example a non-ASCII one).
-fn caller_named(name: &str, uses: &[String]) -> tempfile::TempDir {
-    let t = caller(&[]);
-    fs::remove_file(t.path().join(".github/workflows/ci.yml")).unwrap();
-    let body: String = uses
-        .iter()
-        .map(|u| format!("      - uses: {u}\n"))
-        .collect();
-    fs::write(t.path().join(".github/workflows").join(name), body).unwrap();
-    git(t.path(), &["add", "-A"]);
-    git(t.path(), &["commit", "-q", "-m", "y"]);
-    t
-}
-
-fn cli_dir(f: &Fix, dir: &Path) -> i32 {
-    main_with(
-        [
-            "fs-release",
-            "address",
-            "aufrufer",
-            "--neutral",
-            &f.neutral,
-            "--fs-release",
-            &f.dir.path().display().to_string(),
-            &dir.display().to_string(),
-        ]
-        .map(String::from)
-        .to_vec(),
-    )
-}
-
-#[test]
-fn aufrufer_subfolder_of_a_repo_is_an_error_not_green() {
-    let f = fixture();
-    let c = caller(&[u("FreeSynergy", "main")]);
-    assert_eq!(cli_dir(&f, c.path()), 1, "root: red");
-    let sub = c.path().join(".github");
-    assert_eq!(cli_dir(&f, &sub), 2, "subfolder: rc 2");
-}
-
-#[test]
-fn aufrufer_non_ascii_workflow_name_is_read() {
-    let f = fixture();
-    let c = caller_named("ä.yml", &[u("FreeSynergy", &f.l)]);
-    assert_eq!(cli_dir(&f, c.path()), 1, "ä.yml with the old owner is red");
-    let ok = caller_named("ä.yml", &[u(NEW, &f.l)]);
-    assert_eq!(cli_dir(&f, ok.path()), 0);
-}
-
-#[test]
-fn aufrufer_head_of_clone_is_not_the_main_ref() {
-    let f = fixture();
-    assert_ne!(
-        git(f.dir.path(), &["rev-parse", "HEAD"]),
-        git(f.dir.path(), &["rev-parse", "origin/main"])
-    );
-    assert_eq!(
-        cli(&f, &[u(NEW, &f.l)], &f.neutral),
-        0,
-        "L is on origin/main"
-    );
-    assert_eq!(
-        cli(&f, &[u(NEW, &f.side)], &f.neutral),
-        1,
-        "side is HEAD but not on origin/main"
-    );
-}
-
-#[test]
-fn aufrufer_look_alike_repo_name_is_recognised_and_red() {
-    let f = fixture();
-    let n = format!("{NEW}/FS-Release/.github/workflows/check.yml@{}", f.l);
-    assert_eq!(
-        cli(&f, &[n], &f.neutral),
-        1,
-        "FS-Release is a look-alike: red, not skipped"
-    );
-    assert_eq!(
-        cli(&f, &[format!("{NEW}/xfs-release/a.yml@main")], &f.neutral),
-        0,
-        "different name: not ours"
-    );
-}
-
-#[test]
-fn aufrufer_comment_part_and_composite_actions() {
-    let f = fixture();
-    assert_eq!(
-        cli(&f, &[format!("{} # v0.0.19", u(NEW, &f.l))], &f.neutral),
-        0,
-        "`@<L> # v0.0.x` green"
-    );
-    assert_eq!(
-        cli(&f, &[format!("{} # {}", u(NEW, "main"), f.l)], &f.neutral),
-        1,
-        "`@main # <L>` red"
-    );
-    for dir in [".github/actions/x", "actions/x"] {
-        let c = caller(&[]);
-        fs::create_dir_all(c.path().join(dir)).unwrap();
-        fs::write(
-            c.path().join(dir).join("action.yaml"),
-            format!("      - uses: {}\n", u("FreeSynergy", &f.l)),
-        )
-        .unwrap();
-        git(c.path(), &["add", "-A"]);
-        git(c.path(), &["commit", "-q", "-m", "a"]);
-        assert_eq!(cli_dir(&f, c.path()), 1, "{dir}/action.yaml is read");
-    }
 }
