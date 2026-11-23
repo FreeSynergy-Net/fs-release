@@ -82,3 +82,26 @@ printf 'blinc = "components-only"\n' > "$TR/.fs-rules.toml"; printf '[package]\n
 mkdir -p "$TR/crates/fs-components"; printf '[package]\nname = "fs-components"\nrepository = "https://github.com/FreeSynergy/fs-components"\n' > "$TR/crates/fs-components/Cargo.toml"
 git init -q "$TR"; git -C "$TR" remote add origin https://github.com/someone/fs-components.git; bad "a fork origin beats a claimed official repository"
 rm -rf "$TR/.git" "$TR/crates" "$TR/Cargo.toml" "$TR/.fs-rules.toml"
+# Frozen folder: ONLY the Pattern rule is skipped, ONLY with a checked-in locks/<name>.sha256 whose ordner exists and whose hash matches.
+rm -rf "$TR/crates" "$TR/locks" "$TR/.cargo" "$TR/Cargo.toml" "$TR/.fs-rules.toml"
+D="$TR/src/dummy_v1"; mkdir -p "$D" "$TR/locks"
+printf '//! Entry.\n//! Pattern: none\nfn main() {}\n' > "$TR/src/main.rs"
+printf '//! Old module without a pattern line.\npub fn x() {}\n' > "$D/a.rs"
+# the procedure of tools/hash-ordner.sh (per file "<relpath>\0<sha256>\n", sorted, LC_ALL=C), here for the dummy folder
+hash_dir() { ( export LC_ALL=C; cd "$1"; find . -type f -printf '%P\0' | sort -z | while IFS= read -r -d '' f; do printf '%s\0%s\n' "$f" "$(sha256sum -- "$f" | cut -d' ' -f1)"; done | sha256sum | cut -d' ' -f1 ); }
+lock() { printf '# lock\nordner: %s\nsha256: %s\n' "$1" "$2" > "$TR/locks/$3.sha256"; }
+H="$(hash_dir "$D")"
+bad "frozen folder: no lock file, Pattern rule applies"
+lock src/dummy_v1 "$H" dummy_v1; ok "frozen folder: valid lock + matching hash is exempt"
+lock src/dummy_v1 "0${H#?}" dummy_v1; bad "frozen folder: wrong hash, rule applies"
+lock src/dummy_v1 "$H" dummy_v1; printf '//! New.\npub fn y() {}\n' > "$D/b.rs"; bad "frozen folder: new file after locking breaks the hash"
+rm "$D/b.rs"; ok "frozen folder: change reverted, exempt again"
+printf '//! Old module without a pattern line.\npub fn x() {} // edit\n' > "$D/a.rs"; bad "frozen folder: edited file breaks the hash"
+printf '//! Old module without a pattern line.\npub fn x() {}\n' > "$D/a.rs"
+rm "$TR/locks/dummy_v1.sha256"; lock src/dummy_v1 "$H" other_name; bad "frozen folder: lock file with another folder name is no exemption"
+rm "$TR/locks/other_name.sha256"; lock src/dummy_v1 "$H" dummy_v1
+printf '//! Outside.\npub fn z() {}\n' > "$TR/src/outside.rs"; bad "frozen folder: a file outside it is not exempt"
+rm "$TR/src/outside.rs"
+printf '//! Entry.\n' > "$D/c.rs"; H2="$(hash_dir "$D")"; lock src/dummy_v1 "$H2" dummy_v1; ok "frozen folder: other rules stay (module doc present, Pattern skipped)"
+printf 'pub fn q() {}\n' > "$D/c.rs"; lock src/dummy_v1 "$(hash_dir "$D")" dummy_v1; bad "frozen folder: a missing //! module doc is still an error"
+rm -rf "$TR/locks" "$D"

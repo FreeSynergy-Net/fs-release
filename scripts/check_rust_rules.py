@@ -15,6 +15,11 @@ Checks (exit 1 on any violation):
     LIMIT: these are file checks. Whoever deletes `.fs-rules.toml` (or fakes the identity of the exempt repo in a
     repo whose origin is elsewhere AND whose Cargo.toml says so) turns the rule off; only review catches that.
     Programs take Blinc through `fs_components::blinc`.
+  * Frozen folder (`locks/<folder name>.sha256` checked in at the repo root): ONLY the rule "module doc has a `Pattern:` line"
+    is skipped for the `.rs` files below that folder, and only while the file's `ordner:` (repo-relative path, its last part = the
+    file name) exists AND its `sha256:` equals the folder hash (same procedure as tools/hash-ordner.sh). Any change to the
+    folder breaks the hash and the rule applies again. No lock file, wrong hash, other name or path = no exemption.
+    Format (see docs/usage.md): lines `ordner: crates/x/src/groups_v1` and `sha256: <64 hex>`; other lines are comments.
   * Cargo.lock (every repo, no switch): Blinc packages (blinc*, any fork such as blinc-app-fix) only from
     github.com/FreeSynergy/Blinc at the ONE approved fs-blinc tag + full sha of scripts/blinc-approved.txt
     (scripts/check_blinc_lock.py; crates.io, path, other tags/shas, two Blinc sources are errors). With Blinc in the lock,
@@ -22,7 +27,7 @@ Checks (exit 1 on any violation):
 
     python3 scripts/check_rust_rules.py /srv/FreeSynergy/fs-packages [/srv/FreeSynergy/fs-registry …]
 """
-import importlib.util, re, subprocess, sys, tomllib
+import hashlib, importlib.util, re, subprocess, sys, tomllib
 from pathlib import Path
 
 def _blinc_lock_errors(repo: Path):
@@ -177,8 +182,27 @@ def check_blinc(repo: Path):
                       "; ".join(f"{k} in {', '.join(sorted(set(v)))}" for k, v in sorted(pins.items())))
     return errors
 
+def folder_hash(d: Path) -> str:
+    """Same value as tools/hash-ordner.sh: sha256 over `<relpath>\\0<sha256 of content>\\n` per regular file, sorted by path bytes."""
+    rows = sorted((f.relative_to(d).as_posix().encode(), hashlib.sha256(f.read_bytes()).hexdigest())
+                  for f in d.rglob("*") if f.is_file() and not f.is_symlink())
+    return hashlib.sha256(b"".join(n + b"\0" + h.encode() + b"\n" for n, h in rows)).hexdigest()
+
+def frozen_folders(repo: Path):
+    """Folders (repo-relative, posix) with a valid `locks/<name>.sha256`: `ordner:` exists, its last part is <name>, `sha256:` matches the hash."""
+    out = set()
+    for lock in sorted((repo / "locks").glob("*.sha256")):
+        kv = dict(l.split(":", 1) for l in lock.read_text(encoding="utf-8").splitlines() if re.match(r"^(ordner|sha256):", l))
+        rel, want = kv.get("ordner", "").strip().strip("/"), kv.get("sha256", "").strip()
+        d = (repo / rel).resolve()
+        if rel and Path(rel).name == lock.stem and not rel.startswith(("..", "/")) and d.is_dir() \
+                and d.is_relative_to(repo.resolve()) and folder_hash(d) == want:
+            out.add(rel)
+    return out
+
 def check(repo: Path):
     errors, warns = check_blinc(repo) + _blinc_lock_errors(repo), []
+    frozen = frozen_folders(repo)
     for f in _walk(repo, "*.rs"):
         p = f.as_posix()
         if "/generated/" in p or f.name.endswith("_capnp.rs"):
@@ -192,7 +216,7 @@ def check(repo: Path):
                 errors.append(f"{rel}: missing //! module doc on line 1")
             elif f.name not in ("lib.rs", "mod.rs", "main.rs"):
                 head = "\n".join(l for l in lines[:30] if l.startswith("//!"))
-                if "Pattern:" not in head:
+                if "Pattern:" not in head and not any(rel.startswith(d + "/") for d in frozen):
                     errors.append(f"{rel}: module doc has no 'Pattern:' line")
             if f.name in ("lib.rs", "mod.rs") and re.search(r"^\s*(pub\s+)?(async\s+)?fn\s+\w+.*\{", "\n".join(lines), re.M):
                 errors.append(f"{rel}: logic in {f.name} (only modules/re-exports allowed)")

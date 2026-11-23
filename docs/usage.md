@@ -50,6 +50,11 @@ of a repo; it runs on every push. It needs no secrets and only `contents: read`.
 2. `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
 3. `cargo test --workspace --all-features`
 4. `python3 -I scripts/check_rust_rules.py <root>` (ADR 0043), taken from this repo at the same ref as the workflow (`actions/rust-rules`), no download
+   Frozen folder (the only exemption, rule "module doc has a `Pattern:` line" only): a file `locks/<folder name>.sha256` at the repo root,
+   checked in, with the lines `ordner: <repo-relative path>` (its last part = `<folder name>`) and `sha256: <folder hash>` (the output of
+   `tools/hash-ordner.sh <folder>`); other lines are comments. Example `locks/groups_v1.sha256`:
+   `ordner: crates/fs-group-directory/src/groups_v1` / `sha256: 91c0f8b0849d85b1038b8b09f511e27134c1ddfeb0ef2eae42dc8579b3d2faf3`.
+   Valid only while the folder exists and its hash matches: any change to the folder, a missing lock file, a wrong name or a path outside the folder turns the rule back on.
 
 Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env`, `software-gpu` (boolean, default false), `full` (boolean, default false). Unlike
 `ci.yml` there is no MSRV or cargo-deny step and no feature selection: everything is checked with all features. Repos can run both.
