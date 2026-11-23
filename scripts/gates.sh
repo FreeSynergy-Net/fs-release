@@ -89,6 +89,7 @@ nachpruefung_of() {
     rust-rules) echo "python3 -I {SCRIPTS}/check_rust_rules.py {ROOT}" ;;
     lock) echo "bash {SCRIPTS}/gates-lock.sh {ROOT}" ;;
     files) echo "bash {SCRIPTS}/gates-files.sh {ROOT}" ;;
+    licence) echo "bash {SCRIPTS}/licence-gate.sh {ROOT}" ;;
     identity) echo "bash {SCRIPTS}/identity-check {ROOT}" ;;
     *) ;; # guard: no local check (a change of the tree while the gates run is only found by the full run)
   esac
@@ -172,6 +173,9 @@ else
   step lock error bash "$here/gates-lock.sh" "$root"
   # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
   step files error bash "$here/gates-files.sh" "$root"
+  # licence: cargo-deny `check licenses bans sources` with the ONE policy configs/deny.toml and the cargo-deny pinned in scripts/cargo-deny.pin (version + sha256). Own file, so it has a self test
+  # (scripts/test_licence_gate.sh). NOT RUN (no binary, wrong version, no policy) is red with its own line, never green and never skipped.
+  step licence error bash "$here/licence-gate.sh" "$root"
   # --like-ci: the lint job of CI (the tool missing = "NICHT GEPRUEFT" in the Beleg, never silently skipped) and, with rustup, the MSRV job
   if [ -n "$like_ci" ]; then
     if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi

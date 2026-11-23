@@ -1,5 +1,7 @@
 # Default cargo-deny policy for FreeSynergy repos (ADR 0015/0016).
-# A repo may ship its own deny.toml in its working directory; that one wins.
+# ONE policy for all repos: the gate `licence` of scripts/gates.sh (scripts/licence-gate.sh) always uses this file; a deny.toml of a repo is not read there
+# (actions/licence-check, used by ci.yml only, still lets a repo file win).
+# A finding is a decision of the strategy, never an entry added for convenience.
 # Licences are allow-listed: everything not listed (GPL, AGPL, LGPL, SSPL, BUSL,
 # proprietary, unlicensed ...) is rejected.
 
@@ -35,6 +37,15 @@ allow-wildcard-paths = true
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# ADR coding.md section 8: our own repos are consumed as git dependencies with tags.
-allow-org = { github = ["FreeSynergy"] }
+# the allowed sources are a list of what MAY appear; a repo that uses only crates.io must not get a warning for the others
+unused-allowed-source = "allow"
+# The sources our locks may name (checked against the locks of fs-types and fs-people): crates.io (git index form of older locks and the sparse form)
+# and our own registry `freesynergy` (K-2/K-3, Git index of fs-crates).
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index",
+    "sparse+https://index.crates.io/",
+    "https://github.com/FreeSynergy-Net/fs-crates",
+]
+# ADR coding.md section 8: our own repos are consumed as git dependencies with tags. Both organisation names are ours; the old name `FreeSynergy` is still in
+# the locks (fs-types, fs-people) until the address wave is through, `scripts/gates-lock.sh` (lock-sources) reports it separately. Nothing else is listed here.
+allow-org = { github = ["FreeSynergy-Net", "FreeSynergy"] }

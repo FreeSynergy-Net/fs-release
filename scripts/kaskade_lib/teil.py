@@ -78,7 +78,7 @@ def _check_argv(w):
     if w[0] == "cargo" and w[1] == "fmt":
         return _options(w[2:], {"--check": "flag", "--all": "flag", "-p": "name", "--package": "name"})
     if w[0] == "bash":
-        return len(w) == 3 and w[1] in ("{SCRIPTS}/gates-lock.sh", "{SCRIPTS}/gates-files.sh") and w[2] == "{ROOT}"
+        return len(w) == 3 and w[1] in ("{SCRIPTS}/gates-lock.sh", "{SCRIPTS}/gates-files.sh", "{SCRIPTS}/licence-gate.sh") and w[2] == "{ROOT}"
     if w[0] == "python3":
         return w == ["python3", "-I", "{SCRIPTS}/check_rust_rules.py", "{ROOT}"]
     return False

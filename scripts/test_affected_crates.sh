@@ -82,7 +82,7 @@ got=$(python3 -I "$AC" "$S/sub" HEAD~2 2>/dev/null); [ "$got" = "PACKAGES lone" 
 # gates.sh: copy with stub cargo (metadata goes to the real one), CI=true; the cargo log shows the narrowed test and the full clippy
 GK="$tmp/gk"; mkdir -p "$GK/scripts" "$GK/bin"
 cp "$repo/scripts/gates.sh" "$repo/scripts/lib_gates_guard.sh" "$repo/scripts/lib_gates_list.sh" "$AC" "$repo/scripts/identity-check" "$GK/scripts/"
-echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; : >"$GK/scripts/check_rust_rules.py"
+echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/licence-gate.sh"; : >"$GK/scripts/check_rust_rules.py"
 printf '#!/usr/bin/env bash\nif [ "$1" = metadata ]; then unset RUSTUP_TOOLCHAIN; exec "%s" "$@"; fi\necho "cargo $*" >> "%s/cargo.log"\n' "$real_cargo" "$GK" >"$GK/bin/cargo"
 printf '#!/usr/bin/env bash\nunset RUSTUP_TOOLCHAIN\nexec "%s" "$@"\n' "$(command -v rustc)" >"$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
 gates_run() { # <script> <diff base or empty>; the repo under test is $W (HEAD = the stray commit); output in $GK/out, cargo words in $GK/cargo.log
