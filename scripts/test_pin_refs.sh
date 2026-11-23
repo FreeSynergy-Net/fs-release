@@ -155,6 +155,20 @@ nolower_checks() {
   nl_case "unknown SHA pin is red" FreeSynergy-Net@0123456789abcdef0123456789abcdef01234567 v0.0.10 red
   nl_case "target not in the clone is red" FreeSynergy-Net@v0.0.9 v7.7.7 red
   nl_case "foreign org line stays untouched, no pin check on it" Evil@v0.0.11 v0.0.10 noop
+  nl_case "an owner that only ENDS in FreeSynergy stays untouched (left boundary), no pin check" Not-FreeSynergy@v9.9.9 v0.0.10 noop
+  nl_case "an owner that only ENDS in FreeSynergy-Net stays untouched (left boundary)" Not-FreeSynergy-Net@v0.0.11 v0.0.10 noop
+  nl_case "only @main and a target the clone does not know is red" FreeSynergy-Net@main v7.7.7 red
+  # two DIFFERENT pins in one file (one older, one newer than the target): the whole run is red, nothing written (a check of only one pin must not pass)
+  nl_two() { # <pin a> <pin b> <target> <want rc>
+    rm -rf "$d"; mkdir -p "$d/.github/workflows"
+    printf 'jobs:\n  a:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@%s\n  b:\n    uses: FreeSynergy-Net/fs-release/actions/x@%s\n' "$1" "$2" >"$d/.github/workflows/c.yml"
+    git -C "$d" init -q && git -C "$d" add -A && git -C "$d" -c user.name=t -c user.email=t@t commit -qm base
+    bash "$s" --dir "$d" "$3" >/dev/null 2>&1; rc=$?
+    if [ "$rc" -eq "$4" ] && { [ "$4" -eq 0 ] || [ -z "$(git -C "$d" status --porcelain)" ]; }; then ok "$l two pins $1 / $2 against $3 rc $4"; else bad "$l two pins $1 / $2 against $3 (rc=$rc, want $4)"; fi
+  }
+  nl_two v0.0.9 v0.1.0 v0.0.10 3
+  nl_two v0.1.0 v0.0.9 v0.0.10 3
+  nl_two v0.0.9 v0.0.6 v0.0.10 0
 }
 nolower_checks "$here/pin-refs.sh" real
 
@@ -173,6 +187,10 @@ red_by only-old-owner "s@^owners=.*@owners='FreeSynergy'@"
 red_by nocheck 's@^  check_no_lower .*@  true@'
 red_by noancestor 's@ \|\| git -C "\$repo" merge-base --is-ancestor "\$o" "\$n"@@'
 red_by unknown-ok 's@rc=3; continue; }@continue; }@'
+red_by first-pin-only 's@\| sort -u\)@| sort -u | head -1)@'
+red_by target-unknown-ok 's@(not found in \$repo" >&2; )return 3;@\1true;@'
+red_by noboundary-awk 's@if \(RSTART > 1\) \{ c =@if (0) { c =@'
+red_by noboundary-grep 's@\(\^\|[^)]*\)\(\$owners\)/fs-release@(\$owners)/fs-release@'
 red_by dirignored 's@^if \[ -n "\$dir" \]; then@if false; then@'
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

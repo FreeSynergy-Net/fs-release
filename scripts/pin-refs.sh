@@ -8,7 +8,7 @@
 # Option `--dir <repo>` (before or after the ref): work in ANOTHER repository (a program or library that calls fs-release).
 # Only `<repo>/.github/workflows/*.yml` is touched, only `uses: <owner>/fs-release/<path>@<old>` (owner = one of the two known owners) becomes `@<ref>`; other
 # actions (actions/checkout@..., ...) stay as they are. No `.github/workflows/` there = rc 2. Prints the changed files, rc 0.
-# A pin is never lowered (rc 3, nothing written): every existing `@<old>` (tag or SHA) must resolve in the fs-release clone ($FS_RELEASE_REPO, default: this repo) and <ref> must be equal to it or a descendant (git merge-base --is-ancestor). Unknown, older or unrelated = rc 3. `@main` is raised. The owner name is rewritten to FreeSynergy-Net.
+# A pin is never lowered (rc 3, nothing written; the whole run is red, not line by line): every existing `@<old>` (tag or SHA) must resolve in the fs-release clone ($FS_RELEASE_REPO, default: this repo) and <ref> must be equal to it or a descendant (git merge-base --is-ancestor). Unknown, older or unrelated = rc 3. `@main` is raised. The owner name is rewritten to FreeSynergy-Net.
 # Without `--dir` the script rewrites this repository (workflows and actions) and prints `git diff --stat`, as before.
 set -euo pipefail
 # The two known owners of fs-release, exactly (never "any owner"): the old one stays until part 2 of the address wave is done.
@@ -33,14 +33,16 @@ done
 # The ref goes into a sed expression (`#` is the delimiter, `&` and flags are special): only a full SHA or vX.Y.Z is accepted.
 [[ $ref =~ ^([0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "pin-refs: usage: pin-refs.sh [--dir <repo>] <40-char-sha or vX.Y.Z> (got: ${ref:-nothing})" >&2; exit 2; }
 
-# One `uses:` line at a time (awk, POSIX): `<owner>/fs-release/<path>@<old>` becomes `@<ref>`, everything else on the line and in the file stays.
+# One `uses:` line at a time (awk, POSIX; the owner needs a left boundary: line start, blank, tab or quote): `<owner>/fs-release/<path>@<old>` becomes `@<ref>`, everything else on the line and in the file stays.
 pin_file() {
   local f=$1 tmpf="$1.pin-new"
-  awk -v ref="$ref" -v owners="$owners" '
+  awk -v ref="$ref" -v owners="$owners" -v q="'" '
     BEGIN { re = "(" owners ")/fs-release/[A-Za-z0-9_./-]+@[A-Za-z0-9_.-]+" }
     $0 ~ "^[[:space:]]*(-[[:space:]]+)?uses:" {
       out = ""; rest = $0
       while (match(rest, re)) {
+        # left boundary: the owner starts a word (line start, blank, tab or quote); `Not-FreeSynergy/fs-release/...` is a foreign owner and stays as it is
+        if (RSTART > 1) { c = substr(rest, RSTART - 1, 1); if (c !~ /[[:space:]"]/ && c != q) { out = out substr(rest, 1, RSTART + RLENGTH - 1); rest = substr(rest, RSTART + RLENGTH); continue } }
         tok = substr(rest, RSTART, RLENGTH)
         sub(/^[A-Za-z-]+\//, "FreeSynergy-Net/", tok); tok = substr(tok, 1, index(tok, "@")) ref
         out = out substr(rest, 1, RSTART - 1) tok; rest = substr(rest, RSTART + RLENGTH)
@@ -58,7 +60,7 @@ check_no_lower() {
   local repo=${FS_RELEASE_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)} old n o rc=0
   n=$(git -C "$repo" rev-parse --verify -q "$ref^{commit}") || { echo "pin-refs: target $ref not found in $repo" >&2; return 3; }
   local olds
-  mapfile -t olds < <(cat "$@" | grep -E "^[[:space:]]*(-[[:space:]]+)?uses:" | grep -oE "($owners)/fs-release/[A-Za-z0-9_./-]+@[A-Za-z0-9_.-]+" | sed 's/.*@//' | sort -u)
+  mapfile -t olds < <(cat "$@" | grep -E "^[[:space:]]*(-[[:space:]]+)?uses:" | grep -oE "(^|[[:space:]'\"])($owners)/fs-release/[A-Za-z0-9_./-]+@[A-Za-z0-9_.-]+" | sed 's/.*@//' | sort -u)
   for old in "${olds[@]}"; do
     if [ "$old" = main ] || [ "$old" = "$ref" ]; then continue; fi
     o=$(git -C "$repo" rev-parse --verify -q "$old^{commit}") || { echo "pin-refs: existing pin @$old not resolvable in $repo (not overwritten)" >&2; rc=3; continue; }
