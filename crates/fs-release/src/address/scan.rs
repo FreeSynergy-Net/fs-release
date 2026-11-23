@@ -58,11 +58,19 @@ pub fn scan(dir: &Path, git_ref: &str, owner: &str) -> Result<Vec<Hit>, String> 
     if !ok.status.success() {
         return Err(format!("{repo}: FEHLT ref {git_ref}"));
     }
-    let out = git(dir, &["grep", "-n", "-I", "-i", "-z", "-F", "-e", owner, git_ref])?;
+    let out = git(
+        dir,
+        &["grep", "-n", "-I", "-i", "-z", "-F", "-e", owner, git_ref],
+    )?;
     match out.status.code() {
         Some(0) => {}
         Some(1) => return Ok(Vec::new()),
-        _ => return Err(format!("{repo}: git grep failed: {}", String::from_utf8_lossy(&out.stderr).trim())),
+        _ => {
+            return Err(format!(
+                "{repo}: git grep failed: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ))
+        }
     }
     let text = String::from_utf8_lossy(&out.stdout);
     let prefix = format!("{git_ref}:");

@@ -27,7 +27,9 @@ pub struct Report {
 pub fn replace_tree(dir: &Path, old: &str, new: &str, allow: &mut Allow) -> Result<Report, String> {
     let repo = repo_name(dir)?;
     if repo == "Catalog" {
-        return Err("Catalog: refused, the catalog data change only through the workflow `katalog`".into());
+        return Err(
+            "Catalog: refused, the catalog data change only through the workflow `katalog`".into(),
+        );
     }
     let list = Command::new("git")
         .arg("-C")
@@ -39,11 +41,21 @@ pub fn replace_tree(dir: &Path, old: &str, new: &str, allow: &mut Allow) -> Resu
         return Err(format!("{repo}: git ls-files failed"));
     }
     let mut rep = Report::default();
-    for rel in String::from_utf8_lossy(&list.stdout).split('\0').filter(|s| !s.is_empty()) {
+    for rel in String::from_utf8_lossy(&list.stdout)
+        .split('\0')
+        .filter(|s| !s.is_empty())
+    {
         let full = dir.join(rel);
-        let Ok(raw) = std::fs::read(&full) else { continue };
-        let Ok(text) = String::from_utf8(raw) else { continue };
-        if !text.to_ascii_lowercase().contains(&old.to_ascii_lowercase()) {
+        let Ok(raw) = std::fs::read(&full) else {
+            continue;
+        };
+        let Ok(text) = String::from_utf8(raw) else {
+            continue;
+        };
+        if !text
+            .to_ascii_lowercase()
+            .contains(&old.to_ascii_lowercase())
+        {
             continue;
         }
         if Class::of(rel).replace_forbidden() {
@@ -58,7 +70,15 @@ pub fn replace_tree(dir: &Path, old: &str, new: &str, allow: &mut Allow) -> Resu
     Ok(rep)
 }
 
-fn rewrite(text: &str, rel: &str, repo: &str, old: &str, new: &str, allow: &mut Allow, rep: &mut Report) -> Option<String> {
+fn rewrite(
+    text: &str,
+    rel: &str,
+    repo: &str,
+    old: &str,
+    new: &str,
+    allow: &mut Allow,
+    rep: &mut Report,
+) -> Option<String> {
     let mut out = String::with_capacity(text.len());
     let mut changed = false;
     for line in text.split_inclusive('\n') {

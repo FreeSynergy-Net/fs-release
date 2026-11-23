@@ -21,7 +21,9 @@ const CARGO_SOURCE_FILES: &[&str] = &[
 ];
 
 fn ext(name: &str, e: &str) -> bool {
-    std::path::Path::new(name).extension().is_some_and(|x| x.eq_ignore_ascii_case(e))
+    std::path::Path::new(name)
+        .extension()
+        .is_some_and(|x| x.eq_ignore_ascii_case(e))
 }
 
 impl Class {
@@ -40,7 +42,9 @@ impl Class {
             Self::Ci
         } else if path.starts_with("scripts/") {
             Self::Scripts
-        } else if (name.contains("catalog") || name.contains("packages")) && (ext(name, "xml") || ext(name, "toml")) {
+        } else if (name.contains("catalog") || name.contains("packages"))
+            && (ext(name, "xml") || ext(name, "toml"))
+        {
             Self::Catalog
         } else if path.starts_with("workflows/") {
             Self::Workflows

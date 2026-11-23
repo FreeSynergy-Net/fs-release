@@ -27,12 +27,17 @@ impl Entry {
     fn covers(&self, repo: &str, path: &str, text: &str) -> bool {
         self.applies_to(repo)
             && (self.scope.is_empty() || self.scope == "*" || path.starts_with(&self.scope))
-            && text.to_ascii_lowercase().contains(&self.pattern.to_ascii_lowercase())
+            && text
+                .to_ascii_lowercase()
+                .contains(&self.pattern.to_ascii_lowercase())
     }
 
     #[must_use]
     pub fn label(&self) -> String {
-        format!("pattern {:?} scope {:?} repo {:?} ({})", self.pattern, self.scope, self.repo, self.reason)
+        format!(
+            "pattern {:?} scope {:?} repo {:?} ({})",
+            self.pattern, self.scope, self.repo, self.reason
+        )
     }
 }
 
@@ -53,14 +58,19 @@ impl Allow {
     /// # Errors
     /// A missing or unreadable file, invalid JSON, or an entry without reason or without anything to match.
     pub fn load(path: &Path) -> Result<Self, String> {
-        let raw = std::fs::read_to_string(path).map_err(|e| format!("allow file {}: {e}", path.display()))?;
-        let entries: Vec<Entry> = serde_json::from_str(&raw).map_err(|e| format!("allow file {}: {e}", path.display()))?;
+        let raw = std::fs::read_to_string(path)
+            .map_err(|e| format!("allow file {}: {e}", path.display()))?;
+        let entries: Vec<Entry> = serde_json::from_str(&raw)
+            .map_err(|e| format!("allow file {}: {e}", path.display()))?;
         for e in &entries {
             if e.reason.trim().is_empty() {
                 return Err(format!("allow entry without reason: {}", e.label()));
             }
             if e.pattern.is_empty() && (e.scope.is_empty() || e.scope == "*") {
-                return Err(format!("allow entry that would allow everything: {}", e.label()));
+                return Err(format!(
+                    "allow entry that would allow everything: {}",
+                    e.label()
+                ));
             }
         }
         let used = vec![false; entries.len()];

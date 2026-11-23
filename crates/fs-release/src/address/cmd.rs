@@ -65,7 +65,9 @@ pub fn run(args: &AddressArgs) -> i32 {
 }
 
 fn load_allow(c: &Common) -> Result<Allow, String> {
-    c.allow.as_deref().map_or_else(|| Ok(Allow::none()), Allow::load)
+    c.allow
+        .as_deref()
+        .map_or_else(|| Ok(Allow::none()), Allow::load)
 }
 
 fn replace(c: &Common) -> i32 {
@@ -112,9 +114,15 @@ fn stock(c: &Common, check: bool, all_classes: bool) -> i32 {
         };
         let name = repo_name(d).unwrap_or_default();
         repos.push(name.clone());
-        let kept: Vec<Hit> = hits.into_iter().filter(|h| !allow.allows(&h.repo, &h.path, &h.text)).collect();
+        let kept: Vec<Hit> = hits
+            .into_iter()
+            .filter(|h| !allow.allows(&h.repo, &h.path, &h.text))
+            .collect();
         print_counts(&name, &kept);
-        left.extend(kept.into_iter().filter(|h| !h.ghcr_only() && (all_classes || !h.class.is_cargo())));
+        left.extend(
+            kept.into_iter()
+                .filter(|h| !h.ghcr_only() && (all_classes || !h.class.is_cargo())),
+        );
     }
     let stale = allow.stale(&repos);
     for s in &stale {
@@ -125,9 +133,20 @@ fn stock(c: &Common, check: bool, all_classes: bool) -> i32 {
     }
     if check {
         for h in &left {
-            println!("TREFFER {} {}:{}: {}", h.repo, h.path, h.line, h.text.trim());
+            println!(
+                "TREFFER {} {}:{}: {}",
+                h.repo,
+                h.path,
+                h.line,
+                h.text.trim()
+            );
         }
-        println!("{} nachher: {} Treffer ausserhalb allow, {} veraltete allow-Eintraege", verdict(&left, &stale), left.len(), stale.len());
+        println!(
+            "{} nachher: {} Treffer ausserhalb allow, {} veraltete allow-Eintraege",
+            verdict(&left, &stale),
+            left.len(),
+            stale.len()
+        );
     }
     i32::from(!stale.is_empty() || (check && !left.is_empty()))
 }

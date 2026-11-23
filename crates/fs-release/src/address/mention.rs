@@ -83,7 +83,10 @@ fn judge(line: &str, low: &str, start: usize, end: usize, owner: &str) -> Option
     let after = &low[end..];
     let marked = host || ghcr || key;
     let slash_form = after.strip_prefix('/').is_some_and(|rest| {
-        marked || rest.chars().next().is_some_and(|c| c.is_ascii_alphanumeric() || matches!(c, '{' | '$' | '<' | '*' | '%'))
+        marked
+            || rest.chars().next().is_some_and(|c| {
+                c.is_ascii_alphanumeric() || matches!(c, '{' | '$' | '<' | '*' | '%')
+            })
     });
     let bare_end = !slash_form && !bare_blocked(after);
     let kind = if ghcr {
@@ -121,14 +124,20 @@ fn key_before(before: &str) -> bool {
     let s = before.trim_end_matches(quote);
     let s = s.strip_suffix(['=', ':']).unwrap_or(s);
     let s = s.trim_end_matches(quote);
-    let word: &str = s.rsplit(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))).next().unwrap_or("");
+    let word: &str = s
+        .rsplit(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '-')))
+        .next()
+        .unwrap_or("");
     KEYS.contains(&word)
 }
 
 /// The line with every [`Kind::Safe`] mention swapped to `new`; `None` when nothing changed.
 #[must_use]
 pub fn swap_safe(line: &str, owner: &str, new: &str) -> Option<String> {
-    let safe: Vec<Mention> = mentions(line, owner).into_iter().filter(|m| m.kind == Kind::Safe).collect();
+    let safe: Vec<Mention> = mentions(line, owner)
+        .into_iter()
+        .filter(|m| m.kind == Kind::Safe)
+        .collect();
     if safe.is_empty() {
         return None;
     }
