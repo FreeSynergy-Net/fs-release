@@ -45,11 +45,11 @@ if grep -q '^  step licence error bash "\$here/licence-gate.sh" "\$root"$' "$mut
 real() { # <mech> <fixture name>: the gate on a fixture copy; output in $tmp/r.txt
   fixture "$2" "$tmp/fx"; env ${FS_CARGO_DENY:+FS_CARGO_DENY="$FS_CARGO_DENY"} bash "$1/scripts/licence-gate.sh" "$tmp/fx" >"$tmp/r.txt" 2>&1
 }
-agpl_red() { real "$1" agpl; local r=$?; [ "$r" -eq 1 ] && grep -q 'AGPL-3.0-only' "$tmp/r.txt"; }
+agpl_red() { real "$1" agpl; local r=$?; agpl_rc=$r; [ "$r" -eq 1 ] && grep -q 'AGPL-3.0-only' "$tmp/r.txt"; }
 ok_green() { real "$1" ok; [ $? -eq 0 ]; }
 mkmech "$tmp/real"
 chk "REAL cargo-deny $version: dependency under AGPL-3.0-only is RED (rc 1, the licence is named)" agpl_red "$tmp/real"
-cp "$tmp/r.txt" "$tmp/agpl.txt"
+cp "$tmp/r.txt" "$tmp/agpl.txt"; agpl_keep=$agpl_rc
 chk "REAL cargo-deny $version: dependency under MIT OR Apache-2.0 is green (rc 0)" ok_green "$tmp/real"
 cp "$tmp/r.txt" "$tmp/ok.txt"
 # mutant: AGPL on the allow list -> the check agpl_red must turn red (the test sees the loosened policy)
@@ -58,6 +58,6 @@ if agpl_red "$tmp/mut-allow"; then bad "mutant: allow list with AGPL survived"; 
 # mutant: the call without `licenses` -> the AGPL fixture is no longer red
 mkmech "$tmp/mut-call"; sed -i 's/check licenses bans sources/check bans sources/' "$tmp/mut-call/scripts/licence-gate.sh"
 if agpl_red "$tmp/mut-call"; then bad "mutant: call without licenses survived"; else ok "mutant: call without licenses is caught"; fi
-echo "---"; echo "agpl output (first lines):"; head -n 12 "$tmp/agpl.txt"
+echo "---"; echo "AGPL fixture, output of the gate (rc $agpl_keep):"; head -n 60 "$tmp/agpl.txt"
 if [ "$fails" -ne 0 ]; then echo "test_licence_gate: $fails FAILED"; exit 1; fi
 echo "test_licence_gate: all ok"

@@ -37,6 +37,8 @@ allow-wildcard-paths = true
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# the allowed sources are a list of what MAY appear; a repo that uses only crates.io must not get a warning for the others
+unused-allowed-source = "allow"
 # The sources our locks may name (checked against the locks of fs-types and fs-people): crates.io (git index form of older locks and the sparse form)
 # and our own registry `freesynergy` (K-2/K-3, Git index of fs-crates).
 allow-registry = [
