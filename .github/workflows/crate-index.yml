@@ -1,0 +1,49 @@
+# Reusable job `crate-index` (ADR 0093 follow-up, ENTSCHEID-kaskade B2/K-2): at a TAG run of a library, put its crate into the git index registry `freesynergy`
+# (repo FreeSynergy-Net/fs-crates) so that consumers can write `{ version = "~0.0.N", registry = "freesynergy" }`. Only this job writes the registry, never by hand.
+# Threat model (docs/crate-index.md): protects against MISTAKES (wrong ref, wrong version, a changed .crate), NOT against someone who can change workflow, toolchain or scripts;
+# whoever can write to the registry repo can swap crates, because the checksum lies in the same repo.
+# Caller: `jobs: crate-index: { needs: <the release job>, uses: FreeSynergy-Net/fs-release/.github/workflows/crate-index.yml@<sha>, with: { package: fs-types }, secrets: { FS_CRATES_TOKEN: ${{ secrets.FS_CRATES_TOKEN }} } }`
+name: crate-index
+on:
+  workflow_call:
+    inputs:
+      package: { type: string, required: true, description: "Cargo package (-p) to publish into the registry" }
+      working-directory: { type: string, default: ".", description: "Directory of the Cargo workspace" }
+      semver-checks: { type: boolean, default: false, description: "Interface for the gate BEFORE the index entry (cargo-semver-checks, K-4 wires it for fs-types); true is refused until it is wired" }
+    secrets:
+      FS_CRATES_TOKEN: { required: true, description: "Token with contents write on FreeSynergy-Net/fs-crates only" }
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  crate-index:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # the tag commit must be on main (as for every release)
+      - uses: FreeSynergy-Net/fs-release/actions/tag-on-main@78992eea0128a9871117ae0af81ae68cb275d61f
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@78992eea0128a9871117ae0af81ae68cb275d61f
+        with:
+          toolchain: pinned
+          working-directory: ${{ inputs.working-directory }}
+      # gate BEFORE the index entry: breaking change without a version step. The call itself is made by K-4 (fs-types); here only the place and the rule "red = no entry".
+      - name: semver gate (interface, not wired yet)
+        if: inputs.semver-checks
+        run: |
+          echo "::error::crate-index: semver-checks is not wired yet (K-4 builds the fs-types part); set semver-checks: false"
+          exit 1
+      - uses: FreeSynergy-Net/fs-release/actions/crate-index@78992eea0128a9871117ae0af81ae68cb275d61f
+        with:
+          package: ${{ inputs.package }}
+          working-directory: ${{ inputs.working-directory }}
+          token: ${{ secrets.FS_CRATES_TOKEN }}
