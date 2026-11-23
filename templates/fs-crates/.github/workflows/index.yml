@@ -20,9 +20,6 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
-  # cargo-semver-checks release v0.51.0, x86_64-unknown-linux-musl; sha256 as published by the GitHub release (same as fs-types semver.yml)
-  SEMVER_CHECKS_VERSION: "0.51.0"
-  SEMVER_CHECKS_SHA256: "396c8508d973c83de52660943a057e971b586f7511c3ba695762373452b43d5b"
 
 jobs:
   package:
@@ -37,22 +34,12 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: FreeSynergy-Net/fs-release
-          ref: FS_RELEASE_PIN
-          path: .fs-release
-          persist-credentials: false
       - uses: FreeSynergy-Net/fs-release/actions/setup-rust@FS_RELEASE_PIN
-      - name: build the tool and install cargo-semver-checks (pinned, sha256 checked)
-        run: |
-          set -euo pipefail
-          cargo build --locked --release --manifest-path .fs-release/Cargo.toml -p fs-crate-index --target-dir "$RUNNER_TEMP/ci-target"
-          f=cargo-semver-checks-x86_64-unknown-linux-musl.tar.gz
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$f" "https://github.com/obi1kenobi/cargo-semver-checks/releases/download/v${SEMVER_CHECKS_VERSION}/$f"
-          echo "$SEMVER_CHECKS_SHA256  $RUNNER_TEMP/$f" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/bin" && tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP/bin"
-          mkdir -p "$RUNNER_TEMP/handover" && cp "$RUNNER_TEMP/ci-target/release/fs-crate-index" "$RUNNER_TEMP/handover/"
+      # ONE implementation of the semver gate and ONE place of the pinned cargo-semver-checks: the action (without `package` it only installs and builds the tool)
+      - id: tools
+        uses: FreeSynergy-Net/fs-release/actions/semver-baseline@FS_RELEASE_PIN
+      - name: hand-over directory with the tool
+        run: mkdir -p "$RUNNER_TEMP/handover" && cp "${{ steps.tools.outputs.tool }}" "$RUNNER_TEMP/handover/fs-crate-index"
       # reads the allow list, `git ls-remote --tags` of every repo on it, checks (annotated tag, tag commit on main of the source repo, tag = package version,
       # not in the index yet, tag not moved), `cargo package --locked`, semver gate with --baseline-root on the newest .crate of THIS checkout; writes plan.txt and the .crate files
       - id: scan
@@ -61,7 +48,7 @@ jobs:
           set -euo pipefail
           rc=0
           "$RUNNER_TEMP/handover/fs-crate-index" scan --allow allowed-sources.txt --registry-dir . --work-dir "$RUNNER_TEMP/work" --out "$RUNNER_TEMP/handover/out" \
-            --semver-checks "$RUNNER_TEMP/bin/cargo-semver-checks" | tee "$RUNNER_TEMP/scan.log" || rc=$?
+            --semver-checks "${{ steps.tools.outputs.semver-checks }}" | tee "$RUNNER_TEMP/scan.log" || rc=$?
           grep '^entries=' "$RUNNER_TEMP/scan.log" >> "$GITHUB_OUTPUT" || true
           exit "$rc"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
