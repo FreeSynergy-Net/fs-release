@@ -5,13 +5,13 @@
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{bail, ensure, Context, Result};
 use semver::Version;
 
 use crate::allow::{list_tags, parse_allow, url_of, Source, TagInfo};
 use crate::publish::{git_out, package};
+use crate::semver::{gate, work_for, SemverArgs};
 
 /// The arguments of `scan`.
 #[derive(clap::Args, Clone)]
@@ -162,7 +162,15 @@ fn scan_tag(
         if !pending.contains(p) {
             continue;
         }
-        semver_gate(a, &dir, p, &t.version, rep)?;
+        let o = gate(&SemverArgs {
+            registry: a.registry_dir.to_string_lossy().into_owned(),
+            package: p.clone(),
+            source: dir.clone(),
+            version: Some(t.version.clone()),
+            semver_checks: a.semver_checks.clone(),
+            work_dir: work_for(&a.work_dir, &format!("{p}-{}", t.version)),
+        })?;
+        rep.notes.push(o.line(p));
         let fname = f.file_name().unwrap().to_string_lossy().into_owned();
         std::fs::copy(f, a.out.join(&fname))?;
         let _ = writeln!(
@@ -172,71 +180,5 @@ fn scan_tag(
         );
         rep.entries += 1;
     }
-    Ok(())
-}
-
-/// Gate BEFORE the entry: breaking change without a version step. Baseline = the newest older `.crate` in the registry checkout itself.
-fn semver_gate(
-    a: &ScanArgs,
-    src: &Path,
-    pkg: &str,
-    version: &Version,
-    rep: &mut ScanReport,
-) -> Result<()> {
-    let older = reg_index::list(&a.registry_dir, pkg, None)?
-        .into_iter()
-        .filter(|p| !p.yanked && &p.vers < version)
-        .map(|p| p.vers)
-        .max();
-    let Some(base) = older else {
-        rep.notes.push(format!(
-            "semver {pkg} {version}: first version in the registry, no baseline"
-        ));
-        return Ok(());
-    };
-    let Some(bin) = &a.semver_checks else {
-        rep.notes.push(format!(
-            "semver {pkg} {version}: NOT RUN (no --semver-checks)"
-        ));
-        return Ok(());
-    };
-    let krate = a
-        .registry_dir
-        .join(format!("crates/{pkg}/{pkg}-{base}.crate"));
-    let into = a.work_dir.join(format!("baseline-{pkg}-{base}"));
-    std::fs::create_dir_all(&into)?;
-    let tar = Command::new("tar")
-        .arg("-xzf")
-        .arg(&krate)
-        .arg("-C")
-        .arg(&into)
-        .output()
-        .context("tar")?;
-    ensure!(
-        tar.status.success(),
-        "cannot unpack the baseline {}",
-        krate.display()
-    );
-    let out = Command::new(bin)
-        .args([
-            "semver-checks",
-            "check-release",
-            "--release-type",
-            "minor",
-            "--baseline-root",
-        ])
-        .arg(into.join(format!("{pkg}-{base}")))
-        .args(["-p", pkg])
-        .current_dir(src)
-        .output()
-        .context("cannot start cargo-semver-checks")?;
-    ensure!(
-        out.status.success(),
-        "semver gate RED for {pkg} {version} against {base}:\n{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    rep.notes
-        .push(format!("semver {pkg} {version} against {base}: green"));
     Ok(())
 }

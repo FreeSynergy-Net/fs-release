@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use crate::apply::{apply, ApplyArgs};
 use crate::publish::{publish, PublishArgs};
 use crate::scan::{scan, ScanArgs};
+use crate::semver::{gate, SemverArgs};
 use crate::wait::{wait, WaitArgs};
 
 #[derive(Parser)]
@@ -26,6 +27,8 @@ enum Sub {
     Apply(ApplyArgs),
     /// Enter ONE packaged `.crate` (used by `apply`; also the unit of the tests).
     Publish(PublishArgs),
+    /// The semver gate alone (the one implementation: baseline = newest registry version; first version = green, registry not reachable = RED).
+    Semver(SemverArgs),
     /// Wait for a version to show up in the index; after the time a clear blocker text.
     Wait(WaitArgs),
 }
@@ -58,6 +61,15 @@ pub fn main_with(args: Vec<String>) -> i32 {
         Sub::Apply(a) => report("crate-index apply", apply(&a), |v| {
             format!("{} entered\n{}", v.len(), v.join("\n"))
         }),
+        Sub::Semver(a) => report(
+            "crate-index semver",
+            if a.semver_checks.is_none() {
+                Err(anyhow::anyhow!("--semver-checks is required here"))
+            } else {
+                gate(&a)
+            },
+            |o| o.line(&a.package),
+        ),
         Sub::Wait(a) => report("crate-index wait", wait(&a), |()| "in the index".into()),
         Sub::Scan(a) => match scan(&a) {
             Ok(r) => {
