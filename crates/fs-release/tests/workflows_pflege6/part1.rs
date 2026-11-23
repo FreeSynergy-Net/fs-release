@@ -88,7 +88,7 @@ pub(super) fn decision_flow(text: &str) -> bool {
         && ask.contains("actor: human")
         && ask.contains("gate: human")
         && ask.contains("name: user-decision")
-        && ask.contains("if: ${ $context.verdict.open }")
+        && ask.contains("if: ${ $context.verdict.open or $context.cut.open }")
         && step_body(text, "record").contains("actor: ai")
 }
 
@@ -109,9 +109,10 @@ fn counter_asking_first_or_a_search_by_the_agent_is_caught() {
         "actor: ai\n        freesynergy.net:actor-type: Application",
         1
     )));
-    assert!(!decision_flow(
-        &text.replace("if: ${ $context.verdict.open }", "")
-    ));
+    assert!(!decision_flow(&text.replace(
+        "if: ${ $context.verdict.open or $context.cut.open }",
+        ""
+    )));
     let decision = read("user-decision");
     assert_ne!(
         step_names(&swapped(&decision, "adr-search", "question"))[0],
