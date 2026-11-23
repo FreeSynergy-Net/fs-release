@@ -57,7 +57,26 @@ fn no_line_break_can_get_into_the_repo_file() {
         .lines()
         .filter(|l| l.starts_with("baseurl="))
         .count();
-    assert_eq!(n, 2);
+    assert_eq!(n, 1);
+}
+
+#[test]
+fn the_repo_file_has_exactly_one_section_and_nothing_switched_off() {
+    let repo = repo_file("https://pages.invalid/Repository");
+    let sections: Vec<&str> = repo.lines().filter(|l| l.starts_with('[')).collect();
+    assert_eq!(sections, ["[freesynergy]"], "{repo}");
+    assert!(
+        !repo.contains("enabled=0") && !repo.contains("nightly"),
+        "{repo}"
+    );
+    for line in ["enabled=1", "gpgcheck=1", "repo_gpgcheck=1"] {
+        assert_eq!(
+            repo.lines().filter(|l| *l == line).count(),
+            1,
+            "{line}: {repo}"
+        );
+    }
+    assert!(!repo.contains("skip_if_unavailable"), "{repo}");
 }
 
 #[test]

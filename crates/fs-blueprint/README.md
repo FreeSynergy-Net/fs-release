@@ -136,4 +136,4 @@ Texts:
 
 ## Packages (rpm)
 
-`fs-blueprint package rpm BAUPLAN` makes the noarch RPM `fs-<name>` of a program; `fs-blueprint package release --key F --fingerprint HEX40 --pages-url https://...` makes `freesynergy-release` (dnf source with stable on and nightly off, plus the public key). Nothing is signed here: signing is the CI. The version of `freesynergy-release` follows the fs-blueprint version; when the key or the URL changes, `--pkg-version` MUST be raised, otherwise dnf sees no update. The rpm tests run on Linux only and need `rpm` and `cpio` (a missing tool is a red test).
+`fs-blueprint package rpm BAUPLAN` makes the noarch RPM `fs-<name>` of a program; `fs-blueprint package release --key F --fingerprint HEX40 --pages-url https://...` makes `freesynergy-release` (dnf source with ONE channel `[freesynergy]` that holds pre-releases too, plus the public key). Nothing is signed here: signing is the CI. The version of `freesynergy-release` follows the fs-blueprint version; when the key or the URL changes, `--pkg-version` MUST be raised, otherwise dnf sees no update. The rpm tests run on Linux only and need `rpm` and `cpio` (a missing tool is a red test).
