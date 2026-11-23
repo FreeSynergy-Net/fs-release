@@ -1,0 +1,333 @@
+# lib-umzug: a library or contract moves out of a program repo into its own standalone repo (or into an existing library repo), so that all programs use the SAME crate and no copy stays in the program repo. The code MOVES (byte-equal import, then mechanical rename), it is not rewritten.
+# Order: `Workflow lib-umzug, step <id>, parameters decision, source_repo, source_ref, source_paths, target_repo, target_new, crates (old -> new), layer_rule, users, keep, copy_repos, tag, workdir` (docs/prompt-template.md).
+# Inputs: source (repo, ref/SHA, paths of the crates), target (new or existing repo, crate names old -> new), layer_rule (true = the crate may have no fs dependencies), users (repos that pin it afterwards), keep ({pattern, grund}: old names that stay on purpose).
+# Rules: no program becomes a program; data is not rescued (no migration); the worker never pushes, tags or merges (the helper pushes the branch, the person the main/tag); a licence is taken from the source; a new GitHub repo only after the name gate (ADR 0080).
+# Steps marked "(Spezifikation, Werkzeug folgt)" have no script yet (the @fs calls are specification, see README.md); they are listed as a gap in the report. No Python, no shell logic is added by this flow. Not this flow: new libraries without a source (nothing to import), Modul-Dienste (`modul-neu`), program rename (`umbenennen`), pin lifts (`lift`, `geruest-lift`, `pin-kaskade`).
+# Practice: .scratch/woche-11-23/texts/BERICHT-T5.md (fs-document: commits import byte-equal / rename / workspace / clippy / fmt). FS profile: see README.md.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: lib-umzug
+  version: 0.0.17
+  title: Move a library or contract into its own repo - import, rename, check, repo, CI, review, tag, users pin, delete the copy
+do:
+  - entscheid:
+      call: decision-ref:0.0.17@fs
+      with:
+        decision: ${ .input.decision }
+        source_repo: ${ .input.source_repo }
+        crates: ${ .input.crates }
+      export:
+        as: '${ $context + { entscheid: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The decision for exactly this move (workflow `entscheidung`, file under .scratch) is named with path and risk class (HOCH | NORMAL); without it nothing starts. The rules: the code MOVES and is NOT rewritten; no program becomes a program; data is not rescued (no migration); the worker never pushes, tags or merges. (Spezifikation, Werkzeug folgt)"
+  - entscheid-weiter:
+      switch:
+        - ohne:
+            when: '${ ($context.entscheid.found // false) != true }'
+            then: eskalation
+        - da:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - no decision file means no start, the flow ends in `eskalation` (person); a missing result is not a decision."
+  - vorhanden:
+      call: lib-exists:0.0.17@fs
+      with:
+        target_repo: ${ .input.target_repo }
+        crates: ${ .input.crates }
+        source_repo: ${ .input.source_repo }
+      export:
+        as: '${ $context + { vorhanden: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Looks first (existing first): does the target repo or a crate of this name already exist (local repos, `scripts/repos-abgleichen` state, GitHub), is a copy already somewhere (`git grep` of the crate names over all repos incl. unreviewed branches and .scratch), what do the ADRs say (`scripts/adr-search` for the names, ADR 0080 retired names, ADR 0087 generic names), are the names free on GitHub AND crates.io - each with the proof line (command and answer), not from memory. A name on the retired list or taken by others is red. (Spezifikation, Werkzeug folgt; `adr-search` is a real script)"
+  - vorhanden-weiter:
+      switch:
+        - rot:
+            when: '${ $context.vorhanden.red == true }'
+            then: eskalation
+        - ohne-ergebnis:
+            when: '${ $context.vorhanden.red == null }'
+            then: eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only a green, proven result goes on; red or missing goes to `eskalation`."
+  - import:
+      call: lib-import:0.0.17@fs
+      with:
+        source_repo: ${ .input.source_repo }
+        source_ref: ${ .input.source_ref }
+        source_paths: ${ .input.source_paths }
+        target_repo: ${ .input.target_repo }
+        crates: ${ .input.crates }
+      export:
+        as: '${ $context + { import: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: lib-umzug.import
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The worker copies the crate directories BYTE-EQUAL from the source ref into the new place (target branch `unreviewed/<name>`, own clone in its work area, never /srv/FreeSynergy/fs-*) and commits ONLY that: the commit message names source repo, ref, the full 40-character SHA and the paths; `git diff --no-index` of source and target is empty. No rewriting, no improving in this commit. Local commit only, no push."
+  - abhaengigkeiten:
+      call: lib-deps:0.0.17@fs
+      with:
+        target_repo: ${ .input.target_repo }
+        crates: ${ .input.crates }
+        layer_rule: ${ .input.layer_rule }
+      export:
+        as: '${ $context + { deps: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Lists the dependencies of each moved crate (`cargo metadata`): every dependency on another fs-* crate with its source. If the input `layer_rule` is true (the crate must have no fs dependencies, e.g. a base layer) and one is found: STOP to `eskalation` - the flow does NOT untangle the crate (that is a new task with its own decision). (Spezifikation, Werkzeug folgt)"
+  - abhaengigkeiten-weiter:
+      switch:
+        - verletzt:
+            when: '${ $context.deps.violation == true }'
+            then: eskalation
+        - ohne-ergebnis:
+            when: '${ $context.deps.violation == null }'
+            then: eskalation
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a violated layer rule or a missing result stops at once (`eskalation`)."
+  - rename:
+      call: lib-rename:0.0.17@fs
+      with:
+        target_repo: ${ .input.target_repo }
+        crates: ${ .input.crates }
+        keep: ${ .input.keep }
+      export:
+        as: '${ $context + { rename: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: lib-umzug.rename
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Mechanical rename old -> new crate names (word boundary, also `_` spelling, Cargo.toml, `use` paths, docs, CI files), own commit. The `keep` list ({pattern, grund}) is checked: a `keep` entry without a single hit is RED (the list is wrong or stale), an old name outside `keep` that is still found is RED. Reuse the rename scaffold of `scripts/umbenennen` where it fits (`--keep`). (Spezifikation, Werkzeug folgt for the move case)"
+  - workspace:
+      call: lib-workspace:0.0.17@fs
+      with:
+        target_repo: ${ .input.target_repo }
+        crates: ${ .input.crates }
+        ci_org: ${ .input.ci_org }
+        ci_tag: ${ .input.ci_tag }
+      export:
+        as: '${ $context + { workspace: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: lib-umzug.workspace
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Workspace of the new repo: crate metadata, licence AS IN THE SOURCE, the AI note \"Built with help from Claude (AI)\", README (de and en), `deny.toml`, the caller of the reusable CI workflows including the Windows job. Org and tag (or SHA) of the called workflows are PROVEN with `git ls-remote --tags <org>/fs-release` (command and answer in the report) - no assumption, no remembering. Commits split: workspace, then clippy/fmt fixes, each its own."
+  - gates-lokal:
+      call: repo-gates:0.0.17@fs
+      with:
+        target_repo: ${ .input.target_repo }
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Rebuilds locally the WHOLE test step of the CI (read it from `scripts/gates.sh`: `cargo test --workspace --all-features --locked --no-fail-fast`, plus clippy, fmt, deny, rust-rules) - never only own filtered tests (a filtered run let a red CI test through). Where a comparison exists, the proof \"output before = output after\" (same tests, same results as in the source repo). Builds through the build slot with an own target dir. The local toolchain may differ from the CI one (clippy): decisive is the branch CI at the exact head (step `zweig-ci`). Result with rc per command."
+  - gates-weiter:
+      switch:
+        - rot:
+            when: '${ $context.gates.red != false }'
+            then: rename
+        - gruen:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red (or no result) goes back to `rename`/`workspace` fixes, then again; the loop ends in `eskalation` after the round counter of `agent-run` (third red). Green goes on."
+  - namens-gate:
+      set:
+        todo: lib-umzug-namens-freigabe
+      if: ${ .input.target_new }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Only for a NEW repo name: the user says the name explicitly (names given out are never free again, ADR 0080). For a move into an EXISTING repo this step is skipped (`if` target_new). Without the user word no repo is created."
+  - repo:
+      call: repo-create-or-branch:0.0.17@fs
+      with:
+        target_repo: ${ .input.target_repo }
+        target_new: ${ .input.target_new }
+      export:
+        as: '${ $context + { repo: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: lib-umzug.repo
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "ONLY a helper (never the worker): creates the new GitHub repo (after the name gate) or opens the branch in the existing repo, and pushes the branch `unreviewed/...` - the push is the helper's, the worker never pushes. Output: repo URL and the pushed head (full SHA). (Spezifikation, Werkzeug folgt)"
+  - zweig-ci:
+      call: branch-ci:0.0.17@fs
+      with:
+        target_repo: ${ .input.target_repo }
+        head: ${ .input.head }
+      export:
+        as: '${ $context + { ci: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Reads the branch CI of ALL workflows for exactly this head, also Windows (`scripts/check_job_status.py`, read only); red, hung or unknown is not green. A green result for an older head does not count. The local toolchain proves nothing against the CI toolchain."
+  - ci-weiter:
+      switch:
+        - gruen:
+            when: '${ $context.ci.status == "green" }'
+            then: continue
+        - sonst:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ONLY `status == green` goes on; everything else (red, hung, running, unknown) goes to `eskalation` (rule ZWEIG-CI)."
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.17
+        input:
+          repo: ${ .input.target_repo }
+          branch: ${ .input.branch }
+          head: ${ .input.head }
+          scope: ${ $context.entscheid.risk_class }
+      export:
+        as: '${ $context + { review: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: lib-umzug.review
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Review by the risk class of the decision (HOCH: Opus with the full test; NORMAL: short). Rules: the verdict names the FULL 40-character SHA and the LAST line of the file is `VERDICT: JA am <sha>` (or NEIN); a verdict without a file does not exist. A worker ends only when ALL its own background runs (also a review it started) are finished and the verdict stands in a file."
+  - review-weiter:
+      switch:
+        - ja:
+            when: '${ $context.review.verdict == "JA" and $context.review.sha == $context.ci.head }'
+            then: continue
+        - sonst:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only a JA for exactly the head of the green CI goes on; NEIN, a condition, a missing file or another SHA stops."
+  - ff-tag:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: ff-und-tag
+          version: 0.0.17
+        input:
+          repo: ${ .input.target_repo }
+          branch: ${ .input.branch }
+          head: ${ .input.head }
+          tag: ${ .input.tag }
+      export:
+        as: '${ $context + { tag: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "ff to main and the FIRST tag through `ff-und-tag`, the person's; the tag only in the bundle (CLAUDE.md 4b, one Opus review per bundle); before the bundle the users pin `[patch]` on the local head. A release is built only by the CI fresh from the tag, never a local binary."
+  - nutzer-umstellen:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: pin-kaskade
+          version: 0.0.17
+        input:
+          ausloeser-tag: ${ .input.tag }
+          glieder: ${ .input.users }
+          workdir: ${ .input.workdir }
+      export:
+        as: '${ $context + { nutzer: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Every user repo (input `users`) pins the new crate and renames its imports (`rename` rules, `keep` respected), through `pin-kaskade`, from the bottom up (the order comes from the DAG, not from a list); each one with its own branch CI and review as in that flow. The old copy stays until this step is green."
+  - kopie-loeschen:
+      call: lib-copy-delete:0.0.17@fs
+      with:
+        source_repo: ${ .input.source_repo }
+        source_paths: ${ .input.source_paths }
+        copy_repos: ${ .input.copy_repos }
+      export:
+        as: '${ $context + { loeschen: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: lib-umzug.kopie-loeschen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "ONLY after the green pin: deletes the old crate in the source repo and in EVERY repo that holds a copy (e.g. duplicate crates in two repos) - on a branch, the deletion is code (git rm), no data and no repo deleted. Check: the same type/trait comes from ONE source only (`cargo tree -d`, lock check `lock-check`, a grep over all Cargo.lock); a second source is RED. (Spezifikation, Werkzeug folgt)"
+  - nachher:
+      call: lib-after:0.0.17@fs
+      with:
+        source_repo: ${ .input.source_repo }
+        crates: ${ .input.crates }
+        copy_repos: ${ .input.copy_repos }
+        keep: ${ .input.keep }
+      export:
+        as: '${ $context + { after: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The machine checks: no copy is left anywhere (`git grep` over all repos), old branches of the move are marked \"never merge\", `keep` entries still justified, the checklist `.scratch/FEATURES-OFFEN.md` is pulled along (the EXISTING line is ticked `[ ]` -> `[x]` with a date, no new line). Red goes back to the step it names. (Spezifikation, Werkzeug folgt)"
+  - eskalation:
+      set:
+        todo: lib-umzug-eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red, missing or stopped (no decision, taken name, violated layer rule, red CI, NO verdict): the person decides. Nothing was pushed by the worker, no repo created, nothing deleted. The report names the step and the last red lines; the workflow is improved, then the run starts again (CLAUDE.md 2). This flow ends."

@@ -38,6 +38,7 @@ pub const FILES: [&str; 61] = [
     "icon-round",
     "katalog",
     "koordinator-runde",
+    "lib-umzug",
     "lift",
     "lift-v1plus",
     "menschen-aufnahme",
