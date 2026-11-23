@@ -25,8 +25,60 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  # N1d: the identity check is its OWN job, before everything of the caller: only the checkout and the check, no input of the caller except runs-on, no setup-rust, no rust-cache, no apt, no cargo,
+  # so no code of the caller (build.rs, a rust-toolchain.toml, a package) has run when it looks. The job `check` needs it. Threat model: docs/usage.md "Threat model of the gates".
+  # The step cannot call scripts/identity-check (a reusable workflow cannot call a script of fs-release): its run block is a COPY of the body of that script, and
+  # scripts/test_check_job_identity.sh fails when the copy differs. The checkout takes the head commit of a pull request (the merge commit of GitHub has the committer GitHub <noreply@github.com>).
+  identity:
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Identity (author and committer of origin/main..HEAD)
+        shell: bash {0}
+        run: |
+          set -uo pipefail
+          root="${1:-.}"
+          default_id=support@freesynergy.net
+          # CI case: GITHUB_ACTIONS (protected in Actions) or CI (settable by a caller through test-env) set and not "false", any case
+          ci=0; for v in "${CI:-}" "${GITHUB_ACTIONS:-}"; do case "${v,,}" in ""|false|0) ;; *) ci=1 ;; esac; done
+          if [ "$ci" = 1 ]; then
+            for v in GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_INDEX_FILE GIT_COMMON_DIR GIT_NAMESPACE; do
+              if [ -n "${!v:-}" ]; then echo "identity FAILED: in CI $v must not be set (it would point git at another repo)" >&2; exit 1; fi
+            done
+            if { [ -n "${FS_IDENTITY_BASE:-}" ] && [ "$FS_IDENTITY_BASE" != origin/main ]; } || { [ -n "${FS_ALLOWED_IDENTITY:-}" ] && [ "$FS_ALLOWED_IDENTITY" != "$default_id" ]; }; then
+              echo "identity FAILED: in CI (CI or GITHUB_ACTIONS set) FS_IDENTITY_BASE and FS_ALLOWED_IDENTITY from the environment must not loosen the gate (only origin/main and the fixed identity count)" >&2
+              exit 1
+            fi
+            allowed="$default_id"
+          else
+            allowed="${FS_ALLOWED_IDENTITY:-$default_id}"
+          fi
+          cd "$root" || exit 2
+          base="${2:-$(git config --local --get freesynergy.identity-test-base 2>/dev/null)}"
+          if [ -z "$base" ]; then
+            if [ "$ci" = 1 ]; then base=origin/main; else base="${FS_IDENTITY_BASE:-origin/main}"; fi
+          fi
+          # --no-replace-objects: a local `git replace` must not show another commit than the real one
+          g() { git --no-replace-objects "$@"; }
+          g rev-parse --verify -q "$base^{commit}" >/dev/null || { echo "identity FAILED: base $base not found (fetch it, never skip)" >&2; exit 2; }
+          # Fields are separated by TAB (%x09), never by blank: an address with a blank must not shift the fields. A TAB or line break inside an address changes the line or field count: red as well.
+          hits="$(g log --format='%h%x09%ae%x09%ce' "$base..HEAD")" || exit 2
+          n="$(g rev-list --count "$base..HEAD")" || exit 2
+          bad="$(awk -F'\t' -v ok="$allowed" 'NF != 3 || $2 != ok || $3 != ok { print $1 }' <<<"$hits")"
+          [ "$(grep -c . <<<"$hits")" -eq "$n" ] || bad="$bad count-mismatch"
+          if [ -n "$bad" ]; then
+            echo "identity FAILED: commits with author or committer other than FS_ALLOWED_IDENTITY: $(tr '\n' ' ' <<<"$bad")" >&2
+            echo "rewrite the branch as a NEW branch -rN with an equal tree (workflow branch-neu-schreiben), never main or a public tag" >&2
+            exit 1
+          fi
+          echo "identity ok: $(grep -c . <<<"$hits") commit(s) in $base..HEAD, author and committer = FS_ALLOWED_IDENTITY"
   check:
     runs-on: ${{ inputs.runs-on }}
+    needs: identity
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -35,6 +87,24 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # the identity gate (scripts/identity-check) reads origin/main..HEAD
+      # N1d, way 2: the words of apt-packages go to `apt-get install` unquoted; ALLOWLIST (package names only, no option, no path, no = or /). The block is a copy of the body of
+      # scripts/check-apt-packages; scripts/test_check_apt_packages.sh runs THIS block and fails when the copy differs
+      - name: Package names (allowlist)
+        if: inputs.apt-packages != ''
+        env:
+          PACKAGES: ${{ inputs.apt-packages }}
+        run: |
+          export LC_ALL=C
+          set -f
+          n=0; bad=""
+          for word in $PACKAGES; do
+            n=$((n + 1))
+            if ! [[ "$word" =~ ^[a-z0-9][a-z0-9+.-]*$ ]]; then bad="$bad $n"; fi
+          done
+          if [ -n "$bad" ]; then
+            echo "::error::apt-packages refused (word(s)$bad): every word must be a package name (lower case letters, digits, + . -, starting with a letter or digit); no options, no paths, no = or /"
+            exit 1
+          fi
       - name: System packages
         if: inputs.apt-packages != '' || inputs.software-gpu
         env:

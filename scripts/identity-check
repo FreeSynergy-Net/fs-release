@@ -5,6 +5,7 @@
 # CI case (CI or GITHUB_ACTIONS set and not false; GIT_DIR & co refused): the environment (FS_IDENTITY_BASE other than origin/main, FS_ALLOWED_IDENTITY other than the default) can NOT loosen the gate (a caller can set both through
 # `test-env` into GITHUB_ENV): that is rc 1. Only fixture repos of the self tests may name another base, through the LOCAL repo config key freesynergy.identity-test-base
 # (read with `git config --local`: no environment variable, not GIT_CONFIG_*, can set it); the 2nd argument comes from the calling script, not from the environment.
+# --- body (the identity job of .github/workflows/check.yml runs a COPY of the lines below, byte for byte; scripts/test_check_job_identity.sh fails when they differ) ---
 set -uo pipefail
 root="${1:-.}"
 default_id=support@freesynergy.net

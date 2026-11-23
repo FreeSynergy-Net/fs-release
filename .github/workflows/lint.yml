@@ -146,6 +146,14 @@ jobs:
         id: test-env-step
         continue-on-error: true
         run: bash scripts/test_check_test_env.sh
+      - name: apt-packages step of check.yml self test (allowlist of package names; options, paths, = and / red; block = script; mutants)
+        id: apt-packages-step
+        continue-on-error: true
+        run: bash scripts/test_check_apt_packages.sh
+      - name: identity job of check.yml and toolchain pin of setup-rust self test (isolated job, needs, PR head commit, block = script, RUSTUP_TOOLCHAIN before rust-cache; mutants)
+        id: identity-job
+        continue-on-error: true
+        run: bash scripts/test_check_job_identity.sh
       - name: gates guard self test (lock, snapshot compare, sweep, mutants)
         id: gates-guard-self
         continue-on-error: true
@@ -201,6 +209,8 @@ jobs:
             set-components-tag ${{ steps.set-components-tag.outcome }}
             identity-gate-self ${{ steps.identity-gate-self.outcome }}
             test-env-step ${{ steps.test-env-step.outcome }}
+            apt-packages-step ${{ steps.apt-packages-step.outcome }}
+            identity-job ${{ steps.identity-job.outcome }}
             gates-guard-self ${{ steps.gates-guard-self.outcome }}
             gates-error-list ${{ steps.gates-error-list.outcome }}
             gates-like-ci ${{ steps.gates-like-ci.outcome }}
