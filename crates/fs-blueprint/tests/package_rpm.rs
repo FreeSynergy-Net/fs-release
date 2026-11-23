@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 //! `fs-blueprint package rpm|release`: the made RPM is read back with the system `rpm -qp` (files, requires, arch, desktop entry, no signature).
 use fs_blueprint::cli::run;
 use std::path::{Path, PathBuf};
