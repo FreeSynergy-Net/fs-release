@@ -10,3 +10,4 @@ pub mod cmd;
 pub mod mention;
 pub mod replace;
 pub mod scan;
+pub mod uses_line;
