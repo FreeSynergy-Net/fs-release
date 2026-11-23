@@ -13,7 +13,7 @@ rules_ok() { # <workflow> <example>: 0 when every rule holds
   grep -qE 'runner: \{ type: string, default: windows-2022' "$wf" || return 1
   grep -qF 'runs-on: ${{ inputs.runner }}' "$wf" || return 1
   if grep -qE '[-]latest' <<< "$cwf$cex"; then return 1; fi
-  if grep -qE 'uses:[[:space:]]*FreeSynergy/fs-release/[^ ]*@main' <<< "$cwf$cex"; then return 1; fi
+  if grep -qE 'uses:[[:space:]]*(FreeSynergy-Net|FreeSynergy)/fs-release/[^ ]*@main' <<< "$cwf$cex"; then return 1; fi
   grep -q 'cargo fmt --check' "$wf" || return 1
   grep -qF -- '-D warnings $CLIPPY_EXTRA' "$wf" || return 1
   grep -q -- '--locked' "$wf" || return 1
