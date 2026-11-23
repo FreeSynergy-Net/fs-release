@@ -14,7 +14,8 @@ def _hit(cat, repo, rel, n, line, hay, **more):
 
 
 def _pin(old, line):
-    return f"FreeSynergy/{old}" in line or re.match(rf"\s*{re.escape(old)}(-[a-z0-9]+)*\s*=", line)
+    # the two known owners, exactly; the old one stays until part 2 of the address wave is done
+    return any(f"{o}/{old}" in line for o in ("FreeSynergy-Net", "FreeSynergy")) or re.match(rf"\s*{re.escape(old)}(-[a-z0-9]+)*\s*=", line)
 
 
 def _repo_file(a, repo, rel, text, hits):

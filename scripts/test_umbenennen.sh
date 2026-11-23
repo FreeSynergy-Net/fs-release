@@ -84,7 +84,7 @@ printf '[package]\nname = "fs-wiki-core"\n' >"$v/fs-wiki/crates/fs-text-core/Car
 expect 1 "crate 'fs-wiki-core' still named" "red: old crate name left" -- after $(args "$v")
 printf '[package]\nname = "fs-text-core"\n' >"$v/fs-wiki/crates/fs-text-core/Cargo.toml"
 
-printf 'fs-wiki-core = { git = "https://github.com/FreeSynergy-Net/fs-wiki", tag = "v0.0.10" }\n' >"$v/fs-app/Cargo.toml"
+printf 'fs-wiki-core = { git = "https://github.com/FreeSynergy/fs-wiki", tag = "v0.0.10" }\n' >"$v/fs-app/Cargo.toml"
 # shellcheck disable=SC2046
 expect 1 "pin to the old name" "red: old pin left" -- after $(args "$v")
 printf 'fs-text-core = { git = "https://github.com/FreeSynergy-Net/fs-text", tag = "v0.0.11" }\n' >"$v/fs-app/Cargo.toml"

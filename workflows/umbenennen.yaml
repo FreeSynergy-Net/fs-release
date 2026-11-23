@@ -378,7 +378,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The first release as the new name (next tag of the same count, ADR 0064) runs through release-flow.yaml with its own review; the catalog shows the new entry as an update of the old one (`replaces`); user data is copied, never moved. MANDATORY after the merge: the SHA of `FreeSynergy/fs-release/...@<sha>` in release.yml, ci.yml and check.yml is raised to the merge commit in a second reviewed commit (scripts/pin-refs.sh), see docs/usage.md."
+        freesynergy.net:summary: "The first release as the new name (next tag of the same count, ADR 0064) runs through release-flow.yaml with its own review; the catalog shows the new entry as an update of the old one (`replaces`); user data is copied, never moved. MANDATORY after the merge: the SHA of `<owner>/fs-release/...@<sha>` in release.yml, ci.yml and check.yml is raised to the merge commit in a second reviewed commit (scripts/pin-refs.sh), see docs/usage.md."
   - eskalation:
       set:
         todo: umbenennen-eskalation

@@ -2,7 +2,7 @@
 
 Only in a worktree branch (never main/master), idempotent (names already renamed are a no-op), `keep` lines are skipped, no network.
 Refuses on a dirty tree (it must be committed or clean first, so the rename is one reviewable diff). `--allow` (globs on the file) skips
-those files. Pin URLs (`github.com/FreeSynergy-Net/<old>`) are NOT touched by the normal run: they stay until the GitHub rename has happened;
+those files. Pin URLs (`github.com/<owner>/<old>`) are NOT touched by the normal run: they stay until the GitHub rename has happened;
 the separate switch `--pins` (the flow calls it in the step after `github-umbenennen`) replaces only these URLs.
 The environment variable form (FS_X_ROOT) is NOT replaced (a decision of its own, see `keep`). The lock is renamed with the crates;
 the check `cargo metadata --locked` is the next step of the flow (`lock`), not done here.
@@ -44,7 +44,8 @@ def _move_crates(a, repo, out):
 
 
 def _pin(a):
-    return re.compile(r"github\.com/FreeSynergy-Net/" + re.escape(a.old) + r"(?![\w-])")
+    # the two known owners, exactly; the old one stays until part 2 of the address wave is done
+    return re.compile(r"github\.com/(?:FreeSynergy-Net|FreeSynergy)/" + re.escape(a.old) + r"(?![\w-])")
 
 
 def _dirty(repo):
@@ -83,7 +84,7 @@ def _rewrite(a, repo, keep, out):
             if keep_for(keep, hay) is not None:
                 continue
             if pins_only:
-                new_line = pin.sub("github.com/FreeSynergy-Net/" + a.new, line)
+                new_line = pin.sub(lambda m: m.group(0).rsplit("/", 1)[0] + "/" + a.new, line)
             else:
                 new_line = _transform(a, pin, name, sn, new_snk, line)
             if new_line != line:

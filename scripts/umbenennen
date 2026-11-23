@@ -11,7 +11,7 @@
 `--repos` are checkouts (worktrees) of the repos that may name the old program: the program itself, repos that pin it, CI files.
 `dry-run` only reads and writes the plan. Only files tracked in git count (`git ls-files`); untracked files that name the old name are
 a warning (`untracked`), never a hit. Categories: crates `<old>-*` with their new names (Cargo.toml `name =`), `ci` (.github/), `pins`
-(git URL `FreeSynergy/<old>` or dependency `<old>-*`), `catalog` (entry `id = "<old>"` in `packages.toml`, needs `replaces`),
+(git URL `<owner>/<old>` of the old or the new owner or dependency `<old>-*`), `catalog` (entry `id = "<old>"` in `packages.toml`, needs `replaces`),
 `catalogfiles` (other lines of the catalog), `docs` (`--docs`), `source` (any other tracked text file: constants, FS_<OLD>_ROOT,
 paths, messages, README), `lock` (Cargo.lock), `desktop` (*.desktop, Exec=), `outside` (every fs-* checkout in `--world`, default the
 parent of the first repo, that is not among the given repos: `git grep` on origin/main, read only). A hit is a line with the name

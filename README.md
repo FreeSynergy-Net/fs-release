@@ -15,7 +15,7 @@ Releases are tagged (see the tags of this repo). The workflows are used by the r
 - Packages: Linux (tar.gz, deb, rpm, AppImage, Arch, optional Flatpak), Windows (zip, msi, exe), macOS (tar.gz, dmg), optional container image.
 - A software bill of materials (SPDX), build provenance, checksums and OpenPGP signatures.
 - A draft GitHub release, never published automatically.
-- First real run was green on FreeSynergy/fs-capnpc as a draft release: tar.gz for Linux and macOS, deb, rpm, Arch, msi and zip, SBOM and checksums.
+- First real run was green on FreeSynergy-Net/fs-capnpc as a draft release: tar.gz for Linux and macOS, deb, rpm, Arch, msi and zip, SBOM and checksums.
 
 ## Virtual sessions
 
@@ -107,7 +107,7 @@ sha256sum -c SHA256SUMS.txt
 
 ### Status (2026-11-06)
 
-First real run green on `FreeSynergy/fs-capnpc` (draft release, not public; version numbers count `0.0.N` since the reset, ADR 0064):
+First real run green on `FreeSynergy-Net/fs-capnpc` (draft release, not public; version numbers count `0.0.N` since the reset, ADR 0064):
 `.tar.gz` (Linux x86_64/aarch64, macOS universal), `.deb` (amd64/arm64), `.rpm` (x86_64/aarch64),
 Arch `.pkg.tar.zst`, Windows `.msi` + `.zip`, SPDX SBOM, `SHA256SUMS.txt`. CI (`ci.yml`) green incl. MSRV.
 

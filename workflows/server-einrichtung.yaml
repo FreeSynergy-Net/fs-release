@@ -127,7 +127,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Enters the package source (ADR 0078) as deb822 freesynergy.sources with Signed-By; the first address is the github.io address of FreeSynergy/fs-packages, later packages.freesynergy.net by switching the variable. The key is checked against the fingerprint 16A4...4342 BEFORE it is trusted; a mismatch is red and the file is removed. Expected - the file, apt update without error, exit code 0. Idempotent.
+        freesynergy.net:summary: Enters the package source (ADR 0078) as deb822 freesynergy.sources with Signed-By; the first address is the github.io address of FreeSynergy-Net/fs-packages, later packages.freesynergy.net by switching the variable. The key is checked against the fingerprint 16A4...4342 BEFORE it is trusted; a mismatch is red and the file is removed. Expected - the file, apt update without error, exit code 0. Idempotent.
   - data-directory:
       call: fs-server-layer:0.0.17@fs
       with:
