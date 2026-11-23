@@ -62,6 +62,14 @@ pub fn apply(a: &ApplyArgs) -> Result<Vec<String>> {
             file == format!("{pkg}-{version}.crate"),
             "unexpected file name `{file}`"
         );
+        // the name inside the `.crate` is the word of the (untrusted) job `package`: it must be the package of the plan line, which is on the allow list
+        let inner = reg_index::metadata_from_crate(&a.index_url, a.dir.join(file))
+            .with_context(|| format!("reading `{file}`"))?;
+        ensure!(
+            inner.name == pkg,
+            "`{file}` contains the crate `{}`, but the plan line (and the allow list) say `{pkg}`: nothing is entered",
+            inner.name
+        );
         let now = list_tags(&url_of(&a.source_base, repo))?
             .into_iter()
             .find(|t| t.name == tag)

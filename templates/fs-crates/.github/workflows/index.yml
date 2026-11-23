@@ -7,7 +7,7 @@
 # .crate files of that run, with several source repos in one run also those of the OTHER repos. What the job split does guarantee: the tool that enters them is not theirs.
 # Three jobs:
 # - `tool` (contents: read): builds fs-crate-index from the pinned fs-release, WITHOUT checkout of any source repo, WITHOUT cache; outputs its sha256.
-# - `package` (contents: read): runs the tool and builds the crates (foreign build code runs here, the token is not here). Uploads only plan.txt and the .crate files.
+# - `package` (contents: read): runs the tool and builds the crates (foreign build code runs here, no write token here). Uploads only plan.txt and the .crate files.
 # - `enter` (contents: write): takes the tool from `tool`, checks it against the sha256 (red if it differs), enters the plan with a fixed toolchain, pushes.
 # Install: see README.md. REPLACE the pin `FS_RELEASE_PIN` (40 hex) by hand (the pin tool pin-refs.sh refuses it: rc 3, unknown pin) with the fs-release commit that contains
 # `crates/fs-crate-index`; until then the `uses:` lines are not callable (the old pin 78992eea does not know the tool).
