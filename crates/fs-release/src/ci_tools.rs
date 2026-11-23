@@ -2,7 +2,8 @@
 //!
 //! The release chain signs what the build job produced, so a tool installed in CI must not float: every `cargo install`, `cargo binstall` and
 //! `taiki-e/install-action` line in `.github/` and `actions/` names an exact version (`name@x.y.z`) and uses `--locked`; a `cargo install --git` needs
-//! a `--rev` of a full commit. `fs-release check-ci-tools [dir]` runs it over a checkout (rc 1 = a line to fix).
+//! a `--rev` of a full commit. Every `uses:` is a full commit SHA (a foreign action also names its tag in a comment); a moving tag or branch can be
+//! moved under a signed release. `fs-release check-ci-tools [dir]` runs it over a checkout (rc 1 = a line to fix).
 
 use std::fs;
 use std::path::Path;
@@ -64,6 +65,31 @@ fn install_line(line: &str) -> Option<String> {
     loose.map(|a| format!("`cargo binstall {a}` without an exact version (name@x.y.z)"))
 }
 
+/// A `uses:` line: local (`./...`) or `owner/repo[/path]@<40 hex>`; a foreign action also names its tag in a comment (`# v4.1.0`).
+fn uses_line(line: &str) -> Option<String> {
+    let (code, comment) = line.split_once(" #").map_or((line, ""), |(c, k)| (c, k));
+    let target = code
+        .trim_start()
+        .trim_start_matches("- ")
+        .strip_prefix("uses:")?
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'');
+    if target.starts_with("./") || target.starts_with("docker://") && target.contains("@sha256:") {
+        return None;
+    }
+    let Some((name, r)) = target.split_once('@') else {
+        return Some(format!("`uses: {target}` has no @<commit>"));
+    };
+    if r.len() != 40 || !r.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Some(format!(
+            "`uses: {name}@{r}` is not pinned to a full commit SHA"
+        ));
+    }
+    let own = name.starts_with("FreeSynergy/fs-release/");
+    (!own && comment.trim().is_empty())
+        .then(|| format!("`uses: {name}@<sha>` names no tag in a comment (# vX.Y.Z)"))
+}
+
 /// The violations of one file as `file:line: reason`; comment lines (`#`) are not checked.
 #[must_use]
 pub fn violations(file: &str, text: &str) -> Vec<String> {
@@ -72,7 +98,7 @@ pub fn violations(file: &str, text: &str) -> Vec<String> {
         if line.trim_start().starts_with('#') {
             continue;
         }
-        let mut why = install_line(line);
+        let mut why = install_line(line).or_else(|| uses_line(line));
         for key in ["tool", "tools", "TOOLS"] {
             if let Some(v) = yaml_value(line, key) {
                 let v = v.trim_matches(|c| c == '"' || c == '\'');
