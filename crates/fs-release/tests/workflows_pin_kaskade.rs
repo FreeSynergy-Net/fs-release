@@ -17,6 +17,7 @@ fn ok(t: &str) -> bool {
         &[
             "vorhanden-pruefen",
             "karte",
+            "inventur",
             "lage",
             "plan",
             "glied-weiche",
@@ -113,20 +114,42 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     assert!(bad(t.replace("  - lock-strikt:", "  - lock-x:")));
     assert!(bad(t.replacen("gate: opus-ja", "gate: none", 1)));
     assert!(bad(format!("{t}\n# tag-annotated\n")));
-    // graph: jscalendar dropped, fs-rpc before fs-objects, fs-tasks before fs-people, a changed edge, the rev-pin step skipped
-    let order = "# GLIEDER-ORDER: fs-interfaces, fs-objects, fs-jscalendar, fs-rpc, fs-components, fs-people, fs-tasks, fs-calendars";
-    assert!(t.contains(order));
-    assert!(bad(t.replace(order, "# GLIEDER-ORDER: fs-interfaces, fs-objects, fs-rpc, fs-components, fs-people, fs-tasks, fs-calendars")));
-    assert!(bad(t.replace(order, "# GLIEDER-ORDER: fs-interfaces, fs-rpc, fs-objects, fs-jscalendar, fs-components, fs-people, fs-tasks, fs-calendars")));
-    assert!(bad(t.replace(order, "# GLIEDER-ORDER: fs-interfaces, fs-objects, fs-jscalendar, fs-rpc, fs-components, fs-tasks, fs-people, fs-calendars")));
-    assert!(bad(t.replace(
-        "# DAG: fs-tasks <- fs-interfaces, fs-objects, fs-components, fs-jscalendar, fs-people",
-        "# DAG: fs-tasks <- fs-interfaces, fs-objects, fs-components, fs-jscalendar"
-    )));
-    assert!(bad(t.replace(
-        "# DAG: fs-rpc <- fs-types, fs-interfaces, fs-objects, fs-conformance",
-        "# DAG: fs-rpc <- fs-types, fs-interfaces, fs-objects"
-    )));
+    // graph: jscalendar dropped, a Glied before its dependency (the two old errors: fs-interfaces before fs-jscalendar, fs-rpc before fs-components, and fs-tasks before
+    // fs-people), the rev-pin step skipped. That the edges are the real ones is proven by `fs-release dag-check` (tests/dag.rs).
+    let order = t
+        .lines()
+        .find(|l| l.starts_with("# GLIEDER-ORDER: "))
+        .unwrap()
+        .to_string();
+    let names: Vec<String> = order["# GLIEDER-ORDER: ".len()..]
+        .split(", ")
+        .map(String::from)
+        .collect();
+    let with = |f: &dyn Fn(&mut Vec<String>)| {
+        let mut v = names.clone();
+        f(&mut v);
+        t.replace(&order, &format!("# GLIEDER-ORDER: {}", v.join(", ")))
+    };
+    let at = |v: &Vec<String>, n: &str| v.iter().position(|x| x == n).unwrap();
+    assert!(bad(with(&|v| {
+        let i = at(v, "fs-jscalendar");
+        v.remove(i);
+    })));
+    for (late, early) in [
+        ("fs-interfaces", "fs-jscalendar"),
+        ("fs-rpc", "fs-components"),
+        ("fs-tasks", "fs-people"),
+    ] {
+        assert!(
+            bad(with(&|v| {
+                let e = at(v, early);
+                v.remove(e);
+                let l = at(v, late);
+                v.insert(l + 1, early.to_string());
+            })),
+            "{late} before {early}"
+        );
+    }
     assert!(bad(t.replace("  - rev-pins-weiter:", "  - rev-x:")));
     assert!(bad(t.replace("  - rev-pins:", "  - rev-x:")));
     // A2: every case of every switch, one by one (M4 gates-weiter red -> continue, M5 round case, M7 ff-weiter `sonst`)

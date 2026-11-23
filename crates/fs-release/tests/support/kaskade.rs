@@ -2,53 +2,6 @@
 
 use super::workflows::step_body;
 
-/// The real dependencies of the Glieder (Cargo.toml of main of each repo, read 17.11.2026; the owner repo of `fs-conformance` is fs-types, of
-/// `fs-people-directory` fs-people). The workflow keeps its own copy in `# DAG:` lines; both must be equal and the order a topological one.
-pub const EDGES: &[(&str, &[&str])] = &[
-    ("fs-interfaces", &["fs-types"]),
-    ("fs-objects", &["fs-types"]),
-    ("fs-jscalendar", &["fs-types"]),
-    (
-        "fs-rpc",
-        &["fs-types", "fs-interfaces", "fs-objects", "fs-conformance"],
-    ),
-    ("fs-components", &["fs-types", "fs-conformance"]),
-    (
-        "fs-people",
-        &["fs-interfaces", "fs-objects", "fs-components"],
-    ),
-    (
-        "fs-tasks",
-        &[
-            "fs-interfaces",
-            "fs-objects",
-            "fs-components",
-            "fs-jscalendar",
-            "fs-people",
-        ],
-    ),
-    (
-        "fs-calendars",
-        &[
-            "fs-types",
-            "fs-interfaces",
-            "fs-objects",
-            "fs-rpc",
-            "fs-jscalendar",
-            "fs-components",
-            "fs-tasks",
-        ],
-    ),
-];
-
-/// The `rev` pins to `FreeSynergy` repos the header names (`# REV-PIN: <Glied> -> <owner repo> rev <rev> ...`), read from the Cargo.toml of main 17.11.2026.
-pub const REV_PINS: &[&str] = &[
-    "fs-rpc -> fs-types rev 339aa24f",
-    "fs-components -> fs-types rev 339aa24f",
-    "fs-tasks -> fs-people rev 358a8145",
-    "fs-calendars -> fs-components rev 9950b51",
-];
-
 /// The `@fs` calls of `pin-kaskade` that are real scripts in `scripts/`.
 pub const SCRIPTS: &[&str] = &[
     "kaskade-lage",
@@ -80,40 +33,22 @@ pub fn list(text: &str, prefix: &str) -> Vec<String> {
         .collect()
 }
 
-/// The `# DAG:` lines equal `EDGES` and `# GLIEDER-ORDER:` is a topological order of them (a dependency that is a Glied stands before its user).
+/// The header is self-consistent: every Glied of `# GLIEDER-ORDER:` has its `# DAG:` line (none missing, none surplus) and the order is a topological one of the
+/// `# DAG:` lines. That the edges are the REAL ones is proven by `fs-release dag-check` against the Cargo.toml files (tests/dag.rs).
 pub fn graph_ok(t: &str) -> bool {
-    let order = list(t, "# GLIEDER-ORDER: ");
-    let dag: Vec<(String, Vec<String>)> = t
-        .lines()
-        .filter_map(|l| l.strip_prefix("# DAG: "))
-        .map(|l| {
-            let (a, b) = l.split_once(" <- ").unwrap_or((l, ""));
-            (
-                a.trim().to_string(),
-                b.split(',').map(|x| x.trim().to_string()).collect(),
-            )
-        })
-        .collect();
-    let same = dag.len() == EDGES.len()
-        && EDGES.iter().all(|(r, d)| {
-            dag.iter()
-                .any(|(r2, d2)| r2 == r && d2.iter().map(String::as_str).eq(d.iter().copied()))
-        });
-    let mut names: Vec<&str> = EDGES.iter().map(|(r, _)| *r).collect();
-    names.sort_unstable();
-    let mut o: Vec<&str> = order.iter().map(String::as_str).collect();
-    o.sort_unstable();
-    let topo = EDGES.iter().all(|(r, d)| {
-        let at = order.iter().position(|x| x == r);
-        at.is_some()
-            && d.iter().all(|x| {
-                order
-                    .iter()
-                    .position(|y| y == x)
-                    .is_none_or(|i| i < at.unwrap_or(0))
-            })
+    let h = fs_release::dag::parse_header(t);
+    let mut keys: Vec<&String> = h.dag.keys().collect();
+    keys.sort();
+    let mut o: Vec<&String> = h.order.iter().collect();
+    o.sort();
+    let topo = h.order.iter().enumerate().all(|(i, g)| {
+        h.dag
+            .get(g)
+            .into_iter()
+            .flatten()
+            .all(|d| h.order.iter().position(|y| y == d).is_none_or(|j| j < i))
     });
-    same && names == o && topo && order.first().map(String::as_str) == Some("fs-interfaces")
+    !h.order.is_empty() && keys == o && topo
 }
 
 /// The cases of one `switch` step as (name, when, then), in order (A2: every case is checked one by one, not by `contains`).

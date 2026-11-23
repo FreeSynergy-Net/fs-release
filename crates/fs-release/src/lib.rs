@@ -8,6 +8,7 @@ pub mod address;
 pub mod approval;
 pub mod ci_tools;
 pub mod cli;
+pub mod dag;
 pub mod flow;
 pub mod lift;
 pub mod task;

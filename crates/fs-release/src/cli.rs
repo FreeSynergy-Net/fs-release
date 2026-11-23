@@ -41,6 +41,8 @@ enum Sub {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
+    /// The graph of the pin cascade from the Cargo.toml of the repos: every edge stands in the `# DAG:` lines and `# GLIEDER-ORDER:` is topological (rc 1 = red); `--emit` prints both blocks generated.
+    DagCheck(DagArgs),
     /// `JA am <SHA>` only with the proof of the runner (cost-log row, run record, byte-equal report); rc 1 = refused (hand-written verdict).
     CheckApproval(ApprovalArgs),
     /// Owner swap in GitHub addresses: bestand, ersetzen, nachher (workflow adresse-wechseln).
@@ -82,6 +84,24 @@ struct LiftArgs {
     /// Throw-away git config for local tags.
     #[arg(long, default_value = lift::LOCAL_TAGS)]
     git_config: PathBuf,
+}
+
+#[derive(Args, Clone)]
+struct DagArgs {
+    /// The workflow file (`pin-kaskade.yaml`).
+    workflow: PathBuf,
+    /// Folder with one checkout per repo (`<dir>/<repo>/**/Cargo.toml`).
+    #[arg(long)]
+    repos: PathBuf,
+    /// The trigger repo: Glieder are the repos that depend on it.
+    #[arg(long, default_value = "fs-types")]
+    root: String,
+    /// Known foreign sources (`OWNER/NAME` per line), no edges.
+    #[arg(long)]
+    foreign: Option<PathBuf>,
+    /// Print the generated header blocks instead of checking.
+    #[arg(long)]
+    emit: bool,
 }
 
 #[derive(Args, Clone)]
@@ -142,6 +162,7 @@ pub fn main_with(args: Vec<String>) -> i32 {
         Sub::Flow { lift, flow } => full(&lift, &flow),
         Sub::CheckCiTools { dir } => check_ci_tools(&dir),
         Sub::CheckApproval(a) => check_approval(&a),
+        Sub::DagCheck(a) => dag_check(&a),
     }
 }
 
@@ -265,6 +286,43 @@ fn check_ci_tools(dir: &Path) -> i32 {
         println!("{line}");
     }
     i32::from(!bad.is_empty())
+}
+
+fn dag_check(a: &DagArgs) -> i32 {
+    let read = |p: &Path| std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()));
+    let run = || -> Result<i32, String> {
+        let text = read(&a.workflow)?;
+        let foreign = match &a.foreign {
+            Some(p) => crate::dag::foreign_repos(&read(p)?),
+            None => std::collections::BTreeSet::default(),
+        };
+        let g = crate::dag::scan(&a.repos, &foreign)?;
+        let h = crate::dag::parse_header(&text);
+        for u in &g.unknown {
+            eprintln!("WARNING owner is no repo of the folder: {u}");
+        }
+        if a.emit {
+            return match crate::dag::emit(&g, &a.root, &h.order) {
+                Ok(s) => {
+                    print!("{s}");
+                    Ok(0)
+                }
+                Err(c) => Err(format!("cycle among: {}", c.join(", "))),
+            };
+        }
+        let f = crate::dag::check(&g, &h, &a.root);
+        for l in &f {
+            println!("RED {l}");
+        }
+        if f.is_empty() {
+            println!("GREEN dag-check: every edge of the Cargo.toml files stands in the DAG, the order is topological");
+        }
+        Ok(i32::from(!f.is_empty()))
+    };
+    run().unwrap_or_else(|e| {
+        eprintln!("fs-release dag-check: {e}");
+        2
+    })
 }
 
 fn check_approval(a: &ApprovalArgs) -> i32 {

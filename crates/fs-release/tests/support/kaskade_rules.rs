@@ -1,6 +1,6 @@
 //! Test support for `pin-kaskade`: the lock env inputs, the rev-pin edges, the foreign sources, the build rules and the Windows caller (B1-B4).
 
-use super::kaskade::{list_lines, REV_PINS};
+use super::kaskade::list_lines;
 use super::workflows::step_body;
 
 /// B1 (M11): the `env:` INPUT of `lock-strikt` and `lock-ende` carries both switches; the words in the summary text alone do not count.
@@ -10,10 +10,7 @@ pub const ENV_LINE: &str = "        env: FS_LOCK_STRICT=1 FS_LOCK_ONLY_FROM=1\n"
 fn rules_ok(t: &str) -> bool {
     let head = t.split("document:").next().unwrap_or("");
     let pins = list_lines(head, "# REV-PIN: ");
-    REV_PINS
-        .iter()
-        .all(|p| pins.iter().any(|l| l.starts_with(p)))
-        && pins.len() == REV_PINS.len()
+    pins.iter().any(|l| l == "fs-calendars -> fs-components rev 9950b51")
         && head.lines().any(|l| {
             l.starts_with("# FREMDQUELLEN: workflows/kaskade-fremdquellen.txt")
                 && l.contains("FreeSynergy/blinc-app-fix")
