@@ -8,6 +8,7 @@ use fs_release_chain::meta::Reach;
 use fs_release_chain::outcome::Outcome;
 use fs_release_chain::sys::{SystemClock, SystemRunner};
 
+use crate::dag_cmd::{dag_check, DagArgs};
 use crate::flow;
 use crate::lift::{self, LiftOpts};
 use crate::task::{run_all, NOT_RUN};
@@ -87,24 +88,6 @@ struct LiftArgs {
 }
 
 #[derive(Args, Clone)]
-struct DagArgs {
-    /// The workflow file (`pin-kaskade.yaml`).
-    workflow: PathBuf,
-    /// Folder with one checkout per repo (`<dir>/<repo>/**/Cargo.toml`).
-    #[arg(long)]
-    repos: PathBuf,
-    /// The trigger repo: Glieder are the repos that depend on it.
-    #[arg(long, default_value = "fs-types")]
-    root: String,
-    /// Known foreign sources (`OWNER/NAME` per line), no edges.
-    #[arg(long)]
-    foreign: Option<PathBuf>,
-    /// Print the generated header blocks instead of checking.
-    #[arg(long)]
-    emit: bool,
-}
-
-#[derive(Args, Clone)]
 struct ApprovalArgs {
     /// The verdict file (`review-<topic>-opus.md`).
     verdict: PathBuf,
@@ -160,7 +143,7 @@ pub fn main_with(args: Vec<String>) -> i32 {
         Sub::Push(s) => one(&s, 2),
         Sub::Bump(s) => one(&s, 3),
         Sub::Flow { lift, flow } => full(&lift, &flow),
-        Sub::CheckCiTools { dir } => check_ci_tools(&dir),
+        Sub::CheckCiTools { dir } => crate::ci_tools::check(&dir),
         Sub::CheckApproval(a) => check_approval(&a),
         Sub::DagCheck(a) => dag_check(&a),
     }
@@ -277,51 +260,6 @@ fn full(l: &LiftArgs, f: &FlowArgs) -> i32 {
     };
     with_ctx(f, &l.repo, &l.release_dir, |ctx| {
         flow::run(&o, ctx, &SystemRunner::default())
-    })
-}
-
-fn check_ci_tools(dir: &Path) -> i32 {
-    let bad = crate::ci_tools::scan(dir);
-    for line in &bad {
-        println!("{line}");
-    }
-    i32::from(!bad.is_empty())
-}
-
-fn dag_check(a: &DagArgs) -> i32 {
-    let read = |p: &Path| std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()));
-    let run = || -> Result<i32, String> {
-        let text = read(&a.workflow)?;
-        let foreign = match &a.foreign {
-            Some(p) => crate::dag::foreign_repos(&read(p)?),
-            None => std::collections::BTreeSet::default(),
-        };
-        let g = crate::dag::scan(&a.repos, &foreign)?;
-        let h = crate::dag::parse_header(&text);
-        for u in &g.unknown {
-            eprintln!("WARNING owner is no repo of the folder: {u}");
-        }
-        if a.emit {
-            return match crate::dag::emit(&g, &a.root, &h.order) {
-                Ok(s) => {
-                    print!("{s}");
-                    Ok(0)
-                }
-                Err(c) => Err(format!("cycle among: {}", c.join(", "))),
-            };
-        }
-        let f = crate::dag::check(&g, &h, &a.root);
-        for l in &f {
-            println!("RED {l}");
-        }
-        if f.is_empty() {
-            println!("GREEN dag-check: every edge of the Cargo.toml files stands in the DAG, the order is topological");
-        }
-        Ok(i32::from(!f.is_empty()))
-    };
-    run().unwrap_or_else(|e| {
-        eprintln!("fs-release dag-check: {e}");
-        2
     })
 }
 
