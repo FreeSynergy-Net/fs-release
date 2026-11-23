@@ -45,7 +45,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The order comes from the coordinator or the user and holds only the parameters repo, branch (unreviewed/<task>), head, delta and the task text; everything recurring is in this file and in rules.md. The rule - the coordinator acts only on red or at approval gates (see coordination-round.yaml, step rot-pruefen).
+        freesynergy.net:summary: The order comes from the coordinator or the user and holds only the parameters repo, branch (unreviewed/<task>), head, delta, erwartete_laeufe (the CI run names that must exist at the head) and the task text; everything recurring is in this file and in rules.md. The rule - the coordinator acts only on red or at approval gates (see coordination-round.yaml, step rot-pruefen).
   - worktree:
       call: worktree:0.0.17@fs
       with:

@@ -22,7 +22,7 @@ git -C "$tmp/r" reset -q --hard HEAD~1; c $OK agent@localhost three; run; chk "f
 c $OK $OK four; run; chk "foreign commit in the middle of the range: red" test $rc -eq 1
 git -C "$tmp/r" branch -f base HEAD; run; chk "empty range: green" test $rc -eq 0
 bash "$tool" "$tmp/r" nonexistent >/dev/null 2>&1; chk "missing base: rc 2" test $? -eq 2
-env -u CI FS_ALLOWED_IDENTITY=other@example.org bash "$tool" "$tmp/r" HEAD~1 >/dev/null 2>&1; chk "FS_ALLOWED_IDENTITY is read (other value: red)" test $? -eq 1
+env -u CI -u GITHUB_ACTIONS FS_ALLOWED_IDENTITY=other@example.org bash "$tool" "$tmp/r" HEAD~1 >/dev/null 2>&1; chk "FS_ALLOWED_IDENTITY is read (other value: red)" test $? -eq 1
 # special characters in the address must never shift the fields (a blank, a TAB): author "ok ok" with a blank + foreign committer, TAB in author, TAB+blank in committer
 git -C "$tmp/r" branch -f base HEAD
 c "$OK $OK" bad@x blank; run; chk "blank in the author address cannot hide a foreign committer: red" test $rc -eq 1
@@ -54,14 +54,26 @@ envrun CI=true FS_IDENTITY_BASE=HEAD; chk "CI with FS_IDENTITY_BASE=HEAD: rc 1 (
 envrun CI=true FS_ALLOWED_IDENTITY=$BAD; chk "CI with a changed FS_ALLOWED_IDENTITY: rc 1" test $? -eq 1
 envrun CI=true FS_IDENTITY_BASE=origin/main; chk "CI with FS_IDENTITY_BASE=origin/main (the same): the gate runs, red on the foreign commit" test $? -eq 1
 envrun CI=true GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=freesynergy.identity-test-base GIT_CONFIG_VALUE_0=HEAD; chk "CI: GIT_CONFIG_* from the environment cannot name a test base (still red)" test $? -eq 1
-env -u CI FS_IDENTITY_BASE=HEAD bash "$tool" "$tmp/c" >/dev/null 2>&1; chk "local (no CI): FS_IDENTITY_BASE=HEAD is allowed (empty range, green)" test $? -eq 0
+env -u CI -u GITHUB_ACTIONS FS_IDENTITY_BASE=HEAD bash "$tool" "$tmp/c" >/dev/null 2>&1; chk "local (no CI): FS_IDENTITY_BASE=HEAD is allowed (empty range, green)" test $? -eq 0
 git -C "$tmp/c" config --local freesynergy.identity-test-base HEAD; envrun CI=true; chk "CI: the fixture key in the LOCAL repo config names the test base (green on the empty range)" test $? -eq 0
 git -C "$tmp/c" config --local --unset freesynergy.identity-test-base
-sed 's/"\${CI:-}" = true/"${CI:-}" = nope/g' "$tool" >"$tmp/mutci"; chk "mutant (CI branch off) differs from the original" test "$(cmp -s "$tool" "$tmp/mutci" && echo same)" != same
+sed 's/\*) ci=1 ;;/*) ci=0 ;;/' "$tool" >"$tmp/mutci"; chk "mutant (CI branch off) differs from the original" test "$(cmp -s "$tool" "$tmp/mutci" && echo same)" != same
 env CI=true FS_IDENTITY_BASE=HEAD bash "$tmp/mutci" "$tmp/c" >/dev/null 2>&1; chk "mutant (CI branch off): the CI case turns green (the test sees it)" test $? -eq 0
 # S2: git replace must not hide a foreign commit
 badsha="$(git -C "$tmp/c" rev-parse HEAD)"; goodsha="$(git -C "$tmp/c" rev-parse HEAD~1)"
-git -C "$tmp/c" replace "$badsha" "$goodsha"; env -u CI bash "$tool" "$tmp/c" origin/main >/dev/null 2>&1; chk "git replace of the foreign commit: still red" test $? -eq 1
-sed 's/--no-replace-objects //' "$tool" >"$tmp/mutrep"; env -u CI bash "$tmp/mutrep" "$tmp/c" origin/main >/dev/null 2>&1; chk "mutant (without --no-replace-objects): the replace trick turns green" test $? -eq 0
+git -C "$tmp/c" replace "$badsha" "$goodsha"; env -u CI -u GITHUB_ACTIONS bash "$tool" "$tmp/c" origin/main >/dev/null 2>&1; chk "git replace of the foreign commit: still red" test $? -eq 1
+sed 's/--no-replace-objects //' "$tool" >"$tmp/mutrep"; env -u CI -u GITHUB_ACTIONS bash "$tmp/mutrep" "$tmp/c" origin/main >/dev/null 2>&1; chk "mutant (without --no-replace-objects): the replace trick turns green" test $? -eq 0
 git -C "$tmp/c" replace -d "$badsha" >/dev/null
+# --- Bundle 6 (N1): the CI case must not hang on the caller-settable CI alone, and GIT_DIR & co must not redirect the gate ---
+envrun CI=false GITHUB_ACTIONS=true FS_IDENTITY_BASE=HEAD; chk "N1: CI=false GITHUB_ACTIONS=true FS_IDENTITY_BASE=HEAD: rc 1 (GITHUB_ACTIONS keeps the CI case)" test $? -eq 1
+envrun CI=TRUE GITHUB_ACTIONS=true FS_IDENTITY_BASE=HEAD; chk "N1: CI=TRUE GITHUB_ACTIONS=true FS_IDENTITY_BASE=HEAD: rc 1" test $? -eq 1
+envrun CI=false GITHUB_ACTIONS=true FS_ALLOWED_IDENTITY=$BAD; chk "N1: CI=false GITHUB_ACTIONS=true FS_ALLOWED_IDENTITY changed: rc 1" test $? -eq 1
+mkdir "$tmp/d"; git -C "$tmp/d" init -q -b main; echo a >"$tmp/d/a"; git -C "$tmp/d" add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL=$OK git -C "$tmp/d" -c commit.gpgsign=false commit -q -m ok
+git -C "$tmp/d" update-ref refs/remotes/origin/main HEAD
+for v in GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES; do
+  envrun CI=true "$v=$tmp/d/.git"; chk "N1: CI with $v set: rc 1" test $? -eq 1
+done
+envrun CI=false GITHUB_ACTIONS=true GIT_DIR="$tmp/d/.git"; chk "N1: GITHUB_ACTIONS=true CI=false with GIT_DIR: rc 1" test $? -eq 1
+env -u CI -u GITHUB_ACTIONS GIT_DIR="$tmp/d/.git" bash "$tool" "$tmp/c" >/dev/null 2>&1; chk "N1: local (no CI) with GIT_DIR: not refused by the CI rule (green on the clean repo)" test $? -eq 0
+sed 's/"\${GITHUB_ACTIONS:-}"/""/g' "$tool" >"$tmp/mutga"; env CI=false GITHUB_ACTIONS=true FS_IDENTITY_BASE=HEAD bash "$tmp/mutga" "$tmp/c" >/dev/null 2>&1; chk "N1 mutant (GITHUB_ACTIONS not read): the bypass turns green (the test sees it)" test $? -eq 0
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi

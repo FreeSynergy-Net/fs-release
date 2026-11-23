@@ -1,5 +1,5 @@
 # An Opus review: read-only, the verdict goes into BERICHT.md, JA/NEIN, a JA is bound to exactly one head.
-# The order to the reviewer is compact: `Workflow review, step <id>, parameters repo, branch, head, delta, scope, tests`
+# The order to the reviewer is compact: `Workflow review, step <id>, parameters repo, branch, head, delta, scope, tests, erwartete_laeufe`
 # (docs/prompt-template.md); the check list below and rules.md [REVIEW] [BERICHT] are not repeated in the order. rules.md is the file
 # /srv/FreeSynergy/.scratch/api-runner/rules.md (the one that applies; there is no copy in the repo). FS profile: see README.md.
 # [EFFIZIENZ] (strategy c5) as step rules: a review reads only the delta (git diff <old>..<new>) with the file list of the order;

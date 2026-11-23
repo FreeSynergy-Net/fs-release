@@ -2,13 +2,18 @@
 # Gate "identity" ([IDENTITAET], docs/usage.md "Identity check before ff"): author AND committer ADDRESS of EVERY commit of <base>..HEAD must be
 # FS_ALLOWED_IDENTITY (default support@freesynergy.net). Names are NOT checked. Names the commit (short SHA), never the address. rc 0 green, 1 hit, 2 usage/git error.
 #   scripts/identity-check [<repo root>] [<base>]   base default: $FS_IDENTITY_BASE, else origin/main
-# CI=true: the environment (FS_IDENTITY_BASE other than origin/main, FS_ALLOWED_IDENTITY other than the default) can NOT loosen the gate (a caller can set both through
+# CI case (CI or GITHUB_ACTIONS set and not false; GIT_DIR & co refused): the environment (FS_IDENTITY_BASE other than origin/main, FS_ALLOWED_IDENTITY other than the default) can NOT loosen the gate (a caller can set both through
 # `test-env` into GITHUB_ENV): that is rc 1. Only fixture repos of the self tests may name another base, through the LOCAL repo config key freesynergy.identity-test-base
 # (read with `git config --local`: no environment variable, not GIT_CONFIG_*, can set it); the 2nd argument comes from the calling script, not from the environment.
 set -uo pipefail
 root="${1:-.}"
 default_id=support@freesynergy.net
-if [ "${CI:-}" = true ]; then
+# CI case: GITHUB_ACTIONS (protected in Actions) or CI (settable by a caller through test-env) set and not "false", any case
+ci=0; for v in "${CI:-}" "${GITHUB_ACTIONS:-}"; do case "${v,,}" in ""|false|0) ;; *) ci=1 ;; esac; done
+if [ "$ci" = 1 ]; then
+  for v in GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_INDEX_FILE GIT_COMMON_DIR GIT_NAMESPACE; do
+    if [ -n "${!v:-}" ]; then echo "identity FAILED: in CI $v must not be set (it would point git at another repo)" >&2; exit 1; fi
+  done
   if { [ -n "${FS_IDENTITY_BASE:-}" ] && [ "$FS_IDENTITY_BASE" != origin/main ]; } || { [ -n "${FS_ALLOWED_IDENTITY:-}" ] && [ "$FS_ALLOWED_IDENTITY" != "$default_id" ]; }; then
     echo "identity FAILED: in CI (CI=true) FS_IDENTITY_BASE and FS_ALLOWED_IDENTITY from the environment must not loosen the gate (only origin/main and the fixed identity count)" >&2
     exit 1
@@ -20,7 +25,7 @@ fi
 cd "$root" || exit 2
 base="${2:-$(git config --local --get freesynergy.identity-test-base 2>/dev/null)}"
 if [ -z "$base" ]; then
-  if [ "${CI:-}" = true ]; then base=origin/main; else base="${FS_IDENTITY_BASE:-origin/main}"; fi
+  if [ "$ci" = 1 ]; then base=origin/main; else base="${FS_IDENTITY_BASE:-origin/main}"; fi
 fi
 # --no-replace-objects: a local `git replace` must not show another commit than the real one
 g() { git --no-replace-objects "$@"; }

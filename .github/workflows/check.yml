@@ -60,7 +60,12 @@ jobs:
         if: inputs.test-env != ''
         env:
           TEST_ENV: ${{ inputs.test-env }}
-        run: printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
+        # N1: test-env must not set the variables the gates trust (CI, GITHUB_*, RUNNER_*, FS_*, GATES_*, GIT_*, PATH, BASH_ENV, ENV, LD_*): a hit is red, nothing is written
+        run: |
+          if printf '%s\n' "$TEST_ENV" | grep -qiE '^[[:space:]]*(CI|GITHUB_[A-Z0-9_]*|RUNNER_[A-Z0-9_]*|FS_[A-Z0-9_]*|GATES_[A-Z0-9_]*|GIT_[A-Z0-9_]*|LD_[A-Z0-9_]*|PATH|BASH_ENV|ENV)[[:space:]]*(=|<<)'; then
+            echo "::error::test-env must not set CI, GITHUB_*, RUNNER_*, FS_*, GATES_*, GIT_*, LD_*, PATH, BASH_ENV or ENV (the gates trust them)"; exit 1
+          fi
+          printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
       # CI cost: on a branch `unreviewed/*` the TEST gate runs only the crates that changed against main and their dependants (scripts/affected_crates.py, via the gates input diff-base);
       # fmt, clippy, rules, lock and files stay on the whole workspace. main, tags and every other ref test everything; so does `full: true`. The base is the merge base with origin/main, not the
       # previous push, so a crate whose tests failed earlier is never skipped by a later green push. When main cannot be fetched the gates test everything.

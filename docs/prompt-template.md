@@ -14,7 +14,7 @@ dem Datum; ohne `--since` die mittlere Größe und Kosten je Art).
 (`workflows/<name>.yaml`, a `summary` per step) and in `rules.md` (blocks `[GATES]`, `[BASH]`, `[COMMIT]`, `[TESTS]`,
 `[WORTWAHL]`, `[BERICHT]`, `[REVIEW]`); the agent reads both itself. Not in the order: the gate commands, the bash rules, the
 report form, the JA/NEIN binding to the head, the check list per kind (review), the wording rules. In the order goes only
-what changes from run to run: the parameters `repo`, `branch`, `head`, `delta` and the content (what exactly to build, fix or
+what changes from run to run: the parameters `repo`, `branch`, `head`, `delta`, `erwartete_laeufe` (names of the CI runs that must exist at the head, e.g. `lint`, `branch-ci`, `blueprint-e2e`; REQUIRED by `agent-run` and `review`, without it the run stops) and the content (what exactly to build, fix or
 check, with the user's findings verbatim). `rules.md` is the file `/srv/FreeSynergy/.scratch/api-runner/rules.md` (that one
 applies; there is no copy in the repo). Measuring counts cost and tokens per run, not the order size:
 `python3 -I scripts/measure-prompts.py --since <date>` (5 build and 5 review runs before and after the date; without `--since`
