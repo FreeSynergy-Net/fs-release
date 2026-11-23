@@ -178,6 +178,7 @@ pub fn scan(root: &Path) -> Vec<String> {
 }
 
 /// The `check-ci-tools` subcommand: prints every line to fix, rc 1 when there is one.
+#[must_use]
 pub fn check(dir: &Path) -> i32 {
     let bad = scan(dir);
     for line in &bad {

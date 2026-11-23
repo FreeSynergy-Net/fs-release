@@ -22,6 +22,7 @@ pub struct DagArgs {
     pub emit: bool,
 }
 
+#[must_use]
 pub fn dag_check(a: &DagArgs) -> i32 {
     let read = |p: &Path| std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()));
     let run = || -> Result<i32, String> {
