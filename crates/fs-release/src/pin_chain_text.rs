@@ -109,9 +109,15 @@ mod tests {
         let sha = "0123456789012345678901234567890123456789";
         let t = format!("- uses: freesynergy-net/fs-release/actions/x@{sha}\n- uses: Evil/fs-release/a@{sha}\n- uses: FreeSynergy-Net/fs-release/a@{sha}\n- uses: actions/checkout@v4\n# uses: evil/fs-release/a@b\n");
         assert_eq!(foreign_uses(&t).len(), 2);
-        assert!(foreign_uses("  run: grep -E 'uses: x/fs-release/' actions").is_empty());
+        assert_eq!(
+            foreign_uses("  run: grep -E 'uses: x/fs-release/' actions"),
+            Vec::<String>::new()
+        );
         let n = normalize(&t);
-        assert!(n.contains(&format!("freesynergy-net/fs-release/actions/x@{sha}")), "{n}");
+        assert!(
+            n.contains(&format!("freesynergy-net/fs-release/actions/x@{sha}")),
+            "{n}"
+        );
         assert!(n.contains("FreeSynergy-Net/fs-release/a@PIN"), "{n}");
     }
 
