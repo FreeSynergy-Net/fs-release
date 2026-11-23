@@ -104,31 +104,33 @@ pub(super) fn request(t: &str) -> bool {
                 "then: draft",
             ],
         )
-        && has(
-            t,
-            "blinc-kanal",
-            &[
-                "(98)",
-                "`git-bug`",
-                "no pull request",
-                "no comment",
-                "upstream == \"blinc\"",
-            ],
-        )
-        && has(
-            t,
-            "approval",
-            &[
-                "actor: human",
-                "upstream == \"blinc\" and .input.absender == \"bot\"",
-            ],
-        )
-        && has(
-            t,
-            "choose-channel",
-            &["upstream == \"blinc\" and .input.absender == \"bot\""],
-        )
-        && has(t, "send", &["helper of the strategy", "never calls gh"])
+        && request_send(t)
+}
+
+/// The channel, approval and send part of `upstream-anfrage`.
+fn request_send(t: &str) -> bool {
+    true && has(
+        t,
+        "blinc-kanal",
+        &[
+            "(98)",
+            "`git-bug`",
+            "no pull request",
+            "no comment",
+            "upstream == \"blinc\"",
+        ],
+    ) && has(
+        t,
+        "approval",
+        &[
+            "actor: human",
+            "upstream == \"blinc\" and .input.absender == \"bot\"",
+        ],
+    ) && has(
+        t,
+        "choose-channel",
+        &["upstream == \"blinc\" and .input.absender == \"bot\""],
+    ) && has(t, "send", &["helper of the strategy", "never calls gh"])
         && has(t, "send", &["without a YES, by rule 98"])
         && t.contains("parameters upstream, evidence, art, absender`")
         && [
