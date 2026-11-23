@@ -75,9 +75,9 @@ chk "mutant gates (rc of a run ignored) is caught by the red-run case" [ "$rc" -
 python3 -I - "$here/gates-komplett" "$tmp/mut/gates-komplett" <<'PY'
 import sys
 t = open(sys.argv[1], encoding="utf-8").read()
-old = "max(tags, key=kgit.version_key)"
+old = "max(refs, key="
 assert old in t
-open(sys.argv[2], "w", encoding="utf-8").write(t.replace(old, "min(tags, key=kgit.version_key)", 1))
+open(sys.argv[2], "w", encoding="utf-8").write(t.replace(old, "min(refs, key=", 1))
 PY
 python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/logs" >"$tmp/o.json"; rc=$?
 chk "mutant gates (oldest pinned tag taken) is caught by the highest-tag case" [ "$rc" -ne 0 ]
@@ -92,6 +92,25 @@ if old not in t:
 open(out, "w", encoding="utf-8").write(t.replace(old, new, 1))
 PY
 }
+# SHA pins (ENTSCHEID-ref): the scripts come from `git archive <sha>`; any other ref (@main) or a SHA among other refs is RED (rc 2), never silent own scripts
+sha9="$(git -C "$rel" rev-parse v0.0.9)"; sha10="$(git -C "$rel" rev-parse v0.0.10)"
+sapp() { rm -rf "$tmp/sapp"; git init -q -b main "$tmp/sapp"; mkdir -p "$tmp/sapp/.github/workflows"; printf 'jobs:\n  a:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@%s\n' "$@" >"$tmp/sapp/.github/workflows/check.yml"; echo x >"$tmp/sapp/a.txt"; git -C "$tmp/sapp" add -A; git -C "$tmp/sapp" commit -qm one; }
+srun() { python3 -I "${GK:-$here/gates-komplett}" --repo-dir "$tmp/sapp" --log-dir "$tmp/logs" "$@"; }
+sapp "$sha10"; : >"$FAKE_OUT"; srun >"$tmp/o.json"; rc=$?
+chk "sha pin: green with the scripts of that SHA (rc 0, skripte.tag is the SHA)" [ "$rc" -eq 0 ] && chk "sha pin: scripts of the SHA [part 2]" [ "$(q "$tmp/o.json" 'd["skripte"]["tag"]')" = "$sha10" ]
+sapp "$sha9"; srun >"$tmp/o.json"; rc=$?
+chk "sha pin: the failing gates.sh of the older SHA is taken (rc 1), not the own scripts" [ "$rc" -eq 1 ]
+sapp main; srun >"$tmp/o.json"; rc=$?
+chk "sha pin: @main is RED (rc 2), not silent" [ "$rc" -eq 2 ]
+sapp "${sha10:0:12}"; srun >"$tmp/o.json"; rc=$?
+chk "sha pin: a short SHA is RED (rc 2)" [ "$rc" -eq 2 ]
+sapp "$sha10"; printf '  b:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.9\n' >>"$tmp/sapp/.github/workflows/check.yml"; git -C "$tmp/sapp" commit -qam two; srun >"$tmp/o.json"; rc=$?
+chk "sha pin: a SHA next to a tag is RED (rc 2)" [ "$rc" -eq 2 ]
+sapp "$sha10"; srun --skripte-tag "$sha10" >"$tmp/o.json"; rc=$?
+chk "sha pin: --skripte-tag takes a SHA (rc 0)" [ "$rc" -eq 0 ]
+mkdir -p "$tmp/mut"; mutate "$here/gates-komplett" '|[0-9a-f]{40})(?![0-9A-Za-z])")' ')(?![0-9A-Za-z])")' "$tmp/mut/gates-komplett" || bad "mutant sha not applied"
+cp -r "$here/kaskade_lib" "$tmp/mut/" 2>/dev/null; sapp "$sha10"; GK="$tmp/mut/gates-komplett" srun >"$tmp/o.json"; rc=$?
+chk "mutant gates (SHA not recognised as a pin) is caught by the SHA case" [ "$rc" -ne 0 ]
 # the list of named exceptions is EMPTY since v0.0.12 (the flat run of fs-release fetches its tags); the MECHANISM is tested with a sample entry in an own copy ($mech)
 mech="$tmp/mech"; mkdir -p "$mech"; cp -r "$here/kaskade_lib" "$mech/"
 python3 -I - "$here/gates-komplett" "$mech/gates-komplett" <<'PY'

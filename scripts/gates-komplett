@@ -11,7 +11,7 @@ error lines, exit 1 while anything is open. It is NEVER a gate result: its JSON 
 start with `cargo test|clippy|fmt`, `bash|python3 <script of the repo scripts or of the pinned fs-release tag>` or `scripts/...` run, as an argument list (no shell), words of the plain character set only (an error text never puts a command in).
 
 [GATE-GLEICH-CI]: the check scripts (`scripts/gates.sh`, check_rust_rules, check_lock_sources ...) come from the fs-release TAG the repo's own CI files pin (`git archive` of that tag out of
-$FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The tag is the highest `<owner>/fs-release/...@vX.Y.Z` (the old or the new owner) of DIR/.github/workflows/*.yml, or `--skripte-tag`; without
+$FS_RELEASE_REPO, default /srv/FreeSynergy/fs-release; never main). The ref is the highest `<owner>/fs-release/...@vX.Y.Z` or the ONE full 40-hex SHA (`git archive <sha>`) (the old or the new owner) of DIR/.github/workflows/*.yml, or `--skripte-tag`; any other ref (`@main`, short SHA) or a SHA mixed with other refs is RED (rc 2), never silent; without
 any (fs-release itself) the scripts of DIR are used. [GATE-VOLLSTAENDIG-LAUFEN]: `cargo fmt --all` FIRST (a tree that fmt changes is red: commit it first), then `gates.sh` COMPLETE, ONE run after the other
 (never parallel): (1) the local environment (a CI/CARGO_TERM_COLOR of the caller is dropped), (2) `CARGO_TERM_COLOR=always CI=true`, (3) [GATE-FLACHER-KLON-OHNE-TAGS] the same as (2) in a shallow clone WITHOUT tags (`git clone --depth 1 --no-tags`; in the repo fs-release the tags and the history are fetched afterwards) with an OWN
 target (`.scratch/target/<repo>/<folder>-flach`: <repo> = the repo name of the `origin` URL (the folder name only without an `origin`), <folder> = the folder of the checkout, so every clone has ITS OWN flat target; [FLACHPROBE-EIGENES-TARGET], reused, never a fresh one). Every run goes through `$FS_GATES_BUILD_SLOT` (default /srv/FreeSynergy/.scratch/build-slot.sh) with
@@ -39,7 +39,9 @@ import kio  # noqa: E402
 import teil  # noqa: E402
 
 # the two known owners of fs-release, exactly (never "any owner"); the old one stays until part 2 of the address wave is done
-PIN = re.compile(r"(?:FreeSynergy-Net|FreeSynergy)/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+)\b")
+PIN = re.compile(r"(?:FreeSynergy-Net|FreeSynergy)/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]{40})(?![0-9A-Za-z])")
+LOOSE = re.compile(r"(?:FreeSynergy-Net|FreeSynergy)/fs-release/\S+@([^\s\"'#]+)")  # any ref after the owner form: one that is no tag and no full SHA is RED, never skipped
+SHA = re.compile(r"^[0-9a-f]{40}$")
 # The ONE list of named exceptions (never scattered in the code): repo + run + test. EMPTY since v0.0.12 (the flat run of fs-release fetches its tags, see the flat clone step below); the mechanism stays.
 # An entry needs `bis` (the fs-release release that replaces it): once fs-release `bis` is tagged (ls-remote of fs-release, `FS_KASKADE_BASE`; not readable = red, never a guess) and the list is not empty, gates-komplett is RED.
 # Entry form: {"name": ..., "repo": ..., "lauf": ..., "bis": "vX.Y.Z", "test": ..., "grund": ...}; `grund` is printed on every run.
@@ -48,11 +50,21 @@ SHOW = re.compile(r"rc=|FAILED|ERROR|errors|^error")
 
 
 def pinned_tag(d):
-    tags = set()
+    """The fs-release ref the CI files pin: a tag vX.Y.Z (the highest) or ONE full 40-hex SHA. A ref that is neither, or a SHA next to other refs, raises ValueError (RED, never silent)."""
+    refs, loose = set(), set()
     for f in glob.glob(os.path.join(d, ".github", "workflows", "*.yml")):
         with open(f, encoding="utf-8") as fh:
-            tags.update(PIN.findall(fh.read()))
-    return max(tags, key=kgit.version_key) if tags else None
+            text = "".join(x for x in fh.read().splitlines(True) if not x.lstrip().startswith("#"))
+        refs.update(PIN.findall(text))
+        loose.update(LOOSE.findall(text))
+    if repo_name(d) == "fs-release":  # fs-release itself: its internal `uses:` SHAs pin its actions, they are not the source of the gate scripts (tags as before, else its own scripts)
+        refs, loose = {x for x in refs if not SHA.match(x)}, set()
+    bad = sorted(x for x in loose if x not in refs)
+    if bad:
+        raise ValueError(f"the CI files pin fs-release to {bad}: neither a tag vX.Y.Z nor a full 40-hex SHA (RED, the scripts of the pinned ref cannot be taken)")
+    if len(refs) > 1 and any(SHA.match(x) for x in refs):
+        raise ValueError(f"the CI files pin fs-release to several refs {sorted(refs)} with a SHA among them: one ref only (RED)")
+    return max(refs, key=lambda x: kgit.version_key(x) or (0, 0, 0)) if refs else None
 
 
 def repo_name(d):
@@ -158,7 +170,10 @@ def teilpruefung(a, d):
     if why:
         return kio.skipped(f"the Fehlerliste {path} is refused: {why}")
     slot = os.environ.get("FS_GATES_BUILD_SLOT", "/srv/FreeSynergy/.scratch/build-slot.sh")
-    tag = a.skripte_tag or pinned_tag(d)
+    try:
+        tag = a.skripte_tag or pinned_tag(d)
+    except ValueError as e:
+        return kio.skipped(str(e))
     with tempfile.TemporaryDirectory(prefix="gates-teil-", dir=os.environ.get("TMPDIR")) as tmp:
         scripts_dir, toolchain = os.path.join(d, "scripts"), os.path.join(d, "RUST_VERSION")
         if tag:
@@ -189,15 +204,18 @@ def main(argv):
     d = os.path.realpath(a.repo_dir)
     if not os.path.isdir(os.path.join(d, ".git")) and not os.path.isfile(os.path.join(d, ".git")):
         return kio.skipped(f"{a.repo_dir} is no git checkout")
-    if not 1 <= a.jobs <= 64 or not 0 <= a.prioritaet <= 9 or (a.skripte_tag and not kio.TAG.match(a.skripte_tag)):
-        return kio.skipped("jobs 1..64, prioritaet 0..9, skripte-tag vX.Y.Z")
+    if not 1 <= a.jobs <= 64 or not 0 <= a.prioritaet <= 9 or (a.skripte_tag and not (kio.TAG.match(a.skripte_tag) or SHA.match(a.skripte_tag))):
+        return kio.skipped("jobs 1..64, prioritaet 0..9, skripte-tag vX.Y.Z or a full SHA")
     if a.nur_fehlerliste is not None:
         return teilpruefung(a, d)
     repo = repo_name(d)
     scratch = os.environ.get("FS_GATES_SCRATCH", "/srv/FreeSynergy/.scratch")
     log_dir = a.log_dir or os.path.join(scratch, "api-runner", "gates-logs")
     os.makedirs(log_dir, exist_ok=True)
-    tag = a.skripte_tag or pinned_tag(d)
+    try:
+        tag = a.skripte_tag or pinned_tag(d)
+    except ValueError as e:
+        return kio.skipped(str(e))
     befunde, laeufe, ausnahmen = [], [], []
     with tempfile.TemporaryDirectory(prefix="gates-komplett-", dir=os.environ.get("TMPDIR")) as tmp:
         if tag:
