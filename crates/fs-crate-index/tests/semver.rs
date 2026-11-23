@@ -161,3 +161,38 @@ fn a_checked_branch_cannot_switch_a_lint_off_in_its_manifest() {
         "no call after a red manifest"
     );
 }
+
+/// Live find (first real runner run, fs-types `semver`): the action calls the gate once per package with the SAME work dir. The second call died with
+/// `git clone`: "destination path ... registry already exists". Now the clone is replaced; "not reachable" stays red and is never "no baseline".
+#[test]
+fn one_work_dir_for_several_packages_in_a_row_each_case_stays_correct() {
+    let mut w = World::new();
+    entered(&mut w);
+    let (bin, _log) = fake(&w, 0);
+    let shared = w.root.join("semver-shared");
+    let call = |w: &mut World, reg: &str, pkg: &str| {
+        let mut a = args(w, reg, Some(bin.clone()));
+        a.package = pkg.into();
+        a.work_dir = shared.clone();
+        gate(&a)
+    };
+    let url = w.url.clone();
+    // 1st package: a baseline exists; 2nd package, same work dir: compared too; 3rd: a crate not in the registry = case 1, still green
+    assert_eq!(
+        call(&mut w, &url, "demo-base").unwrap(),
+        Outcome::Compared("0.0.7".parse().unwrap())
+    );
+    assert_eq!(
+        call(&mut w, &url, "demo-lib").unwrap(),
+        Outcome::Compared("0.0.7".parse().unwrap())
+    );
+    assert_eq!(
+        call(&mut w, &url, "demo-not-yet").unwrap(),
+        Outcome::NoBaseline
+    );
+    // the registry is gone: a stale clone in the shared work dir must NOT hide it as "no baseline"
+    let gone = format!("file://{}/missing-registry", w.root.display());
+    let e = format!("{:#}", call(&mut w, &gone, "demo-not-yet").unwrap_err());
+    assert!(e.contains("NOT REACHABLE"), "{e}");
+    assert!(!e.contains("first registry version"), "{e}");
+}

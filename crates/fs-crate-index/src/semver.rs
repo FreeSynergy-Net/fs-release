@@ -28,7 +28,7 @@ pub struct SemverArgs {
     /// `cargo-semver-checks` binary (the subcommand needs it).
     #[arg(long)]
     pub semver_checks: Option<PathBuf>,
-    /// New directory for the clone and the unpacked baseline.
+    /// Directory for the clone and the unpacked baseline; may be reused by later calls (an earlier `registry` clone in it is replaced).
     #[arg(long)]
     pub work_dir: PathBuf,
 }
@@ -64,6 +64,11 @@ fn registry_checkout(a: &SemverArgs) -> Result<PathBuf> {
     std::fs::create_dir_all(&a.work_dir)?;
     let dir = if a.registry.contains("://") {
         let d = a.work_dir.join("registry");
+        // The work dir may be shared by several calls of one job (one call per package): a clone of an earlier call is stale, never reused (always a fresh read), never a reason to fail.
+        if d.exists() {
+            std::fs::remove_dir_all(&d)
+                .with_context(|| format!("cannot remove the earlier clone {}", d.display()))?;
+        }
         let out = Command::new("git")
             .args(["clone", "-q", "--depth", "1", &a.registry])
             .arg(&d)
