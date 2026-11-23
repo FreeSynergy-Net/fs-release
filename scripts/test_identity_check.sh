@@ -155,10 +155,10 @@ sed 's/"\$lrc" -ne 2/"$lrc" -eq 99/' "$tool" >"$tmp/mut9f2"; cmp -s "$tool" "$tm
 erun fd "$tmp/mut9f2"; chk "9f mutant 2 (ls-remote error = no main): case (d) turns green (the test sees it)" test $rc -eq 0
 # --- S1 (identity-erstpruefung-r2): GH_TOKEN goes ONLY to origin https://github.com/ ; any other host gets NO Authorization header. A stub git in PATH logs the ls-remote call (and answers rc 2 = "no main") ---
 real_git="$(command -v git)"; mkdir "$tmp/stub"
-printf '#!/usr/bin/env bash\ncase " $* " in *" ls-remote "*) printf "%%s\\n" "$*" >>"$GIT_STUB_LOG"; exit 2;; esac\nexec %s "$@"\n' "$real_git" >"$tmp/stub/git"; chmod +x "$tmp/stub/git"
+printf '#!/usr/bin/env bash\ncase " $* " in *" ls-remote "*) printf "argv:%%s\\nenv:%%s=%%s;%%s\\n" "$*" "${GIT_CONFIG_KEY_0:-}" "${GIT_CONFIG_VALUE_0:-}" "${GIT_CONFIG_COUNT:-}" >>"$GIT_STUB_LOG"; exit 2;; esac\nexec %s "$@"\n' "$real_git" >"$tmp/stub/git"; chmod +x "$tmp/stub/git"
 trun() { : >"$tmp/stub.log"; env CI=true GITHUB_ACTIONS=true GH_TOKEN=sekret PATH="$tmp/stub:$PATH" GIT_STUB_LOG="$tmp/stub.log" bash "${2:-$tool}" "$tmp/$1" >"$tmp/o" 2>&1; rc=$?; }
 fx fg none; git -C "$tmp/fg" remote set-url origin https://github.com/FreeSynergy-Net/x.git
-trun fg; chk "S1 origin https://github.com/: first check runs (rc 0) and the header IS sent" test $rc -eq 0 -a -n "$(grep -F http.extraheader "$tmp/stub.log")"
+trun fg; chk "S1 origin https://github.com/: first check runs (rc 0) and the header IS sent" test $rc -eq 0 -a -n "$(grep -F extraheader "$tmp/stub.log")"
 fx fh none; git -C "$tmp/fh" remote set-url origin https://codeberg.org/FreeSynergy/x.git
 trun fh; chk "S1 foreign host (codeberg): the call happens (rc 0) and NO Authorization header is sent" test $rc -eq 0 -a -s "$tmp/stub.log" -a -z "$(grep -Fi -e extraheader -e AUTHORIZATION "$tmp/stub.log")"
 chk "S1 the token itself is never in the call (foreign host)" test -z "$(grep -F -e sekret -e "$(printf 'x-access-token:sekret' | base64 -w0)" "$tmp/stub.log")"
@@ -166,4 +166,20 @@ git -C "$tmp/fh" remote set-url origin http://github.com/x/y.git; trun fh; chk "
 git -C "$tmp/fh" remote set-url origin https://github.com.evil.example/x.git; trun fh; chk "S1 look-alike host github.com.evil.example: no header" test -s "$tmp/stub.log" -a -z "$(grep -F extraheader "$tmp/stub.log")"
 sed 's#https://github.com/\*)#*)#' "$tool" >"$tmp/muts1"; cmp -s "$tool" "$tmp/muts1" && chk "S1 mutant was applied" false
 git -C "$tmp/fh" remote set-url origin https://codeberg.org/FreeSynergy/x.git; trun fh "$tmp/muts1"; chk "S1 mutant (always send): the foreign-host case turns red, the header is sent (the test sees it)" test -n "$(grep -F extraheader "$tmp/stub.log")"
+# --- S1-r2 (review identity-token-host S1): the header goes through GIT_CONFIG_* (env), never through argv; S2: insteadOf / pushurl (get-url = the URL ls-remote really uses) ---
+git -C "$tmp/fg" remote set-url origin https://github.com/FreeSynergy-Net/x.git; trun fg
+chk "S1-r2 github.com: the token is NOT in argv (neither raw nor base64, no -c extraheader)" test -s "$tmp/stub.log" -a -z "$(grep '^argv:' "$tmp/stub.log" | grep -F -e sekret -e "$(printf 'x-access-token:sekret' | base64 -w0)" -e extraheader -e AUTHORIZATION)"
+chk "S1-r2 github.com: the header is in the git env config with the URL-scoped key" test -n "$(grep -F -e 'env:http.https://github.com/.extraheader=AUTHORIZATION: basic ' "$tmp/stub.log")" -a -n "$(grep -F ';1' "$tmp/stub.log")"
+git -C "$tmp/fg" config url.https://codeberg.org/.insteadOf https://github.com/; trun fg
+chk "S2 insteadOf github.com -> codeberg: ls-remote goes to codeberg, NO header" test -s "$tmp/stub.log" -a -z "$(grep -Fi -e extraheader -e AUTHORIZATION -e sekret "$tmp/stub.log")"
+git -C "$tmp/fg" config --unset url.https://codeberg.org/.insteadOf
+git -C "$tmp/fg" config remote.origin.pushurl https://evil.example/x.git; trun fg
+chk "S2 pushurl foreign, fetch URL github.com: header IS sent (ls-remote uses the fetch URL)" test -n "$(grep -F extraheader "$tmp/stub.log")"
+sed 's#get-url origin#get-url --push origin#' "$tool" >"$tmp/muts2"; cmp -s "$tool" "$tmp/muts2" && chk "S2 mutant was applied" false
+trun fg "$tmp/muts2"; chk "S2 mutant (get-url --push): the pushurl case turns red, no header (the test sees it)" test -z "$(grep -F extraheader "$tmp/stub.log")"
+git -C "$tmp/fg" config --unset remote.origin.pushurl
+sed 's#https://github.com/\*) if#NEVER) if#' "$tool" >"$tmp/muts3"; cmp -s "$tool" "$tmp/muts3" && chk "S1-r2 mutant (never send) was applied" false
+trun fg "$tmp/muts3"; chk "S1-r2 mutant (never send): the github.com case turns red, no header (the test sees it)" test -z "$(grep -F extraheader "$tmp/stub.log")"
+sed 's#GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=#GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_9=#' "$tool" >"$tmp/muts4"; cmp -s "$tool" "$tmp/muts4" && chk "S1-r2 mutant (wrong key) was applied" false
+trun fg "$tmp/muts4"; chk "S1-r2 mutant (header not in KEY_0): the env check turns red (the test sees it)" test -z "$(grep -F 'env:http.https://github.com/.extraheader=' "$tmp/stub.log")"
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi
