@@ -49,7 +49,7 @@ fn a_branch_or_pr_run_or_a_wrong_tag_writes_nothing() {
         "refs/tags/v0.0.9",
     ] {
         let e = publish(&w.args(r)).unwrap_err();
-        assert!(!format!("{e:#}").is_empty());
+        assert!(format!("{e:#}").contains("tag"), "{r}: {e:#}");
         assert_eq!(w.head(), before, "{r}: no commit");
         assert!(
             !w.reg.join("crates").exists() && !w.reg.join("de").exists(),
