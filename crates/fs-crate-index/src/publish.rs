@@ -1,5 +1,6 @@
 //! Pattern: Adapter (our steps around the `reg-index` library; the index format itself is not ours).
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -153,10 +154,10 @@ pub fn publish(a: &PublishArgs) -> Result<String> {
     let subject = git_out(&a.registry_dir, &["log", "-1", "--format=%s"])?;
     let mut msg = subject.trim().to_string();
     if !a.source.is_empty() {
-        msg.push_str(&format!("\n\nsource: {}", a.source));
+        let _ = write!(msg, "\n\nsource: {}", a.source);
     }
     if let Ok(run) = std::env::var("GITHUB_RUN_ID") {
-        msg.push_str(&format!("\nrun: {run}"));
+        let _ = write!(msg, "\nrun: {run}");
     }
     git(
         &a.registry_dir,

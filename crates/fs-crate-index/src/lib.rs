@@ -12,14 +12,18 @@
 //! - `config.json` of the registry exists and its `dl` leads to exactly the place where the `.crate` is stored;
 //! - features with `dep:` or `?/` are written in index format v2 (`features2`, `v: 2`).
 
+pub mod allow;
+pub mod apply;
 pub mod cli;
 pub mod guard;
 pub mod publish;
 pub mod scan;
 pub mod wait;
 
+pub use allow::{list_tags, parse_allow, Source};
+pub use apply::{apply, ApplyArgs};
 pub use cli::main_with;
 pub use guard::{index_file, split_v2, version_of_ref};
 pub use publish::{check_dl, package, publish, PublishArgs};
-pub use scan::{apply, list_tags, parse_allow, scan, ApplyArgs, ScanArgs, Source};
+pub use scan::{scan, ScanArgs};
 pub use wait::{wait, WaitArgs};
