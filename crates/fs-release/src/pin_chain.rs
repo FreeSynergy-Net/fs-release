@@ -12,6 +12,9 @@
 //! Roots are every workflow and every action file at S. A pin to a workflow reaches that file, a pin to an action reaches the directory of
 //! the action; every reached file is compared with S and followed with ITS pins, so each level is checked on its own.
 //! `fs-release check-pin-chain [--repo <dir>] [<start>]`: rc 0 green, 1 red, 2 bad input; `--melden` only reports (lint), rc 0 on red.
+//! `scripts/`: an action (`actions/<name>`) whose files say `../../scripts` runs the `scripts/` of ITS pin (`$GITHUB_ACTION_PATH/../../scripts`), so for such a
+//! pin the whole `scripts/` directory at the pin is compared with `scripts/` at the start too (red lists the files and names pin-refs.sh).
+//! Not covered (honest): a `uses:` value on the following line, a block scalar, anchors/aliases, complex keys, escapes in the name.
 //! THREAT MODEL: protects against OVERSIGHT, not against someone who can change workflow, toolchain or scripts.
 
 use std::collections::BTreeSet;
@@ -119,10 +122,45 @@ impl Walk<'_> {
                 ));
             }
         }
+        self.scripts(from, u, &at_pin);
         for f in at_pin.iter().filter(|f| is_yaml(f)) {
             if let Some(t) = show(self.repo, &u.pin, f) {
                 self.follow(&format!("{f}@{}", short(&u.pin)), &t);
             }
+        }
+    }
+}
+
+impl Walk<'_> {
+    /// A reached action that runs `../../scripts` at its pin: `scripts/` at the pin against `scripts/` at the start (once per pin).
+    fn scripts(&mut self, from: &str, u: &Use, at_pin: &[String]) {
+        let reads_scripts = u.path.starts_with("actions/")
+            && at_pin
+                .iter()
+                .any(|f| show(self.repo, &u.pin, f).is_some_and(|t| t.contains("../../scripts")));
+        if !reads_scripts || !self.seen.insert(("scripts".into(), u.pin.clone())) {
+            return;
+        }
+        let old = files_at(self.repo, &u.pin, "scripts");
+        let new = files_at(self.repo, &self.start, "scripts");
+        let names: BTreeSet<&String> = old.iter().chain(new.iter()).collect();
+        let differ: Vec<&str> = names
+            .into_iter()
+            .filter(|f| {
+                show(self.repo, &u.pin, f).map(|t| normalize(&t))
+                    != show(self.repo, &self.start, f).map(|t| normalize(&t))
+            })
+            .map(String::as_str)
+            .collect();
+        if !differ.is_empty() {
+            self.red.push(format!(
+                "{from}: `{}` runs the scripts/ of its pin {}, which differ from the start head {} in {} file(s): {} (fix: bash scripts/pin-refs.sh <start sha>)",
+                u.path,
+                short(&u.pin),
+                short(&self.start),
+                differ.len(),
+                differ.join(", ")
+            ));
         }
     }
 }

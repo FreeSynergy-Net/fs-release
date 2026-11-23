@@ -38,11 +38,22 @@ fn unread_form(line: &str) -> bool {
     let low = code.to_ascii_lowercase();
     !low.starts_with('#')
         && low.contains("fs-release/")
-        && (low.starts_with('{')
+        && (flow_uses(&low)
+            || low.starts_with('{')
             || low.starts_with('[')
             || low.starts_with("uses")
             || low.starts_with("\"uses\"")
             || low.starts_with("'uses'"))
+}
+
+/// `uses` as a key inside a flow mapping or sequence on the same line (`steps: [ {uses: ...} ]`, `job: {uses: ...}`, `{a: 1, "uses": ...}`).
+/// Whitespace is dropped first; a `run:` text that merely says ", uses fs-release/" has no `:` after `uses` and stays green.
+fn flow_uses(low: &str) -> bool {
+    let compact: String = low.split_whitespace().collect();
+    ["{", ","]
+        .iter()
+        .flat_map(|o| ["uses:", "\"uses\":", "'uses':"].map(|k| format!("{o}{k}")))
+        .any(|p| compact.contains(&p))
 }
 
 /// The `uses:` targets that name a `.../fs-release/...` which the chain does not follow: another owner or owner spelling, another spelling of the

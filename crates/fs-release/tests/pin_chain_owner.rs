@@ -123,3 +123,41 @@ fn unread_uses_forms_are_red() {
         assert!(is_red_spelling(line), "{line}");
     }
 }
+
+/// S3: the flow forms behind a key (`steps: [ {uses: ...} ]`, `job: {uses: ...}`) are red too, one test per form.
+#[test]
+fn flow_sequence_form_is_red() {
+    for line in [
+        "steps: [ {uses: FreeSynergy-Net/fs-release/actions/pub@{OLD}} ]",
+        "steps: [{ \"uses\": \"FreeSynergy-Net/fs-release/actions/pub@{OLD}\" }]",
+        "steps: [ {name: x, uses: FreeSynergy-Net/fs-release/actions/pub@{OLD}} ]",
+    ] {
+        assert!(is_red_spelling(line), "{line}");
+    }
+}
+
+#[test]
+fn flow_mapping_form_behind_a_job_key_is_red() {
+    for line in [
+        "b: {uses: FreeSynergy-Net/fs-release/.github/workflows/x.yml@{OLD}}",
+        "b: { 'uses': FreeSynergy-Net/fs-release/.github/workflows/x.yml@{OLD} }",
+    ] {
+        assert!(is_red_spelling(line), "{line}");
+    }
+}
+
+/// A `run:` text that says "uses" and `fs-release/` in prose is no flow form.
+#[test]
+fn prose_in_a_run_line_is_not_a_flow_form() {
+    assert!(!is_red_spelling(
+        "run: echo done, uses fs-release/actions/pub and {braces}"
+    ));
+}
+
+/// S4: the parser call in `foreign_uses` is needed: `- - uses:` (a sequence in a sequence) is read by the parser but is no form `unread_form` sees.
+#[test]
+fn a_nested_sequence_uses_with_a_foreign_owner_is_red() {
+    assert!(is_red_spelling(
+        "- - uses: Evil/fs-release/actions/pub@{OLD}"
+    ));
+}
