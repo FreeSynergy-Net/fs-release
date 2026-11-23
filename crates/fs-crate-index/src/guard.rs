@@ -1,6 +1,9 @@
 //! Pattern: none (the guards that need no I/O: tag run, index format).
 
+use std::path::PathBuf;
+
 use anyhow::{bail, ensure, Result};
+use reg_index::IndexPackage;
 
 /// Version of a tag run: `refs/tags/v0.0.7` -> `0.0.7`. Everything else is refused.
 ///
@@ -24,18 +27,43 @@ pub fn version_of_ref(git_ref: &str) -> Result<String> {
     Ok(tag.to_string())
 }
 
-/// `reg-index` 0.6.0 writes index format v1 only: a feature with `dep:` or `?/` would be indexed wrongly (cargo needs `features2` and `v: 2`), so it is refused.
-///
-/// # Errors
-/// A feature value uses `dep:` or `?/`.
-pub fn check_features(features: &std::collections::BTreeMap<String, Vec<String>>) -> Result<()> {
-    for (name, values) in features {
-        if let Some(v) = values
+/// Index format v2 (registry-index standard): a feature whose values use `dep:` or `?/` belongs in `features2`, and the line carries `v: 2`
+/// (cargo before 1.60 skips such a line, newer cargo merges `features` and `features2`). `reg-index` 0.6.0 writes only format v1, so the adapter
+/// corrects the line it got. Returns whether the line was changed.
+pub fn split_v2(pkg: &mut IndexPackage) -> bool {
+    let needs_v2 = |values: &Vec<String>| {
+        values
             .iter()
-            .find(|v| v.starts_with("dep:") || v.contains("?/"))
-        {
-            bail!("feature `{name}` uses `{v}`: index format v2 is not supported by reg-index 0.6.0, the entry would be wrong");
+            .any(|v| v.starts_with("dep:") || v.contains("?/"))
+    };
+    let moved: Vec<String> = pkg
+        .features
+        .iter()
+        .filter(|(_, v)| needs_v2(v))
+        .map(|(k, _)| k.clone())
+        .collect();
+    if moved.is_empty() {
+        return false;
+    }
+    let mut f2 = pkg.features2.take().unwrap_or_default();
+    for k in moved {
+        if let Some(v) = pkg.features.remove(&k) {
+            f2.insert(k, v);
         }
     }
-    Ok(())
+    pkg.features2 = Some(f2);
+    pkg.v = Some(2);
+    true
+}
+
+/// Repo-relative path of the index file of a crate (layout of the cargo registry index: `1/a`, `2/ab`, `3/a/abc`, `ab/cd/abcd...`).
+#[must_use]
+pub fn index_file(name: &str) -> PathBuf {
+    let n = name.to_lowercase();
+    match n.len() {
+        1 => PathBuf::from("1").join(&n),
+        2 => PathBuf::from("2").join(&n),
+        3 => PathBuf::from("3").join(&n[..1]).join(&n),
+        _ => PathBuf::from(&n[0..2]).join(&n[2..4]).join(&n),
+    }
 }
