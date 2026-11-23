@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pattern: none (test).
 # Self test of the gate `licence` (scripts/licence-gate.sh, step `licence` of scripts/gates.sh). Part A (stub cargo-deny, no network): "not run is never green" (no binary, wrong version, no policy, no
-# manifest, bad pin = rc 3 with the line `licence gate NOT RUN`), the exact cargo-deny call, the rc of cargo-deny is passed on, the step is in gates.sh. Part B (the REAL cargo-deny of
+# manifest, bad pin = rc 64 with the line `licence gate NOT RUN`), the exact cargo-deny call, the rc of cargo-deny is passed on, the step is in gates.sh. Part B (the REAL cargo-deny of
 # scripts/cargo-deny.pin, downloaded and sha256-checked by the gate itself): a workspace with a path dependency under AGPL-3.0-only is RED, one under `MIT OR Apache-2.0` is green
 # (tests/fixtures/licence-gate/). Mutants (the allow list gets AGPL; the step is removed from gates.sh; the call loses `licenses`) must each turn a check red.
 #   bash scripts/test_licence_gate.sh        (FS_CARGO_DENY=<binary of the pinned version> skips the download)
@@ -25,18 +25,18 @@ printf '#!/usr/bin/env bash\n[ "$1" = --version ] && { echo "cargo-deny 0.0.1"; 
 chmod +x "$tmp"/bin/*
 mkmech "$tmp/m"; fixture ok "$tmp/ok"
 g() { env "$@" bash "$tmp/m/scripts/licence-gate.sh" "$tmp/ok" >"$tmp/o.txt" 2>&1; }
-notrun() { [ "$rc" -eq 3 ] && grep -q '^licence gate NOT RUN: ' "$tmp/o.txt"; }
-g FS_CARGO_DENY="$tmp/bin/does-not-exist"; rc=$?; chk "no binary: rc 3, NOT RUN (never green)" notrun
-g FS_CARGO_DENY="$tmp/bin/cargo-deny-old"; rc=$?; chk "wrong version: rc 3, NOT RUN" notrun
-rm "$tmp/m/configs/deny.toml"; g FS_CARGO_DENY="$tmp/bin/cargo-deny"; rc=$?; chk "no policy file: rc 3, NOT RUN" notrun
-cp "$repo/configs/deny.toml" "$tmp/m/configs/"; rm "$tmp/ok/Cargo.toml"; g FS_CARGO_DENY="$tmp/bin/cargo-deny"; rc=$?; chk "no Cargo.toml: rc 3, NOT RUN" notrun
-fixture ok "$tmp/ok"; sed -i 's/^CARGO_DENY_SHA256=.*/CARGO_DENY_SHA256=zz/' "$tmp/m/scripts/cargo-deny.pin"; g FS_CARGO_DENY="$tmp/bin/cargo-deny"; rc=$?; chk "bad pin file: rc 3, NOT RUN" notrun
+notrun() { [ "$rc" -eq 64 ] && grep -q '^licence gate NOT RUN: ' "$tmp/o.txt"; }
+g FS_CARGO_DENY="$tmp/bin/does-not-exist"; rc=$?; chk "no binary: rc 64, NOT RUN (never green)" notrun
+g FS_CARGO_DENY="$tmp/bin/cargo-deny-old"; rc=$?; chk "wrong version: rc 64, NOT RUN" notrun
+rm "$tmp/m/configs/deny.toml"; g FS_CARGO_DENY="$tmp/bin/cargo-deny"; rc=$?; chk "no policy file: rc 64, NOT RUN" notrun
+cp "$repo/configs/deny.toml" "$tmp/m/configs/"; rm "$tmp/ok/Cargo.toml"; g FS_CARGO_DENY="$tmp/bin/cargo-deny"; rc=$?; chk "no Cargo.toml: rc 64, NOT RUN" notrun
+fixture ok "$tmp/ok"; sed -i 's/^CARGO_DENY_SHA256=.*/CARGO_DENY_SHA256=zz/' "$tmp/m/scripts/cargo-deny.pin"; g FS_CARGO_DENY="$tmp/bin/cargo-deny"; rc=$?; chk "bad pin file: rc 64, NOT RUN" notrun
 cp "$here/cargo-deny.pin" "$tmp/m/scripts/"
 g FS_CARGO_DENY="$tmp/bin/cargo-deny"; rc=$?
 chk "stub green: rc 0" [ "$rc" -eq 0 ]
 chk "the call is exactly: --manifest-path <root>/Cargo.toml --workspace --locked --config <mech>/configs/deny.toml check licenses bans sources" \
   grep -qxF -- "--manifest-path $tmp/ok/Cargo.toml --workspace --locked --config $tmp/m/scripts/../configs/deny.toml check licenses bans sources" "$tmp/args.txt"
-g FS_CARGO_DENY="$tmp/bin/cargo-deny" STUB_RC=1; rc=$?; chk "a finding of cargo-deny (rc 1) is passed on, not turned green" [ "$rc" -eq 1 ]
+g FS_CARGO_DENY="$tmp/bin/cargo-deny" STUB_RC=1; rc=$?; chk "a finding of cargo-deny (rc 1) is passed on unchanged, not turned green" [ "$rc" -eq 1 ]
 chk "gates.sh runs the step licence (own step, severity error)" grep -q '^  step licence error bash "\$here/licence-gate.sh" "\$root"$' "$here/gates.sh"
 chk "a repo deny.toml is not read: the call names only the shared policy" bash -c "grep -c -- '--config' '$tmp/args.txt' | grep -qx 1"
 mut_a="$tmp/mut-step"; mkdir -p "$mut_a"; grep -v 'step licence error' "$here/gates.sh" >"$mut_a/gates.sh"
@@ -45,10 +45,10 @@ if grep -q '^  step licence error bash "\$here/licence-gate.sh" "\$root"$' "$mut
 real() { # <mech> <fixture name>: the gate on a fixture copy; output in $tmp/r.txt
   fixture "$2" "$tmp/fx"; env ${FS_CARGO_DENY:+FS_CARGO_DENY="$FS_CARGO_DENY"} bash "$1/scripts/licence-gate.sh" "$tmp/fx" >"$tmp/r.txt" 2>&1
 }
-agpl_red() { real "$1" agpl; local r=$?; agpl_rc=$r; [ "$r" -eq 1 ] && grep -q 'AGPL-3.0-only' "$tmp/r.txt"; }
+agpl_red() { real "$1" agpl; local r=$?; agpl_rc=$r; [ "$r" -eq 4 ] && grep -q 'AGPL-3.0-only' "$tmp/r.txt"; }
 ok_green() { real "$1" ok; [ $? -eq 0 ]; }
 mkmech "$tmp/real"
-chk "REAL cargo-deny $version: dependency under AGPL-3.0-only is RED (rc 1, the licence is named)" agpl_red "$tmp/real"
+chk "REAL cargo-deny $version: dependency under AGPL-3.0-only is RED (rc 4 = bit of licenses, the licence is named)" agpl_red "$tmp/real"
 cp "$tmp/r.txt" "$tmp/agpl.txt"; agpl_keep=$agpl_rc
 chk "REAL cargo-deny $version: dependency under MIT OR Apache-2.0 is green (rc 0)" ok_green "$tmp/real"
 cp "$tmp/r.txt" "$tmp/ok.txt"

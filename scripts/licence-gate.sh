@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Pattern: none. Gate `licence` of scripts/gates.sh: `cargo-deny check licenses bans sources` with the ONE policy configs/deny.toml (no deny.toml per repo is read) and the cargo-deny
-# pinned in scripts/cargo-deny.pin (version + sha256 of the release asset). "Not run is never green": no binary / wrong version / no config / no manifest = exit 3 with its own line
+# pinned in scripts/cargo-deny.pin (version + sha256 of the release asset). "Not run is never green": no binary / wrong version / no config / no manifest = exit 64 with its own line
 # `licence gate NOT RUN: ...`; a finding of cargo-deny keeps its exit code (1). Advisories are not part of the gate (moving database; see actions/licence-check).
 #   bash scripts/licence-gate.sh <repo root>
 # FS_CARGO_DENY=<path>: use that binary (still must report the pinned version). Otherwise the pinned asset is downloaded (linux x86_64), its sha256 is checked EVERY run and it is unpacked fresh.
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-notrun() { echo "licence gate NOT RUN: $*" >&2; exit 3; }
+notrun() { echo "licence gate NOT RUN: $*" >&2; exit 64; }
 [ $# -eq 1 ] && [ -d "$1" ] || notrun "usage: licence-gate.sh <repo root>"
 root="$(cd "$1" && pwd)"
 config="$here/../configs/deny.toml"

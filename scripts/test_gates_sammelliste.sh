@@ -36,7 +36,7 @@ export STUBLOG="$tmp/cargo.log"
 # fixture repos have no origin/main: every fixture repo names HEAD as identity base in its LOCAL config (freesynergy.identity-test-base); no environment variable can do that in CI
 
 # a mechanism folder (scripts + RUST_VERSION) and a repo with its own copy of it (no fs-release tag is pinned: the repo's own scripts count)
-mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; printf '#!/usr/bin/env bash\n[ -n "${RED_LICENCE:-}" ] && { echo "licence gate NOT RUN: stub" >&2; exit 3; }\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"; }
+mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; printf '#!/usr/bin/env bash\n[ -n "${RED_LICENCE:-}" ] && { echo "licence gate NOT RUN: stub" >&2; exit 64; }\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"; }
 mkrepo() { mkmech "$1"; git init -q -b main "$1"; echo x >"$1/a.txt"; echo "__pycache__/" >"$1/.gitignore"; git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" config --local freesynergy.identity-test-base HEAD; }
 app="$tmp/app"; mkrepo "$app"
 gates() { # <gates.sh> <list dir> [env...]: stdout+stderr in $tmp/o.txt; the rc is returned
@@ -56,9 +56,9 @@ chk "two errors: every item has its exact nachpruefung command" bash -c "grep -q
 chk "two errors: a test name with a shell character never reaches the list" bash -c "! grep -q 'touch_pwned' '$tmp/l1'/*.md | grep nachpruefung; ! grep 'nachpruefung' '$tmp/l1'/*.md | grep -q 'touch'"
 chk "two errors: cargo test runs with --no-fail-fast and clippy with --keep-going" bash -c "grep -q 'cargo test .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo clippy .*--keep-going' '$STUBLOG'"
 chk "two errors: the list is not in the repo tree" bash -c "[ -z \"\$(git -C '$app' status --porcelain)\" ] && [ ! -e '$app'/fehlerliste-main.md ]"
-# 1b. the licence gate red (cargo-deny finding or NOT RUN, rc 3): it is a finding of its own with its exact nachpruefung, the exit code is red
+# 1b. the licence gate red (cargo-deny finding or NOT RUN, rc 64): it is a finding of its own with its exact nachpruefung, the exit code is red
 gates "$app/scripts/gates.sh" "$tmp/l1b" RED_LICENCE=1; rc=$?
-chk "licence red: exit code 1, rc 3 printed, finding on the list with its nachpruefung" bash -c "[ $rc -eq 1 ] && grep -q '^gate licence: rc=3' '$tmp/o.txt' && grep -q '\*\*licence\*\*' '$tmp/l1b'/fehlerliste-*.md && grep -q 'nachpruefung: bash {SCRIPTS}/licence-gate.sh {ROOT}' '$tmp/l1b'/fehlerliste-*.md"
+chk "licence red: exit code 1, rc 64 printed, finding on the list with its nachpruefung" bash -c "[ $rc -eq 1 ] && grep -q '^gate licence: rc=64' '$tmp/o.txt' && grep -q '\*\*licence\*\*' '$tmp/l1b'/fehlerliste-*.md && grep -q 'nachpruefung: bash {SCRIPTS}/licence-gate.sh {ROOT}' '$tmp/l1b'/fehlerliste-*.md"
 # 2. no error: empty list, exit 0
 gates "$app/scripts/gates.sh" "$tmp/l2"; rc=$?
 chk "no error: exit code 0" [ "$rc" -eq 0 ]
