@@ -47,7 +47,7 @@ pub(super) fn main_view(text: &str) -> bool {
             text,
             "hauptansicht",
             &[
-                "main-view-ai:0.0.17@fs",
+                "main-view-ai:0.0.18@fs",
                 "src/preview.rs",
                 "mode(capabilities)",
                 "EXACTLY ONCE",
@@ -60,7 +60,7 @@ pub(super) fn main_view(text: &str) -> bool {
                 "existing fs-components blocks",
             ],
         )
-        && text.contains("call: main-view-ai:0.0.17@fs")
+        && text.contains("call: main-view-ai:0.0.18@fs")
 }
 
 #[test]

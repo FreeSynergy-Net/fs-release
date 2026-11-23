@@ -29,7 +29,7 @@ Makes the data package of a program from a blueprint (`scaffold.toml`, schema 2,
 
 ## The generated CI
 
-The generated `check.yml` has three jobs. `kind` looks whether the repo has a `Cargo.toml`. `package` (no `Cargo.toml`) checks out fs-documentation for the talk records, installs `fs-blueprint` from the tag `v0.0.17` and runs `fs-blueprint check --repo "$PWD" --talks "$PWD/.fs-documentation" --drift`. `code` (a repo with a `Cargo.toml`) calls the fs-release `check.yml` at the same tag with `blueprint: warn`. The install tag is the one constant `skeleton::RELEASE_TAG` (today `v0.0.17`); a test fails when a pin differs.
+The generated `check.yml` has three jobs. `kind` looks whether the repo has a `Cargo.toml`. `package` (no `Cargo.toml`) checks out fs-documentation for the talk records, installs `fs-blueprint` from the tag `v0.0.18` and runs `fs-blueprint check --repo "$PWD" --talks "$PWD/.fs-documentation" --drift`. `code` (a repo with a `Cargo.toml`) calls the fs-release `check.yml` at the same tag with `blueprint: warn`. The install tag is the one constant `skeleton::RELEASE_TAG` (today `v0.0.18`); a test fails when a pin differs.
 
 ## Findings
 

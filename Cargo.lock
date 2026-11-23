@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "fs-blueprint"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "pgp",
  "rpm",
@@ -828,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "fs-release"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "clap",
  "fs-release-chain",
@@ -840,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "fs-release-chain"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "clap",
  "serde",

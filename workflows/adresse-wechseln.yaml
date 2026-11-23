@@ -11,11 +11,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: adresse-wechseln
-  version: 0.0.17
+  version: 0.0.18
   title: Swap the GitHub owner in all addresses - stock, plan gate, fs-release first, replace without Cargo per repo with gates, review and ff, catalog last, after-check; Cargo pins later bottom-up
 do:
   - bestand:
-      call: address-stock:0.0.17@fs
+      call: address-stock:0.0.18@fs
       with:
         old_owner: ${ .input.old_owner }
         new_owner: ${ .input.new_owner }
@@ -45,7 +45,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The strategy accepts exactly this work list (the replaceable forms, the HAND LIST of the forms the tool cannot replace - nearly all of fs-release and Catalog - and the `allow` list with its reasons) before any file is changed; the approval event carries the subject old_owner->new_owner."
   - fs-release-zuerst:
-      call: fs-release-owner-neutral:0.0.17@fs
+      call: fs-release-owner-neutral:0.0.18@fs
       with:
         repo: fs-release
         old_owner: ${ .input.old_owner }
@@ -62,7 +62,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "(Spezifikation, Folgeauftrag) FIRST work step after the plan gate, in fs-release itself: make every owner comparison owner-neutral - the owner comes from the run (`github.repository_owner`) or old AND new owner are accepted (the rule is written down in the order; no hard-coded owner stays). Work list of the places (from the review of the first draft, plus grep): `.github/workflows/check.yml` (plan probe `startswith(\"FreeSynergy/fs-release/.github/workflows/release.yml@\")`, `workflow_repository ==`), `actions/publish-release/publish.sh` (`--signer-workflow`), `crates/fs-release-chain/src/preapproved.rs` and `.fs/preapproved.toml` (security module: full test + Opus review), `scripts/pin-refs.sh`, `scripts/gates-komplett`, `scripts/kaskade_lib/kwindows.py`, `scripts/check_release_env.sh`, `.github/workflows/lint.yml` (guard against `@ref` in composite actions), `crates/fs-release/src/cli.rs`, `crates/fs-release/src/flow/target.rs`, `workflows/katalog.yaml`, `workflows/catalog-bump.yaml`, Blueprint templates (`repository: FreeSynergy-Net/fs-documentation`). Risk class HIGH: Opus review, a security module (`preapproved`) gets the full test before release. Own branch per repo head, no push."
   - fs-release-ref:
-      call: resolve-head:0.0.17@fs
+      call: resolve-head:0.0.18@fs
       with:
         repo: fs-release
         branch: main
@@ -76,7 +76,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Read only: the head of main of fs-release AFTER the landing of the owner-neutral branch (the coordinator's ff; the result `kopf.head` (the loop below overwrites `kopf` per repo, so L is checked against the input before it) is the full 40-hex SHA L; `aufrufer-umstellen` takes `fs_release_ref` (the input) and the step `aufrufer-pruefen` (`address aufrufer --neutral fs_release_neutral`) turns red when L is not on origin/main or does not contain the neutral commit; L must equal `kopf.head`). NO tag: a tag needs the version round 0.0.18 and two pin-refs rounds and `ff-und-tag` does not fit fs-release yet (known gap, see `ff-und-tag`); G6 no. 4 and check-ci-tools want a full SHA for `uses:` anyway. The callers pin `FreeSynergy-Net/fs-release/...@<L>`; `scripts/gates-komplett` takes the scripts of that SHA (`git archive <sha>`)."
   - aufrufer-umstellen:
-      call: caller-switch:0.0.17@fs
+      call: caller-switch:0.0.18@fs
       with:
         repos: ${ .input.repos }
         old_owner: ${ .input.old_owner }
@@ -96,7 +96,7 @@ do:
         in: ${ .input.repos }
         do:
           - tausch:
-              call: address-replace:0.0.17@fs
+              call: address-replace:0.0.18@fs
               with:
                 repo: ${ $repo }
                 old_owner: ${ .input.old_owner }
@@ -111,7 +111,7 @@ do:
                 freesynergy.net:kind: objective
                 freesynergy.net:summary: "Per repo, worker (Sonnet), one branch `unreviewed/<branch>`: `fs-release address ersetzen <dir>` (safe forms only; never Cargo sources, `Cargo.lock`, `scripts/lock-sources.toml`, catalog data; the repo Catalog is refused), then the HAND LIST of this repo from the approved plan, then the fresh check `fs-release address nachher --ref HEAD` on the branch. Local commit only, no push. A repo without hits is `0 Dateien`, not an error."
           - aufrufer-pruefen:
-              call: address-callers:0.0.17@fs
+              call: address-callers:0.0.18@fs
               with:
                 repo: ${ $repo }
                 neutral: ${ .input.fs_release_neutral }
@@ -124,7 +124,7 @@ do:
                 freesynergy.net:kind: objective
                 freesynergy.net:summary: "`fs-release address aufrufer --neutral <fs_release_neutral> --fs-release <fresh clone, fetched> --ref HEAD <dir>` on the branch of this repo: every `uses:` of fs-release names exactly `FreeSynergy-Net`, a full SHA or an existing tag, the ref contains owner-neutral and lies on origin/main of fs-release, one ref per repo. rc 0 is required BEFORE the push (rc 1 red goes back to `tausch`, rc 2 is an error and never green). `address nachher --neutral .. --fs-release ..` runs the same rule."
           - head:
-              call: resolve-head:0.0.17@fs
+              call: resolve-head:0.0.18@fs
               with:
                 repo: ${ $repo }
                 branch: ${ "unreviewed/" + .input.branch }
@@ -137,7 +137,7 @@ do:
                 freesynergy.net:kind: objective
                 freesynergy.net:summary: "Resolves the branch of THIS repo to the commit hash of its tip (git rev-parse, read only) after the work of `tausch`. From here on only this hash counts (gates, review, ff), never the branch name; a new commit means a new `head`, new gates and a new review."
           - gates:
-              call: branch-ci:0.0.17@fs
+              call: branch-ci:0.0.18@fs
               with:
                 repo: ${ $repo }
                 branch: ${ "unreviewed/" + .input.branch }
@@ -155,7 +155,7 @@ do:
                 workflow:
                   namespace: freesynergy.net
                   name: review
-                  version: 0.0.17
+                  version: 0.0.18
                 input:
                   repo: ${ $repo }
                   branch: ${ "unreviewed/" + .input.branch }
@@ -173,7 +173,7 @@ do:
                 freesynergy.net:kind: subjective
                 freesynergy.net:summary: "`review.yaml` for exactly the `head` of this repo (parameters repo, branch, head, delta `origin/main..<head>`, scope, tests), per repo. Risk class NORMAL, fs-release and Catalog HIGH with Opus. The JA is bound to this hash by `bind`; NEIN goes back to `tausch` of this repo."
           - ff:
-              call: merge-ff:0.0.17@fs
+              call: merge-ff:0.0.18@fs
               with:
                 into: main
                 repo: ${ $repo }
@@ -197,7 +197,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: katalog
-          version: 0.0.17
+          version: 0.0.18
         input:
           modus: adresse (Spezifikation, Werkzeug folgt)
           branch: ${ .input.branch }
@@ -209,7 +209,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The own LAST step of part 1: repo `Catalog` (`catalog.xml`, `packages.toml`, class e; signed files, `scripts/bump_catalog.py`): the change goes ONLY through the existing catalog workflow `katalog` (risk class HIGH, Opus review); `packages.toml` is changed and `catalog.xml` is generated and signed by the CI, never by an agent (`fs-release address ersetzen` refuses the repo Catalog and never writes class e). (Spezifikation, Werkzeug folgt: `katalog` has no mode for an address swap yet and expects `modus/program/tag/branches/head/..`; the order of the strategy names the mode, and the workflow gets it when the first run needs it.) Only after the ff of the other repos."
   - nachher:
-      call: address-stock:0.0.17@fs
+      call: address-stock:0.0.18@fs
       with:
         old_owner: ${ .input.old_owner }
         new_owner: ${ .input.new_owner }
@@ -232,7 +232,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: pin-kaskade
-          version: 0.0.17
+          version: 0.0.18
         input:
           branch: ${ .input.branch }
       if: ${ .input.teil == 2 }
@@ -244,7 +244,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "(Spezifikation, Werkzeug folgt: `pin-kaskade` takes `ausloeser-tag, glieder, ab, workdir` and lifts versions with `lift --repo NAME=vX.Y.Z`; it knows no URL swap yet, and an owner-swap mode has to be added by `workflow-pflege` before the first part-2 run.) PART 2, own later run (`teil` = 2): classes a + b and every Cargo-source file (`scripts/lock-sources.toml`, `scripts/lock-gleich`, `scripts/check_rust_rules.py`, `.cargo/config*`, `deny.toml`, `[patch]`), bottom-up along the dependency edges (section `Abhaengigkeits-Reihenfolge` of the stock list), a new tag per repo, only in the bundled release (CLAUDE.md 4b). Releases are built by the CI from the tag only."
   - nachher-ende:
-      call: address-stock:0.0.17@fs
+      call: address-stock:0.0.18@fs
       with:
         old_owner: ${ .input.old_owner }
         new_owner: ${ .input.new_owner }

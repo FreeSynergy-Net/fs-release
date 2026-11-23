@@ -45,8 +45,8 @@ mk() { mkdir -p "$1/src"; printf '[package]\nname = "%s"\nversion = "%s"\neditio
 fixture() { rm -rf "$1"; mk "$1/crates/fs-forms" fs-forms 0.3.1; mk "$1/crates/fs-forms-run" fs-forms-run 0.4.0; printf '[workspace]\nmembers = ["crates/fs-forms", "crates/fs-forms-run"]\nresolver = "2"\n' >"$1/Cargo.toml"; mkdir -p "$1/.github/workflows"; }
 # release_yml DIR USES WITH-LINES...
 release_yml() { local d=$1 u=$2; shift 2; { printf 'name: release\non:\n  push:\n    tags: ["v*"]\njobs:\n  release:\n    uses: %s\n    with:\n' "$u"; printf '      %s\n' "$@"; } >"$d/.github/workflows/release.yml"; }
-REL=FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.17
-RELNEW=FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.17   # the new owner: the probe must really run (it was skipped silently before)
+REL=FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.18
+RELNEW=FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.18   # the new owner: the probe must really run (it was skipped silently before)
 
 # run_case SCRIPT DIR -> prints "probe=<true|false|none> plan_rc=<rc>" and leaves the output in $tmp/case.out
 run_case() {
@@ -99,7 +99,7 @@ all_cases() { # <script>: every case against it
   expect "the NEW owner's release workflow is probed, not skipped silently (red: fs-forms-run)" "$s" "$D" "probe=true plan_rc=1" "fs-forms-run"
   release_yml "$D" "$RELNEW" "binaries: fs-forms" "ignore-binaries: fs-forms-run"
   expect "the new owner, nothing to complain about: green" "$s" "$D" "probe=true plan_rc=0"
-  release_yml "$D" "FreeSynergy-Netx/fs-release/.github/workflows/release.yml@v0.0.17" "binaries: fs-forms"
+  release_yml "$D" "FreeSynergy-Netx/fs-release/.github/workflows/release.yml@v0.0.18" "binaries: fs-forms"
   expect "a third owner that only looks like the new one: no probe" "$s" "$D" "probe=false plan_rc=-"
   release_yml "$D" "someone/else/.github/workflows/release.yml@main" "binaries: fs-forms"
   expect "a release.yml that does not call fs-release: no probe" "$s" "$D" "probe=false plan_rc=-"

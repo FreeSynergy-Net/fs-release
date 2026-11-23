@@ -8,11 +8,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: geruest-ausbau
-  version: 0.0.17
+  version: 0.0.18
   title: "Scaffold build-out E1-E3 until the E4 acceptance is green: data-package generator, contract and tables, host mandatory parts"
 do:
   - bestand:
-      call: inventory-ai:0.0.17@fs
+      call: inventory-ai:0.0.18@fs
       with:
         spur: ${ .input.spur }
         repo: ${ .input.repo }
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Haiku (read only) - inventory per track: what of E1, E2, E3 already exists (fs-blueprint, fs-starter, fs-interfaces schema, FEATURES-OFFEN section 2), as `vorhanden | fehlt` with file and line; existing parts are extended, never rebuilt (rule: existing first). Report only."
   - e1-new-daten:
-      call: build-ai:0.0.17@fs
+      call: build-ai:0.0.18@fs
       with:
         spur: e1
         repo: ${ .input.repo }
@@ -37,7 +37,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet worker - track E1: `fs-blueprint new` writes ONLY a data package (types, no program code) plus a check CI; a rule check `code-in-program` is red when a program repo holds code that the blueprint should generate. Nothing is written on error. `cargo check -p fs-blueprint` while working."
   - e3-vertrag-db:
-      call: build-ai:0.0.17@fs
+      call: build-ai:0.0.18@fs
       with:
         spur: e3
         repo: ${ .input.repo }
@@ -50,7 +50,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet worker - track E3: from the data types of a package generate the capnp structs of its own types (nested struct / List(...)) and the DB tables with typed columns (child table `<parent>_<field>` for nested types, link table for reference lists; no JSON or TOML as storage). The contract is NOT generated into the program: it lives in fs-interfaces and the package only names it (`provides` as reference, check `contract-unknown`). Same types give the same output (check: two runs, identical bytes; append-only guard for the contract numbers)."
   - e2-host-pflicht:
-      call: build-ai:0.0.17@fs
+      call: build-ai:0.0.18@fs
       with:
         spur: e2
         repo: ${ .input.repo }
@@ -63,7 +63,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sonnet worker - track E2: the host mandatory parts in fs-starter (settings, help, session, update, MCP) come from blueprint and forms descriptions; a program never writes them by hand. The host is fs-starter (v0.0.3 is tagged and released, ADR 0105 (a): one executable host started with the path of the data package, it calls fs-forms-run as a library); work against the tags, not against local heads."
   - modul-test:
-      call: testlauf-ende:0.0.17@fs
+      call: testlauf-ende:0.0.18@fs
       with:
         spur: ${ .input.spur }
       metadata:
@@ -73,7 +73,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - per finished module ONE `testlauf` stage `ende`, only that module (`-p`), bottom up; then the module is frozen. `cargo check -p` while working, no tests. A missing result is red."
   - abnahme-e4:
-      call: e4-check:0.0.17@fs
+      call: e4-check:0.0.18@fs
       export:
         as: '${ $context + { e4: . } }'
       metadata:

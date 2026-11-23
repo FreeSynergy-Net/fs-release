@@ -77,8 +77,8 @@ fn frontend_umbau_counts_and_compares_by_script() {
 fn counter_frontend_umbau_a_count_by_the_agent_is_caught() {
     let text = read("frontend-umbau");
     let changed = text.replacen(
-        "  - recount:\n      call: count-fixed-values:0.0.17@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: machine\n        freesynergy.net:actor-type: Service",
-        "  - recount:\n      call: count-fixed-values:0.0.17@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: ai\n        freesynergy.net:actor-type: Application",
+        "  - recount:\n      call: count-fixed-values:0.0.18@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: machine\n        freesynergy.net:actor-type: Service",
+        "  - recount:\n      call: count-fixed-values:0.0.18@fs\n      with:\n        group: ${ .input.group }\n      export:\n        as: '${ $context + { recount: . } }'\n      metadata:\n        freesynergy.net:actor: ai\n        freesynergy.net:actor-type: Application",
         1,
     );
     assert_ne!(changed, text);

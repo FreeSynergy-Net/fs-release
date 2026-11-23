@@ -251,7 +251,7 @@ fn assert_is_empty_in_a_test_is_red_at_clippy_stable_with_the_first_error_line()
 #[test]
 fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
     let w = World::new();
-    tag_release(&w, &["v0.0.17"]);
+    tag_release(&w, &["v0.0.18"]);
     let wf = w.work().join(".github/workflows");
     fs::create_dir_all(&wf).unwrap();
     let check = "jobs:\n  check:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@main\n  other:\n    steps:\n      - uses: actions/checkout@v4\n";
@@ -261,7 +261,7 @@ fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
     let (r, _) = run(&w, &w.opts());
     assert_eq!(step(&r, "pins").status, "ok", "{}", r.markdown());
     let t = w.read(".github/workflows/check.yml");
-    assert!(t.contains("check.yml@v0.0.17\n") && t.contains("actions/checkout@v4"));
+    assert!(t.contains("check.yml@v0.0.18\n") && t.contains("actions/checkout@v4"));
     assert!(!t.contains("@main"));
     // A second run finds the tag in place and changes nothing.
     let (r, _) = run(&w, &w.opts());
@@ -270,10 +270,10 @@ fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
 #[test]
 fn pins_never_lowers_a_pin_to_an_older_tag() {
     let w = World::new();
-    tag_release(&w, &["v0.0.17", "v0.0.18"]);
+    tag_release(&w, &["v0.0.18", "v0.0.19"]);
     let wf = w.work().join(".github/workflows");
     fs::create_dir_all(&wf).unwrap();
-    let sha = git(&w.rel(), &["rev-parse", "v0.0.18"]);
+    let sha = git(&w.rel(), &["rev-parse", "v0.0.19"]);
     let check = format!(
         "jobs:\n  check:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@{sha}\n"
     );

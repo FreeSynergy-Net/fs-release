@@ -8,11 +8,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: lib-umzug
-  version: 0.0.17
+  version: 0.0.18
   title: Move a library or contract into its own repo - import, rename, check, repo, CI, review, tag, users pin, delete the copy
 do:
   - entscheid:
-      call: decision-ref:0.0.17@fs
+      call: decision-ref:0.0.18@fs
       with:
         decision: ${ .input.decision }
         source_repo: ${ .input.source_repo }
@@ -39,7 +39,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - no decision file means no start, the flow ends in `eskalation` (person); a missing result is not a decision."
   - vorhanden:
-      call: lib-exists:0.0.17@fs
+      call: lib-exists:0.0.18@fs
       with:
         target_repo: ${ .input.target_repo }
         crates: ${ .input.crates }
@@ -69,7 +69,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - only a green, proven result goes on; red or missing goes to `eskalation`."
   - import:
-      call: lib-import:0.0.17@fs
+      call: lib-import:0.0.18@fs
       with:
         source_repo: ${ .input.source_repo }
         source_ref: ${ .input.source_ref }
@@ -86,7 +86,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The worker copies the crate directories BYTE-EQUAL from the source ref into the new place (target branch `unreviewed/<name>`, own clone in its work area, never /srv/FreeSynergy/fs-*) and commits ONLY that: the commit message names source repo, ref, the full 40-character SHA and the paths; `git diff --no-index` of source and target is empty. No rewriting, no improving in this commit. Local commit only, no push."
   - abhaengigkeiten:
-      call: lib-deps:0.0.17@fs
+      call: lib-deps:0.0.18@fs
       with:
         target_repo: ${ .input.target_repo }
         crates: ${ .input.crates }
@@ -116,7 +116,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a violated layer rule or a missing result stops at once (`eskalation`)."
   - rename:
-      call: lib-rename:0.0.17@fs
+      call: lib-rename:0.0.18@fs
       with:
         target_repo: ${ .input.target_repo }
         crates: ${ .input.crates }
@@ -131,7 +131,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Mechanical rename old -> new crate names (word boundary, also `_` spelling, Cargo.toml, `use` paths, docs, CI files), own commit. The `keep` list ({pattern, grund}) is checked: a `keep` entry without a single hit is RED (the list is wrong or stale), an old name outside `keep` that is still found is RED. Reuse the rename scaffold of `scripts/umbenennen` where it fits (`--keep`). (Spezifikation, Werkzeug folgt for the move case)"
   - workspace:
-      call: lib-workspace:0.0.17@fs
+      call: lib-workspace:0.0.18@fs
       with:
         target_repo: ${ .input.target_repo }
         crates: ${ .input.crates }
@@ -147,7 +147,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Workspace of the new repo: crate metadata, licence AS IN THE SOURCE, the AI note \"Built with help from Claude (AI)\", README (de and en), `deny.toml`, the caller of the reusable CI workflows including the Windows job. Org and tag (or SHA) of the called workflows are PROVEN with `git ls-remote --tags <org>/fs-release` (command and answer in the report) - no assumption, no remembering. Commits split: workspace, then clippy/fmt fixes, each its own."
   - gates-lokal:
-      call: repo-gates:0.0.17@fs
+      call: repo-gates:0.0.18@fs
       with:
         target_repo: ${ .input.target_repo }
       export:
@@ -182,7 +182,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Only for a NEW repo name: the user says the name explicitly (names given out are never free again, ADR 0080). For a move into an EXISTING repo this step is skipped (`if` target_new). Without the user word no repo is created."
   - repo:
-      call: repo-create-or-branch:0.0.17@fs
+      call: repo-create-or-branch:0.0.18@fs
       with:
         target_repo: ${ .input.target_repo }
         target_new: ${ .input.target_new }
@@ -196,7 +196,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "ONLY a helper (never the worker): creates the new GitHub repo (after the name gate) or opens the branch in the existing repo, and pushes the branch `unreviewed/...` - the push is the helper's, the worker never pushes. Output: repo URL and the pushed head (full SHA). (Spezifikation, Werkzeug folgt)"
   - zweig-ci:
-      call: branch-ci:0.0.17@fs
+      call: branch-ci:0.0.18@fs
       with:
         target_repo: ${ .input.target_repo }
         head: ${ .input.head }
@@ -226,7 +226,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.17
+          version: 0.0.18
         input:
           repo: ${ .input.target_repo }
           branch: ${ .input.branch }
@@ -259,7 +259,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: ff-und-tag
-          version: 0.0.17
+          version: 0.0.18
         input:
           repo: ${ .input.target_repo }
           branch: ${ .input.branch }
@@ -278,7 +278,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: pin-kaskade
-          version: 0.0.17
+          version: 0.0.18
         input:
           ausloeser-tag: ${ .input.tag }
           glieder: ${ .input.users }
@@ -292,7 +292,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Every user repo (input `users`) pins the new crate and renames its imports (`rename` rules, `keep` respected), through `pin-kaskade`, from the bottom up (the order comes from the DAG, not from a list); each one with its own branch CI and review as in that flow. The old copy stays until this step is green."
   - kopie-loeschen:
-      call: lib-copy-delete:0.0.17@fs
+      call: lib-copy-delete:0.0.18@fs
       with:
         source_repo: ${ .input.source_repo }
         source_paths: ${ .input.source_paths }
@@ -307,7 +307,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "ONLY after the green pin: deletes the old crate in the source repo and in EVERY repo that holds a copy (e.g. duplicate crates in two repos) - on a branch, the deletion is code (git rm), no data and no repo deleted. Check: the same type/trait comes from ONE source only (`cargo tree -d`, lock check `lock-check`, a grep over all Cargo.lock); a second source is RED. (Spezifikation, Werkzeug folgt)"
   - nachher:
-      call: lib-after:0.0.17@fs
+      call: lib-after:0.0.18@fs
       with:
         source_repo: ${ .input.source_repo }
         crates: ${ .input.crates }

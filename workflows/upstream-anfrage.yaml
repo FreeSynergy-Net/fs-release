@@ -25,11 +25,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: upstream-anfrage
-  version: 0.0.17
+  version: 0.0.18
   title: Send one request to an upstream project by the channel the person chooses
 do:
   - art-pruefen:
-      call: request-kind:0.0.17@fs
+      call: request-kind:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         art: ${ .input.art }
@@ -58,7 +58,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a pull request goes to `pr-nach-antwort` (red until the answer or the time limit, and only the human sends it); a comment or a missing result goes to `abgelehnt`; only `red == false` goes on to the proof."
   - ziel-regeln-lesen:
-      call: target-rules:0.0.17@fs
+      call: target-rules:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
       export:
@@ -71,7 +71,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "TEXTS TO THE OUTSIDE (a), mandatory for every outside text. The agent READS the rules of the target (CONTRIBUTING, code of conduct, AI or LLM stance, issue and PR template, the contributor notes in the README) read only, and cites the place of each finding (file and line or link, at the date read); no citation means not read. Result `ziel` with `ki` (`erlaubt`, `verlangt`, `ohne-vermerk` = the rules forbid an AI note in the text, as at Blinc, or `abgelehnt` = the target refuses AI contributions, as Kanidm), `bot` (`erlaubt` only when the cited rules allow a bot or an AI agent to write and send itself; silent rules or none = `nein`), `format` (the format of the target: template fields, language, length) and `fundstellen`. Silent rules count as `erlaubt`."
   - erstkontakt-lesen:
-      call: first-contact-read:0.0.17@fs
+      call: first-contact-read:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         datei: ${ .input.erstkontakt_datei // "workflows/upstream-erstkontakt.txt" }
@@ -97,7 +97,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (a) and (b)) - no `fundstellen` (missing or empty: the rules count as NOT read), a missing `ziel` result or a `ki` value outside the fixed set `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt` (the rules are NOT read: nothing is prepared). A target that REJECTS AI contributions (`ki == abgelehnt`, Kanidm) is NOT stopped here (user decision 23.11.2026): the draft IS prepared up to the copy block and the preview, but afterwards ONLY the human sends it (`send` is blocked by its `if:`, the person uses `hand-text`). Only a cited result with a value of the set goes on. The AI note for the text is decided right after by `ki-hinweis` from the entry of `erstkontakt-lesen` (first contact: the note stands once, clearly; later only on a condition)."
   - ki-hinweis:
-      call: ai-note-decide:0.0.17@fs
+      call: ai-note-decide:0.0.18@fs
       with:
         erstkontakt: ${ $context.erstkontakt }
         ziel: ${ $context.ziel }
@@ -128,7 +128,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (b2)) - the order names WHO sends: `absender` = `mensch` | `bot`; a missing or other value is held back. The bot as sender is refused (`abgelehnt`) at the FIRST contact (the human writes and sends it), at Kanidm (agents and bot never send themselves), at a target that refuses AI, and at every target except Blinc whose cited rules (`ziel.bot`) do not allow a bot; Blinc stays allowed by rule 98 (git-bug). A text of the bot is openly the bot, never in the voice of the user."
   - belegen:
-      call: prove-ai:0.0.17@fs
+      call: prove-ai:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         evidence: ${ .input.evidence }
@@ -155,7 +155,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - an unproven statement (or a missing result) is held back: `abgelehnt`; only `belegt == true` goes on to the duplicate search."
   - dubletten:
-      call: search-duplicates-ai:0.0.17@fs
+      call: search-duplicates-ai:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         belegt: ${ $context.belegt }
@@ -182,7 +182,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a duplicate (the same request already stands in the tracker) or a missing result goes to `abgelehnt` with the link, no comment is written there; only an empty hit list (`treffer` present and empty) goes on."
   - ticket:
-      call: git-bug-ticket:0.0.17@fs
+      call: git-bug-ticket:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         belegt: ${ $context.belegt }
@@ -195,7 +195,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - the request is a git-bug ticket in OUR repo (`git-bug` entry with labels kind and area); the id is returned and stands in the text and in the report. Nothing is sent to the upstream yet. Result `ticket` with `id`."
   - draft:
-      call: draft-issue:0.0.17@fs
+      call: draft-issue:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         evidence: ${ $context.belegt }
@@ -213,7 +213,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body; it names the git-bug id of the ticket; NO address or personal data, NO AI words except the one honest AI note below, no pull request, no comment in a foreign issue. TEXTS TO THE OUTSIDE (b) - INFORM, do not advertise, do not nag - when `ki_hinweis` is true (first contact, or a condition of `ki-hinweis`) the text states the AI help ONCE, clearly, as ONE honest sentence or short paragraph inside the text (what the AI did and that a human stands behind or answers) - never a signature, never a trailer, never a robot footer, no session link, never scattered; when `ki_hinweis` is false there is NO AI word (nothing is denied when somebody asks). Voice by `absender` - `mensch` is the voice of the user (we or I as the user would say it), `bot` is OPENLY the bot (Claude), never in the voice of the user, no pretence of a person; the format follows `ziel.format`.
   - rules:
-      call: upstream-rules:0.0.17@fs
+      call: upstream-rules:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         draft: ${ $context.draft }
@@ -227,7 +227,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Script - reads the CLAUDE.md of the upstream clone (Blinc - /srv/FreeSynergy/blinc) and checks the draft against it AND against the rules and format cited in `ziel` (`ziel.fundstellen`, `ziel.format`, `ziel.ki`); for Blinc no Claude, Anthropic or AI mention, no Co-Authored-By, no session link, no robot footer; a new Blinc PR needs the user's question first. The result is `hits`, the list of broken rules.
   - text-gate:
-      call: text-gate:0.0.17@fs
+      call: text-gate:0.0.18@fs
       with:
         draft: ${ $context.draft }
         ticket: ${ $context.ticket }
@@ -259,7 +259,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a hit of `rules` or `text-gate` (a missing `hits` result counts as a hit) goes back to draft with the hits as the order, from the third round (`runde` >= 3) to `eskalation`; a clean draft goes on to the copy block (`kopierblock`) and the preview gate.
   - kopierblock:
-      call: copy-block:0.0.17@fs
+      call: copy-block:0.0.18@fs
       with:
         draft: ${ $context.draft }
         format: ${ $context.ziel.format }
@@ -286,7 +286,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (c), mandatory gate) - without a copy block whose preview in the target format was checked (`vorschau_ok == true`, a missing result counts as not checked) NOTHING goes to the user or on: `abgelehnt`."
   - blinc-kanal:
-      call: blinc-channel:0.0.17@fs
+      call: blinc-channel:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
       export:
@@ -299,7 +299,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - for Blinc with the sender `bot` the channel is `git-bug` and nothing else, set by the rule of the Blinc permission (98): no approval of the user is asked for a proven, duplicate-free, English text without AI words (the gate above), no pull request, no comment. Result `channel`."
   - approval:
-      call: approve:0.0.17@fs
+      call: approve:0.0.18@fs
       with:
         block: ${ $context.block }
       export:
@@ -312,7 +312,7 @@ do:
         freesynergy.net:summary: TEXTS TO THE OUTSIDE (d) - the SENDER (the user) reads the copy block `block` against the preview and the cited rules of the target, and gives the YES for exactly this text, beforehand; without it nothing is sent, a changed text needs a new YES. Result `freigabe` (`ja`); only `ja == true` lets a human sender go to `send`. The approval is skipped ONLY for the sender `bot` at Blinc (rule 98, we are the sender there, the bot, by THEIR rules); a human sender at Blinc ALSO goes through it, so no text goes out in the voice of the user unread.
       if: '${ (.input.upstream == "blinc" and .input.absender == "bot") | not }'
   - choose-channel:
-      call: choose-channel:0.0.17@fs
+      call: choose-channel:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
       export:
@@ -325,7 +325,7 @@ do:
         freesynergy.net:summary: The person chooses the channel for this upstream - `tracker` (the upstream's own issue tracker, e.g. a GitHub issue under the user's account, only after the user's release for exactly this channel), `git-bug` (only if we have write access to the upstream's repository; `git-bug push` over SSH fails otherwise) or `direct` (Discord or mail, the user writes it themselves with the approved text as the template). Without a choice nothing is sent.
       if: '${ (.input.upstream == "blinc" and .input.absender == "bot") | not }'
   - send:
-      call: send-issue:0.0.17@fs
+      call: send-issue:0.0.18@fs
       if: '${ $context.channel != "direct" and .input.upstream != "kanidm" and $context.ziel.ki != "abgelehnt" and (.input.absender == "bot" or $context.freigabe.ja == true) }'
       with:
         upstream: ${ .input.upstream }
@@ -340,7 +340,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Script - sends by the chosen channel, only the approved copy block `block` (exactly what the sender read), only after the YES and the choice (for Blinc without a YES, by rule 98 and the gates above); `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The step is BLOCKED by its `if:` for Kanidm and every target with `ziel.ki == abgelehnt` (agents and bot never send there, the person does by `hand-text`) and for a human sender without the YES (`freigabe.ja`). The helper of the strategy runs it; an agent never calls gh or a browser login. WHO sends is `absender` - a human (first contact always) or, from the second contact on and only where allowed (step `absender-weiche`), openly the bot.
   - hand-text:
-      call: hand-text:0.0.17@fs
+      call: hand-text:0.0.18@fs
       if: '${ $context.channel == "direct" or .input.upstream == "kanidm" or $context.ziel.ki == "abgelehnt" or ($context.freigabe.ja != true and .input.absender != "bot") }'
       with:
         block: ${ $context.block }
@@ -351,7 +351,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Direct contact (Discord, mail) and EVERY send at Kanidm or at a target that refuses AI, or by a human without the YES - the person writes and sends the message themselves, with the approved copy block `block` as the template; the machine sends nothing and the agent does nothing in this step.
   - erstkontakt-vermerken:
-      call: first-contact-note:0.0.17@fs
+      call: first-contact-note:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         datei: ${ .input.erstkontakt_datei // "workflows/upstream-erstkontakt.txt" }
@@ -365,7 +365,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Script - AFTER the text was SENT (by `send`, or the person confirmed that they sent it themselves by `hand-text`): sets the line of this target project in `workflows/upstream-erstkontakt.txt` when there was none (`erstkontakt=<UTC date>`, `quelle=<issue id or direct>`, `reaktion=offen`), otherwise only updates it; the `reaktion` is added later when an answer arrives (also by `upstream-watch`). One list, one source; nothing is written when nothing was sent. The file is part of the checked-in repo fs-release: the write lands as a change in a worker branch (or the working copy of the coordinator) and goes through review like any change; agents never push, tag or merge it themselves."
   - link-ins-ticket:
-      call: ticket-link:0.0.17@fs
+      call: ticket-link:0.0.18@fs
       with:
         ticket: ${ $context.ticket }
         channel: ${ $context.channel }
@@ -376,7 +376,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script - writes the link of the sent issue (or the note `direct`) into the git-bug ticket of our repo, so the ticket and the upstream issue point at each other."
   - record:
-      call: note-history:0.0.17@fs
+      call: note-history:0.0.18@fs
       then: end
       with:
         id: ${ $context.send.id }
@@ -389,7 +389,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The agent notes the history - upstream, channel, issue id (none for `direct`), date, the approved text, later answers - in the report; no planning files in the upstream.
   - pr-nach-antwort:
-      call: pr-gate:0.0.17@fs
+      call: pr-gate:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         issue: ${ .input.issue }
@@ -417,7 +417,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a missing result, no answer and no expired time limit, or rules of the upstream not cited (`fundstellen` empty) keep the pull request RED: `pr-rot`; only `frei == true` with cited rules goes on to the approval of the user."
   - pr-ziel-regeln:
-      call: target-rules:0.0.17@fs
+      call: target-rules:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         art: pr
@@ -431,7 +431,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "TEXTS TO THE OUTSIDE (a) for the pull request: the SAME call as `ziel-regeln-lesen` (no copy of its logic) - the rules of the target (CONTRIBUTING, AI or LLM stance, PR template) are read read only and cited in `fundstellen`, with `ki` and `format`. The rules of the upstream go first."
   - pr-erstkontakt-lesen:
-      call: first-contact-read:0.0.17@fs
+      call: first-contact-read:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         datei: ${ .input.erstkontakt_datei // "workflows/upstream-erstkontakt.txt" }
@@ -457,7 +457,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow, the same rule as `ki-haltung-weiche` (TEXTS TO THE OUTSIDE (a), (b)) - no `fundstellen`, no `ziel` result or a `ki` value outside `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt`: the rules are NOT read."
   - pr-ki-hinweis:
-      call: ai-note-decide:0.0.17@fs
+      call: ai-note-decide:0.0.18@fs
       with:
         erstkontakt: ${ $context.erstkontakt }
         ziel: ${ $context.ziel }
@@ -512,7 +512,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Blinc - `vermerk.ki` is false whatever `ki_hinweis` says: NO AI attribution in the pull request text (rule of the maintainer, quoted in the head of this flow). The text gate then refuses every AI word."
   - pr-dubletten:
-      call: search-duplicates-ai:0.0.17@fs
+      call: search-duplicates-ai:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         belegt: ${ $context.pr_tor }
@@ -540,7 +540,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow, the same rule as `dubletten-weiche` - a duplicate pull request or a missing result goes to `abgelehnt` with the link, no comment is written there; only an empty hit list goes on."
   - pr-regeln:
-      call: upstream-rules:0.0.17@fs
+      call: upstream-rules:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         draft: ${ .input.pr_text }
@@ -554,7 +554,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script, the SAME call as `rules` - checks the PR text against the CLAUDE.md of the upstream clone and the rules cited in `ziel` (for Blinc: no Claude, Anthropic or AI mention, no Co-Authored-By)."
   - pr-text-gate:
-      call: text-gate:0.0.17@fs
+      call: text-gate:0.0.18@fs
       with:
         draft: ${ .input.pr_text }
         ticket: ${ .input.issue }
@@ -583,7 +583,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a hit of `pr-regeln` or `pr-text-gate` (a missing `hits` result counts as a hit) keeps the pull request RED (`pr-rot`, the hits are the reason); the text is corrected and the flow runs again. A clean text goes on to the copy block."
   - pr-kopierblock:
-      call: copy-block:0.0.17@fs
+      call: copy-block:0.0.18@fs
       with:
         draft: ${ .input.pr_text }
         format: ${ $context.ziel.format }
@@ -610,7 +610,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (c), mandatory gate), the same rule as `vorschau-weiche` - without a copy block whose preview in the target format was checked NOTHING goes to the user: `abgelehnt`."
   - pr-freigabe:
-      call: approve:0.0.17@fs
+      call: approve:0.0.18@fs
       with:
         block: ${ $context.block }
       export:
@@ -622,7 +622,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The sender (the user) reads the pull request text and the patch against the cited rules of the upstream and gives the YES for exactly this text, beforehand. This step comes only after the same gates as an issue (rules read, attitude switch, duplicates, text gate, copy block with a checked preview). The AI note follows the rules of the target: openly named where `vermerk.ki` is true, never hidden, never denied; at Blinc there is NO AI attribution (house rule). Without the YES nothing goes out."
   - pr-hand-text:
-      call: hand-text:0.0.17@fs
+      call: hand-text:0.0.18@fs
       then: end
       if: '${ $context.freigabe.ja == true }'
       with:

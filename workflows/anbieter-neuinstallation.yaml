@@ -9,7 +9,7 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: anbieter-neuinstallation
-  version: 0.0.17
+  version: 0.0.18
   title: Reinstall a server from the provider rescue system (way C, Hetzner installimage) - config, check, data-loss gate, rescue, install, reboot, check, hand-over
 do:
   - variables:
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: 'The person writes the variable set (plain text, no secrets): HOSTNAME, IMAGE (exact file name from the images directory of the rescue system: Debian 13 or 12, Ubuntu), BOOT_MODE (uefi or bios, or taken from the inventory), DRIVE1 and DRIVE2 (or from the inventory), BOOT_SIZE_MIB, ESP_SIZE_MIB, SWAP_GIB, ROOT_GIB, FS_DATA (btrfs default, zfs optional, none). Way C only; the setup of our layer is the separate flow server-einrichtung (way A).'
   - inventory:
-      call: fs-server-bestand:0.0.17@fs
+      call: fs-server-bestand:0.0.18@fs
       with:
         mode: read-only
         output: bestand-vorher.json
@@ -87,7 +87,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: 'Control flow - a red check goes back to variables; the config is never edited by hand to make it pass. Green goes on to the data-loss gate.'
   - data-loss-gate:
-      call: confirm-plan:0.0.17@fs
+      call: confirm-plan:0.0.18@fs
       with:
         file: plan.txt
         repeat: hostname
@@ -113,7 +113,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: 'Control flow - a NO or a wrong host name ends the flow here, nothing has been changed; a YES goes on to rescue.'
   - rescue:
-      call: provider-rescue:0.0.17@fs
+      call: provider-rescue:0.0.18@fs
       with:
         provider: hetzner
         config: installimage.conf
@@ -126,7 +126,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: 'The person does it, no agent has access - in the Hetzner Robot activates the Rescue System (Linux 64 bit, own public key), triggers a hardware reset or reboot, waits, logs in by SSH to the rescue system (host key shown and compared first) and copies installimage.conf there. Expected - a root shell in the rescue system and the file present. Emergency hint - if the machine does not come up, Robot offers reset and the vKVM option; they help the person and are never a precondition of this flow.'
   - install:
-      call: fs-server-run:0.0.17@fs
+      call: fs-server-run:0.0.18@fs
       with:
         action: installimage
         config: installimage.conf
@@ -159,7 +159,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: 'Control flow - a failed installimage goes back to variables when the config was the cause, repeats up to three times otherwise, then ends the flow; the person reads the log (hardware or Robot support). Green goes on to the reboot.'
   - reboot:
-      call: reboot:0.0.17@fs
+      call: reboot:0.0.18@fs
       with:
         command: reboot
         from: rescue
@@ -172,7 +172,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: 'GATE - the person types reboot in the rescue system (rescue is a one-time mode, the next start comes from the disk). Never automatic. Expected - the machine goes down and comes up with the new system. Emergency hint - if it does not return, Robot reset, then vKVM or the rescue again as a help; the flow then goes back to rescue.'
   - first-boot-check:
-      call: fs-server-bestand:0.0.17@fs
+      call: fs-server-bestand:0.0.18@fs
       with:
         mode: read-only
         output: bestand-nachher.json
@@ -202,7 +202,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: 'Control flow - not reachable, or boot mode or RAID differs from the plan, goes back to rescue (the person decides about a new installimage run); green goes on.'
   - data-part:
-      call: fs-server-run:0.0.17@fs
+      call: fs-server-run:0.0.18@fs
       with:
         action: data-filesystem
         from: plan.txt
@@ -220,7 +220,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: server-einrichtung
-          version: 0.0.17
+          version: 0.0.18
         input: ${ $context.server }
       metadata:
         freesynergy.net:actor: human
@@ -229,7 +229,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: 'Continue with the flow server-einrichtung (way A) on the new system - inventory, dry run, approval, layer, hardening, services. Way C ends here; it sets up no service and no package source.'
   - hand-back:
-      call: return-log:0.0.17@fs
+      call: return-log:0.0.18@fs
       then: end
       with:
         files: [bestand-vorher.json, installimage.conf, plan.txt, bestand-nachher.json, protocol.log]

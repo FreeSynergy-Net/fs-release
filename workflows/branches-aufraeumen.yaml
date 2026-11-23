@@ -8,11 +8,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: branches-aufraeumen
-  version: 0.0.17
+  version: 0.0.18
   title: "Branch, clone and target clean-up list with a user script - agents delete nothing, the user runs it"
 do:
   - remote-lage:
-      call: remote-heads:0.0.17@fs
+      call: remote-heads:0.0.18@fs
       with:
         repos: ${ .input.repos }
       export:
@@ -24,7 +24,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script (read only) - per repo `git ls-remote --heads <url>` gives the heads of all branches; main and the newest tag are named. Nothing is fetched into a working tree, nothing is changed. Result `heads` (repo, branch, head)."
   - merged-belegen:
-      call: merged-proof:0.0.17@fs
+      call: merged-proof:0.0.18@fs
       with:
         heads: ${ $context.heads }
       export:
@@ -36,7 +36,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script (read only) - for every branch `git merge-base --is-ancestor <head> origin/main` (merged = the head is part of main) and `git cherry` as the second view; `unreviewed/*` branches are listed apart. Result `branches` with the proof per branch (head, result of the check, date of the last commit); a branch without a proof is `unklar`, never `merged`."
   - lokal-listen:
-      call: local-list:0.0.17@fs
+      call: local-list:0.0.18@fs
       with:
         wurzeln: ${ .input.wurzeln }
       export:
@@ -48,7 +48,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script (read only) - lists the local clones under `.scratch/review-*`, the work trees under `wt/*`, the `target` folders (size per folder, last change, which run owns them according to the board) and the temporary folders of finished runs. Result `lokal`; nothing is touched."
   - podman-listen:
-      call: podman-list:0.0.17@fs
+      call: podman-list:0.0.18@fs
       export:
         as: '${ $context + { podman: . } }'
       metadata:
@@ -58,7 +58,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Script (read only) - lists the podman images and volumes (name, size, age, used by which run). Anonymous volumes and everything of other runs are marked BLEIBT and are never put on a list for removal. Result `podman`."
   - bleibt-liste:
-      call: sort-lists-ai:0.0.17@fs
+      call: sort-lists-ai:0.0.18@fs
       with:
         branches: ${ $context.branches }
         lokal: ${ $context.lokal }
@@ -73,7 +73,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The agent sorts everything found into two lists: `weg` (a branch that is merged with proof, a clone or work tree of a finished run, a target folder without an owner, an image of a finished run) and `bleibt` (a branch that is not merged, an open review, a lane that still runs, anonymous volumes and everything of other runs, everything without a proof). Every entry has its proof and the reason; when in doubt it goes to `bleibt`. The agent changes and runs nothing here. Result `listen` carrying `runde` (+1 for each jump back from `listen-weiche`)."
   - listen-pruefen:
-      call: check-list:0.0.17@fs
+      call: check-list:0.0.18@fs
       with:
         listen: ${ $context.listen }
       export:
@@ -101,7 +101,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red or missing check result goes back to `bleibt-liste` (the failing entries go to `bleibt`), from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the user script."
   - skript-erzeugen:
-      call: user-script-ai:0.0.17@fs
+      call: user-script-ai:0.0.18@fs
       with:
         listen: ${ $context.listen }
         datum: ${ .input.datum }
@@ -115,7 +115,7 @@ do:
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "The agent WRITES (does not run) the user script `aufraeumen-<datum>.sh` and an entry in `fuer-nutzer.md`: default `--dry-run` (it only prints; the removal needs the explicit `--apply`), a header check (the script is in the right folder, the repos match), a question j/N per group, a backup list BEFORE the removal, every name of the list `weg` as ONE single name (no placeholder, no glob), a `rm -rf` only after a check of the exact absolute path (not empty, under the allowed root), `git push --delete` per single branch; the delete commands are TEXT inside this script and are NEVER run by the agent. The entry says what the script does, what stays (`bleibt`) and how to check afterwards."
   - skript-pruefen:
-      call: check-user-script:0.0.17@fs
+      call: check-user-script:0.0.18@fs
       with:
         skript: ${ $context.skript }
         listen: ${ $context.listen }
@@ -144,7 +144,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red or missing script check goes back to `skript-erzeugen`, from the third round (`runde` >= 3) to `eskalation`; only `red == false` goes on to the user."
   - nutzer-fuehrt-aus:
-      call: user-runs:0.0.17@fs
+      call: user-runs:0.0.18@fs
       with:
         skript: ${ $context.skript }
       then: end

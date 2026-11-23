@@ -70,7 +70,7 @@ fn a_repo_without_workflow_files_is_green() {
 #[test]
 fn lift_is_red_at_yaml_check_for_the_broken_file_and_green_for_the_valid_one() {
     let w = World::new();
-    tag_release(&w, &["v0.0.17"]);
+    tag_release(&w, &["v0.0.18"]);
     put_workflow(&w.work(), GOOD);
     let (r, code) = lift::run(&w.opts(), &fs_release_chain::sys::SystemRunner::default());
     assert_eq!(code, 0, "{}", r.markdown());

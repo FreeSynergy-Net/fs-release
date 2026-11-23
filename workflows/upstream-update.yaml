@@ -8,11 +8,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: upstream-update
-  version: 0.0.17
+  version: 0.0.18
   title: Take over a new upstream release into the mirror and the catalog, security fixes first
 do:
   - pin-lesen:
-      call: pin-lesen:0.0.17@fs
+      call: pin-lesen:0.0.18@fs
       export:
         as: '${ $context + { pin: . } }'
       metadata:
@@ -23,7 +23,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "FIRST step, HANDLAUF (no script; read only). Read the pin that is really on origin/main and never believe the local clone or NEUE-VERSIONEN.md - gh api repos/<our mirror repo>/contents/mirror.toml?ref=main --jq .content | base64 -d, then read upstream version, [source] tag and commit from it; also gh api repos/<our mirror repo>/commits/main --jq .sha for the head of main. Compare with the local clone (git -C <clone> rev-parse HEAD against that sha) and with the list; a difference is reported first (example - the pin 1.12.1 was already on main although the list said open). Output - pinned version, tag, commit, main head, local head, equal yes/no. If the pin on main already equals the new tag, the run goes on as a check of an existing pin (review after the fact), it does not pin again."
   - check-upstream:
-      call: check-upstream:0.0.17@fs
+      call: check-upstream:0.0.18@fs
       with:
         upstream: ${ .input.upstream }
         repo: ${ .input.repo }
@@ -37,7 +37,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "HANDLAUF (no script, read commands only; sub-workflow check-upstream@fs has no script yet). Checklist, every point with its output in the report. (1) Release text and advisories: gh api repos/<repo>/releases/tags/<tag>, gh api repos/<repo>/security-advisories (403 or empty = say so, never guess); rate severity critical, high, medium, low, none, with the sentence of the text that proves it. (2) TAG TO COMMIT: gh api repos/<repo>/git/ref/tags/<tag>; if .object.type is tag, follow gh api repos/<repo>/git/tags/<sha> until a commit (annotated tag), else the ref sha IS the commit (lightweight tag); write down both shas and the type; only the commit counts. (3) SIGNATURE STATE: gh api repos/<repo>/commits/<commit> --jq .commit.verification and, for annotated tags, git/tags/<sha> --jq .verification; record verified, reason, signer; unsigned stays unsigned (never claimed signed), a change against mirror.toml tag_signed is reported. SIGNER IDENTITY: if verified, write verification.reason and the upstream signer (key id or user) of the upstream tag or commit; it is only recorded, never trusted by name alone, and never mixed with our key: an upstream tag never carries our key. Trust in the upstream state rests on the pinned commit and the ls-remote check. verify-mirror.sh (step Verify our signatures of mirror.yml: release-signing-key.asc fetched from fs-release, fingerprint from mirror.toml [signing].key_fingerprint) checks only OUR artifacts, our own signature is only ever our key; NOTE mirror.yml has no cosign step - it signs with OpenPGP and checks with verify-mirror.sh, plus SLSA attestation; that check is never loosened, skipped or made optional, not for a rush and not for a security fix. (4) FIX COMMIT IS IN THE TAG RANGE: name the fix commit or PR of the advisory (from release text or advisory), then gh api repos/<repo>/compare/<fix-commit>...<commit> --jq .status; status ahead or identical = the fix is contained, behind or diverged = NOT contained, stop and report (a fix on a release branch that is not on upstream master is a finding of its own). (5) IS THE MIRROR ALREADY PUBLISHED: gh release list -R <our mirror repo>, gh run list -R <our mirror repo> --workflow mirror.yml --limit 10; a release or draft for this tag, or a green run for this commit, is reported before anything is pinned again. Output - tag, tag object, commit, date, severity, advisory ids, signature state, fix-contained yes/no, mirror state. Card - Skript folgt (Rust): one read-only tool for points 2 to 5 (tag to commit, signature, fix in range, mirror state); until then hand work. High or critical goes first."
   - compare:
-      call: compare-versions:0.0.17@fs
+      call: compare-versions:0.0.18@fs
       with:
         from: ${ .input.from }
         to: ${ $context.upstream.tag }
@@ -49,7 +49,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "HANDLAUF (no script; compare-versions@fs). gh api repos/<repo>/compare/<from>...<to> --jq '.files[].filename' (read only), then look at exactly these files and say changed or unchanged for each - rust-toolchain.toml (MSRV), Cargo.lock (list added, removed, bumped crates by gh api contents at both tags), the build profile and Cargo.toml [profile.*], the container and packaging files. The answer goes into the report and decides whether mirror.yml needs a change; an unchecked file is written as not checked, never as unchanged. If the compare is too large (truncated file list) say so and read both trees by tag. A real change of toolchain or lock is an open decision for the review, not a silent pass."
   - pin:
-      call: pin-mirror:0.0.17@fs
+      call: pin-mirror:0.0.18@fs
       with:
         tag: ${ $context.upstream.tag }
         commit: ${ $context.upstream.commit }
@@ -62,7 +62,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "HANDLAUF (no script; pin-mirror@fs), done by hand in the branch worktree, local commits only, identity FreeSynergy. After step pin-lesen and check-upstream. Edit mirror.toml (upstream version, released, [source] tag, tag_signed, commit = the COMMIT of the check, never the tag object; artefact names carry the version), capabilities.toml (sources and version), every script, test and the README that carry the old version (grep -rn for the old version number and the old commit; every hit is changed or named as kept on purpose), and add the security note (severity, advisory, fixed in). Do not raise the version or crate of fs-release. Own read-only proof before commit - git ls-remote <upstream> refs/tags/<tag> refs/tags/<tag>^{} shows exactly the pinned commit (the same check mirror.yml makes). Only the pinned commit counts; never an unresolved tag."
   - capabilities-check:
-      call: capabilities-check:0.0.17@fs
+      call: capabilities-check:0.0.18@fs
       with:
         book: ${ .input.book }
         tag: ${ $context.upstream.tag }
@@ -76,7 +76,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "HANDLAUF (no script; capabilities-check@fs). For EVERY capability line of capabilities.toml - open the book (the user guide of the NEW version, gh api contents at the tag or the published book of that version), find the page and the sentence that proves the line, quote page and sentence in the report. A line the book does not show is marked not proven, never guessed. A changed support value (yes, no, unstable) is listed old value, new value, sentence, and decided in the review. Table in the report - line, old value, new value, proof or not proven. Card - Skript folgt (Rust): a tool that lists the capability lines and checks each quoted sentence against the book text; until then this is hand work."
   - docs:
-      call: docs-sync:0.0.17@fs
+      call: docs-sync:0.0.18@fs
       with:
         languages: [de, en]
       metadata:
@@ -87,7 +87,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "HANDLAUF (no script; docs-sync@fs). docs/de and docs/en are generated by the repo own tool, not edited by hand where generated: run python3 -I scripts/repo_tool.py docs and python3 -I scripts/repo_tool.py export (existing commands of the repo, they write docs and export from mirror.toml and capabilities.toml; no new script), then adapt by hand what is not generated (date of the check, security note). Check by reading - both languages name the same version, the same date and the same capability values (diff the two tables line by line); placeholders are gone (repo_tool.py check reports them). Card - Skript folgt (Rust): a de/en parity check."
   - local-gates:
-      call: repo-gates:0.0.17@fs
+      call: repo-gates:0.0.18@fs
       export:
         as: '${ $context + { gates: . } }'
       metadata:
@@ -117,7 +117,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: doku-mitziehen
-          version: 0.0.17
+          version: 0.0.18
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -150,7 +150,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review. Only green goes on."
   - head:
-      call: resolve-head:0.0.17@fs
+      call: resolve-head:0.0.18@fs
       with:
         branch: ${ .input.branch }
       export:
@@ -166,7 +166,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.17
+          version: 0.0.18
         input:
           repo: ${ .input.repo }
           branch: ${ .input.branch }
@@ -199,7 +199,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a NO goes back to pin with the findings of BERICHT.md as the order; from the third NO (`runde`) the flow ends in `upstream-eskalation`; a YES goes on to the tag.
   - tag:
-      call: tag:0.0.17@fs
+      call: tag:0.0.18@fs
       with:
         head: ${ $context.kopf.head }
       metadata:
@@ -209,7 +209,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Annotated tag v<version> of the mirror on the approved head hash (the approval file of exactly this hash must exist, as in release-flow), locally.
   - push:
-      call: push:0.0.17@fs
+      call: push:0.0.18@fs
       with:
         head: ${ $context.kopf.head }
       metadata:
@@ -219,7 +219,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Branch release-<version> and tag, never forced; the repo must be on the pre-approved list (as in release-flow); agents never push, the coordinator does.
   - mirror-gate:
-      call: mirror-gate:0.0.17@fs
+      call: mirror-gate:0.0.18@fs
       with:
         head: ${ $context.kopf.head }
         review: ${ $context.review.verdict }
@@ -231,7 +231,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "HANDLAUF (no script, no new Python; read commands only), BEFORE every dispatch of mirror.yml. Threat model, word for word - the gate protects against OVERSIGHT, not against someone who can change the workflow, the toolchain or the scripts. (1) The Opus YES of step review exists for exactly this head (the full 40-character hash of step head; a YES for an older hash does not count, a changed head means a new review). (2) CI at exactly this head, read yourself - gh api repos/<our mirror repo>/commits/<head>/check-runs --jq '.check_runs[] | [.name,.status,.conclusion]': check and secrets-scan are completed and success; red, missing or running = STOP (a run of an older hash does not count; a known false positive is no excuse, it is fixed in the repo first or decided by the person). (3) Only then dispatch (step start-build) with the REQUIRED input reviewed_head = this head; the dispatch is started on the ref of exactly this head. The gate job of mirror.yml is the first job (build needs gate) and aborts the run if reviewed_head is not exactly github.sha, and if check or secrets-scan at github.sha is not green (it reads gh api repos/<repo>/commits/<github.sha>/check-runs). There is NO field reviewed_head in mirror.toml (the commit that sets it would change the head, so it could never be equal). Publishing stays a step of its own (publish), by the person only; the draft is checked for pre-release state and head before it. Part 2 of the card (the same gate job in mirror.yml of fs-kanidm, fs-zentinel and fs-tuwunel, one wave, one review) is a separate order after the review of this step; until it is built the dispatch is NOT allowed to run without this hand check, written into the report with the output of point 2."
   - start-build:
-      call: dispatch-workflow:0.0.17@fs
+      call: dispatch-workflow:0.0.18@fs
       with:
         workflow: mirror.yml
         inputs:
@@ -286,7 +286,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - no green CI event of this head within 2 hours means `upstream-eskalation` (the person decides); a green event goes on to the Pre-release.
   - publish:
-      call: publish-release:0.0.17@fs
+      call: publish-release:0.0.18@fs
       with:
         from: draft
         to: pre-release
@@ -301,7 +301,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: publish-doc
-          version: 0.0.17
+          version: 0.0.18
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
@@ -309,7 +309,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Sub-workflow publish-doc.yaml - rebase, generate and fast-forward push of the docs main branch by the coordinator or the human, only AFTER the review (opus-ja) and the approval of the code, together with its merge; never before, never forced; the agent never pushes."
   - catalog-entry:
-      call: catalog-entry:0.0.17@fs
+      call: catalog-entry:0.0.18@fs
       with:
         program: ${ .input.upstream }
       metadata:
@@ -324,7 +324,7 @@ do:
         workflow:
           namespace: freesynergy.net
           name: catalog-bump
-          version: 0.0.17
+          version: 0.0.18
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -332,7 +332,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: Sub-workflow catalog-bump after the Pre-release is published, behind the approval, public reach only (as in release-flow).
   - catalog-check:
-      call: check:0.0.17@fs
+      call: check:0.0.18@fs
       then: end
       metadata:
         freesynergy.net:actor: machine

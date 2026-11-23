@@ -44,7 +44,7 @@ pub fn meta<'a>(d: &'a Value, n: &str, k: &str) -> &'a str {
         .unwrap_or("")
 }
 
-/// The call without the version (`text-gate:0.0.17@fs` gives `text-gate`).
+/// The call without the version (`text-gate:0.0.18@fs` gives `text-gate`).
 pub fn call<'a>(d: &'a Value, n: &str) -> &'a str {
     field(d, n, "call").split(':').next().unwrap_or("")
 }

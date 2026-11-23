@@ -181,7 +181,7 @@ pub(super) fn no_pr_calls(t: &str) -> bool {
         .collect();
     !calls.is_empty()
         && calls.iter().all(|c| {
-            c.strip_suffix(":0.0.17@fs")
+            c.strip_suffix(":0.0.18@fs")
                 .is_some_and(|name| CALLS.contains(&name))
         })
 }

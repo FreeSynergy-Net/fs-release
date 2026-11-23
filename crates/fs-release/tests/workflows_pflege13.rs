@@ -51,7 +51,7 @@ const PR_MUTANTS: [Mut; 33] = [
         );
     }),
     ("M7 pr-hand-text calls send-issue", |d| {
-        set_text(d, "pr-hand-text", "call", "send-issue:0.0.17@fs");
+        set_text(d, "pr-hand-text", "call", "send-issue:0.0.18@fs");
     }),
     ("M8 no Blinc case", |d| {
         drop_case(d, "pr-haltung-weiche", "blinc");
@@ -97,7 +97,7 @@ const PR_MUTANTS: [Mut; 33] = [
         set_meta(d, "pr-hand-text", "actor", "machine");
     }),
     ("M25 pr-ki-hinweis another call", |d| {
-        set_text(d, "pr-ki-hinweis", "call", "note-history:0.0.17@fs");
+        set_text(d, "pr-ki-hinweis", "call", "note-history:0.0.18@fs");
     }),
     ("M26 mit-vermerk falls into ohne-vermerk", |d| {
         remove_key(d, "pr-mit-vermerk", "then");
