@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0 # the next step needs origin/main
       - name: the commit of the tag is on main
-        uses: FreeSynergy-Net/fs-release/actions/tag-on-main@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+        uses: FreeSynergy-Net/fs-release/actions/tag-on-main@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
         env:
           TAG: ${{ fromJSON(inputs.plan).tag }}
       - name: the checkout is the commit of the tag
@@ -42,19 +42,19 @@ jobs:
           pattern: dist-*
           merge-multiple: true
           path: dist
-      - uses: FreeSynergy-Net/fs-release/actions/sbom@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+      - uses: FreeSynergy-Net/fs-release/actions/sbom@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
         with:
           name: ${{ fromJSON(inputs.plan).name }}
           version: ${{ fromJSON(inputs.plan).version }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
       # Order matters: package signatures change the files, so they come before the checksums.
-      - uses: FreeSynergy-Net/fs-release/actions/sign-files@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+      - uses: FreeSynergy-Net/fs-release/actions/sign-files@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
         with:
           mode: packages
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      - uses: FreeSynergy-Net/fs-release/actions/checksums@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
-      - uses: FreeSynergy-Net/fs-release/actions/sign-files@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+      - uses: FreeSynergy-Net/fs-release/actions/checksums@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
+      - uses: FreeSynergy-Net/fs-release/actions/sign-files@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
         with:
           mode: detached
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -63,7 +63,7 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*
-      - uses: FreeSynergy-Net/fs-release/actions/draft-release@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+      - uses: FreeSynergy-Net/fs-release/actions/draft-release@9134bcf813b1720aa4cd57c133401ee8ed88ce8e
         with:
           tag: ${{ fromJSON(inputs.plan).tag }}
           name: ${{ fromJSON(inputs.plan).name }}
