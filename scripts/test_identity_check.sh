@@ -116,4 +116,41 @@ hrun() { env "$@" bash "$tool" "$tmp/h" >"$tmp/o" 2>&1; }
 hrun CI=true GITHUB_EVENT_NAME=pull_request GITHUB_SHA=0000000000000000000000000000000000000000; chk "M1: pull_request, PR head is itself a merge commit (HEAD != GITHUB_SHA), foreign identity inside: red (rc 1)" test $? -eq 1
 sed 's/ && \[ "\$(g rev-parse HEAD)" = "\${GITHUB_SHA:-}" \]//' "$tool" >"$tmp/mutsha"; cmp -s "$tool" "$tmp/mutsha" && chk "M1 mutant: the GITHUB_SHA condition was found in the tool" false
 env CI=true GITHUB_EVENT_NAME=pull_request GITHUB_SHA=0000000000000000000000000000000000000000 bash "$tmp/mutsha" "$tmp/h" >/dev/null 2>&1; chk "M1 mutant (no GITHUB_SHA condition): the merge-head case turns green (the test sees it)" test $? -eq 0
+# --- Decision 9f (first check): no origin/main ON THE REMOTE = check ALL commits of the branch and say so; a fetch or network error is NOT "no main" ---
+# Threat model: the gate protects against MISTAKES, not against someone who can change workflow, toolchain or scripts.
+fx() { # fx <dir> <remote-state: none|main|broken>: clone-like repo with origin; commits: root(OK) + one
+  rm -rf "$tmp/$1" "$tmp/$1.git"; git init -q --bare -b main "$tmp/$1.git"; git init -q -b feat "$tmp/$1"; git -C "$tmp/$1" remote add origin "$tmp/$1.git"
+  [ "$2" = broken ] && git -C "$tmp/$1" remote set-url origin "$tmp/$1-does-not-exist.git"
+  r="$tmp/$1"; echo root >"$r/root"; git -C "$r" add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL=$OK git -C "$r" -c commit.gpgsign=false commit -q -m root
+  if [ "$2" = main ]; then git -C "$r" push -q origin feat:main; git -C "$r" fetch -q origin; fi
+  fc() { echo "$2" >"$r/$2"; git -C "$r" add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL="$1" GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL="$1" git -C "$r" -c commit.gpgsign=false commit -q -m "$2"; }
+}
+erun() { env CI=true GITHUB_ACTIONS=true bash "${2:-$tool}" "$tmp/$1" >"$tmp/o" 2>&1; rc=$?; }
+# (a) main exists: as before (range main..HEAD; the stock before main is not looked at)
+fx fa main; fc "$BAD" late; erun fa; chk "9f (a) main exists, foreign commit after it: red (rc 1), no first check" test $rc -eq 1 -a -z "$(grep -F 'Erstpruefung' "$tmp/o")"
+git -C "$tmp/fa" reset -q --hard HEAD~1; fc $OK fine; erun fa; chk "9f (a) main exists, clean range: green, no first check" test $rc -eq 0 -a -z "$(grep -F 'Erstpruefung' "$tmp/o")"
+# (b) no main on the remote, all commits FreeSynergy: green and visible
+fx fb none; fc $OK two; erun fb; chk "9f (b) no main, all commits allowed: green (rc 0)" test $rc -eq 0
+chk "9f (b) the message 'kein main: Erstpruefung' is shown" test -n "$(grep -F 'kein main: Erstpruefung' "$tmp/o")"
+chk "9f (b) all commits are counted (2)" test -n "$(grep -F 'identity ok: 2 commit(s)' "$tmp/o")"
+env -u CI -u GITHUB_ACTIONS bash "$tool" "$tmp/fb" >"$tmp/o" 2>&1; chk "9f (b) local (no CI): the same, green" test $? -eq 0
+# (c) no main, ONE foreign commit in the middle: red, commit named, address not
+fx fc none; fc "$BAD" mid; fc $OK three; erun fc; chk "9f (c) no main, foreign commit in the middle: red (rc 1)" test $rc -eq 1 -a -n "$(grep "$(git -C "$tmp/fc" rev-parse --short HEAD~1)" "$tmp/o")"
+chk "9f (c) the address is never printed" test -z "$(grep -F "$BAD" "$tmp/o")"
+fx fc2 none; GIT_AUTHOR_EMAIL=$BAD GIT_AUTHOR_NAME=a GIT_COMMITTER_EMAIL=$BAD GIT_COMMITTER_NAME=a git -C "$tmp/fc2" -c commit.gpgsign=false commit -q --amend --no-edit --reset-author; erun fc2; chk "9f (c) the foreign identity sits in the ROOT commit: red" test $rc -eq 1
+# (d) fetch error (the remote cannot be asked): red rc 2, NOT a first check
+fx fd broken; erun fd; chk "9f (d) remote not reachable: red (rc 2)" test $rc -eq 2
+chk "9f (d) not treated as a first check" test -z "$(grep -F 'Erstpruefung' "$tmp/o")"
+fx fe none; git -C "$tmp/fe" remote remove origin; erun fe; chk "9f (d) no remote at all: red (rc 2), never skipped" test $rc -eq 2
+# main exists on the remote but was not fetched: red, never a first check
+fx ff main; git -C "$tmp/ff" update-ref -d refs/remotes/origin/main; erun ff; chk "9f main exists on the remote but is not fetched: red (rc 2)" test $rc -eq 2 -a -z "$(grep -F 'Erstpruefung' "$tmp/o")"
+# an explicit base that does not exist stays red (rc 2), also without main
+bash "$tool" "$tmp/fb" nonexistent >/dev/null 2>&1; chk "9f explicit missing base: rc 2 as before" test $? -eq 2
+# shallow clone without main: the root commit is not known: red
+git clone -q --depth 1 "file://$tmp/fb" "$tmp/fs" 2>/dev/null; erun fs; chk "9f shallow clone without main: red (rc 2)" test $rc -eq 2
+# mutants: (1) the check of the first-check range removed (range empty) -> (c) turns green; (2) any ls-remote error counted as "no main" -> (d) turns green
+sed 's/^  range_base=""$/  range_base="HEAD.."/' "$tool" >"$tmp/mut9f1"; cmp -s "$tool" "$tmp/mut9f1" && chk "9f mutant 1 was applied" false
+erun fc "$tmp/mut9f1"; chk "9f mutant 1 (first-check range empty): case (c) turns green (the test sees it)" test $rc -eq 0
+sed 's/"\$lrc" -ne 2/"$lrc" -eq 99/' "$tool" >"$tmp/mut9f2"; cmp -s "$tool" "$tmp/mut9f2" && chk "9f mutant 2 was applied" false
+erun fd "$tmp/mut9f2"; chk "9f mutant 2 (ls-remote error = no main): case (d) turns green (the test sees it)" test $rc -eq 0
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi
