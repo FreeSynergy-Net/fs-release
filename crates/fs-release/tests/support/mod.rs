@@ -16,6 +16,7 @@ pub mod flowcheck;
 pub mod gh;
 pub mod kaskade;
 pub mod kaskade_rules;
+pub mod rel_tags;
 pub mod workflows;
 
 pub fn git(dir: &Path, args: &[&str]) -> String {

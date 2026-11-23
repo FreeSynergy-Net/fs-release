@@ -6,6 +6,7 @@ mod support;
 use fs_release::lift::{self, Report};
 use fs_release_chain::sys::SystemRunner;
 use std::fs;
+use support::rel_tags::tag_release;
 use support::{git, World};
 
 fn step<'a>(r: &'a Report, name: &str) -> &'a fs_release::task::Record {
@@ -23,6 +24,7 @@ fn run(w: &World, o: &lift::LiftOpts) -> (Report, i32) {
 /// A repo with workflows on `@main`, an old tag and a newer tag, committed in the world's work tree.
 fn world_with_workflows() -> World {
     let w = World::new();
+    tag_release(&w, &["v0.0.9", "v0.0.17"]);
     let wf = w.work().join(".github/workflows");
     fs::create_dir_all(&wf).unwrap();
     fs::write(
