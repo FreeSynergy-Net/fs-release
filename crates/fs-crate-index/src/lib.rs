@@ -18,6 +18,7 @@ pub mod cli;
 pub mod guard;
 pub mod publish;
 pub mod scan;
+pub mod semver;
 pub mod wait;
 
 pub use allow::{list_tags, parse_allow, Source};
@@ -26,4 +27,5 @@ pub use cli::main_with;
 pub use guard::{index_file, split_v2, version_of_ref};
 pub use publish::{check_dl, package, publish, PublishArgs};
 pub use scan::{scan, ScanArgs};
+pub use semver::{gate, Outcome, SemverArgs};
 pub use wait::{wait, WaitArgs};
