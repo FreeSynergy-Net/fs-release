@@ -1,11 +1,12 @@
-//! Pattern: none (test support). A throw-away registry (git index + `.crate` files, `file://`, no GitHub, no network): index line, checksum,
-//! fresh resolution of a consumer with `registry = "freesynergy"`, counter-test "a changed .crate is rejected by cargo", counter-test "a branch run writes nothing".
+//! Pattern: none (test support). A throw-away world, no GitHub, no network: a registry (git index + `.crate` files, `file://`), a source repo with three
+//! crates that mirror fs-types / fs-conformance / fs-records (a path dependency WITH `version` and `registry`, an optional path dependency,
+//! a feature `conf = ["dep:demo-lib"]`), tags, an allow list and a consumer with `registry = "freesynergy"`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use fs_crate_index::PublishArgs;
+use fs_crate_index::{ApplyArgs, ScanArgs};
 
 pub fn run(dir: &Path, cmd: &str, args: &[&str], envs: &[(&str, &Path)]) -> Output {
     let mut c = Command::new(cmd);
@@ -34,11 +35,15 @@ pub fn ok(o: &Output) -> String {
 pub struct World {
     _tmp: tempfile::TempDir,
     pub root: PathBuf,
-    pub lib: PathBuf,
+    /// the source repo (a git repo with the workspace of the three crates)
+    pub src: PathBuf,
     pub reg: PathBuf,
     pub url: String,
+    pub allow: PathBuf,
     pub n: u32,
 }
+
+const CRATES: [&str; 3] = ["demo-base", "demo-lib", "demo-app"];
 
 #[allow(dead_code)] // each test file uses a part
 impl World {
@@ -68,38 +73,106 @@ impl World {
             None,
         )
         .unwrap();
-        let lib = root.join("demo-lib");
-        fs::create_dir_all(lib.join("src")).unwrap();
-        fs::write(lib.join("src/lib.rs"), "pub fn answer() -> u32 { 42 }\n").unwrap();
+        let src = root.join("owner/demo");
+        let allow = root.join("allowed-sources.txt");
+        fs::write(
+            &allow,
+            "# test\nowner/demo 0.0.7 demo-base demo-lib demo-app\n",
+        )
+        .unwrap();
         let w = Self {
             _tmp: tmp,
             root,
-            lib,
+            src,
             reg,
             url,
+            allow,
             n: 0,
         };
-        w.set_version("0.0.7");
-        w
-    }
-    pub fn set_version(&self, v: &str) {
+        fs::create_dir_all(w.src.join(".cargo")).unwrap();
         fs::write(
-            self.lib.join("Cargo.toml"),
-            format!("[package]\nname = \"demo-lib\"\nversion = \"{v}\"\nedition = \"2021\"\nlicense = \"MIT\"\ndescription = \"demo\"\n"),
+            w.src.join(".cargo/config.toml"),
+            format!("[registries.freesynergy]\nindex = \"{}\"\n", w.url),
         )
         .unwrap();
-        ok(&run(&self.lib, "cargo", &["generate-lockfile"], &[]));
+        fs::write(
+            w.src.join("Cargo.toml"),
+            "[workspace]\nresolver = \"2\"\nmembers = [\"demo-base\", \"demo-lib\", \"demo-app\"]\n",
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&w.src, w.root.join("owner/demo.git")).unwrap(); // the clone URL ends with `.git`
+        ok(&run(&w.src, "git", &["init", "-q", "-b", "main"], &[]));
+        w.commit("init");
+        w
     }
-    pub fn args(&mut self, git_ref: &str) -> PublishArgs {
+
+    /// Writes the three crates in `version`; `answer` is the value `demo-base` returns.
+    pub fn write_crates(&self, version: &str, answer: u32) {
+        let dep = |n: &str, extra: &str| {
+            format!("{n} = {{ path = \"../{n}\", version = \"{version}\", registry = \"freesynergy\"{extra} }}\n")
+        };
+        for c in CRATES {
+            fs::create_dir_all(self.src.join(c).join("src")).unwrap();
+            let deps = match c {
+                "demo-lib" => dep("demo-base", ""),
+                "demo-app" => dep("demo-base", "") + &dep("demo-lib", ", optional = true"),
+                _ => String::new(),
+            };
+            let features = if c == "demo-app" {
+                "\n[features]\nconf = [\"dep:demo-lib\"]\n"
+            } else {
+                ""
+            };
+            fs::write(
+                self.src.join(c).join("Cargo.toml"),
+                format!("[package]\nname = \"{c}\"\nversion = \"{version}\"\nedition = \"2021\"\nlicense = \"MIT\"\ndescription = \"demo\"\npublish = [\"freesynergy\"]\n{features}\n[dependencies]\n{deps}"),
+            )
+            .unwrap();
+            let lib = match c {
+                "demo-base" => format!("pub fn answer() -> u32 {{ {answer} }}\n"),
+                "demo-lib" => "pub fn lib_answer() -> u32 { demo_base::answer() + 1 }\n".into(),
+                _ => "pub fn app_answer() -> u32 { demo_base::answer() }\n#[cfg(feature = \"conf\")]\npub fn conf_answer() -> u32 { demo_lib::lib_answer() }\n".into(),
+            };
+            fs::write(self.src.join(c).join("src/lib.rs"), lib).unwrap();
+        }
+        ok(&run(&self.src, "cargo", &["generate-lockfile"], &[]));
+    }
+
+    pub fn commit(&self, msg: &str) {
+        ok(&run(&self.src, "git", &["add", "-A"], &[]));
+        ok(&run(&self.src, "git", &["commit", "-q", "-m", msg], &[]));
+    }
+
+    /// New release: crates in `version`, commit on main, annotated tag `v<version>`.
+    pub fn release(&self, version: &str, answer: u32) {
+        self.write_crates(version, answer);
+        self.commit(&format!("release {version}"));
+        ok(&run(
+            &self.src,
+            "git",
+            &["tag", "-a", "-m", "release", &format!("v{version}")],
+            &[],
+        ));
+    }
+
+    pub fn scan_args(&mut self) -> ScanArgs {
         self.n += 1;
-        PublishArgs {
-            git_ref: git_ref.into(),
-            package: "demo-lib".into(),
-            workspace: self.lib.clone(),
+        ScanArgs {
+            allow: self.allow.clone(),
+            registry_dir: self.reg.clone(),
+            source_base: format!("file://{}", self.root.display()),
+            work_dir: self.root.join(format!("work-{}", self.n)),
+            out: self.root.join(format!("out-{}", self.n)),
+            semver_checks: None,
+        }
+    }
+    pub fn apply_args(&self, scan: &ScanArgs) -> ApplyArgs {
+        ApplyArgs {
+            allow: self.allow.clone(),
+            dir: scan.out.clone(),
             registry_dir: self.reg.clone(),
             index_url: self.url.clone(),
-            upload: "crates/{crate}".into(),
-            target_dir: self.root.join(format!("target-{}", self.n)),
+            source_base: scan.source_base.clone(),
         }
     }
     pub fn head(&self) -> String {
@@ -115,7 +188,7 @@ impl World {
         fs::create_dir_all(c.join(".cargo")).unwrap();
         fs::write(
             c.join("src/main.rs"),
-            "fn main() { println!(\"{}\", demo_lib::answer()); }\n",
+            "fn main() { println!(\"{} {}\", demo_app::app_answer(), demo_app::conf_answer()); }\n",
         )
         .unwrap();
         fs::write(
@@ -125,7 +198,7 @@ impl World {
         .unwrap();
         fs::write(
             c.join("Cargo.toml"),
-            format!("[package]\nname = \"consumer\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\ndemo-lib = {{ version = \"{req}\", registry = \"freesynergy\" }}\n"),
+            format!("[package]\nname = \"consumer\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\ndemo-app = {{ version = \"{req}\", registry = \"freesynergy\", features = [\"conf\"] }}\n"),
         )
         .unwrap();
         c

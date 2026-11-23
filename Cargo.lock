@@ -917,6 +917,8 @@ dependencies = [
  "anyhow",
  "clap",
  "reg-index",
+ "semver",
+ "serde_json",
  "tempfile",
 ]
 

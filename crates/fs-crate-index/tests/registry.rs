@@ -1,74 +1,106 @@
-//! Pattern: none (integration test: index line, checksum, fresh resolution of a consumer, a changed .crate is rejected by cargo).
+//! Pattern: none (integration test: the pull path end to end: scan -> apply, index lines, v2 features, fresh resolution of a consumer,
+//! a changed .crate is rejected by cargo, replay, semver gate wired).
 
 mod support;
 
 use std::fs;
 
-use fs_crate_index::publish;
+use fs_crate_index::{apply, scan};
 use support::{ok, run, World};
 
 #[test]
-fn tag_run_writes_index_line_checksum_and_crate_in_one_commit() {
+fn scan_and_apply_enter_three_crates_in_order_with_v2_features() {
     let mut w = World::new();
+    w.release("0.0.7", 42);
     let before = w.head();
-    let line = publish(&w.args("refs/tags/v0.0.7")).unwrap();
-    assert!(line.contains("demo-lib 0.0.7"), "{line}");
-    assert_ne!(before, w.head(), "one new commit");
+    let s = w.scan_args();
+    let rep = scan(&s).unwrap();
+    assert!(rep.error.is_none(), "{:?}", rep.error);
+    assert_eq!(rep.entries, 3);
+    assert_eq!(
+        w.head(),
+        before,
+        "scan (job 1) writes nothing to the registry"
+    );
+    let done = apply(&w.apply_args(&s)).unwrap();
+    assert_eq!(done.len(), 3);
     let count = ok(&run(
         &w.reg,
         "git",
         &["rev-list", "--count", &format!("{before}..HEAD")],
         &[],
     ));
-    assert_eq!(count.trim(), "1", "exactly one commit");
-    let files = ok(&run(
+    assert_eq!(count.trim(), "3", "one commit per crate");
+    let log = ok(&run(&w.reg, "git", &["log", "--format=%B", "-3"], &[]));
+    let sha = ok(&run(&w.src, "git", &["rev-parse", "v0.0.7^{commit}"], &[]));
+    assert!(
+        log.contains(&format!("source: owner/demo v0.0.7 commit {}", sha.trim())),
+        "tag commit in the message: {log}"
+    );
+    let first = ok(&run(
         &w.reg,
         "git",
-        &["show", "--name-only", "--format=%s", "HEAD"],
+        &["show", "--name-only", "--format=%s", "HEAD~2"],
         &[],
     ));
-    assert!(files.contains("Updating crate `demo-lib#0.0.7`"), "{files}");
     assert!(
-        files.contains("de/mo/demo-lib\n") || files.contains("de/mo/demo-lib"),
-        "{files}"
+        first.contains("demo-base#0.0.7")
+            && first.contains("crates/demo-base/demo-base-0.0.7.crate"),
+        "{first}"
+    );
+    // the optional dependency feature: `dep:` goes to features2 with v 2 (M1: such a crate is NOT refused)
+    let app = fs::read_to_string(w.reg.join("de/mo/demo-app")).unwrap();
+    assert!(
+        app.contains("\"features2\":{\"conf\":[\"dep:demo-lib\"]}") && app.contains("\"v\":2"),
+        "{app}"
     );
     assert!(
-        files.contains("crates/demo-lib/demo-lib-0.0.7.crate"),
-        "the .crate is in the same commit: {files}"
+        app.contains("\"features\":{}"),
+        "the v2 feature is not in `features`: {app}"
     );
-    let index = fs::read_to_string(w.reg.join("de/mo/demo-lib")).unwrap();
-    assert_eq!(index.lines().count(), 1);
-    let crate_file = w.reg.join("crates/demo-lib/demo-lib-0.0.7.crate");
     let sum = ok(&run(
         &w.reg,
         "sha256sum",
-        &[crate_file.to_str().unwrap()],
+        &[w.reg
+            .join("crates/demo-app/demo-app-0.0.7.crate")
+            .to_str()
+            .unwrap()],
         &[],
     ));
-    let sum = sum.split_whitespace().next().unwrap().to_string();
     assert!(
-        index.contains(&format!("\"cksum\":\"{sum}\"")),
-        "checksum of the index = sha256 of the file: {index} / {sum}"
+        app.contains(&format!(
+            "\"cksum\":\"{}\"",
+            sum.split_whitespace().next().unwrap()
+        )),
+        "{app}"
     );
     assert!(
-        index.contains("\"name\":\"demo-lib\"")
-            && index.contains("\"vers\":\"0.0.7\"")
-            && index.contains("\"yanked\":false"),
-        "{index}"
+        !app.contains("\"registry\":\""),
+        "same-registry dependencies are stored as such: {app}"
     );
     assert_eq!(
         ok(&run(&w.reg, "git", &["status", "--porcelain"], &[])).trim(),
-        "",
-        "nothing left uncommitted"
+        ""
     );
+    // replay: nothing new, nothing written
+    let head = w.head();
+    let s2 = w.scan_args();
+    let r2 = scan(&s2).unwrap();
+    assert!(r2.error.is_none() && r2.entries == 0, "{r2:?}");
+    assert_eq!(w.head(), head);
 }
 
 #[test]
-fn consumer_resolves_the_newest_version_of_the_range_fresh() {
+fn consumer_resolves_fresh_with_the_v2_feature() {
     let mut w = World::new();
-    publish(&w.args("refs/tags/v0.0.7")).unwrap();
-    w.set_version("0.0.8");
-    publish(&w.args("refs/tags/v0.0.8")).unwrap();
+    w.release("0.0.7", 42);
+    let s = w.scan_args();
+    scan(&s).unwrap();
+    apply(&w.apply_args(&s)).unwrap();
+    w.release("0.0.8", 50);
+    let s = w.scan_args();
+    assert_eq!(scan(&s).unwrap().entries, 3, "only the new tag");
+    apply(&w.apply_args(&s)).unwrap();
     let c = w.consumer("~0.0.7");
     let home = w.cargo_home();
     let o = run(
@@ -80,56 +112,113 @@ fn consumer_resolves_the_newest_version_of_the_range_fresh() {
             ("CARGO_TARGET_DIR", &c.join("target")),
         ],
     );
-    assert_eq!(ok(&o).trim(), "42");
+    assert_eq!(ok(&o).trim(), "50 51");
     let lock = fs::read_to_string(c.join("Cargo.lock")).unwrap();
-    assert_eq!(
-        lock.matches("name = \"demo-lib\"").count(),
-        1,
-        "one source: {lock}"
-    );
+    for n in ["demo-base", "demo-lib", "demo-app"] {
+        assert_eq!(
+            lock.matches(&format!("name = \"{n}\"")).count(),
+            1,
+            "one source of {n}: {lock}"
+        );
+    }
     assert!(
-        lock.contains("version = \"0.0.8\""),
-        "newest of ~0.0.7: {lock}"
+        lock.contains("version = \"0.0.8\"") && lock.contains(&format!("registry+{}", w.url)),
+        "{lock}"
     );
-    assert!(lock.contains(&format!("registry+{}", w.url)), "{lock}");
 }
 
 #[test]
 fn a_changed_crate_file_is_rejected_by_cargo() {
     let mut w = World::new();
-    publish(&w.args("refs/tags/v0.0.7")).unwrap();
-    // mutant: a different (valid) crate under the same name and version, the checksum in the index stays
-    let other = w.root.join("other");
-    fs::create_dir_all(other.join("src")).unwrap();
-    fs::write(other.join("src/lib.rs"), "pub fn answer() -> u32 { 13 }\n").unwrap();
-    fs::copy(w.lib.join("Cargo.toml"), other.join("Cargo.toml")).unwrap();
-    ok(&run(&other, "cargo", &["generate-lockfile"], &[]));
+    w.release("0.0.7", 42);
+    let s = w.scan_args();
+    scan(&s).unwrap();
+    apply(&w.apply_args(&s)).unwrap();
+    // mutant: another valid crate under the same name and version, the checksum in the index stays
+    w.write_crates("0.0.7", 13);
     ok(&run(
-        &other,
+        &w.src,
         "cargo",
         &[
             "package",
             "--locked",
+            "--no-verify",
+            "--allow-dirty",
+            "-p",
+            "demo-base",
             "--target-dir",
             w.root.join("t-other").to_str().unwrap(),
         ],
         &[],
     ));
     fs::copy(
-        w.root.join("t-other/package/demo-lib-0.0.7.crate"),
-        w.reg.join("crates/demo-lib/demo-lib-0.0.7.crate"),
+        w.root.join("t-other/package/demo-base-0.0.7.crate"),
+        w.reg.join("crates/demo-base/demo-base-0.0.7.crate"),
     )
     .unwrap();
     let c = w.consumer("~0.0.7");
     let home = w.cargo_home();
     let o = run(&c, "cargo", &["fetch"], &[("CARGO_HOME", &home)]);
     assert!(!o.status.success(), "cargo must refuse the changed .crate");
-    let err = String::from_utf8_lossy(&o.stderr).to_lowercase();
-    assert!(err.contains("checksum"), "{err}");
-    // control: the untouched crate is accepted (the test above would be green without the mutant too, if the fetch never worked)
+    assert!(String::from_utf8_lossy(&o.stderr)
+        .to_lowercase()
+        .contains("checksum"));
+    // control: the untouched world is accepted (otherwise the test would be green when the fetch never worked)
     let mut w2 = World::new();
-    publish(&w2.args("refs/tags/v0.0.7")).unwrap();
+    w2.release("0.0.7", 42);
+    let s2 = w2.scan_args();
+    scan(&s2).unwrap();
+    apply(&w2.apply_args(&s2)).unwrap();
     let c2 = w2.consumer("~0.0.7");
     let home2 = w2.cargo_home();
     ok(&run(&c2, "cargo", &["fetch"], &[("CARGO_HOME", &home2)]));
+}
+
+#[test]
+fn the_semver_gate_runs_before_the_entry_with_baseline_root_and_red_means_no_entry() {
+    let mut w = World::new();
+    w.release("0.0.7", 42);
+    let s = w.scan_args();
+    scan(&s).unwrap();
+    apply(&w.apply_args(&s)).unwrap();
+    w.release("0.0.8", 43);
+    let fake = w.root.join("fake-semver.sh");
+    let argsfile = w.root.join("semver-args.txt");
+    fs::write(
+        &fake,
+        format!("#!/bin/sh\necho \"$@\" >> {}\nexit 0\n", argsfile.display()),
+    )
+    .unwrap();
+    ok(&run(&w.root, "chmod", &["+x", fake.to_str().unwrap()], &[]));
+    let mut s = w.scan_args();
+    s.semver_checks = Some(fake.clone());
+    let rep = scan(&s).unwrap();
+    assert!(rep.error.is_none() && rep.entries == 3, "{rep:?}");
+    let args = fs::read_to_string(&argsfile).unwrap();
+    assert_eq!(args.lines().count(), 3, "once per crate: {args}");
+    assert!(
+        args.contains("--baseline-root")
+            && args.contains("--release-type minor")
+            && args.contains("-p demo-app"),
+        "{args}"
+    );
+    assert!(
+        args.contains("baseline-demo-app-0.0.7/demo-app-0.0.7"),
+        "baseline = the .crate of the own registry checkout: {args}"
+    );
+    // MUTANT-like counter-test: the same gate but red -> nothing is planned, nothing entered
+    fs::write(&fake, "#!/bin/sh\necho breaking change\nexit 1\n").unwrap();
+    let head = w.head();
+    let mut s = w.scan_args();
+    s.semver_checks = Some(fake);
+    let rep = scan(&s).unwrap();
+    assert!(
+        rep.error
+            .as_deref()
+            .is_some_and(|e| e.contains("semver gate RED")),
+        "{rep:?}"
+    );
+    assert_eq!(rep.entries, 0);
+    assert_eq!(fs::read_to_string(s.out.join("plan.txt")).unwrap(), "");
+    assert_eq!(w.head(), head);
 }
