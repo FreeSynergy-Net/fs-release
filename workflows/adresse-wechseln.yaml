@@ -68,20 +68,20 @@ do:
         branch: main
       if: ${ .input.teil == 1 }
       export:
-        as: '${ $context + { kopf: . } }'
+        as: '${ $context + { fs_release_kopf: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Read only: the head of main of fs-release AFTER the landing of the owner-neutral branch (the coordinator's ff; the result `kopf.head` - the loop below overwrites `kopf` per repo, so `aufrufer-umstellen` reads it first - is the full 40-hex SHA L = `fs_release_ref`, it must equal the input and contain `fs_release_neutral`). NO tag: a tag needs the version round 0.0.18 and two pin-refs rounds and `ff-und-tag` does not fit fs-release yet (known gap, see `ff-und-tag`); G6 no. 4 and check-ci-tools want a full SHA for `uses:` anyway. The callers pin `FreeSynergy-Net/fs-release/...@<L>`; `scripts/gates-komplett` takes the scripts of that SHA (`git archive <sha>`)."
+        freesynergy.net:summary: "Read only: the head of main of fs-release AFTER the landing of the owner-neutral branch (the coordinator's ff; the result `fs_release_kopf.head` (an own name, the loop below overwrites `kopf` per repo) is the full 40-hex SHA L; `aufrufer-umstellen` takes `fs_release_ref` (the input) and the step `aufrufer-pruefen` (`address aufrufer --neutral fs_release_neutral`) turns red when L is not on origin/main or does not contain the neutral commit; L must equal `fs_release_kopf.head`). NO tag: a tag needs the version round 0.0.18 and two pin-refs rounds and `ff-und-tag` does not fit fs-release yet (known gap, see `ff-und-tag`); G6 no. 4 and check-ci-tools want a full SHA for `uses:` anyway. The callers pin `FreeSynergy-Net/fs-release/...@<L>`; `scripts/gates-komplett` takes the scripts of that SHA (`git archive <sha>`)."
   - aufrufer-umstellen:
       call: caller-switch:0.0.17@fs
       with:
         repos: ${ .input.repos }
         old_owner: ${ .input.old_owner }
         new_owner: ${ .input.new_owner }
-        ref: ${ $context.kopf.head }
+        ref: ${ .input.fs_release_ref }
       if: ${ .input.teil == 1 }
       metadata:
         freesynergy.net:actor: ai
