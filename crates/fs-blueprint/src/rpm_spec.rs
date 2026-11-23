@@ -63,6 +63,22 @@ impl RpmSpec {
         b.using_config(config)
             .release(&self.release)
             .description(&self.description);
+        // rpmlint E no-changelogname-tag and no-buildhost-tag: both tags must exist. The host is a fixed word (reproducible, no real host name leaks); the
+        // date of the entry follows --source-date.
+        let when = self.source_date.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| u32::try_from(d.as_secs()).unwrap_or(0))
+        });
+        b.build_host("fs-blueprint");
+        b.add_changelog_entry(
+            "FreeSynergy",
+            format!(
+                "- {} {}, made by fs-blueprint package",
+                self.name, self.version
+            ),
+            when,
+        );
         if let Some(u) = &self.url {
             b.url(u);
         }
