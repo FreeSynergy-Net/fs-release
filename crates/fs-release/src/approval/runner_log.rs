@@ -2,6 +2,8 @@
 //!
 //! Row format: `| UTC | Aufgabe | Modell | Tok ein | Tok aus | Tok Cache | USD | Dauer s | Exit | Quelle | RunID |`.
 
+use std::path::Path;
+
 /// The columns of a run that the approval needs.
 #[derive(Debug, PartialEq, Eq)]
 pub struct LogRow {
@@ -36,4 +38,28 @@ impl LogRow {
             run_id: cells[11].into(),
         })
     }
+}
+
+/// The texts of the run records `out-<task>-*.json` of the task of `run_id` (the lander reads them; `verify` only compares).
+#[must_use]
+pub fn run_records(dir: &Path, log: &str, run_id: &str) -> Vec<String> {
+    let Some(row) = LogRow::find(log, run_id) else {
+        return Vec::new();
+    };
+    let prefix = format!("out-{}-", row.task);
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut names: Vec<_> = rd.flatten().map(|e| e.path()).collect();
+    names.sort();
+    names
+        .iter()
+        .filter(|p| {
+            let n = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            n.starts_with(&prefix)
+                && p.extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+        })
+        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .collect()
 }

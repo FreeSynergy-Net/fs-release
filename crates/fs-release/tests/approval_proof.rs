@@ -16,16 +16,14 @@ fn record(model: &str, cwd: &str, path: &str, body: &str) -> String {
 }
 
 const VERDICT: &str = "JA am 0123456789abcdef0123456789abcdef01234567\nreport body\n";
-const BODY: &str = "JA am 0123456 (short)\nreport body\n";
+const FULL: &str = "0123456789abcdef0123456789abcdef01234567";
 
 fn good_rec() -> String {
     record(
         "claude-opus-5-5",
         "/r/wt/rev-x",
         "/r/wt/rev-x/BERICHT.md",
-        &BODY
-            .replace("(short)\n", "\n")
-            .replacen("0123456 \n", "0123456\n", 1),
+        &format!("JA am {FULL}\nreport body\n"),
     )
 }
 
@@ -144,5 +142,25 @@ fn wrong_head_model_mode_or_exit_is_refused() {
     assert!(matches!(
         run(VERDICT, &ok, &[build]),
         Err(Reject::RecordFolder(_))
+    ));
+}
+
+#[test]
+fn a_report_that_names_only_a_prefix_of_the_head_is_refused() {
+    let l = log("rev-x", "claude-opus-5-5", "0");
+    let prefix_only = record(
+        "claude-opus-5-5",
+        "/r/wt/rev-x",
+        "/r/wt/rev-x/BERICHT.md",
+        "JA am 0123456\nreport body\n",
+    );
+    assert_eq!(
+        run(VERDICT, &l, &[prefix_only]),
+        Err(Reject::NoMatchingReport)
+    );
+    let short = "JA am 0123456\nreport body\n";
+    assert!(matches!(
+        run(short, &l, &[good_rec()]),
+        Err(Reject::FirstLine(_))
     ));
 }
