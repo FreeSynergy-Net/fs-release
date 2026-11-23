@@ -20,6 +20,18 @@ pub struct Entry {
 }
 
 impl Entry {
+    fn is_unscoped(&self) -> bool {
+        self.scope.is_empty() || self.scope == "*"
+    }
+
+    fn too_broad(&self, owner: &str) -> bool {
+        let (p, o) = (
+            self.pattern.to_ascii_lowercase(),
+            owner.to_ascii_lowercase(),
+        );
+        p.len() < 4 || p.contains(&o) || o.contains(&p)
+    }
+
     fn applies_to(&self, repo: &str) -> bool {
         self.repo.as_deref().is_none_or(|r| r == repo)
     }
@@ -56,8 +68,8 @@ impl Allow {
     }
 
     /// # Errors
-    /// A missing or unreadable file, invalid JSON, or an entry without reason or without anything to match.
-    pub fn load(path: &Path) -> Result<Self, String> {
+    /// A missing or unreadable file, invalid JSON, an entry without reason, or an unscoped entry that is too broad (empty or under 4 characters, or the owner name or a part of it: it would cover every hit).
+    pub fn load(path: &Path, owner: &str) -> Result<Self, String> {
         let raw = std::fs::read_to_string(path)
             .map_err(|e| format!("allow file {}: {e}", path.display()))?;
         let entries: Vec<Entry> = serde_json::from_str(&raw)
@@ -66,9 +78,9 @@ impl Allow {
             if e.reason.trim().is_empty() {
                 return Err(format!("allow entry without reason: {}", e.label()));
             }
-            if e.pattern.is_empty() && (e.scope.is_empty() || e.scope == "*") {
+            if e.is_unscoped() && e.too_broad(owner) {
                 return Err(format!(
-                    "allow entry that would allow everything: {}",
+                    "allow entry without scope that would allow (nearly) everything, give it a scope or a narrower pattern: {}",
                     e.label()
                 ));
             }
@@ -91,11 +103,18 @@ impl Allow {
 
     /// Entries for one of the checked repos that matched nothing.
     #[must_use]
-    pub fn stale(&self, repos: &[String]) -> Vec<String> {
+    pub fn stale(&self, repos: &[String], whole_run: bool) -> Vec<String> {
         self.entries
             .iter()
             .zip(&self.used)
-            .filter(|(e, used)| !**used && repos.iter().any(|r| e.applies_to(r)))
+            .filter(|(e, used)| {
+                !**used
+                    && (if e.repo.is_some() {
+                        repos.iter().any(|r| e.applies_to(r))
+                    } else {
+                        whole_run
+                    })
+            })
             .map(|(e, _)| e.label())
             .collect()
     }

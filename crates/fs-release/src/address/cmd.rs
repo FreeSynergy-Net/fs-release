@@ -67,7 +67,7 @@ pub fn run(args: &AddressArgs) -> i32 {
 fn load_allow(c: &Common) -> Result<Allow, String> {
     c.allow
         .as_deref()
-        .map_or_else(|| Ok(Allow::none()), Allow::load)
+        .map_or_else(|| Ok(Allow::none()), |p| Allow::load(p, &c.old))
 }
 
 fn replace(c: &Common) -> i32 {
@@ -124,7 +124,8 @@ fn stock(c: &Common, check: bool, all_classes: bool) -> i32 {
                 .filter(|h| !h.ghcr_only() && (all_classes || !h.class.is_cargo())),
         );
     }
-    let stale = allow.stale(&repos);
+    // a global entry (no `repo`) is judged only when the run covers several repos: one repo alone cannot show that it is stale.
+    let stale = allow.stale(&repos, c.dirs.len() > 1);
     for s in &stale {
         println!("ROT veralteter allow-Eintrag: {s}");
     }

@@ -206,7 +206,10 @@ fn address_stale_allow_entry_is_red() {
     let allow = r.path().join("allow.json");
     fs::write(
         &allow,
-        r#"[{"pattern":"nothing like this","reason":"old","scope":"docs/"}]"#,
+        format!(
+            r#"[{{"pattern":"nothing like this","reason":"old","scope":"docs/","repo":"{}"}}]"#,
+            r.path().file_name().unwrap().to_str().unwrap()
+        ),
     )
     .unwrap();
     assert_eq!(

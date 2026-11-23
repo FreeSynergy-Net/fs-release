@@ -73,12 +73,16 @@ pub fn mentions(line: &str, owner: &str) -> Vec<Mention> {
 fn judge(line: &str, low: &str, start: usize, end: usize, owner: &str) -> Option<Kind> {
     let before = &low[..start];
     let prev = before.chars().next_back();
-    if prev.is_some_and(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '@')) {
+    // shell default value `${VAR:-Owner/repo}` / `${VAR:=Owner/repo}`: the `-` belongs to the operator, not to a name
+    let shell_default = before.ends_with(":-") || before.ends_with(":=");
+    if !shell_default
+        && prev.is_some_and(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '@'))
+    {
         return None;
     }
     let host = HOSTS.iter().any(|h| before.ends_with(h));
     let ghcr = before.ends_with(GHCR);
-    let key = key_before(before);
+    let key = shell_default || key_before(before);
     let exact_case = &line[start..end] == owner;
     let after = &low[end..];
     let marked = host || ghcr || key;

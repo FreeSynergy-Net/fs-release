@@ -20,6 +20,9 @@ const CARGO_SOURCE_FILES: &[&str] = &[
     "scripts/check_rust_rules.py",
 ];
 
+/// Folders whose files stand for a Cargo source (lock fixtures of the lock gate, packaging rules with `[patch."<url>"]`): part 2 with `scripts/lock-sources.toml`.
+const CARGO_SOURCE_DIRS: &[&str] = &["tests/fixtures/lock-sources/", "tests/packaging/rules.sh"];
+
 fn ext(name: &str, e: &str) -> bool {
     std::path::Path::new(name)
         .extension()
@@ -36,6 +39,7 @@ impl Class {
             || name == "deny.toml"
             || path.split('/').any(|c| c == ".cargo")
             || CARGO_SOURCE_FILES.contains(&path)
+            || CARGO_SOURCE_DIRS.iter().any(|d| path.starts_with(d))
         {
             Self::CargoSource
         } else if path.starts_with(".github/") {
