@@ -1,0 +1,1 @@
+//! Pattern: none (test fixture).

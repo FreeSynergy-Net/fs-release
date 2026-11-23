@@ -1,0 +1,6 @@
+# The ONE pin of cargo-deny for the gate `licence` (scripts/licence-gate.sh). Read as KEY=VALUE lines, never executed.
+# Binary: the GitHub release asset of EmbarkStudios/cargo-deny (MIT OR Apache-2.0), x86_64-unknown-linux-musl.
+# SHA256 = the digest GitHub shows for the asset (`gh api repos/EmbarkStudios/cargo-deny/releases/tags/<version>`, field `digest`).
+# Raising the version = change BOTH lines in one commit; the gate refuses a download whose sha256 differs and a binary whose --version differs.
+CARGO_DENY_VERSION=0.22.0
+CARGO_DENY_SHA256=98c56e6a408bfa5c3c60744b6015aaa6aa08f743fdeb88386d06fca035bb1786

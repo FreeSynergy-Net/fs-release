@@ -36,7 +36,7 @@ export STUBLOG="$tmp/cargo.log"
 # fixture repos have no origin/main: every fixture repo names HEAD as identity base in its LOCAL config (freesynergy.identity-test-base); no environment variable can do that in CI
 
 # a mechanism folder (scripts + RUST_VERSION) and a repo with its own copy of it (no fs-release tag is pinned: the repo's own scripts count)
-mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; echo 1.0.0 >"$1/RUST_VERSION"; }
+mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; printf '#!/usr/bin/env bash\n[ -n "${RED_LICENCE:-}" ] && { echo "licence gate NOT RUN: stub" >&2; exit 3; }\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"; }
 mkrepo() { mkmech "$1"; git init -q -b main "$1"; echo x >"$1/a.txt"; echo "__pycache__/" >"$1/.gitignore"; git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" config --local freesynergy.identity-test-base HEAD; }
 app="$tmp/app"; mkrepo "$app"
 gates() { # <gates.sh> <list dir> [env...]: stdout+stderr in $tmp/o.txt; the rc is returned
@@ -48,7 +48,7 @@ list() { cat "$1"/fehlerliste-*.md 2>/dev/null; }
 # 1. two intentional errors in different steps: both are on the list, the run goes to the end, the exit code is red
 gates "$app/scripts/gates.sh" "$tmp/l1" RED_FMT=1 RED_TEST=1; rc=$?
 chk "two errors: exit code 1" [ "$rc" -eq 1 ]
-chk "two errors: every step ran (an rc line for each of the 7 gates)" [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/o.txt")" -eq 8 ]
+chk "two errors: every step ran (an rc line for each of the 9 gates)" [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/o.txt")" -eq 9 ]
 chk "two errors: both findings are on the list" bash -c "grep -q '\*\*fmt\*\*' '$tmp/l1'/fehlerliste-*.md && grep -q '\*\*test\*\*' '$tmp/l1'/fehlerliste-*.md"
 chk "two errors: the list says 2 findings" grep -q '^2 findings' "$tmp/l1"/fehlerliste-main.md
 chk "two errors: the red rc is printed (fmt rc=1, test rc=101)" bash -c "grep -q '^gate fmt: rc=1' '$tmp/o.txt' && grep -q '^gate test: rc=101' '$tmp/o.txt'"
@@ -56,6 +56,9 @@ chk "two errors: every item has its exact nachpruefung command" bash -c "grep -q
 chk "two errors: a test name with a shell character never reaches the list" bash -c "! grep -q 'touch_pwned' '$tmp/l1'/*.md | grep nachpruefung; ! grep 'nachpruefung' '$tmp/l1'/*.md | grep -q 'touch'"
 chk "two errors: cargo test runs with --no-fail-fast and clippy with --keep-going" bash -c "grep -q 'cargo test .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo clippy .*--keep-going' '$STUBLOG'"
 chk "two errors: the list is not in the repo tree" bash -c "[ -z \"\$(git -C '$app' status --porcelain)\" ] && [ ! -e '$app'/fehlerliste-main.md ]"
+# 1b. the licence gate red (cargo-deny finding or NOT RUN, rc 3): it is a finding of its own with its exact nachpruefung, the exit code is red
+gates "$app/scripts/gates.sh" "$tmp/l1b" RED_LICENCE=1; rc=$?
+chk "licence red: exit code 1, rc 3 printed, finding on the list with its nachpruefung" bash -c "[ $rc -eq 1 ] && grep -q '^gate licence: rc=3' '$tmp/o.txt' && grep -q '\*\*licence\*\*' '$tmp/l1b'/fehlerliste-*.md && grep -q 'nachpruefung: bash {SCRIPTS}/licence-gate.sh {ROOT}' '$tmp/l1b'/fehlerliste-*.md"
 # 2. no error: empty list, exit 0
 gates "$app/scripts/gates.sh" "$tmp/l2"; rc=$?
 chk "no error: exit code 0" [ "$rc" -eq 0 ]
@@ -135,12 +138,12 @@ import teil
 refused = ["cargo test --config=/tmp/evil.toml", "cargo test --manifest-path=/tmp/evil/Cargo.toml", "cargo clippy -Zunstable-options", "cargo test --target-dir=/",
            "cargo fmt -- --config-path=/tmp/x", "bash {SCRIPTS}/gates-lock.sh /etc", "scripts/gates-komplett --repo-dir=/ --nur-fehlerliste=/tmp/x.md", "cargo test -C /tmp",
            "cargo test -p x RUSTC=evil", "cargo test /etc/passwd", "cargo test ../x", "cargo test -p /abs", "cargo test -- --test-threads=1;", "cargo test --config build.rustc-wrapper=x",
-           "cargo test -Zunstable", "cargo test -p x -- --include-ignored", "python3 -I {SCRIPTS}/check_rust_rules.py /etc", "python3 -c x", "bash {SCRIPTS}/gates-lock.sh {ROOT} extra", "bash -c x",
+           "cargo test -Zunstable", "cargo test -p x -- --include-ignored", "python3 -I {SCRIPTS}/check_rust_rules.py /etc", "python3 -c x", "bash {SCRIPTS}/gates-lock.sh {ROOT} extra", "bash -c x", "bash {SCRIPTS}/licence-gate.sh /etc", "bash {SCRIPTS}/licence-gate.sh {ROOT} extra",
            "cargo test -p x -- /etc/passwd", "cargo test -p x -- ../x", "cargo test it_works", "cargo test --workspace --", "cargo test -p x --", "cargo clippy -p x", "cargo clippy --workspace --all-targets", "cargo clippy -p x -- -D warnings", "cargo fmt -- --check", "cargo build", "cargo test -p x $(touch y)", "cargo test | touch y", "cargo clippy -p x -- -A warnings", "cargo clippy -- -D warnings --cap-lints allow", "cargo test --features=evil",
            "cargo test --release", "cargo fmt --check --config-path=/x", "cargo test -p ../x", "cargo test -p x -p"]
 good = ["cargo fmt --check", "cargo clippy -p fs-demo --all-targets --all-features --locked -- -D warnings -W clippy::pedantic", "cargo test -p fs-demo --test gold --all-features --locked -- it_breaks mod_a::case",
         "cargo test --workspace --all-features --locked --no-fail-fast", "cargo test -p x --lib", "cargo test -p x --bin fs-x --locked -q", "python3 -I {SCRIPTS}/check_rust_rules.py {ROOT}",
-        "bash {SCRIPTS}/gates-lock.sh {ROOT}", "bash {SCRIPTS}/gates-files.sh {ROOT}", "cargo fmt --all --check", "cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic"]
+        "bash {SCRIPTS}/gates-lock.sh {ROOT}", "bash {SCRIPTS}/gates-files.sh {ROOT}", "bash {SCRIPTS}/licence-gate.sh {ROOT}", "cargo fmt --all --check", "cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic"]
 bad = [c for c in refused if teil.check_command(c, "/s", "/r") is not None]
 miss = [c for c in good if teil.check_command(c, "/s", "/r") is None]
 assert not bad and not miss, (bad, miss)
@@ -185,7 +188,7 @@ PY
     gates) # two errors: a list with both, exit 1, 7 rc lines, nachpruefung
       local dd="$tmp/mm-$RANDOM"; mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m
       : >"$STUBLOG"; env RED_FMT=1 RED_TEST=1 PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$dd" bash "$tmp/app-m/scripts/gates.sh" "$tmp/app-m" >"$tmp/mo.txt" 2>&1; local rc=$?
-      [ "$rc" -eq 1 ] && [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/mo.txt")" -eq 8 ] && grep -q '\*\*fmt\*\*' "$dd"/*.md 2>/dev/null && grep -q '\*\*test\*\*' "$dd"/*.md && grep -q 'nachpruefung: cargo fmt --check' "$dd"/*.md && grep -q 'cargo test .*--no-fail-fast' "$STUBLOG" && [ -z "$(git -C "$tmp/app-m" status --porcelain)" ] && [ ! -e "$tmp/app-m"/fehlerliste-main.md ] || r=1
+      [ "$rc" -eq 1 ] && [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/mo.txt")" -eq 9 ] && grep -q '\*\*fmt\*\*' "$dd"/*.md 2>/dev/null && grep -q '\*\*test\*\*' "$dd"/*.md && grep -q 'nachpruefung: cargo fmt --check' "$dd"/*.md && grep -q 'cargo test .*--no-fail-fast' "$STUBLOG" && [ -z "$(git -C "$tmp/app-m" status --porcelain)" ] && [ ! -e "$tmp/app-m"/fehlerliste-main.md ] || r=1
       ;;
     teil) # the partial check: tick, injection, no gate result, no abort at the first green
       mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m; rm -f "$tmp/PWNED"
