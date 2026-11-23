@@ -1,5 +1,5 @@
 # ff-und-tag: the push of a reviewed head to main and the annotated tag - what the push helper of the strategy does by hand today. The
-# order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (required) and, optional, `pakete` (true = the repo builds rpm and deb, then `paketname-gleich` runs; not set = skipped, named in the output), `registry_crate` (true | false; not set = taken from the list), `registry_crates` (list of repo names, default fs-types, fs-conformance, fs-records), `erstkette_ok` (true = the user knows the FIRST release chain of this repo), `rot_freigabe` (`{ run_ids, workflows, grund, wort }`: `run_ids` = a LIST with the ids of EXACTLY the red BRANCH runs, `workflows` = a LIST with their workflow names, `grund` not empty; r2: the checks read this input itself, not an echo of a script; a string or a single number as `run_ids` is no release), `index_wait_wired`, `index_warten_minuten` (default 10), `main_ci_warten_minuten` (default 30) (docs/prompt-template.md). Specification (the @fs calls
+# order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (required) and, optional, `pakete` (true = the repo builds rpm and deb, then `paketname-gleich` runs; not set = skipped, named in the output), `registry_crate` (true | false; not set = taken from the list), `registry_crates` (list of repo names, default fs-types, fs-conformance, fs-records), `erstkette_ok` (true = the user knows the FIRST release chain of this repo), `rot_freigabe` (`{ run_ids, workflows, grund, wort }`: RULE r3 (M1-r2): an order from before r2 that has only `{ run_ids, grund, wort }` is NOT a release - every caller (`pin-kaskade`, `lib-umzug`, orders by hand) must add `workflows`; `run_ids` = a LIST with the ids of EXACTLY the red BRANCH runs, `workflows` = a LIST with their workflow names, `grund` not empty; r2: the checks read this input itself, not an echo of a script; a string or a single number as `run_ids` is no release), `index_wait_wired`, `index_warten_minuten` (default 10), `main_ci_warten_minuten` (default 30) (docs/prompt-template.md). Specification (the @fs calls
 # have no script yet, like the other specification steps). It is the procedure behind the steps `tag`, `push`, `ci` and `main-ff` of
 # `release-flow` (those stay, they follow the code of `fs-release flow`); the checklist here is the hands-on side with the proofs.
 # Order of the end (r1: erst-release stands directly before the tag, main-vor-push directly before the push): branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, the expected runs per repo (each one there and green for the head), fresh
@@ -255,7 +255,7 @@ do:
             when: '${ $context.alle.status == "green" }'
             then: continue
         - rot-mit-freigabe:
-            when: '${ (($context.alle.status == "red") and ((.input.rot_freigabe | type) == "object") and (($context.alle.fehlend // []) == []) and (($context.alle.rote // []) | length) > 0 and (($context.alle.rote // []) | all(.conclusion == "failure")) and ((.input.rot_freigabe.grund // "") != "") and ((.input.rot_freigabe.run_ids | type) == "array") and ((.input.rot_freigabe.workflows | type) == "array") and (((($context.alle.rote // []) | map(.run_id | tostring)) - (.input.rot_freigabe.run_ids | map(tostring))) | length) == 0 and (((($context.alle.rote // []) | map(.workflow)) - .input.rot_freigabe.workflows) | length) == 0) }'
+            when: '${ (($context.alle.status == "red") and ((.input.rot_freigabe | type) == "object") and (($context.alle.fehlend // []) == []) and (($context.alle.rote // []) | length) > 0 and (($context.alle.rote // []) | all(.conclusion == "failure" and .run_id != null and .workflow != null)) and ((((.input.rot_freigabe.grund // null) | type) == "string") and ((.input.rot_freigabe.grund // "") | test("\\S"))) and ((.input.rot_freigabe.run_ids | type) == "array") and ((.input.rot_freigabe.workflows | type) == "array") and (((($context.alle.rote // []) | map(.run_id | tostring)) - (.input.rot_freigabe.run_ids | map(tostring))) | length) == 0 and (((($context.alle.rote // []) | map(.workflow)) - .input.rot_freigabe.workflows) | length) == 0) }'
             then: continue
         - sonst:
             then: eskalation
@@ -264,7 +264,18 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - ONLY all workflows green goes on to the push; a red one goes on ONLY with the release of the strategy that is bound to EXACTLY these runs: `rot_freigabe` = `{ run_ids: [...], grund, wort }`, `rot_freigabe` is read from the INPUT (not from an echo), `run_ids` and `workflows` must be lists, every run id in `alle.rote` must be named in `run_ids` and every workflow name of `alle.rote` in `workflows` (the release is a SUPERSET OF `alle.rote`), the reason is not empty, `alle.fehlend` is empty, and every red run has the conclusion `failure` (a second red run that the release does not name, a skipped, cancelled, queued or not-run workflow never passes; [LANDUNG-ALLE-GRUEN], [NICHT-GELAUFEN-NIE-GRUEN]); run ids and reason go into the report. THREAT MODEL (K5): `rot_freigabe` is text in the order; whoever writes the order opens this gate, no protection beyond that is claimed; every other result (unknown, missing, a not-run workflow, a release without run id or reason) escalates. No push to main with a red or unknown workflow."
+        freesynergy.net:summary: "Control flow - ONLY all workflows green goes on to the push; a red one goes on ONLY with the release of the strategy that is bound to EXACTLY these runs: `rot_freigabe` = `{ run_ids: [...], workflows: [...], grund, wort }` (r3 M1-r2: `workflows` = the workflow NAMES of the red branch runs; an order from before r2 without `workflows` is NO release and escalates), `rot_freigabe` is read from the INPUT (not from an echo), `run_ids` and `workflows` must be lists, every run id in `alle.rote` must be named in `run_ids` and every workflow name of `alle.rote` in `workflows` (the release is a SUPERSET OF `alle.rote`), the reason is not empty, `alle.fehlend` is empty, and every red run has the conclusion `failure` (a second red run that the release does not name, a skipped, cancelled, queued or not-run workflow never passes; [LANDUNG-ALLE-GRUEN], [NICHT-GELAUFEN-NIE-GRUEN]); run ids and reason go into the report. THREAT MODEL (K5): `rot_freigabe` is text in the order; whoever writes the order opens this gate, no protection beyond that is claimed; every other result (unknown, missing, a not-run workflow, a release without run id or reason) escalates. No push to main with a red or unknown workflow."
+  - push-start:
+      set:
+        n: 0
+      export:
+        as: '${ $context + { push_versuche: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "r3 S1-r2: start value of the push counter (`push_versuche.n` 0). It stands BEFORE `main-vor-push`; the return of `push-weiter` goes to `main-vor-push`, so it is not reset."
   - main-vor-push:
       call: head-ff-check:0.0.18@fs
       with:
@@ -303,11 +314,22 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The person or the coordinator (the strategy's push helper) pushes the head to main as a pure fast-forward, WITHOUT force and without a merge commit; agents never push. A rejected push is never forced: it goes back to `main-vor-push` (r2 K4: step `push-weiter` below; result `push` with `rejected` and `versuch`; the new main is read again, `vor-push-weiter` decides). Only after `alle-workflows-gruen` ([LANDUNG-ALLE-GRUEN])."
+        freesynergy.net:summary: "The person or the coordinator (the strategy's push helper) pushes the head to main as a pure fast-forward, WITHOUT force and without a merge commit; agents never push. A rejected push is never forced: it goes back to `main-vor-push` (r2 K4: step `push-weiter` below; result `push` with `rejected`, the step `push-zaehlen` counts in `push_versuche.n` (r3); the new main is read again, `vor-push-weiter` decides). Only after `alle-workflows-gruen` ([LANDUNG-ALLE-GRUEN])."
+  - push-zaehlen:
+      set:
+        n: '${ (($context.push_versuche.n // 0) + 1) }'
+      export:
+        as: '${ $context + { push_versuche: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "r3 S1-r2: the WORKFLOW counts the pushes itself (`push_versuche.n`, first push 1), it does not rely on the push result to report `versuch`. The counter has its own key, so the next `push` result cannot reset it."
   - push-weiter:
       switch:
         - zurueck:
-            when: '${ ($context.push.rejected == true) and (($context.push.versuch // 1) < 2) }'
+            when: '${ ($context.push.rejected == true) and ($context.push_versuche.n < 2) }'
             then: main-vor-push
         - abgelehnt:
             when: '${ $context.push.rejected == true }'
@@ -319,7 +341,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow (r2 K4; specification). A push that the remote rejected (`push.rejected == true`, e.g. main moved after the check) is never forced: the FIRST rejection goes back to `main-vor-push` (main is read again; `vor-push-weiter` goes on only while the head is still a pure fast-forward, else `eskalation`); a SECOND rejection (`push.versuch` 2) escalates, so the loop cannot run on. No rejection: on to `main-ci-nach-landung`."
+        freesynergy.net:summary: "Control flow (r2 K4; specification). A push that the remote rejected (`push.rejected == true`, e.g. main moved after the check) is never forced: the FIRST rejection goes back to `main-vor-push` (main is read again; `vor-push-weiter` goes on only while the head is still a pure fast-forward, else `eskalation`); a SECOND rejection (`push_versuche.n` 2) escalates. r3 S1-r2: the WORKFLOW counts itself (step `push-zaehlen`, `push_versuche.n` = previous + 1, first push 1), so the loop ends after the second push even if the push result does not report `versuch`; the loop cannot run on. No rejection: on to `main-ci-nach-landung`."
   - main-ci-nach-landung:
       call: all-workflows-green:0.0.18@fs
       with:
@@ -343,7 +365,7 @@ do:
             when: '${ $context.main_ci.status == "green" }'
             then: continue
         - rot-mit-freigabe:
-            when: '${ (($context.main_ci.status == "red") and ((.input.rot_freigabe | type) == "object") and (($context.main_ci.fehlend // []) == []) and (($context.main_ci.rote // []) | length) > 0 and (($context.main_ci.rote // []) | all(.conclusion == "failure")) and ((.input.rot_freigabe.grund // "") != "") and ((.input.rot_freigabe.workflows | type) == "array") and (($context.alle.rote // []) | length) > 0 and (((($context.main_ci.rote // []) | map(.workflow)) - (($context.alle.rote // []) | map(.workflow))) | length) == 0 and (((($context.main_ci.rote // []) | map(.workflow)) - .input.rot_freigabe.workflows) | length) == 0) }'
+            when: '${ (($context.main_ci.status == "red") and ((.input.rot_freigabe | type) == "object") and (($context.main_ci.fehlend // []) == []) and (($context.main_ci.rote // []) | length) > 0 and (($context.main_ci.rote // []) | all(.conclusion == "failure" and .workflow != null)) and ((((.input.rot_freigabe.grund // null) | type) == "string") and ((.input.rot_freigabe.grund // "") | test("\\S"))) and ((.input.rot_freigabe.workflows | type) == "array") and (($context.alle.rote // []) | length) > 0 and (((($context.main_ci.rote // []) | map(.workflow)) - (($context.alle.rote // []) | map(.workflow))) | length) == 0 and (((($context.main_ci.rote // []) | map(.workflow)) - .input.rot_freigabe.workflows) | length) == 0) }'
             then: continue
         - haengt:
             when: '${ $context.main_ci.status == "hung" }'
