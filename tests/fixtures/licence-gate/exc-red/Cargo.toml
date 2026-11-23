@@ -1,0 +1,13 @@
+# Fixture of scripts/test_licence_gate.sh: a workspace of its own; no registry, no network.
+[workspace]
+
+[package]
+name = "licence-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+fs-components-render = { path = "fs-components-render" }
+other-cdla = { path = "other-cdla" }
+other-ofl = { path = "other-ofl" }

@@ -29,6 +29,32 @@ unused-allowed-license = "allow"
 # Workspace members with `publish = false` and no licence are our own code.
 private = { ignore = true }
 
+# Exceptions per crate (decision of the strategy 9f, 2026-11-24). NOT in the allow list above: the licence stays rejected for every other crate.
+# Remove an entry as soon as its reason is gone.
+[[licenses.exceptions]]
+# CDLA-Permissive-2.0: the Mozilla root certificate data of webpki-roots and webpki-root-certs (permissive data licence, no copyleft; attribution kept in the crates).
+# Reason: the root certificate data of the TLS chains of fs-broadcast, fs-files, fs-identity, fs-maps, fs-messages and fs-packages (licence inventory 2026-11-24). Date 2026-11-24.
+crate = "webpki-roots"
+allow = ["CDLA-Permissive-2.0"]
+
+[[licenses.exceptions]]
+# Same reason and date as webpki-roots (2026-11-24).
+crate = "webpki-root-certs"
+allow = ["CDLA-Permissive-2.0"]
+
+[[licenses.exceptions]]
+# OFL-1.1: fs-components-render 0.0.13 and 0.0.20 carry JetBrains Mono (crates/fs-components-render/assets/fonts/ with the OFL text, README and the copyright line of the
+# JetBrains Mono Project Authors: all in the package, no include list); the font is gone since 0.0.23 (licence MIT OR Apache-2.0 again). Used by fs-tasks (0.0.13) and
+# fs-texts (0.0.20). Exact versions on purpose (cargo-deny 0.22 does not apply a version RANGE in `crate` reliably: tested). Date 2026-11-24. Remove these entries when
+# the callers use 0.0.23 or later, or the font is a package of its own.
+crate = "fs-components-render@0.0.13"
+allow = ["OFL-1.1"]
+
+[[licenses.exceptions]]
+# Same reason and date as fs-components-render 0.0.13 (2026-11-24).
+crate = "fs-components-render@0.0.20"
+allow = ["OFL-1.1"]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
