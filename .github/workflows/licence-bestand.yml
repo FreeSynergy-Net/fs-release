@@ -78,14 +78,18 @@ jobs:
           bin="$dl/$asset/cargo-deny"
           [ "$("$bin" --version)" = "cargo-deny $version" ] || { echo "NOT RUN: wrong version"; exit 64; }
           locked=(); [ -f target/Cargo.lock ] && locked=(--locked)
-          rc=0
-          "$bin" --format json --manifest-path target/Cargo.toml --workspace "${locked[@]}" --config fsr/configs/deny.toml check licenses 2> deny.jsonl || rc=$?
-          # human readable repeat of the same check for the log
-          "$bin" --manifest-path target/Cargo.toml --workspace "${locked[@]}" --config fsr/configs/deny.toml check licenses 2>&1 | tail -n 60
+          rc=0; note=""
+          run() { "$bin" "$@" --manifest-path target/Cargo.toml --workspace "${locked[@]}" --config fsr/configs/deny.toml check licenses; }
+          run --format json 2> deny.jsonl || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 4 ] && [ "${#locked[@]}" -gt 0 ]; then
+            # not a licence finding (rc 4) but a metadata error with --locked (lock file out of date): repeat once without it, the inventory wants the licences
+            locked=(); note=" (lock out of date, repeated without --locked)"; rc=0; run --format json 2> deny.jsonl || rc=$?
+          fi
+          run 2>&1 | tail -n 60 || true
           findings="$(jq -r 'select(.type=="diagnostic" and .fields.severity=="error") | "\(.fields.code): \((.fields.graphs[0].Krate | "\(.name) \(.version)") // .fields.message)"' deny.jsonl 2>/dev/null | sort -u | paste -sd';' -)"
           n="$(jq -r 'select(.type=="diagnostic" and .fields.severity=="error") | 1' deny.jsonl 2>/dev/null | wc -l)"
           mkdir -p result
-          printf '| %s | %s | %s | %s |\n' "$REPO" "$rc" "$n" "${findings:-none}" > "result/$REPO.row"
+          printf '| %s | %s | %s | %s |\n' "$REPO" "$rc$note" "$n" "${findings:-none}" > "result/$REPO.row"
           { echo "### $REPO: rc=$rc, errors=$n"; echo "${findings:-none}"; } >> "$GITHUB_STEP_SUMMARY"
           [ "$rc" -eq 0 ]
       - name: keep the row
