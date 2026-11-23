@@ -17,6 +17,7 @@ path = "src/main.rs"
 reg-index = "=0.6.0"
 anyhow = "1"
 semver = "1"
+toml = "0.8"
 serde_json = "1"
 clap = { version = "4", features = ["derive"] }
 
