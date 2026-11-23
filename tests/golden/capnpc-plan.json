@@ -11,7 +11,7 @@
   "has_linux": true,
   "has_macos": true,
   "has_windows": true,
-  "homepage": "https://github.com/FreeSynergy-Net/fs-capnpc",
+  "homepage": "https://github.com/FreeSynergy/fs-capnpc",
   "kind": "cli",
   "license": "MIT OR Apache-2.0",
   "linux_formats": "tar.gz,deb,rpm,arch",
