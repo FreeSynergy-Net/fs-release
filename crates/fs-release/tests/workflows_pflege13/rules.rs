@@ -141,11 +141,7 @@ fn gates_and_attitude(d: &Value) -> R {
         step(d, "pr-ohne-vermerk").is_some_and(|s| s["set"]["ki"] == false),
         "pr-ohne-vermerk does not set false",
     )?;
-    let ex = |n: &str| {
-        step(d, n)
-            .map(|s| s["export"]["as"].to_string())
-            .unwrap_or_default()
-    };
+    let ex = |n: &str| step(d, n).map_or_else(String::new, |s| s["export"]["as"].to_string());
     need(
         ex("pr-ohne-vermerk").contains("vermerk: ."),
         "pr-ohne-vermerk exports no vermerk",
@@ -154,9 +150,7 @@ fn gates_and_attitude(d: &Value) -> R {
         ex("pr-mit-vermerk").contains("vermerk: ."),
         "pr-mit-vermerk exports no vermerk",
     )?;
-    let mit = step(d, "pr-mit-vermerk")
-        .map(|s| s["set"]["ki"].to_string())
-        .unwrap_or_default();
+    let mit = step(d, "pr-mit-vermerk").map_or_else(String::new, |s| s["set"]["ki"].to_string());
     need(
         mit.contains("$context.ki_hinweis == true"),
         "pr-mit-vermerk ignores ki_hinweis",
@@ -237,9 +231,7 @@ pub fn cut_ok(d: &Value) -> R {
         meta(d, "cut", "gate") == "strategie-ok",
         "cut has no gate strategie-ok",
     )?;
-    let ex = step(d, "cut")
-        .map(|s| s["export"]["as"].to_string())
-        .unwrap_or_default();
+    let ex = step(d, "cut").map_or_else(String::new, |s| s["export"]["as"].to_string());
     need(ex.contains("cut: ."), "cut does not write $context.cut")?;
     for n in ["ask", "record"] {
         let f = field(d, n, "if");

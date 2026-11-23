@@ -63,10 +63,15 @@ pub fn cases(d: &Value, n: &str) -> Vec<(String, String, String)> {
         return vec![];
     };
     sw.iter()
-        .map(|c| {
-            let (k, v) = c.as_object().unwrap().iter().next().unwrap();
-            let g = |f: &str| v.get(f).and_then(Value::as_str).unwrap_or("").to_string();
-            (k.clone(), g("when"), g("then"))
+        .map(|case| {
+            let (name, body) = case.as_object().unwrap().iter().next().unwrap();
+            let get = |f: &str| {
+                body.get(f)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string()
+            };
+            (name.clone(), get("when"), get("then"))
         })
         .collect()
 }
@@ -95,10 +100,10 @@ pub fn drop_step(d: &mut Value, n: &str) {
 }
 
 pub fn move_step_to_end(d: &mut Value, n: &str) {
-    let a = d["do"].as_array_mut().unwrap();
-    let i = a.iter().position(|s| s.get(n).is_some()).unwrap();
-    let s = a.remove(i);
-    a.push(s);
+    let list = d["do"].as_array_mut().unwrap();
+    let at = list.iter().position(|x| x.get(n).is_some()).unwrap();
+    let moved = list.remove(at);
+    list.push(moved);
 }
 
 pub fn set_text(d: &mut Value, n: &str, k: &str, v: &str) {
@@ -113,7 +118,7 @@ pub fn remove_key(d: &mut Value, n: &str, k: &str) {
 
 pub fn set_meta(d: &mut Value, n: &str, k: &str, v: &str) {
     edit(d, n, |s| {
-        s["metadata"][format!("freesynergy.net:{k}")] = json!(v)
+        s["metadata"][format!("freesynergy.net:{k}")] = json!(v);
     });
 }
 
