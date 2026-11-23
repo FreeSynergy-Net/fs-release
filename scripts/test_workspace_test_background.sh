@@ -41,7 +41,8 @@ out="$("$tool" start --repo "$tmp/repo" --head "$head")"; chk "start returns at 
 res="$("$tool" wait --repo "$tmp/repo" --head "$head" --timeout 30)"; rc=$?
 chk "wait: result green (rc 0, red false)" rce 0; chk "wait: bound to the head" isval head "$res" "$head"
 chk "wait: only the summary line" grep -q "3 passed" <<<"$res"; chk "wait: red false" isval red "$res" False
-chk "slot run has core dumps off (ulimit -c 0)" test "$(cat "$tmp/corelimit")" = 0
+if [ "$(ulimit -H -c)" = 0 ]; then echo "skip übersprungen: hard limit 0 (core limit cannot be raised, the check says nothing)"
+else chk "slot run has core dumps off (ulimit -c 0)" test "$(cat "$tmp/corelimit")" = 0; fi
 out="$("$tool" start --repo "$tmp/repo" --head "$head")"; chk "a second start for the same head is no second run" isval started "$out" False
 
 # red twice in a row: runde counts per head only for the same head, a new commit is a new head

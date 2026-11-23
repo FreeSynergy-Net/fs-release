@@ -834,6 +834,7 @@ dependencies = [
  "fs-release-chain",
  "serde",
  "serde_json",
+ "serde_norway",
  "tempfile",
 ]
 
