@@ -52,7 +52,7 @@ SHOW = re.compile(r"rc=|FAILED|ERROR|errors|^error")
 def pinned_tag(d):
     """The fs-release ref the CI files pin: a tag vX.Y.Z (the highest) or ONE full 40-hex SHA. A ref that is neither, or a SHA next to other refs, raises ValueError (RED, never silent)."""
     refs, loose = set(), set()
-    for f in glob.glob(os.path.join(d, ".github", "workflows", "*.yml")):
+    for f in sorted(glob.glob(os.path.join(d, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(d, ".github", "workflows", "*.yaml"))):
         with open(f, encoding="utf-8") as fh:
             text = "".join(x for x in fh.read().splitlines(True) if not x.lstrip().startswith("#"))
         refs.update(PIN.findall(text))
