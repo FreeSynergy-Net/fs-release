@@ -23,6 +23,13 @@ runs:
         toolchain: ${{ steps.tc.outputs.toolchain }}
         targets: ${{ inputs.targets }}
         components: ${{ inputs.components }}
+    # N1d: from here on the toolchain is the ONE chosen above, by the environment, which beats a rust-toolchain.toml of the caller (also one with `path = ...`, a toolchain that runs arbitrary code):
+    # rust-cache runs `rustc -vV` and `cargo metadata` without `+toolchain`. scripts/test_check_job_identity.sh checks that this step stands before rust-cache.
+    - name: Fix the toolchain (RUSTUP_TOOLCHAIN)
+      shell: bash
+      env:
+        TOOLCHAIN: ${{ steps.tc.outputs.toolchain }}
+      run: echo "RUSTUP_TOOLCHAIN=$TOOLCHAIN" >> "$GITHUB_ENV"
     - if: inputs.cache != 'false'
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:

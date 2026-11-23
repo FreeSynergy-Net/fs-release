@@ -1,5 +1,6 @@
 # Rule: every work step runs through a workflow. A step without a workflow first gets one (written or extended here).
 # Agents never push, tag or merge; the merge into main is the coordinator's. FS profile: see README.md.
+# Rule [BEDROHUNGSMODELL] (decision 9f): every security gate names its threat model in the documentation (what mistake it stops, what it does NOT stop); see docs/usage.md "Threat model of the gates".
 document:
   dsl: 1.0.3
   namespace: freesynergy.net

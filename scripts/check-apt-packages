@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Allowlist for the `apt-packages` input of .github/workflows/check.yml (N1d, way 2 of the review of bundle 7): the words of PACKAGES are given to `apt-get install` unquoted, so an option
+# (-oDpkg::Pre-Invoke::=...), a local file (./x.deb), `pkg=version`, `pkg/release` or a glob would run code as root. Every word (separated by blanks, tabs, newlines) must be a plain
+# Debian package name `^[a-z0-9][a-z0-9+.-]*$` (LC_ALL=C: bytes). One other word = red, nothing installed. Threat model: this protects against a MISTAKE in the caller's input, not against a
+# caller that can change the workflow itself (docs/usage.md "Threat model of the gates").
+# The check.yml step cannot call this file (a reusable workflow cannot call a script of fs-release): its run block is a COPY of everything below the marker line, and
+# scripts/test_check_apt_packages.sh fails when the copy and this file differ.
+#   PACKAGES="a b" scripts/check-apt-packages
+# --- body (the check.yml block is a copy of the lines below) ---
+export LC_ALL=C
+set -f
+n=0; bad=""
+for word in $PACKAGES; do
+  n=$((n + 1))
+  if ! [[ "$word" =~ ^[a-z0-9][a-z0-9+.-]*$ ]]; then bad="$bad $n"; fi
+done
+if [ -n "$bad" ]; then
+  echo "::error::apt-packages refused (word(s)$bad): every word must be a package name (lower case letters, digits, + . -, starting with a letter or digit); no options, no paths, no = or /"
+  exit 1
+fi
