@@ -161,7 +161,7 @@ fn key() -> PathBuf {
 }
 
 #[test]
-fn the_release_package_has_repo_file_and_key_with_stable_on_and_nightly_off() {
+fn the_release_package_has_repo_file_and_key_with_one_channel() {
     if !have_rpm() {
         return;
     }
@@ -194,11 +194,11 @@ fn the_release_package_has_repo_file_and_key_with_stable_on_and_nightly_off() {
     let cfg = rpm(&["-qpc"], &f);
     assert!(cfg.contains("freesynergy.repo"));
     let repo = fs_blueprint::package_rpm::repo_file("https://pages.invalid/Repository");
-    let (stable, nightly) = repo.split_once("\n[freesynergy-nightly]").unwrap();
-    assert!(stable.contains("enabled=1") && nightly.contains("enabled=0"));
-    for part in [stable, nightly] {
-        assert!(part.contains("gpgcheck=1") && part.contains("repo_gpgcheck=1"));
-    }
+    assert!(
+        repo.contains("enabled=1")
+            && repo.contains("gpgcheck=1")
+            && repo.contains("repo_gpgcheck=1")
+    );
 }
 
 #[test]

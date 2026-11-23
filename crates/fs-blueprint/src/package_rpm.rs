@@ -178,22 +178,12 @@ pub fn program_spec(
     })
 }
 
-/// The dnf source: `stable` is on, `nightly` is there but off (decision 2026-11-23). Packages and the repo data are checked (`gpgcheck`, `repo_gpgcheck`).
+/// The dnf source: ONE section `[freesynergy]`, on (decision 9f, 2026-11-23: one channel, it holds pre-releases too; no nightly section, no `enabled=0`). Packages and the repo data are checked (`gpgcheck`, `repo_gpgcheck`).
 #[must_use]
 pub fn repo_file(pages: &str) -> String {
-    let section = |id: &str, name: &str, channel: &str, on: u8| {
-        format!(
-            "[{id}]\nname={name}\nbaseurl={pages}/rpm/{channel}\nenabled={on}\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file://{KEY_PATH}\n"
-        )
-    };
-    let stable = section("freesynergy", "FreeSynergy (stable)", "stable", 1);
-    let nightly = section(
-        "freesynergy-nightly",
-        "FreeSynergy (nightly, for testers)",
-        "nightly",
-        0,
-    );
-    format!("{stable}\n{nightly}")
+    format!(
+        "[freesynergy]\nname=FreeSynergy\nbaseurl={pages}/rpm/stable\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file://{KEY_PATH}\n"
+    )
 }
 
 /// The package `freesynergy-release`: the dnf source and the PUBLIC key. Its version follows the fs-blueprint version; when the key or the URL changes, `--pkg-version` MUST be raised (else dnf sees no update).
@@ -222,7 +212,7 @@ pub fn release_spec(
         release: release.into(),
         license: LICENSE.into(),
         summary: "FreeSynergy package source and signing key".into(),
-        description: "The package source of FreeSynergy (stable on, nightly off).\nAnd the public key that signs the packages and the repo data.".into(),
+        description: "The package source of FreeSynergy (one channel; it holds pre-releases too).\nAnd the public key that signs the packages and the repo data.".into(),
         url: Some(REPOSITORY_URL.into()),
         files: vec![
             cfg(REPO_FILE, repo_file(pages).into_bytes()),
