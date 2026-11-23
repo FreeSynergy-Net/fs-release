@@ -49,7 +49,7 @@ fn split(words: &[String]) -> Result<(Extra, Vec<String>), String> {
                 x.source_date = Some(
                     v()?.parse()
                         .map_err(|_| "--source-date needs seconds".to_string())?,
-                )
+                );
             }
             _ => rest.push(w.clone()),
         }
