@@ -52,6 +52,15 @@ chk "REAL cargo-deny $version: dependency under AGPL-3.0-only is RED (rc 4 = bit
 cp "$tmp/r.txt" "$tmp/agpl.txt"; agpl_keep=$agpl_rc
 chk "REAL cargo-deny $version: dependency under MIT OR Apache-2.0 is green (rc 0)" ok_green "$tmp/real"
 cp "$tmp/r.txt" "$tmp/ok.txt"
+# exceptions per crate (decision 9f): the named crates are green, the SAME licences on other crates (and on a version outside the bound) stay red
+exc_ok() { real "$1" exc-ok; [ $? -eq 0 ]; }
+exc_red() { real "$1" exc-red; local r=$?; [ "$r" -eq 4 ] && grep -q "other-cdla" "$tmp/r.txt" && grep -q "other-ofl" "$tmp/r.txt" && grep -q "fs-components-render v0.0.23" "$tmp/r.txt"; }
+chk "exceptions: webpki-roots, webpki-root-certs (CDLA-Permissive-2.0) and fs-components-render 0.0.20 (OFL-1.1) are green (rc 0)" exc_ok "$tmp/real"
+chk "mutant of the data: CDLA-Permissive-2.0 / OFL-1.1 on OTHER crates and OFL on fs-components-render 0.0.23 stay RED (rc 4)" exc_red "$tmp/real"
+mkmech "$tmp/mut-exc"; perl -0pi -e 's/\[\[licenses\.exceptions\]\].*?(?=\[bans\])//s' "$tmp/mut-exc/configs/deny.toml"
+if exc_ok "$tmp/mut-exc"; then bad "mutant: exceptions removed survived"; else ok "mutant: policy without the exceptions is caught (exc-ok is no longer green)"; fi
+mkmech "$tmp/mut-exc2"; sed -i 's/^    "MIT",$/    "MIT",\n    "CDLA-Permissive-2.0",\n    "OFL-1.1",/' "$tmp/mut-exc2/configs/deny.toml"
+if exc_red "$tmp/mut-exc2"; then bad "mutant: licences in the general allow list survived"; else ok "mutant: licences in the general allow list are caught (exc-red is no longer red)"; fi
 # mutant: AGPL on the allow list -> the check agpl_red must turn red (the test sees the loosened policy)
 mkmech "$tmp/mut-allow"; sed -i 's/^    "MIT",$/    "MIT",\n    "AGPL-3.0-only",/' "$tmp/mut-allow/configs/deny.toml"
 if agpl_red "$tmp/mut-allow"; then bad "mutant: allow list with AGPL survived"; else ok "mutant: allow list with AGPL is caught (the AGPL fixture is no longer red)"; fi
