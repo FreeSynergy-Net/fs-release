@@ -12,9 +12,12 @@
 //! Roots are every workflow and every action file at S. A pin to a workflow reaches that file, a pin to an action reaches the directory of
 //! the action; every reached file is compared with S and followed with ITS pins, so each level is checked on its own.
 //! `fs-release check-pin-chain [--repo <dir>] [<start>]`: rc 0 green, 1 red, 2 bad input; `--melden` only reports (lint), rc 0 on red.
-//! `scripts/`: an action (`actions/<name>`) whose files say `../../scripts` runs the `scripts/` of ITS pin (`$GITHUB_ACTION_PATH/../../scripts`), so for such a
-//! pin the whole `scripts/` directory at the pin is compared with `scripts/` at the start too (red lists the files and names pin-refs.sh).
-//! Not covered (honest): a `uses:` value on the following line, a block scalar, anchors/aliases, complex keys, escapes in the name.
+//! Whole tree: GitHub checks out the whole repository at the pin and an action reaches all of it (`$GITHUB_ACTION_PATH/..` in any spelling, `cd ../..`,
+//! `scripts/`, `RUST_VERSION`, `configs/`, the signing key, the workspace, neighbour actions). So behind EVERY pin that is no workflow file the whole tree
+//! at the pin is compared with the tree at the start (`git diff --name-only`, then the normalised content; only the self-pins may differ). No text
+//! detection, so no spelling slips through; red lists the files and names pin-refs.sh. Once per pin (the message holds for every action at that pin).
+//! Not covered (honest): a `uses:` value on the following line, a block scalar, anchors/aliases, complex keys, escapes in the name; the tree of a
+//! checkout done at run time by the caller (`actions/checkout` of another repo); symlinks are compared as text (their target), not followed.
 //! THREAT MODEL: protects against OVERSIGHT, not against someone who can change workflow, toolchain or scripts.
 
 use std::collections::BTreeSet;
@@ -122,7 +125,7 @@ impl Walk<'_> {
                 ));
             }
         }
-        self.scripts(from, u, &at_pin);
+        self.tree(from, u);
         for f in at_pin.iter().filter(|f| is_yaml(f)) {
             if let Some(t) = show(self.repo, &u.pin, f) {
                 self.follow(&format!("{f}@{}", short(&u.pin)), &t);
@@ -132,29 +135,41 @@ impl Walk<'_> {
 }
 
 impl Walk<'_> {
-    /// A reached action that runs `../../scripts` at its pin: `scripts/` at the pin against `scripts/` at the start (once per pin).
-    fn scripts(&mut self, from: &str, u: &Use, at_pin: &[String]) {
-        let reads_scripts = u.path.starts_with("actions/")
-            && at_pin
-                .iter()
-                .any(|f| show(self.repo, &u.pin, f).is_some_and(|t| t.contains("../../scripts")));
-        if !reads_scripts || !self.seen.insert(("scripts".into(), u.pin.clone())) {
+    /// Behind an action pin (every reached path that is no workflow file) the WHOLE tree at the pin against the tree at the start, once per pin.
+    /// GitHub checks out the whole repository at the pin and an action reaches all of it (`$GITHUB_ACTION_PATH/..`, `cd ../..`, `RUST_VERSION`,
+    /// `configs/`, the signing key, neighbour actions), so no text detection is used: only the self-pins (normalised) may differ.
+    fn tree(&mut self, from: &str, u: &Use) {
+        if u.path.starts_with(".github/workflows/")
+            || !self.seen.insert(("tree".into(), u.pin.clone()))
+        {
             return;
         }
-        let old = files_at(self.repo, &u.pin, "scripts");
-        let new = files_at(self.repo, &self.start, "scripts");
-        let names: BTreeSet<&String> = old.iter().chain(new.iter()).collect();
+        let Some(names) = git(
+            self.repo,
+            &[
+                "diff",
+                "--name-only",
+                "--no-renames",
+                "-z",
+                &u.pin,
+                &self.start,
+            ],
+        ) else {
+            self.red.push(format!(
+                "{from}: cannot compare the tree of pin {} with the start head {}",
+                short(&u.pin),
+                short(&self.start)
+            ));
+            return;
+        };
         let differ: Vec<&str> = names
-            .into_iter()
-            .filter(|f| {
-                show(self.repo, &u.pin, f).map(|t| normalize(&t))
-                    != show(self.repo, &self.start, f).map(|t| normalize(&t))
-            })
-            .map(String::as_str)
+            .split('\0')
+            .filter(|f| !f.is_empty())
+            .filter(|f| !same_file(self.repo, &u.pin, &self.start, f))
             .collect();
         if !differ.is_empty() {
             self.red.push(format!(
-                "{from}: `{}` runs the scripts/ of its pin {}, which differ from the start head {} in {} file(s): {} (fix: bash scripts/pin-refs.sh <start sha>)",
+                "{from}: `{}` runs the whole repository of its pin {} (also `..`, scripts/, RUST_VERSION, configs/), which differs from the start head {} in {} file(s): {} (reported once per pin, it holds for every other action at this pin too; fix: bash scripts/pin-refs.sh <start sha>)",
                 u.path,
                 short(&u.pin),
                 short(&self.start),
@@ -163,6 +178,30 @@ impl Walk<'_> {
             ));
         }
     }
+}
+
+/// A file is the same at both commits when the bytes are equal, or when both are text and equal after the self-pins are normalised.
+/// A missing file or a non-text file with other bytes is different (fail closed).
+fn same_file(repo: &Path, pin: &str, start: &str, file: &str) -> bool {
+    let (Some(old), Some(new)) = (show_bytes(repo, pin, file), show_bytes(repo, start, file))
+    else {
+        return false;
+    };
+    old == new
+        || matches!(
+            (String::from_utf8(old), String::from_utf8(new)),
+            (Ok(o), Ok(n)) if normalize(&o) == normalize(&n)
+        )
+}
+
+fn show_bytes(repo: &Path, commit: &str, file: &str) -> Option<Vec<u8>> {
+    let o = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["show", &format!("{commit}:{file}")])
+        .output()
+        .ok()?;
+    o.status.success().then_some(o.stdout)
 }
 
 /// Run the gate over `repo` from `start`. `Ok(findings)` (empty = green) or `Err` for bad input (rc 2).

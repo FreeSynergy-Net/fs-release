@@ -9,7 +9,7 @@
 # Only `<repo>/.github/workflows/*.yml` is touched, only `uses: <owner>/fs-release/<path>@<old>` (owner = one of the two known owners) becomes `@<ref>`; other
 # actions (actions/checkout@..., ...) stay as they are. No `.github/workflows/` there = rc 2. Prints the changed files, rc 0.
 # A pin is never lowered (rc 3, nothing written; the whole run is red, not line by line): every existing `@<old>` (tag or SHA) must resolve in the fs-release clone ($FS_RELEASE_REPO, default: this repo) and <ref> must be equal to it or a descendant (git merge-base --is-ancestor). Unknown, older or unrelated = rc 3. `@main` is raised. The owner name is rewritten to FreeSynergy-Net.
-# Without `--dir` the script rewrites this repository (workflows and actions) and prints `git diff --stat`, as before.
+# Without `--dir` the script rewrites this repository (workflows and actions) and prints `git diff --stat`; the never-lower check holds there too (rc 3, nothing written).
 set -euo pipefail
 # The two known owners of fs-release, exactly (never "any owner"): the old one stays until part 2 of the address wave is done.
 owners='FreeSynergy-Net|FreeSynergy'
@@ -87,8 +87,13 @@ if [ -n "$dir" ]; then
   exit 0
 fi
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-grep -rlE "($owners)/fs-release/.+@" .github actions | while read -r f; do
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FS_RELEASE_REPO=${FS_RELEASE_REPO:-$root}
+cd "$root"
+mapfile -t selfs < <(grep -rlE "($owners)/fs-release/.+@" .github actions || true)
+# Self mode never lowers either (review pin-chain-gate r4 S5): rc 3, nothing written, the message names the pin.
+[ "${#selfs[@]}" -eq 0 ] || check_no_lower "${selfs[@]}" || exit 3
+for f in "${selfs[@]}"; do
   pin_file "$f"
 done
 git diff --stat

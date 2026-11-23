@@ -179,7 +179,13 @@ fn only_another_chain_differs() {
         found.iter().any(|f| f.contains("actions/sign/sign.sh")),
         "{found:?}"
     );
-    assert!(!found.iter().any(|f| f.contains("pub")), "{found:?}");
+    // the own files of the pub chain are equal (the whole-tree finding behind every action pin names the sign.sh change, but not pub files)
+    assert!(
+        !found
+            .iter()
+            .any(|f| f.contains("pub.sh at pin") || f.contains("_pub.yml at pin")),
+        "{found:?}"
+    );
 }
 
 #[test]

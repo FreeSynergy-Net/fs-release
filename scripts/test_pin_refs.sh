@@ -20,7 +20,10 @@ mk() {
   mkdir -p "$1/scripts"
   cp -r "$repo/.github" "$repo/actions" "$1/"
   cp "$2" "$1/scripts/pin-refs.sh"
+  # the pins of the copy point to commits that do not exist in the throw-away repo: `@main` (always raised), the real pins are tested in self_checks
+  grep -rlE 'fs-release/.+@' "$1/.github" "$1/actions" | while read -r f; do sed -i -E '/^[[:space:]]*(-[[:space:]]+)?uses:/ s|(fs-release/[A-Za-z0-9_./-]+)@[A-Za-z0-9_.-]+|\1@main|' "$f"; done
   git -C "$1" init -q && git -C "$1" add -A && git -C "$1" -c user.name=t -c user.email=t@t commit -qm base
+  git -C "$1" tag v9.8.7
 }
 # bad_refs <dir> <label>: every bad ref must give rc 2 and leave the tree untouched
 bad_refs() {
@@ -31,8 +34,8 @@ bad_refs() {
   done
 }
 
-sha=0123456789abcdef0123456789abcdef01234567
 mk "$tmp/real" "$here/pin-refs.sh"
+sha=$(git -C "$tmp/real" rev-parse HEAD)
 uses_before="$(git -C "$tmp/real" grep -hE '^[[:space:]]*(-[[:space:]]+)?uses:.*FreeSynergy-Net/fs-release/' | wc -l)"
 bash "$tmp/real/scripts/pin-refs.sh" "$sha" >/dev/null; rc=$?
 [ "$rc" -eq 0 ] && ok "valid SHA rc 0" || bad "valid SHA rc=$rc"
@@ -173,13 +176,30 @@ nolower_checks() {
 }
 nolower_checks "$here/pin-refs.sh" real
 
+# never lower, SELF mode (no --dir; review pin-chain-gate r4 S5): pins at a newer commit than the target = rc 3, nothing written, a message; the same or an
+# older pin is raised. A throw-away copy whose own history gives the pins (c1 older, c2 newer).
+self_checks() {
+  local s=$1 l=$2 d="$tmp/self-$2" c1 c2 rc out
+  mk "$d" "$s"
+  c1=$(git -C "$d" rev-parse HEAD)
+  git -C "$d" -c user.name=t -c user.email=t@t commit -qm two --allow-empty
+  c2=$(git -C "$d" rev-parse HEAD)
+  grep -rlE 'fs-release/.+@' "$d/.github" "$d/actions" | while read -r f; do sed -i -E "/^[[:space:]]*(-[[:space:]]+)?uses:/ s|(fs-release/[A-Za-z0-9_./-]+)@[A-Za-z0-9_.-]+|\1@$c2|" "$f"; done
+  git -C "$d" add -A && git -C "$d" -c user.name=t -c user.email=t@t commit -qm pinned
+  out=$(FS_RELEASE_REPO="$d" bash "$d/scripts/pin-refs.sh" "$c1" 2>&1); rc=$?
+  if [ "$rc" -eq 3 ] && [ -z "$(git -C "$d" status --porcelain)" ] && echo "$out" | grep -q 'never lowered'; then ok "$l self mode: lowering is rc 3 with a message, nothing written"; else bad "$l self mode: lowering rc=$rc or files changed: $out"; git -C "$d" checkout -q .; fi
+  out=$(FS_RELEASE_REPO="$d" bash "$d/scripts/pin-refs.sh" "$c2" 2>&1); rc=$?
+  if [ "$rc" -eq 0 ] && [ -z "$(git -C "$d" status --porcelain)" ]; then ok "$l self mode: the same pin is a no-op"; else bad "$l self mode: same pin rc=$rc: $out"; fi
+}
+self_checks "$here/pin-refs.sh" real
+
 # mutations of the --dir path: each must turn dir_checks (or the never-lower checks) red
 red_by() { # <label> <sed expression on the script>
   local m="$tmp/m-$1.sh"
   sed -E "$2" "$here/pin-refs.sh" >"$m"
   if cmp -s "$m" "$here/pin-refs.sh"; then bad "mutation $1 did not change the script"; return; fi
   local res
-  res="$(dir_checks "$m" "$1" 2>&1; nolower_checks "$m" "$1" 2>&1)"
+  res="$(dir_checks "$m" "$1" 2>&1; nolower_checks "$m" "$1" 2>&1; self_checks "$m" "$1" 2>&1)"
   if echo "$res" | grep -q '^FAIL'; then ok "mutation $1 turns the --dir checks red"; else bad "mutation $1 stayed green"; fi
 }
 red_by noanchor 's@\$0 ~ "\^\[\[:space:\]\]\*\(-\[\[:space:\]\]\+\)\?uses:"@$0 ~ "uses:"@'
@@ -193,6 +213,7 @@ red_by last-pin-only 's@\| sort -u\)@| sort -u | tail -1)@'
 red_by target-unknown-ok 's@(not found in \$repo" >&2; )return 3;@\1true;@'
 red_by noboundary-awk 's@if \(RSTART > 1\) \{ c =@if (0) { c =@'
 red_by noboundary-grep 's@\(\^\|[^)]*\)\(\$owners\)/fs-release@(\$owners)/fs-release@'
+red_by selfnocheck 's#^\[ "\$\{\#selfs\[@\]\}" -eq 0 \] \|\| check_no_lower .*#true#'
 red_by dirignored 's@^if \[ -n "\$dir" \]; then@if false; then@'
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
