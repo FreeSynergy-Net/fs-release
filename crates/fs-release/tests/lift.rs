@@ -5,6 +5,7 @@ mod support;
 use fs_release::lift::{self, Report};
 use fs_release_chain::sys::SystemRunner;
 use std::fs;
+use support::rel_tags::tag_release;
 use support::{git, World};
 
 fn step<'a>(r: &'a Report, name: &str) -> &'a fs_release::task::Record {
@@ -250,6 +251,7 @@ fn assert_is_empty_in_a_test_is_red_at_clippy_stable_with_the_first_error_line()
 #[test]
 fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
     let w = World::new();
+    tag_release(&w, &["v0.0.17"]);
     let wf = w.work().join(".github/workflows");
     fs::create_dir_all(&wf).unwrap();
     let check = "jobs:\n  check:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@main\n  other:\n    steps:\n      - uses: actions/checkout@v4\n";
@@ -264,4 +266,21 @@ fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
     // A second run finds the tag in place and changes nothing.
     let (r, _) = run(&w, &w.opts());
     assert!(step(&r, "pins").detail.contains(" 0 file(s) changed"));
+}
+#[test]
+fn pins_never_lowers_a_pin_to_an_older_tag() {
+    let w = World::new();
+    tag_release(&w, &["v0.0.17", "v0.0.18"]);
+    let wf = w.work().join(".github/workflows");
+    fs::create_dir_all(&wf).unwrap();
+    let sha = git(&w.rel(), &["rev-parse", "v0.0.18"]);
+    let check = format!(
+        "jobs:\n  check:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@{sha}\n"
+    );
+    fs::write(wf.join("check.yml"), &check).unwrap();
+    git(&w.work(), &["add", "-A"]);
+    git(&w.work(), &["commit", "--quiet", "-m", "workflow"]);
+    let (r, _) = run(&w, &w.opts());
+    assert_eq!(step(&r, "pins").status, "red", "{}", r.markdown());
+    assert_eq!(w.read(".github/workflows/check.yml"), check);
 }

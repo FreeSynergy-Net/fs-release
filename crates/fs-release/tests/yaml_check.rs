@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use fs_release::lift;
 use fs_release::task::{run_all, Task, SKIPPED};
 use fs_release_chain::outcome::Stop;
+use support::rel_tags::tag_release;
 use support::{have_yaml, python, World};
 
 const GOOD: &str = "name: ci\non: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Build (debug, the test x)\n        run: echo hi\n";
@@ -69,6 +70,7 @@ fn a_repo_without_workflow_files_is_green() {
 #[test]
 fn lift_is_red_at_yaml_check_for_the_broken_file_and_green_for_the_valid_one() {
     let w = World::new();
+    tag_release(&w, &["v0.0.17"]);
     put_workflow(&w.work(), GOOD);
     let (r, code) = lift::run(&w.opts(), &fs_release_chain::sys::SystemRunner::default());
     assert_eq!(code, 0, "{}", r.markdown());

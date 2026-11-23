@@ -53,7 +53,22 @@ out="$(bad_refs "$tmp/mut" mutant 2>&1)"
 if echo "$out" | grep -q '^FAIL'; then ok "mutation (check removed) turns the bad-ref cases red"; else bad "mutation stayed green"; fi
 
 # --- `--dir <repo>`: a foreign repo (a program that calls fs-release) ---
-foreign_sha=6ebd3f8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+# A throw-away fs-release clone (FS_RELEASE_REPO) with a linear history and tags, plus a side commit unrelated to the tags' line.
+mkrel() {
+  local r=$1 t
+  git init -q "$r"
+  for t in v0.0.6 v0.0.9 v0.0.10 v0.0.11 v0.0.100 v0.1.0; do
+    echo "$t" >"$r/f" && git -C "$r" add f && git -C "$r" -c user.name=t -c user.email=t@t commit -qm "$t" && git -C "$r" tag "$t"
+  done
+  git -C "$r" checkout -q --orphan side && git -C "$r" -c user.name=t -c user.email=t@t commit -qm side --allow-empty
+  git -C "$r" checkout -q -f v0.1.0
+}
+mkrel "$tmp/rel"
+export FS_RELEASE_REPO="$tmp/rel"
+tagsha() { git -C "$tmp/rel" rev-parse "$1^{commit}"; }
+side="$(git -C "$tmp/rel" rev-parse side)"
+
+ foreign_sha=$(tagsha v0.0.6)
 checkout=actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 # mkforeign <dir>: two workflows with every kind of line the script must treat differently
 mkforeign() {
@@ -111,18 +126,35 @@ bash "$here/pin-refs.sh" --dir >/dev/null 2>&1; rc=$?
 bash "$here/pin-refs.sh" v0.0.10 v0.0.11 >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 2 ] && ok "two refs rc 2" || bad "two refs rc=$rc"
 
-# never lower (--dir, per `uses:` line): a line on a HIGHER tag stays, @main / SHA / older tags are raised, even when another line already has the new tag
+# never lower (--dir): target equal or descendant of every existing pin = ok; older, unrelated, unknown, or a foreign org = rc 3 and NOTHING written
 nolower_checks() {
-  local s=$1 l=$2 d="$tmp/n-$2"
-  mkdir -p "$d/.github/workflows"
-  printf 'jobs:\n  a:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.11\n  b:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.9\n  c:\n    uses: FreeSynergy-Net/fs-release/actions/sbom@v0.1.0 # newer minor\n  d:\n    uses: FreeSynergy-Net/fs-release/actions/x@v0.0.10\n  e:\n    uses: FreeSynergy-Net/fs-release/actions/y@main\n  f:\n    uses: FreeSynergy-Net/fs-release/actions/z@v0.0.100\n' >"$d/.github/workflows/release.yml"
-  git -C "$d" init -q && git -C "$d" add -A && git -C "$d" -c user.name=t -c user.email=t@t commit -qm base
-  bash "$s" --dir "$d" v0.0.10 >/dev/null 2>&1; rc=$?
-  [ "$rc" -eq 0 ] && ok "$l never-lower run rc 0" || bad "$l never-lower rc=$rc"
-  git -C "$d" grep -q 'release.yml@v0.0.11$' && git -C "$d" grep -q 'sbom@v0.1.0 # newer minor' && git -C "$d" grep -q 'actions/z@v0.0.100$' && ok "$l higher tags (v0.0.11, v0.1.0, v0.0.100) stay" || bad "$l a higher tag was lowered"
-  git -C "$d" grep -q 'check.yml@v0.0.10$' && git -C "$d" grep -q 'actions/y@v0.0.10$' && git -C "$d" grep -q 'actions/x@v0.0.10$' && ok "$l v0.0.9 and @main are raised to v0.0.10" || bad "$l old pin not raised"
-  bash "$s" --dir "$d" 0123456789abcdef0123456789abcdef01234567 >/dev/null 2>&1
-  [ "$(git -C "$d" grep -c '@0123456789abcdef0123456789abcdef01234567' | awk -F: '{s+=$NF} END{print s}')" -eq 6 ] && ok "$l a SHA target replaces every ref (no tag comparison)" || bad "$l SHA target"
+  local s=$1 l=$2 d="$tmp/n-$2" rc t before
+  nl_case() { # <name> <old pin line ref or full owner/ref> <target> <want: ok|noop|red>
+    local want=$4
+    rm -rf "$d"; mkdir -p "$d/.github/workflows"
+    printf 'jobs:\n  a:\n    uses: %s/fs-release/.github/workflows/check.yml@%s\n  b:\n    uses: %s/fs-release/actions/x@%s\n' "${2%%@*}" "${2##*@}" "${2%%@*}" "${2##*@}" >"$d/.github/workflows/c.yml"
+    git -C "$d" init -q && git -C "$d" add -A && git -C "$d" -c user.name=t -c user.email=t@t commit -qm base
+    bash "$s" --dir "$d" "$3" >/dev/null 2>&1; rc=$?
+    case $want in
+      ok) { [ "$rc" -eq 0 ] && git -C "$d" grep -q "FreeSynergy-Net/fs-release/.github/workflows/check.yml@$3\$" && ok "$l $1"; } || bad "$l $1 (rc=$rc)" ;;
+      noop) { [ "$rc" -eq 0 ] && [ -z "$(git -C "$d" status --porcelain)" ] && ok "$l $1"; } || bad "$l $1 (rc=$rc)" ;;
+      red) { [ "$rc" -eq 3 ] && [ -z "$(git -C "$d" status --porcelain)" ] && ok "$l $1"; } || bad "$l $1 (rc=$rc, want 3 and untouched)" ;;
+    esac
+  }
+  nl_case "newer tag over an older tag is raised" FreeSynergy-Net@v0.0.9 v0.0.11 ok
+  nl_case "SHA descendant over an older tag is raised" FreeSynergy-Net@v0.0.9 "$(tagsha v0.0.10)" ok
+  nl_case "equal pin is a no-op" FreeSynergy-Net@v0.0.11 v0.0.11 noop
+  nl_case "the same commit as a SHA pin is rewritten to the tag" FreeSynergy-Net@"$(tagsha v0.0.11)" v0.0.11 ok
+  nl_case "old org name is rewritten to FreeSynergy-Net" FreeSynergy@v0.0.9 v0.0.10 ok
+  nl_case "@main is raised" FreeSynergy-Net@main v0.0.10 ok
+  nl_case "older tag target is red (v0.0.10 over v0.0.11)" FreeSynergy-Net@v0.0.11 v0.0.10 red
+  nl_case "older SHA target is red" FreeSynergy-Net@v0.1.0 "$(tagsha v0.0.100)" red
+  nl_case "v0.0.17-style lowering of a SHA pin is red" FreeSynergy-Net@"$(tagsha v0.1.0)" v0.0.10 red
+  nl_case "unrelated commit as pin is red" FreeSynergy-Net@"$side" v0.0.10 red
+  nl_case "unknown pin (not in the clone) is red, not overwritten" FreeSynergy-Net@v9.9.9 v0.0.10 red
+  nl_case "unknown SHA pin is red" FreeSynergy-Net@0123456789abcdef0123456789abcdef01234567 v0.0.10 red
+  nl_case "target not in the clone is red" FreeSynergy-Net@v0.0.9 v7.7.7 red
+  nl_case "foreign org line stays untouched, no pin check on it" Evil@v0.0.11 v0.0.10 noop
 }
 nolower_checks "$here/pin-refs.sh" real
 
@@ -138,8 +170,9 @@ red_by() { # <label> <sed expression on the script>
 red_by noanchor 's@\$0 ~ "\^\[\[:space:\]\]\*\(-\[\[:space:\]\]\+\)\?uses:"@$0 ~ "uses:"@'
 red_by widened 's@re = "\(" owners "\)/fs-release/@re = "[A-Za-z0-9_-]+/fs-release/@'
 red_by only-old-owner "s@^owners=.*@owners='FreeSynergy'@"
-red_by lowers 's@if \(!\(keep == 1.*\)\) tok@if (1) tok@'
-red_by semver-as-text 's@ver\(old\) > ver\(ref\)@old > ref@'
+red_by nocheck 's@^  check_no_lower .*@  true@'
+red_by noancestor 's@ \|\| git -C "\$repo" merge-base --is-ancestor "\$o" "\$n"@@'
+red_by unknown-ok 's@rc=3; continue; }@continue; }@'
 red_by dirignored 's@^if \[ -n "\$dir" \]; then@if false; then@'
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
