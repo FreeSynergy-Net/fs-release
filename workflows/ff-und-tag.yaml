@@ -1,5 +1,5 @@
 # ff-und-tag: the push of a reviewed head to main and the annotated tag - what the push helper of the strategy does by hand today. The
-# order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (required) and, optional, `pakete` (true = the repo builds rpm and deb, then `paketname-gleich` runs; not set = skipped, named in the output), `registry_crate` (true | false; not set = taken from the list), `registry_crates` (list of repo names, default fs-types, fs-conformance, fs-records), `erstkette_ok` (true = the user knows the FIRST release chain of this repo), `rot_freigabe` (`{ run_ids, grund, wort }`: the run ids of EXACTLY the red runs), `index_wait_wired`, `index_warten_minuten` (default 10), `main_ci_warten_minuten` (default 30) (docs/prompt-template.md). Specification (the @fs calls
+# order: `Workflow ff-und-tag, parameters repo, branch, head, tag, allow, workdir` (required) and, optional, `pakete` (true = the repo builds rpm and deb, then `paketname-gleich` runs; not set = skipped, named in the output), `registry_crate` (true | false; not set = taken from the list), `registry_crates` (list of repo names, default fs-types, fs-conformance, fs-records), `erstkette_ok` (true = the user knows the FIRST release chain of this repo), `rot_freigabe` (`{ run_ids, workflows, grund, wort }`: `run_ids` = a LIST with the ids of EXACTLY the red BRANCH runs, `workflows` = a LIST with their workflow names, `grund` not empty; r2: the checks read this input itself, not an echo of a script; a string or a single number as `run_ids` is no release), `index_wait_wired`, `index_warten_minuten` (default 10), `main_ci_warten_minuten` (default 30) (docs/prompt-template.md). Specification (the @fs calls
 # have no script yet, like the other specification steps). It is the procedure behind the steps `tag`, `push`, `ci` and `main-ff` of
 # `release-flow` (those stay, they follow the code of `fs-release flow`); the checklist here is the hands-on side with the proofs.
 # Order of the end (r1: erst-release stands directly before the tag, main-vor-push directly before the push): branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, the expected runs per repo (each one there and green for the head), fresh
@@ -8,7 +8,7 @@
 # KNOWN GAP (ENTSCHEID-ref, 23.11.): the case repo = fs-release does not fit this flow yet: fs-release has no release run for a tag (`release.yml` and `_release-*.yml` are `workflow_call` only; a tag push starts only `lint.yml`), so `erwartete-laeufe`/`release-beobachten` would be red or unknown and nothing is signed. A step for the case fs-release (no release run expected, check `lint.yml` and the tag proof only) is to be added later by `workflow-pflege`, before the tag v0.0.18.
 # RULES ADDED BY workflow-pflege-1 (23.11.2026, cards of the strategy; each rule names its occasion):
 # [LANDUNG-ALLE-GRUEN] A push to main only when ALL CI workflows of the exact head (check, windows, semver, lint, every workflow the repo runs on the branch) are green (step `alle-workflows-gruen`).
-#   A deliberately red gate is allowed only with the explicit release of the strategy, named in the report with run id and reason (input `rot_freigabe`, with the run ids of exactly the red runs). Occasion: fs-types main 6f1ebcf0 landed with semver RED
+#   A deliberately red gate is allowed only with the explicit release of the strategy, named in the report with run id and reason (input `rot_freigabe`, with the run ids and the workflow NAMES of exactly the red branch runs; r2: on main the release holds by workflow NAME, because the runs on main get new ids at the push). Occasion: fs-types main 6f1ebcf0 landed with semver RED
 #   (run 45253040919) after an Opus JA, without asking the strategy - a JA covers the code, not a red workflow.
 # [NICHT-GELAUFEN-NIE-GRUEN] For ALL gates (gates.sh, semver, every check script): a gate that did not run, was skipped or cancelled, has no result or says `NotRun` is NEVER green; it is red or unknown and stops.
 #   Occasion: K-2-r2 M2 (a semver check that returned `NotRun` was counted GREEN). Written once here, repeated in `testlauf`, `review` and `pin-kaskade`.
@@ -18,7 +18,7 @@
 # [ERSTE-KETTE] The FIRST release of a repo (first tag, public pre-release) is user knowledge (step `erst-release`): secrets are only read for "set or not" (names, never values), a dry run comes first.
 #   Occasion: fs-capnpc v0.2.3 - first real release chain of that repo, GPG secrets not proven, decision to the user.
 # [KOPF-NEU-LESEN] Every review promise names "exactly this head"; right before a push `main` of the remote is read again (`git ls-remote`), because every new main costs one CI round (steps `kopf-und-ff` first reading, `main-vor-push` directly before `push-ff`; `ja-fuer-kopf`).
-# [BEDROHUNGSMODELL] (r1, K5) `rot_freigabe` and `erstkette_ok` open a gate and are TEXT in the order: whoever writes the order opens the gate (the strategy by the word of the user). Nothing more is claimed: no signature, no proof of the word; the check binds the release only to the run ids it names (`alle-weiter`, `main-ci-weiter`). Same known limit as `check-approval`.
+# [BEDROHUNGSMODELL] (r1, K5) `rot_freigabe` and `erstkette_ok` open a gate and are TEXT in the order: whoever writes the order opens the gate (the strategy by the word of the user). Nothing more is claimed: no signature, no proof of the word; the check binds the release only to the run ids (branch) and workflow names (main) it names (`alle-weiter`, `main-ci-weiter`). Same known limit as `check-approval`.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -28,10 +28,10 @@ document:
 do:
   - eingaben-ableiten:
       set:
-        registry: '${ if .input.registry_crate != null then (.input.registry_crate == true) else (((.input.registry_crates // ["fs-types", "fs-conformance", "fs-records"]) | index(.input.repo | split("/") | last)) != null) end }'
+        registry: '${ (.input.repo | split("/") | last) as $r | if .input.registry_crate != null then (.input.registry_crate == true) else (((.input.registry_crates // ["fs-types", "fs-conformance", "fs-records"]) | index($r)) != null) end }'
         pakete: '${ .input.pakete == true }'
         erstkette_ok: '${ .input.erstkette_ok == true }'
-        hinweise: '${ [ (if .input.pakete == true then "paketname-gleich: runs" else "paketname-gleich: SKIPPED, input pakete is not true (a repo that builds rpm and deb sets pakete: true)" end), (if (if .input.registry_crate != null then (.input.registry_crate == true) else (((.input.registry_crates // ["fs-types", "fs-conformance", "fs-records"]) | index(.input.repo | split("/") | last)) != null) end) then "index-zeile: runs (registry crate)" else "index-zeile: not applicable, the repo is not a registry crate (input registry_crate or the list registry_crates)" end) ] }'
+        hinweise: '${ (.input.repo | split("/") | last) as $r | (if .input.registry_crate != null then (.input.registry_crate == true) else (((.input.registry_crates // ["fs-types", "fs-conformance", "fs-records"]) | index($r)) != null) end) as $reg | [ (if .input.pakete == true then "paketname-gleich: runs" else "paketname-gleich: SKIPPED, input pakete is not true (a repo that builds rpm and deb sets pakete: true)" end), (if $reg then "index-zeile: runs (registry crate)" else "index-zeile: not applicable, the repo is not a registry crate (input registry_crate or the list registry_crates)" end) ] }'
       export:
         as: '${ $context + { eingaben: . } }'
       metadata:
@@ -248,14 +248,14 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "SPECIFICATION (no script yet; reads `gh run list --commit <head>` through the push helper, read only). [LANDUNG-ALLE-GRUEN] BEFORE the push to main: EVERY workflow the repo runs for the exact head (not only `check` and `windows`: also `semver`, `lint`, and any other) exists and is green; the list comes from `laeufe.erwartet` PLUS `gh run list` of the head, so a workflow that nobody expected is seen too. Result `alle` with `status` green | red | unknown, `rote` (run id, workflow, conclusion) and `freigabe`. [NICHT-GELAUFEN-NIE-GRUEN]: skipped, cancelled, queued, NotRun or missing is not green. A deliberately red gate counts only with `rot_freigabe` (text of the strategy: `run_ids` of exactly the red runs + reason + the word of the strategy; see `alle-weiter`); the run ids and reason go into the report. Occasion: fs-types main 6f1ebcf0, semver run 45253040919 RED accepted without asking the strategy."
+        freesynergy.net:summary: "SPECIFICATION (no script yet; reads `gh run list --commit <head>` through the push helper, read only). [LANDUNG-ALLE-GRUEN] BEFORE the push to main: EVERY workflow the repo runs for the exact head (not only `check` and `windows`: also `semver`, `lint`, and any other) exists and is green; the list comes from `laeufe.erwartet` PLUS `gh run list` of the head, so a workflow that nobody expected is seen too. Result `alle` with `status` green | red | unknown, `rote` (run id, workflow, conclusion) and `fehlend` (names of workflows that were expected or seen but have no run). r2 (S1): every workflow that is not green (missing, skipped, cancelled, queued, NotRun) stands in `rote` with its `conclusion` (a missing one with `run_id: null`, `conclusion: missing`) AND, if it has no run, in `fehlend`; the switch checks both (`rote` all `failure`, `fehlend` empty), so a missing workflow never passes a release. [NICHT-GELAUFEN-NIE-GRUEN]: skipped, cancelled, queued, NotRun or missing is not green. A deliberately red gate counts only with `rot_freigabe` (text of the strategy: `run_ids` and `workflows` of exactly the red runs + reason + the word of the strategy; see `alle-weiter`); the run ids and reason go into the report. Occasion: fs-types main 6f1ebcf0, semver run 45253040919 RED accepted without asking the strategy."
   - alle-weiter:
       switch:
         - gruen:
             when: '${ $context.alle.status == "green" }'
             then: continue
         - rot-mit-freigabe:
-            when: '${ ($context.alle.status == "red") and (($context.alle.rote // []) | length) > 0 and (($context.alle.rote // []) | all(.conclusion == "failure")) and (($context.alle.freigabe.grund // "") != "") and (((($context.alle.rote // []) | map(.run_id | tostring)) - (($context.alle.freigabe.run_ids // []) | map(tostring))) | length) == 0 }'
+            when: '${ (($context.alle.status == "red") and ((.input.rot_freigabe | type) == "object") and (($context.alle.fehlend // []) == []) and (($context.alle.rote // []) | length) > 0 and (($context.alle.rote // []) | all(.conclusion == "failure")) and ((.input.rot_freigabe.grund // "") != "") and ((.input.rot_freigabe.run_ids | type) == "array") and ((.input.rot_freigabe.workflows | type) == "array") and (((($context.alle.rote // []) | map(.run_id | tostring)) - (.input.rot_freigabe.run_ids | map(tostring))) | length) == 0 and (((($context.alle.rote // []) | map(.workflow)) - .input.rot_freigabe.workflows) | length) == 0) }'
             then: continue
         - sonst:
             then: eskalation
@@ -264,7 +264,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - ONLY all workflows green goes on to the push; a red one goes on ONLY with the release of the strategy that is bound to EXACTLY these runs: `rot_freigabe` = `{ run_ids: [...], grund, wort }`, every run id in `alle.rote` must be named in `run_ids` (run ids of the release SUPERSET OF `alle.rote`), the reason is not empty, and every red run has the conclusion `failure` (a second red run that the release does not name, a skipped, cancelled, queued or not-run workflow never passes; [LANDUNG-ALLE-GRUEN], [NICHT-GELAUFEN-NIE-GRUEN]); run ids and reason go into the report. THREAT MODEL (K5): `rot_freigabe` is text in the order; whoever writes the order opens this gate, no protection beyond that is claimed; every other result (unknown, missing, a not-run workflow, a release without run id or reason) escalates. No push to main with a red or unknown workflow."
+        freesynergy.net:summary: "Control flow - ONLY all workflows green goes on to the push; a red one goes on ONLY with the release of the strategy that is bound to EXACTLY these runs: `rot_freigabe` = `{ run_ids: [...], grund, wort }`, `rot_freigabe` is read from the INPUT (not from an echo), `run_ids` and `workflows` must be lists, every run id in `alle.rote` must be named in `run_ids` and every workflow name of `alle.rote` in `workflows` (the release is a SUPERSET OF `alle.rote`), the reason is not empty, `alle.fehlend` is empty, and every red run has the conclusion `failure` (a second red run that the release does not name, a skipped, cancelled, queued or not-run workflow never passes; [LANDUNG-ALLE-GRUEN], [NICHT-GELAUFEN-NIE-GRUEN]); run ids and reason go into the report. THREAT MODEL (K5): `rot_freigabe` is text in the order; whoever writes the order opens this gate, no protection beyond that is claimed; every other result (unknown, missing, a not-run workflow, a release without run id or reason) escalates. No push to main with a red or unknown workflow."
   - main-vor-push:
       call: head-ff-check:0.0.18@fs
       with:
@@ -296,12 +296,30 @@ do:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
         into: main
+      export:
+        as: '${ $context + { push: . } }'
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The person or the coordinator (the strategy's push helper) pushes the head to main as a pure fast-forward, WITHOUT force and without a merge commit; agents never push. A rejected push is never forced: it goes back to `kopf-und-ff`. Only after `alle-workflows-gruen` ([LANDUNG-ALLE-GRUEN])."
+        freesynergy.net:summary: "The person or the coordinator (the strategy's push helper) pushes the head to main as a pure fast-forward, WITHOUT force and without a merge commit; agents never push. A rejected push is never forced: it goes back to `main-vor-push` (r2 K4: step `push-weiter` below; result `push` with `rejected` and `versuch`; the new main is read again, `vor-push-weiter` decides). Only after `alle-workflows-gruen` ([LANDUNG-ALLE-GRUEN])."
+  - push-weiter:
+      switch:
+        - zurueck:
+            when: '${ ($context.push.rejected == true) and (($context.push.versuch // 1) < 2) }'
+            then: main-vor-push
+        - abgelehnt:
+            when: '${ $context.push.rejected == true }'
+            then: eskalation
+        - gelandet:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow (r2 K4; specification). A push that the remote rejected (`push.rejected == true`, e.g. main moved after the check) is never forced: the FIRST rejection goes back to `main-vor-push` (main is read again; `vor-push-weiter` goes on only while the head is still a pure fast-forward, else `eskalation`); a SECOND rejection (`push.versuch` 2) escalates, so the loop cannot run on. No rejection: on to `main-ci-nach-landung`."
   - main-ci-nach-landung:
       call: all-workflows-green:0.0.18@fs
       with:
@@ -318,14 +336,14 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "SPECIFICATION (no script yet). After the landing, BEFORE the tag: the runs that the push started on main (`ci`, `msrv`, `semver` ... all that `gh run list --commit <head>` shows) are read for the exact head and must be ALL green; running = wait (poll after 3-5 minutes, never a long pause) up to `main_ci_warten_minuten` (default 30); a run that is still running after that limit has status `hung` (no endless wait); not-run or missing = not green ([NICHT-GELAUFEN-NIE-GRUEN]). `rot_freigabe` is passed on (S2): a release bound to exactly the red runs (see `alle-weiter`) is valid for the main runs too; a red run that it does not name stays red. Result `main_ci` with `status` (green | red | hung | unknown), `rote`, `freigabe`. The tag is set ONLY after the landing with all workflows green (occasion: fs-types main 6f1ebcf0, semver red after the landing; the tag would have carried a red head)."
+        freesynergy.net:summary: "SPECIFICATION (no script yet). After the landing, BEFORE the tag: the runs that the push started on main (`ci`, `msrv`, `semver` ... all that `gh run list --commit <head>` shows) are read for the exact head and must be ALL green; running = wait (poll after 3-5 minutes, never a long pause) up to `main_ci_warten_minuten` (default 30); a run that is still running after that limit has status `hung` (no endless wait); not-run or missing = not green ([NICHT-GELAUFEN-NIE-GRUEN]). `rot_freigabe` is passed on (S2, r2 M2-neu). The runs on main get NEW ids at the push (the order is written before the push and cannot name them), so on main the release holds by workflow NAME, not by run id: see `main-ci-weiter`. Result `main_ci` with `status` (green | red | hung | unknown), `rote` (run id, workflow, conclusion; not green = in `rote` with its `conclusion`, S1) and `fehlend`. The tag is set ONLY after the landing with all workflows green (occasion: fs-types main 6f1ebcf0, semver red after the landing; the tag would have carried a red head)."
   - main-ci-weiter:
       switch:
         - gruen:
             when: '${ $context.main_ci.status == "green" }'
             then: continue
         - rot-mit-freigabe:
-            when: '${ ($context.main_ci.status == "red") and (($context.main_ci.rote // []) | length) > 0 and (($context.main_ci.rote // []) | all(.conclusion == "failure")) and (($context.main_ci.freigabe.grund // "") != "") and (((($context.main_ci.rote // []) | map(.run_id | tostring)) - (($context.main_ci.freigabe.run_ids // []) | map(tostring))) | length) == 0 }'
+            when: '${ (($context.main_ci.status == "red") and ((.input.rot_freigabe | type) == "object") and (($context.main_ci.fehlend // []) == []) and (($context.main_ci.rote // []) | length) > 0 and (($context.main_ci.rote // []) | all(.conclusion == "failure")) and ((.input.rot_freigabe.grund // "") != "") and ((.input.rot_freigabe.workflows | type) == "array") and (($context.alle.rote // []) | length) > 0 and (((($context.main_ci.rote // []) | map(.workflow)) - (($context.alle.rote // []) | map(.workflow))) | length) == 0 and (((($context.main_ci.rote // []) | map(.workflow)) - .input.rot_freigabe.workflows) | length) == 0) }'
             then: continue
         - haengt:
             when: '${ $context.main_ci.status == "hung" }'
@@ -337,7 +355,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - the tag only after the landing with ALL workflows green on main, or red ONLY for exactly the runs that the `rot_freigabe` names (same binding as `alle-weiter`, S2: otherwise a released red head would land and then always escalate at the tag); `hung` (still running after the limit, S3), red without a matching release, unknown or missing escalates (main stays as landed, nothing is forced, no tag)."
+        freesynergy.net:summary: "Control flow - the tag only after the landing with ALL workflows green on main, or red ONLY under the release (r2 M2-neu: run ids of the branch runs cannot match the new runs on main, so the binding is by workflow NAME): a release was in force on the branch (`alle.rote` is not empty), every red workflow name on main is among the names of the released red branch runs (`alle.rote`) AND among `rot_freigabe.workflows`, every red main run is `failure`, `main_ci.fehlend` is empty, the reason is not empty; a new red workflow, a second one, a cancelled, skipped or missing one escalates (a not-run workflow never passes; S1). Without a release on the branch every red main run escalates; `hung` (still running after the limit, S3), red without a matching release, unknown or missing escalates (main stays as landed, nothing is forced, no tag)."
   - erst-release:
       call: first-release-check:0.0.18@fs
       with:
