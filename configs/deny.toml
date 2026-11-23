@@ -48,4 +48,5 @@ allow-registry = [
 ]
 # ADR coding.md section 8: our own repos are consumed as git dependencies with tags. Both organisation names are ours; the old name `FreeSynergy` is still in
 # the locks (fs-types, fs-people) until the address wave is through, `scripts/gates-lock.sh` (lock-sources) reports it separately. Nothing else is listed here.
+# TEMPORARY: the old name `FreeSynergy` is removed after the address wave / as soon as no lock uses the old organisation any more.
 allow-org = { github = ["FreeSynergy-Net", "FreeSynergy"] }

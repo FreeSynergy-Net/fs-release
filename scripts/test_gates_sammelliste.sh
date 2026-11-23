@@ -185,7 +185,7 @@ PY
   then bad "mutant $name: NOT APPLIED (pattern gone)"; return; fi
   local r=0
   case "$want" in
-    gates) # two errors: a list with both, exit 1, 7 rc lines, nachpruefung
+    gates) # two errors: a list with both, exit 1, 9 rc lines, nachpruefung
       local dd="$tmp/mm-$RANDOM"; mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m
       : >"$STUBLOG"; env RED_FMT=1 RED_TEST=1 PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$dd" bash "$tmp/app-m/scripts/gates.sh" "$tmp/app-m" >"$tmp/mo.txt" 2>&1; local rc=$?
       [ "$rc" -eq 1 ] && [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/mo.txt")" -eq 9 ] && grep -q '\*\*fmt\*\*' "$dd"/*.md 2>/dev/null && grep -q '\*\*test\*\*' "$dd"/*.md && grep -q 'nachpruefung: cargo fmt --check' "$dd"/*.md && grep -q 'cargo test .*--no-fail-fast' "$STUBLOG" && [ -z "$(git -C "$tmp/app-m" status --porcelain)" ] && [ ! -e "$tmp/app-m"/fehlerliste-main.md ] || r=1

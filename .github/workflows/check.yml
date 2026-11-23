@@ -1,5 +1,5 @@
 # Reusable check gate for every FreeSynergy Rust repo, meant to run on every push. No secrets. Usage: docs/usage.md
-# Stricter than ci.yml (workspace-wide, clippy::pedantic); ci.yml additionally offers MSRV and cargo-deny.
+# Stricter than ci.yml (workspace-wide, clippy::pedantic); ci.yml additionally offers MSRV; the licence check (cargo-deny) is the gate `licence` in scripts/gates.sh.
 # The checks and their flags live ONLY in scripts/gates.sh (actions/gates runs it); the toolchain version ONLY in RUST_VERSION.
 name: check
 on:
