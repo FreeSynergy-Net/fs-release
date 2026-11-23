@@ -51,13 +51,11 @@ fn no_line_break_can_get_into_the_repo_file() {
     );
     assert!(spec.is_err());
     let url = checked_pages_url("https://example.org/x").unwrap();
-    assert!(
-        repo_file(&url)
-            .lines()
-            .filter(|l| l.starts_with("baseurl="))
-            .count()
-            == 2
-    );
+    let n = repo_file(&url)
+        .lines()
+        .filter(|l| l.starts_with("baseurl="))
+        .count();
+    assert_eq!(n, 2);
 }
 
 #[test]
