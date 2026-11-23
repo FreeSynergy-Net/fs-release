@@ -12,13 +12,21 @@ gates_read_rc() {
 ACTIONLINT_PIN=1.7.12 # the version lint.yml installs
 # gates_tool_version <tool>: first line of its version output, or "missing".
 gates_tool_version() { command -v "$1" >/dev/null 2>&1 && "$1" "${2:---version}" 2>&1 | sed -n 1,2p | tr '\n' ' ' || echo missing; }
+# gates_has_windows_cfg <root>: the repo has Rust code behind a Windows cfg (CI job windows checks it, a Linux run never sees it: clippy "unused self", PKG-2).
+gates_has_windows_cfg() { git -C "$1" grep -qE 'cfg\(.*windows|target_os *= *"windows"' -- '*.rs' 2>/dev/null; }
+# gates_windows_target: the windows target installed in the rustc sysroot (check/clippy need no linker, only the target), empty = none.
+gates_windows_target() {
+  local t root; root="$(rustc --print sysroot 2>/dev/null)"
+  for t in x86_64-pc-windows-msvc x86_64-pc-windows-gnu; do if [ -d "$root/lib/rustlib/$t" ]; then echo "$t"; return 0; fi; done
+}
 # gates_ci_diff <want> <have> <root> <like>: one line per reason why this run is not CI-equal (empty = CI-equal).
 gates_ci_diff() {
-  case "$2" in "rustc $1 "*) ;; *) echo "toolchain: local '$2' != CI $1 (rustup missing: RUSTUP_TOOLCHAIN has no effect); lints of the newer toolchain are not CI lints" ;; esac
+  case "$2" in "rustc $1 "*) ;; *) echo "toolchain: Toolchain $1 nicht verfuegbar -> NICHT CI-gleich (local '$2'; rustup missing: RUSTUP_TOOLCHAIN has no effect); lints of the other toolchain are not CI lints (clippy runs with the local one PLUS the counter-probe)" ;; esac
   [ -n "$4" ] || echo "mode standard: the lint job (shellcheck, actionlint) and the MSRV check did not run (use --like-ci)"
   [ -z "${FS_GATES_SKIP_TEST:-}" ] || echo "test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST)"
   [ -z "${FS_GATES_DIFF_BASE:-}" ] || echo "test scope narrowed (FS_GATES_DIFF_BASE=$FS_GATES_DIFF_BASE): not the whole workspace"
   git -C "$3" merge-base HEAD origin/main >/dev/null 2>&1 || echo "NICHT GEPRUEFT: origin/main fehlt (changed files unknown: clippy findings cannot be assigned to the branch)"
+  if gates_has_windows_cfg "$3" && [ -z "$(gates_windows_target)" ]; then echo "NICHT GEPRUEFT: Windows-cfg nicht lokal pruefbar (no windows target installed for rustc): Zweig-CI Pflicht (windows)"; fi
   command -v shellcheck >/dev/null 2>&1 || echo "NICHT GEPRUEFT: shellcheck fehlt (CI job lint)"
   if [ -d "$3/.github/workflows" ]; then
     if ! command -v actionlint >/dev/null 2>&1; then echo "NICHT GEPRUEFT: actionlint fehlt (CI job lint)"

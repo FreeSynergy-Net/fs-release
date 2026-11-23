@@ -169,6 +169,9 @@ else
   if [ -n "$like_ci" ]; then
     if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi
     if [ -d .github/workflows ] && command -v actionlint >/dev/null 2>&1; then step actionlint lint gates_lint_actions "$root"; fi
+    # Windows cfg code: clippy for the windows target when it is installed (no linker needed); not installed = "NICHT GEPRUEFT" in the Beleg (gates_ci_diff), never silently skipped
+    wintarget="$(gates_windows_target)"
+    if [ -n "$wintarget" ] && gates_has_windows_cfg "$root"; then step clippy-windows lint cargo clippy --workspace --all-targets --all-features --locked --keep-going --target "$wintarget" -- -D warnings -W clippy::pedantic; fi
     if [ -f .github/workflows/lint.yml ]; then step selftests error gates_lint_selftests "$root"; fi
     msrv="$(grep -m1 -E '^rust-version[[:space:]]*=' Cargo.toml 2>/dev/null | sed 's/[^"]*"\([0-9.]*\)".*/\1/' || true)"
     if [ -n "$msrv" ] && command -v rustup >/dev/null 2>&1; then step msrv error env RUSTUP_TOOLCHAIN="$msrv" cargo check --all-targets --locked; fi

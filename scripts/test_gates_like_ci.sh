@@ -38,7 +38,7 @@ run() { # <script> <path dir> <args...>: output in $tmp/o.txt, the rc is returne
 G="$app/scripts/gates.sh"
 # 1. foreign toolchain: rc follows the steps (clippy red), NEIN with reason, counter-probe runs, head + time in the Beleg
 run "$G" "$tmp/bin" --like-ci "$app"
-chk "foreign toolchain: NEIN with toolchain reason and the CI-proof rule" bash -c "grep -q 'CI-gleich: NEIN' '$tmp/o.txt' && grep -q 'toolchain: local .rustc 9.9.9' '$tmp/o.txt' && grep -q 'branch CI at the head is the proof' '$tmp/o.txt'"
+chk "foreign toolchain: NEIN with toolchain reason and the CI-proof rule" bash -c "grep -q 'CI-gleich: NEIN' '$tmp/o.txt' && grep -q 'Toolchain 1.0.0 nicht verfuegbar -> NICHT CI-gleich (local .rustc 9.9.9' '$tmp/o.txt' && grep -q 'branch CI at the head is the proof' '$tmp/o.txt'"
 chk "foreign toolchain: clippy counter-probe with -A of the lib lint, green = test targets checked" bash -c "grep -q 'clippy-gegenprobe rc=0 with -A clippy::map_unwrap_or' '$tmp/o.txt'"
 chk "Beleg carries the full head and a time stamp" bash -c "grep -q \"head=$(git -C "$app" rev-parse HEAD); time=20\" '$tmp/o.txt'"
 # 2. a REAL lint (format_collect) in a CHANGED test file next to the foreign lib lint (AW18): it must not be allowed away; the probe names it and the file as CHANGED
@@ -72,6 +72,22 @@ chk "failing CI self test: red (rc 1), its rc is printed, no 'gates ok'" bash -c
 printf '#!/usr/bin/env bash\nexit 0\n' >"$app/scripts/test_fail.sh"; git -C "$app" add -A; git -C "$app" commit -qm lintyml-ok
 run "$G" "$tmp/alt" --like-ci "$app"; rc=$?
 chk "passing CI self test: rc 0 and counted" bash -c "[ $rc -eq 0 ] && grep -q 'selftests run: 1' '$tmp/o.txt'"
+# 3c. Windows cfg code (PKG-2): no windows target = NICHT GEPRUEFT + NEIN, never ja; target installed = clippy for it runs, red when it is red
+mkdir -p "$tmp/sysroot/lib/rustlib/x86_64-pc-windows-msvc"; cat >"$tmp/alt/rustc" <<S
+#!/usr/bin/env bash
+[ "\$1" = --print ] && { echo "$tmp/sysroot-none"; exit 0; }
+echo "rustc 1.0.0 (stub)"
+S
+mkdir -p "$tmp/alt-win"; cp "$tmp"/alt/* "$tmp/alt-win/"; sed -i "s|sysroot-none|sysroot|" "$tmp/alt-win/rustc"
+printf '//! Pattern: none (test).\n#[cfg(windows)]\nfn w() {}\n' >"$app/crates/x/src/win.rs"; git -C "$app" add -A; git -C "$app" commit -qm win
+run "$G" "$tmp/alt" --like-ci "$app"; rc=$?
+chk "windows cfg, no target: NICHT GEPRUEFT + NEIN (never ja), no clippy-windows step" bash -c "grep -q 'NICHT GEPRUEFT: Windows-cfg nicht lokal pruefbar' '$tmp/o.txt' && grep -q 'Zweig-CI Pflicht (windows)' '$tmp/o.txt' && grep -q 'CI-gleich: NEIN' '$tmp/o.txt' && ! grep -q 'CI-gleich: ja' '$tmp/o.txt' && ! grep -q '^gate clippy-windows' '$tmp/o.txt'"
+run "$G" "$tmp/alt-win" --like-ci "$app"; rc=$?
+chk "windows cfg, target installed: clippy-windows runs (rc 0) and ja is possible" bash -c "[ $rc -eq 0 ] && grep -q '^gate clippy-windows: rc=0' '$tmp/o.txt' && grep -q 'CI-gleich: ja' '$tmp/o.txt'"
+printf '#!/usr/bin/env bash\n[ "$1" = clippy ] && case "$*" in *--target*) echo "error: unused self argument"; exit 101;; esac\nexit 0\n' >"$tmp/alt-win/cargo"; chmod +x "$tmp/alt-win/cargo"
+run "$G" "$tmp/alt-win" --like-ci "$app"; rc=$?
+chk "windows clippy red (unused self): run red, rc 1, no gates ok" bash -c "[ $rc -eq 1 ] && grep -q '^gate clippy-windows: rc=101' '$tmp/o.txt' && ! grep -q '^gates ok' '$tmp/o.txt'"
+git -C "$app" rm -q -f crates/x/src/win.rs; git -C "$app" commit -qm unwin
 # 4. a 301-line TEST file: rust-rules red, never gates ok
 { echo "//! Pattern: none (test)."; for i in $(seq 1 300); do echo "// line $i"; done; } >"$app/crates/x/tests/big.rs"
 git -C "$app" add -A; git -C "$app" commit -qm big
@@ -94,6 +110,8 @@ mut "head left out of the Beleg" lib_gates_list.sh 'head=$(git -C "$root" rev-pa
 MPATH="$tmp/bin" MENV=BADTEST=1 MARGS=--like-ci mut "probe allows every lint" lib_gates_list.sh 'if [ -z "${bad[$l]:-}" ]; then lints' 'if true; then lints' 'grep -q "CHANGED file: tests/t.rs" "$tmp/om.txt"'
 MPATH="$tmp/bin" MENV=BADTEST=1 MARGS=--like-ci mut "unmarked changed files" lib_gates_list.sh 'then echo "gates-beleg:   CHANGED file: $f"' 'then echo "gates-beleg:   $f"' 'grep -q "CHANGED file: tests/t.rs" "$tmp/om.txt"'
 mut "selftests step removed" gates.sh 'step selftests error gates_lint_selftests' ': selftests' 'printf "jobs:\\n  a:\\n    steps:\\n      - name: x\\n        run: bash scripts/test_x.sh\\n" >"$tmp/m/.github/workflows/lint.yml"; printf "#!/usr/bin/env bash\\nexit 1\\n" >"$tmp/m/scripts/test_x.sh"; git -C "$tmp/m" add -A; git -C "$tmp/m" commit -qm x; env PATH="$tmp/alt:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$tmp/m/scripts/gates.sh" --like-ci "$tmp/m" 2>&1 | grep -q "selftest rc=1"'
+mut "windows reason removed" lib_gates_list.sh 'echo "NICHT GEPRUEFT: Windows-cfg' ': "Windows-cfg' 'printf "//! Pattern: none (test).\\n#[cfg(windows)]\\nfn w() {}\\n" >"$tmp/m/crates/x/src/w.rs"; git -C "$tmp/m" add -A; git -C "$tmp/m" commit -qm w; env PATH="$tmp/alt:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$tmp/m/scripts/gates.sh" --like-ci "$tmp/m" 2>&1 | grep -q "Windows-cfg nicht lokal"'
+mut "windows clippy step removed" gates.sh 'step clippy-windows lint' ': clippy-windows lint' 'printf "//! Pattern: none (test).\\n#[cfg(windows)]\\nfn w() {}\\n" >"$tmp/m/crates/x/src/w.rs"; git -C "$tmp/m" add -A; git -C "$tmp/m" commit -qm w; env PATH="$tmp/alt-win:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$tmp/m/scripts/gates.sh" --like-ci "$tmp/m" 2>&1 | grep -q "^gate clippy-windows"'
 mut "origin/main reason removed" lib_gates_list.sh 'echo "NICHT GEPRUEFT: origin/main fehlt (changed' ': "(changed' 'git -C "$tmp/m" update-ref -d refs/remotes/origin/main; env PATH="$tmp/alt:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$tmp/m/scripts/gates.sh" --like-ci "$tmp/m" 2>&1 | grep -q "origin/main fehlt"'
 if [ "$fails" -ne 0 ]; then echo; echo "test_gates_like_ci: $fails failures"; exit 1; fi
 echo; echo "test_gates_like_ci: all ok"
