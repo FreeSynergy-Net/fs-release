@@ -20,7 +20,7 @@ do:
         freesynergy.net:bot-seat: wrapper-einbindung.pin
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent adds the foreign crate as a git dependency with a fixed revision (no copy, no fork); a needed change goes to the upstream as an issue (upstream-anfrage.yaml), or at most as `[patch]` in our own workspace root, never inside the dependency.
+        freesynergy.net:summary: The agent adds the foreign crate as a git dependency with a fixed revision (no copy, no fork); a needed change goes to the upstream as an issue (TEXTS TO THE OUTSIDE applies - rules of the target read, voice of the sender, one honest AI sentence only where allowed, copy block, the sender reads against; see upstream-anfrage.yaml), or at most as `[patch]` in our own workspace root, never inside the dependency.
   - wrapper:
       call: wrapper-crate:0.0.17@fs
       with:
