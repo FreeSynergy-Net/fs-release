@@ -64,7 +64,7 @@ impl Walk<'_> {
     fn follow(&mut self, from: &str, text: &str) {
         for t in foreign_uses(text) {
             self.red.push(format!(
-                "{from}: `uses: {t}` names an owner of fs-release that is not spelled exactly FreeSynergy-Net or FreeSynergy (unknown owner spelling; the chain would not follow it)"
+                "{from}: `{t}` names fs-release in a spelling or form the chain does not follow: owner exactly FreeSynergy-Net or FreeSynergy, repo exactly fs-release, `uses: ...@<ref>` as a plain key (unknown owner spelling; the chain would not follow it)"
             ));
         }
         for u in uses_of(text) {

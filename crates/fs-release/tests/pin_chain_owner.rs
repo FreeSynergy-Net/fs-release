@@ -35,6 +35,11 @@ fn write(d: &Path, rel: &str, text: &str) {
 /// A repo whose start head has one correct self-pin (`FreeSynergy-Net`, to an old commit with the SAME action code) and a second `uses:` with `owner`
 /// pinned to an OLD action code. Returns the red findings.
 fn findings(owner: &str) -> Vec<String> {
+    findings_line(&format!("- uses: {owner}/fs-release/actions/pub@{{OLD}}"))
+}
+
+/// Same, with the second step line given verbatim (`{OLD}` is replaced by the old commit).
+fn findings_line(second: &str) -> Vec<String> {
     let t = tempfile::tempdir().unwrap();
     let d = t.path();
     git(d, &["init", "-q", "-b", "main"]);
@@ -44,7 +49,7 @@ fn findings(owner: &str) -> Vec<String> {
     let old = git(d, &["rev-parse", "HEAD"]);
     write(d, "actions/pub/pub.sh", "publish v2");
     let wf = format!(
-        "jobs:\n  a:\n    steps:\n      - uses: FreeSynergy-Net/fs-release/actions/pub@{old}\n      - uses: {owner}/fs-release/actions/pub@{old}\n"
+        "jobs:\n  a:\n    steps:\n      - uses: FreeSynergy-Net/fs-release/actions/pub@{old}\n      {}\n", second.replace("{OLD}", &old)
     );
     write(d, ".github/workflows/x.yml", &wf);
     git(d, &["add", "-A"]);
@@ -84,5 +89,37 @@ fn the_exact_owners_are_not_flagged_as_spelling() {
                 .any(|f| f.contains("differs from the start head")),
             "{found:?}"
         );
+    }
+}
+
+fn is_red_spelling(second: &str) -> bool {
+    findings_line(second)
+        .iter()
+        .any(|f| f.contains("unknown owner spelling"))
+}
+
+/// M5: GitHub resolves the repo name without regard to case, too.
+#[test]
+fn a_differently_cased_repo_name_pinned_to_old_code_is_red() {
+    for name in ["FS-Release", "Fs-release", "FS-RELEASE"] {
+        assert!(
+            is_red_spelling(&format!(
+                "- uses: FreeSynergy-Net/{name}/actions/pub@{{OLD}}"
+            )),
+            "{name}"
+        );
+    }
+}
+
+/// S1: a `uses:` in a form the parser does not read is red, never silently green.
+#[test]
+fn unread_uses_forms_are_red() {
+    for line in [
+        "- {uses: FreeSynergy-Net/fs-release/actions/pub@{OLD}}",
+        "- uses : FreeSynergy-Net/fs-release/actions/pub@{OLD}",
+        "- \"uses\": FreeSynergy-Net/fs-release/actions/pub@{OLD}",
+        "- uses: FreeSynergy-Net/fs-release/actions/pub",
+    ] {
+        assert!(is_red_spelling(line), "{line}");
     }
 }

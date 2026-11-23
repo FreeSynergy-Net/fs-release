@@ -272,6 +272,12 @@ fn is_caller_file(p: &str) -> bool {
 /// `/fs-release/`, left-anchored) and the ref.
 #[must_use]
 pub fn parse_uses(line: &str) -> Option<(String, String, String)> {
+    parse_uses_path(line).map(|(o, n, _, r)| (o, n, r))
+}
+
+/// Like [`parse_uses`], plus the path inside the repo (between `fs-release/` and `@`): `(owner, name, path, ref)`.
+#[must_use]
+pub fn parse_uses_path(line: &str) -> Option<(String, String, String, String)> {
     let code = line.split_once(" #").map_or(line, |(c, _)| c);
     let target = code
         .trim_start()
@@ -294,6 +300,8 @@ pub fn parse_uses(line: &str) -> Option<(String, String, String)> {
         .rfind(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
         .map_or(0, |i| i + 1);
     let owner = head[start..].to_string();
-    let r = target.split_once('@').map_or("", |(_, r)| r).trim();
-    Some((owner, name, r.to_string()))
+    let (path, r) = target[at + "fs-release/".len()..]
+        .split_once('@')
+        .map_or((&target[at + "fs-release/".len()..], ""), |(p, r)| (p, r));
+    Some((owner, name, path.to_string(), r.trim().to_string()))
 }

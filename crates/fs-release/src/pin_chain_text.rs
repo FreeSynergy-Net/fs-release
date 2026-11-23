@@ -1,6 +1,9 @@
 //! Pattern: none (text helpers of `pin_chain`: the internal `uses:` lines of a file and the normalisation of the self-pins).
+//! The `uses:` line is read by the one parser of the crate, `address::aufrufer::parse_uses_path` (recognises `fs-release/` in any spelling).
 
 use fs_release_chain::owner::OWNERS;
+
+use crate::address::aufrufer::parse_uses_path;
 
 /// One reached `uses:` of the own repo: the path inside the repo and the 40-hex ref (or whatever stands after the `@`).
 #[derive(Debug, PartialEq, Eq)]
@@ -15,53 +18,39 @@ pub(crate) fn is_sha(s: &str) -> bool {
             .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
-/// (Only a real YAML `uses:` key at the start of the line, optionally after `- `: a `uses:` inside a script text is no pin.)
-/// The target of a `uses:` line (comment lines and trailing comments excluded), if the line has one.
-fn target_of(line: &str) -> Option<&str> {
-    let code = line.trim_start();
-    if code.starts_with('#') {
-        return None;
-    }
-    let code = code.strip_prefix("- ").map_or(code, str::trim_start);
-    let after = code.strip_prefix("uses:")?;
-    Some(
-        after
-            .split(" #")
-            .next()
-            .unwrap_or("")
-            .trim()
-            .trim_matches(|c| c == '"' || c == '\''),
-    )
-}
-
-/// The part of a target after `<tracked owner>/fs-release/`, if the owner is one of the exact `OWNERS`.
-fn tracked_rest(target: &str) -> Option<&str> {
-    OWNERS
-        .iter()
-        .find_map(|o| target.strip_prefix(&format!("{o}/fs-release/")))
+/// The `uses:` of a line if it is a TRACKED one: owner exactly one of `OWNERS`, repo name exactly `fs-release`, with an `@<ref>`.
+fn tracked(line: &str) -> Option<Use> {
+    let (owner, name, path, pin) = parse_uses_path(line)?;
+    (OWNERS.contains(&owner.as_str()) && name == "fs-release" && line.contains('@'))
+        .then_some(Use { path, pin })
 }
 
 /// Every internal `uses: <owner>/fs-release/<path>@<ref>` of a text, comment lines excluded.
 pub(crate) fn uses_of(text: &str) -> Vec<Use> {
-    text.lines()
-        .filter_map(target_of)
-        .filter_map(tracked_rest)
-        .filter_map(|rest| {
-            rest.split_once('@').map(|(path, pin)| Use {
-                path: path.to_string(),
-                pin: pin.trim().to_string(),
-            })
-        })
-        .collect()
+    text.lines().filter_map(tracked).collect()
 }
 
-/// The `uses:` targets that name a `.../fs-release/...` of an owner that is not exactly one of the `OWNERS` (other spelling or other owner).
-/// GitHub resolves the owner without regard to case, but the chain follows only the exact spellings: such a line would stay old and unseen.
+/// A non-comment line that mentions `uses` and `fs-release/` (any case) in a form the parser does not read (`- {uses: ...}`, `uses :`, quoted key):
+/// it would stay old and unseen, so it is red (fail closed). A `run:` script text that merely mentions both is no such form.
+fn unread_form(line: &str) -> bool {
+    let code = line.trim_start();
+    let code = code.strip_prefix("- ").map_or(code, str::trim_start);
+    let low = code.to_ascii_lowercase();
+    !low.starts_with('#')
+        && low.contains("fs-release/")
+        && (low.starts_with('{')
+            || low.starts_with('[')
+            || low.starts_with("uses")
+            || low.starts_with("\"uses\"")
+            || low.starts_with("'uses'"))
+}
+
+/// The `uses:` targets that name a `.../fs-release/...` which the chain does not follow: another owner or owner spelling, another spelling of the
+/// repo name (GitHub resolves owner and repo without regard to case), no `@<ref>`, or a form the parser does not read.
 pub(crate) fn foreign_uses(text: &str) -> Vec<String> {
     text.lines()
-        .filter_map(target_of)
-        .filter(|t| t.contains("/fs-release/") && tracked_rest(t).is_none())
-        .map(str::to_string)
+        .filter(|l| tracked(l).is_none() && (parse_uses_path(l).is_some() || unread_form(l)))
+        .map(|l| l.trim().to_string())
         .collect()
 }
 
@@ -84,9 +73,9 @@ pub(crate) fn normalize(text: &str) -> String {
 
 /// Byte range of the 40-hex ref of a tracked internal `uses:` line.
 fn tracked_line_pin(line: &str) -> Option<(usize, usize)> {
-    let target = target_of(line)?;
-    tracked_rest(target)?;
-    let at = line.find(target)? + target.find('@')? + 1;
+    tracked(line)?;
+    let from = line.to_ascii_lowercase().find("fs-release/")?;
+    let at = from + line[from..].find('@')? + 1;
     let r = &line[at..];
     (r.len() >= 40 && is_sha(&r[..40])).then_some((at, at + 40))
 }
