@@ -107,7 +107,7 @@ mutate "$Z" 'cyc = [sorted(c, key=order.get) for c in sccs(graph) if len(c) > 1 
 m="$tmp/mut/kaskade-zyklen"
 py "$m" --repos "$w/fs-types,$w/fs-interfaces,$w/fs-objects,$w/fs-people,$w/fs-tasks" >/dev/null; rc=$?
 chk "mutant (every repo is a cycle) turns the acyclic case red (rc 1)" [ "$rc" -eq 1 ]
-mutate "$Z" 'if d["owner"].lower() in kcargo.ORGS and not kcargo.is_fremd(d, fremd):' 'if d["owner"].lower() == kcargo.ORG.lower() and not kcargo.is_fremd(d, fremd) and not d["rev"]:' "$m" || bad "mutant rev not applied"
+mutate "$Z" 'if d["owner"].lower() in kcargo.ORGS and not kcargo.is_fremd(d, fremd):' 'if d["owner"].lower() in kcargo.ORGS and not kcargo.is_fremd(d, fremd) and not d["rev"]:' "$m" || bad "mutant rev not applied"
 py "$m" --repos "$tmp/co/fs-forms,$tmp/co/fs-rpc,$tmp/co/fs-starter" >/dev/null; rc=$?
 chk "mutant (rev pins not read) misses the fs-starter cycle, so the rev case bites (rc $rc, not 1)" [ "$rc" -eq 0 ]
 mutate "$Z" 'd = os.path.join(a.root, a.prefix + r)' 'd = os.path.join(a.root, r)' "$m" || bad "mutant prefix not applied"

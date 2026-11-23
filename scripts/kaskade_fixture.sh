@@ -13,7 +13,7 @@
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 origin="$tmp/origin"
 export FS_KASKADE_BASE="file://$origin"
-GH="https://github.com/FreeSynergy"
+GH="https://github.com/FreeSynergy-Net"
 
 # newrepo <name>: a bare repo "origin/<name>" and a work clone "work/<name>" on main
 newrepo() {
@@ -40,7 +40,7 @@ printf '[package]\nname = "fs-interfaces"\nversion = "0.0.2"\n[dependencies]\nfs
 lock fs-interfaces "git+$GH/fs-types?tag=v0.0.3#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" >"$tmp/work/fs-interfaces/Cargo.lock"
 printf "strict = true\nonly_from_enabled = true\n" >"$tmp/work/fs-interfaces/.fs-lock-sources.toml"
 mkdir -p "$tmp/work/fs-interfaces/.github/workflows"
-printf 'name: windows\njobs:\n  windows:\n    uses: FreeSynergy/fs-release/.github/workflows/_windows-check.yml@v0.0.11\n' >"$tmp/work/fs-interfaces/.github/workflows/windows.yml"
+printf 'name: windows\njobs:\n  windows:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/_windows-check.yml@v0.0.11\n' >"$tmp/work/fs-interfaces/.github/workflows/windows.yml"
 commit_push fs-interfaces one; tag_push fs-interfaces v0.0.2
 ifc_head="$(git -C "$tmp/work/fs-interfaces" rev-parse HEAD)"
 

@@ -3,7 +3,7 @@
 
     scripts/set_components_tag.py <tag> <repo root> [fs-repo-name]      (name default fs-components, e.g. fs-interfaces) exit 0: changed or already on the tag; 3: no such dependency; 1: could not
     scripts/set_components_tag.py --move <fs-name> <tag> <repo root>    (e.g. --move fs-types v0.0.1: a dependency named <fs-name> or with `package = "<fs-name>"` is moved from the
-                                                                       repo fs-interfaces to github.com/FreeSynergy/<fs-name> at the tag; same exit codes)
+                                                                       repo fs-interfaces to github.com/FreeSynergy-Net/<fs-name> at the tag; same exit codes)
 
 Pattern: none (helper of bump-components.sh).
 The files are edited line by line (comments and layout stay), the parser is the judge: after the edit every
@@ -14,7 +14,7 @@ A `[patch]`/`[replace]` on the fs-components repo is an error (exit 1, nothing w
 Anything else fails the check and exits 1, nothing is written then.
 V1+ (ADR 0092/0093): with the repo fs-interfaces a dependency named `fs-types` (or `package = "fs-types"`) is NEVER touched, whatever its git URL (it lived in the
 repo fs-interfaces up to v0.0.26; the lift of fs-interfaces must not drag it to the interfaces tag). `--move` is the only way to change it: the entry gets
-`git = "https://github.com/FreeSynergy/<fs-name>"` and `tag = <tag>` (rev/branch removed); afterwards the parser checks that no such dependency points at fs-interfaces
+`git = "https://github.com/FreeSynergy-Net/<fs-name>"` and `tag = <tag>` (rev/branch removed); afterwards the parser checks that no such dependency points at fs-interfaces
 any more. A dependency of that name with a git URL that is neither fs-interfaces nor <fs-name> is an error (exit 1, nothing written): it is never guessed.
 Entries without `git` (`fs-types.workspace = true`, path, registry) are left alone.
 """
@@ -26,7 +26,7 @@ REPO_URL = re.compile(r"/fs-components(\.git)?/?$", re.I)
 PROTECT = None                                              # a dependency name the lift of REPO never touches (fs-types with fs-interfaces)
 MOVE = None                                                 # --move <name>: the dependency that changes its repo
 OLD_HOME = "fs-interfaces"                                  # where a moved dependency came from
-HOME = "https://github.com/FreeSynergy"
+HOME = "https://github.com/FreeSynergy-Net"
 SKIP = {"target", ".git", "node_modules"}
 VERSION_KEYS = ("rev", "branch", "tag")
 
@@ -49,7 +49,7 @@ def target(name: str, pkg, url) -> str | None:
     --move mode: only the moved name, from fs-interfaces or the new repo, to the new repo."""
     if not isinstance(url, str): return None
     if MOVE:
-        old_or_new = any(re.fullmatch(rf"https?://github\.com/FreeSynergy/{n}(\.git)?/?", url, re.I) for n in (OLD_HOME, MOVE))
+        old_or_new = any(re.fullmatch(rf"https?://github\.com/FreeSynergy-Net/{n}(\.git)?/?", url, re.I) for n in (OLD_HOME, MOVE))
         return f"{HOME}/{MOVE}" if named(name, pkg, MOVE) and old_or_new else None
     return url if REPO_URL.search(url) and not named(name, pkg, PROTECT) else None
 

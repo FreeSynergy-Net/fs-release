@@ -69,7 +69,7 @@ impl World {
                 ],
             );
             super::git(&rel, &["init", "--quiet", "-b", "main"]);
-            let url = "https://github.com/FreeSynergy/fs-release.git";
+            let url = "https://github.com/FreeSynergy-Net/fs-release.git";
             super::git(&rel, &["remote", "add", "origin", url]);
             super::git(
                 &rel,

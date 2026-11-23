@@ -72,7 +72,7 @@ case_run() {
 all_cases() { # <script>: runs every case against it; counts failures in cases_fail
   local s=$1 r=0123456789abcdef0123456789abcdef01234567
   cases_fail=0
-  case_run "$s" "warn, clean" warn "$r" 0 0 "cargo install --git https://github.com/FreeSynergy/fs-release --rev $r --locked --root .*/fsbp fs-blueprint" "" ""
+  case_run "$s" "warn, clean" warn "$r" 0 0 "cargo install --git https://github.com/FreeSynergy-Net/fs-release --rev $r --locked --root .*/fsbp fs-blueprint" "" ""
   case_run "$s" "the check words" warn "$r" 0 0 "fs-blueprint check --repo .+ --talks .+/docs --drift" "" ""
   case_run "$s" "warn, errors" warn "$r" 1 0 "" "" "::warning::"
   case_run "$s" "warn, usage error" warn "$r" 2 0 "" "" "::warning::"

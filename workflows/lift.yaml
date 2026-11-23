@@ -17,7 +17,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Set the git tag of every dependency on the asked libraries in the workspace (`--components`, `--interfaces`, `--types` or `--repo NAME=vX.Y.Z`: fs-components, fs-interfaces, fs-types, fs-objects, fs-rpc, fs-jscalendar). fs-interfaces never touches fs-types; fs-types is moved to the repo FreeSynergy/fs-types (`set_components_tag.py --move`)."
+        freesynergy.net:summary: "Set the git tag of every dependency on the asked libraries in the workspace (`--components`, `--interfaces`, `--types` or `--repo NAME=vX.Y.Z`: fs-components, fs-interfaces, fs-types, fs-objects, fs-rpc, fs-jscalendar). fs-interfaces never touches fs-types; fs-types is moved to the repo FreeSynergy-Net/fs-types (`set_components_tag.py --move`)."
   - lock:
       call: lock:0.0.17@fs
       metadata:
@@ -25,7 +25,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "cargo update --workspace, then prove Cargo.lock holds the asked tags (`github.com/FreeSynergy/<name>?tag=<tag>#` for every asked library, also fs-types)."
+        freesynergy.net:summary: "cargo update --workspace, then prove Cargo.lock holds the asked tags (`github.com/FreeSynergy-Net/<name>?tag=<tag>#` for every asked library, also fs-types)."
   - lock-gate:
       call: lock-gate:0.0.17@fs
       metadata:
@@ -91,7 +91,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Raise the fs-release pins of the repo to the release tag (default: v<version of the fs-release crate>, the release tag itself, so a new release tag moves it with no code change; override with the environment variable FS_LIFT_PIN_TAG): `scripts/pin-refs.sh --dir <repo> <tag>` rewrites only the `uses: FreeSynergy/fs-release/...@<ref>` lines of `.github/workflows/*.yml` (`@main`, an older tag or a commit); other actions, comments and all other files stay. A pin is never lowered, checked per `uses:` line: a line already on a HIGHER tag (release.yml@v0.0.11 against v0.0.10) stays. Skipped without `.github/workflows`. The changed workflow files are committed by the step `commit`. This step runs before `lock-sources`; `check.yml@v0.0.10` or newer and `strict = true` are only REQUIRED at the V1+ lift (step `lock-sources`); before, the pin is a plain upgrade of the callers."
+        freesynergy.net:summary: "Raise the fs-release pins of the repo to the release tag (default: v<version of the fs-release crate>, the release tag itself, so a new release tag moves it with no code change; override with the environment variable FS_LIFT_PIN_TAG): `scripts/pin-refs.sh --dir <repo> <tag>` rewrites only the `uses: FreeSynergy-Net/fs-release/...@<ref>` lines of `.github/workflows/*.yml` (`@main`, an older tag or a commit); other actions, comments and all other files stay. A pin is never lowered, checked per `uses:` line: a line already on a HIGHER tag (release.yml@v0.0.11 against v0.0.10) stays. Skipped without `.github/workflows`. The changed workflow files are committed by the step `commit`. This step runs before `lock-sources`; `check.yml@v0.0.10` or newer and `strict = true` are only REQUIRED at the V1+ lift (step `lock-sources`); before, the pin is a plain upgrade of the callers."
   - lock-sources:
       call: lock-sources:0.0.17@fs
       metadata:
@@ -99,7 +99,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Lock check `scripts/gates-lock.sh` (one source per shared library in every Cargo.lock, scripts/lock-sources.toml). Warning first, error later: a lift to V1+ (fs-types from the repo FreeSynergy/fs-types, one tag of each library) ALSO raises the fs-release pin in .github/workflows/check.yml to the tag >= 0.0.10 and sets `strict = true` in the repo's `.fs-lock-sources.toml` (optionally `only_from_enabled = true`); after that the same step is red on a second source. These two edits are done by the person or agent that lifts; the step reports. It becomes RED (not only a report) when the lift is the V1+ lift (env `FS_LIFT_V1PLUS=1`, set by the V1+ round, never earlier so that no repo is blocked before) and the fs-release pin of `.github/workflows/check.yml` is a tag older than v0.0.10 (a `@main` or commit pin is not compared) or `.fs-lock-sources.toml` lacks `strict = true`."
+        freesynergy.net:summary: "Lock check `scripts/gates-lock.sh` (one source per shared library in every Cargo.lock, scripts/lock-sources.toml). Warning first, error later: a lift to V1+ (fs-types from the repo FreeSynergy-Net/fs-types, one tag of each library) ALSO raises the fs-release pin in .github/workflows/check.yml to the tag >= 0.0.10 and sets `strict = true` in the repo's `.fs-lock-sources.toml` (optionally `only_from_enabled = true`); after that the same step is red on a second source. These two edits are done by the person or agent that lifts; the step reports. It becomes RED (not only a report) when the lift is the V1+ lift (env `FS_LIFT_V1PLUS=1`, set by the V1+ round, never earlier so that no repo is blocked before) and the fs-release pin of `.github/workflows/check.yml` is a tag older than v0.0.10 (a `@main` or commit pin is not compared) or `.fs-lock-sources.toml` lacks `strict = true`."
   - commit:
       call: commit:0.0.17@fs
       if: ${ .input.commit }

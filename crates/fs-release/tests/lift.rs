@@ -113,7 +113,7 @@ fn two_blinc_sources_in_the_lock_are_red_even_when_both_are_approved() {
     // The program takes a second Blinc source on its own (a fork crate from another approved tag).
     let t = w.read("crates/b/Cargo.toml");
     let extra =
-        "blinc-fork = { git = \"https://github.com/FreeSynergy/Blinc\", tag = \"fs-blinc-4\" }\n";
+        "blinc-fork = { git = \"https://github.com/FreeSynergy-Net/Blinc\", tag = \"fs-blinc-4\" }\n";
     fs::write(w.work().join("crates/b/Cargo.toml"), format!("{t}{extra}")).unwrap();
     git(&w.work(), &["commit", "--quiet", "-am", "second blinc"]);
     let (r, code) = run(&w, &w.opts());
@@ -252,7 +252,7 @@ fn pins_raises_the_fs_release_pins_and_leaves_other_actions_alone() {
     let w = World::new();
     let wf = w.work().join(".github/workflows");
     fs::create_dir_all(&wf).unwrap();
-    let check = "jobs:\n  check:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@main\n  other:\n    steps:\n      - uses: actions/checkout@v4\n";
+    let check = "jobs:\n  check:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@main\n  other:\n    steps:\n      - uses: actions/checkout@v4\n";
     fs::write(wf.join("check.yml"), check).unwrap();
     git(&w.work(), &["add", "-A"]);
     git(&w.work(), &["commit", "--quiet", "-m", "workflow"]);

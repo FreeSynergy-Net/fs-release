@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pin consistency of fs-release's OWN workflows (no network): every `uses: FreeSynergy/fs-release/...@<ref>` in .github/workflows/*.yml points at
+# Pin consistency of fs-release's OWN workflows (no network): every `uses: FreeSynergy-Net/fs-release/...@<ref>` in .github/workflows/*.yml points at
 # ONE common full commit SHA (the round of the pin cascade, scripts/pin-refs.sh), and no internal `uses:` is `@main` (or any other moving ref).
 # It does not demand a particular SHA: round 1 (all on SHA A) and round 2 (all on SHA B) are both green; a mixed state is red.
 # Counter-checks on copies: one `uses:` on another SHA, a `@main` left standing, a round-2 SHA swapped back to the older one.
@@ -50,7 +50,7 @@ mutant swapped-round "0,/_release-linux.yml@${sha}/s//_release-linux.yml@1111111
 mutant short-sha "0,/@${sha}/s//@${sha:0:7}/" check.yml
 mutant tag-instead "0,/@${sha}/s//@v0.0.10/" check.yml
 # a comment naming @main is not a use
-d="$tmp/comment"; mkdir -p "$d"; cp "$repo"/.github/workflows/*.yml "$d/"; echo '# uses: FreeSynergy/fs-release/actions/x@main' >>"$d/check.yml"
+d="$tmp/comment"; mkdir -p "$d"; cp "$repo"/.github/workflows/*.yml "$d/"; echo '# uses: FreeSynergy-Net/fs-release/actions/x@main' >>"$d/check.yml"
 if check "$d" >/dev/null; then ok "a comment with @main is not a use"; else bad "a comment with @main counted as a use"; fi
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

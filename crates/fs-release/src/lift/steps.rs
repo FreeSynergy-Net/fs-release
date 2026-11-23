@@ -107,7 +107,7 @@ impl Task<LiftEnv<'_>> for Lock {
         let mut done = Vec::new();
         for (repo, tag) in wanted(env) {
             if depends_on(env, repo) {
-                if !lock.contains(&format!("github.com/FreeSynergy/{repo}?tag={tag}#")) {
+                if !lock.contains(&format!("github.com/FreeSynergy-Net/{repo}?tag={tag}#")) {
                     return Err(Stop::red(format!(
                         "Cargo.lock does not hold {repo} {tag} after the update"
                     )));

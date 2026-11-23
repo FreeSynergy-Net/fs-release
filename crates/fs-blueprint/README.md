@@ -2,7 +2,7 @@
 
 Makes the data package of a program from a blueprint (`scaffold.toml`, schema 2, ADR 0099) and checks that a repo is still what its blueprint says. The package holds data and CI, no code.
 
-1. Install: `cargo install --git https://github.com/FreeSynergy/fs-release fs-blueprint` (needs the Rust toolchain of `RUST_VERSION`).
+1. Install: `cargo install --git https://github.com/FreeSynergy-Net/fs-release fs-blueprint` (needs the Rust toolchain of `RUST_VERSION`).
 2. Call: `fs-blueprint new scaffold.toml --out fs-myprogram`. It checks the blueprint (and the folder `forms/` next to it, which comes along) and writes the data package only when the check is clean; on an error nothing is written. `new` writes:
    - the CI: `.github/workflows/check.yml`, `.github/workflows/windows.yml`, and `.gitattributes`;
    - `packaging/`: the desktop file, the frontend manifest, the package layout;

@@ -3,4 +3,4 @@
 # usage: OLD=FreeSynergy NEW=FreeSynergy-Net [REF=origin/main] [ALLOW=allow.json] scripts/adresse-wechseln bestand|ersetzen|nachher [--all-classes] <repo-dir>...
 set -euo pipefail
 mode=${1:?bestand|ersetzen|nachher}; shift
-exec cargo run -q -p fs-release -- address "$mode" --old "${OLD:-FreeSynergy}" --new "${NEW:-FreeSynergy-Net}" --ref "${REF:-origin/main}" ${ALLOW:+--allow "$ALLOW"} "$@"
+exec cargo run -q -p fs-release -- address "$mode" --old "${OLD:-FreeSynergy-Net}" --new "${NEW:-FreeSynergy-Net}" --ref "${REF:-origin/main}" ${ALLOW:+--allow "$ALLOW"} "$@"

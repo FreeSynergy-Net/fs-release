@@ -1,7 +1,7 @@
 # Reusable red notice (event net.freesynergy.run.failed, no dispatch, no secret): one issue per workflow and repo, only GITHUB_TOKEN.
 # Red: opens the issue `rot: <workflow> <repo>` (label `rot`), or only comments when an open one exists.
 # Green: closes the open issue of the same title. The coordinator asks once for the whole organisation:
-#   gh search issues --owner FreeSynergy --label rot --state open
+#   gh search issues --owner FreeSynergy-Net --label rot --state open
 # Call it as the last job of a workflow, with `if: always()`; usage and caller permissions: docs/notify-red.md
 name: _notify-red
 on:

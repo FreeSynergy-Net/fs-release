@@ -29,7 +29,7 @@ mk() { # mk <dir>: the world before the rename
   printf '[package]\nname = "fs-wiki-core"\nversion = "0.0.10"\n' >"$1/fs-wiki/crates/fs-wiki-core/Cargo.toml"
   printf '[package]\nname = "fs-wiki"\n' >"$1/fs-wiki/Cargo.toml"
   printf 'jobs:\n  b:\n    steps:\n      - run: cargo build -p fs-wiki-*\n' >"$1/fs-wiki/.github/workflows/release.yml"
-  printf '[dependencies]\nfs-wiki-core = { git = "https://github.com/FreeSynergy/fs-wiki", tag = "v0.0.10" }\n' >"$1/fs-app/Cargo.toml"
+  printf '[dependencies]\nfs-wiki-core = { git = "https://github.com/FreeSynergy-Net/fs-wiki", tag = "v0.0.10" }\n' >"$1/fs-app/Cargo.toml"
   printf '[[package]]\nid = "fs-wiki"\nkind = "program"\n' >"$1/fs-catalog/packages.toml"
   printf 'Das Wiki fs-wiki ist ein Programm. Nicht fs-wikipedia.\n' >"$1/fs-documentation/docs/de/wiki.md"
   : >"$1/retired.txt"
@@ -72,7 +72,7 @@ rm -rf "$v/fs-wiki/crates/fs-wiki-core"; mkdir -p "$v/fs-wiki/crates/fs-text-cor
 printf '[package]\nname = "fs-text-core"\n' >"$v/fs-wiki/crates/fs-text-core/Cargo.toml"
 printf '[package]\nname = "fs-text"\n' >"$v/fs-wiki/Cargo.toml"
 printf 'jobs:\n  b:\n    steps:\n      - run: cargo build -p fs-text-*\n' >"$v/fs-wiki/.github/workflows/release.yml"
-printf '[dependencies]\nfs-text-core = { git = "https://github.com/FreeSynergy/fs-text", tag = "v0.0.11" }\n' >"$v/fs-app/Cargo.toml"
+printf '[dependencies]\nfs-text-core = { git = "https://github.com/FreeSynergy-Net/fs-text", tag = "v0.0.11" }\n' >"$v/fs-app/Cargo.toml"
 printf '[[package]]\nid = "fs-text"\nreplaces = ["fs-wiki"]\n' >"$v/fs-catalog/packages.toml"
 printf 'Das Programm fs-text.\n' >"$v/fs-documentation/docs/de/wiki.md"
 printf 'fs-wiki -> fs-text  # ADR 0080\n' >"$v/retired.txt"
@@ -84,10 +84,10 @@ printf '[package]\nname = "fs-wiki-core"\n' >"$v/fs-wiki/crates/fs-text-core/Car
 expect 1 "crate 'fs-wiki-core' still named" "red: old crate name left" -- after $(args "$v")
 printf '[package]\nname = "fs-text-core"\n' >"$v/fs-wiki/crates/fs-text-core/Cargo.toml"
 
-printf 'fs-wiki-core = { git = "https://github.com/FreeSynergy/fs-wiki", tag = "v0.0.10" }\n' >"$v/fs-app/Cargo.toml"
+printf 'fs-wiki-core = { git = "https://github.com/FreeSynergy-Net/fs-wiki", tag = "v0.0.10" }\n' >"$v/fs-app/Cargo.toml"
 # shellcheck disable=SC2046
 expect 1 "pin to the old name" "red: old pin left" -- after $(args "$v")
-printf 'fs-text-core = { git = "https://github.com/FreeSynergy/fs-text", tag = "v0.0.11" }\n' >"$v/fs-app/Cargo.toml"
+printf 'fs-text-core = { git = "https://github.com/FreeSynergy-Net/fs-text", tag = "v0.0.11" }\n' >"$v/fs-app/Cargo.toml"
 
 printf 'cargo build -p fs-wiki-core\n' >"$v/fs-wiki/.github/workflows/release.yml"
 # shellcheck disable=SC2046
@@ -267,7 +267,7 @@ r="$tmp/w7"; mk "$r"; mkdir -p "$r/fs-wiki/crates/fs-wiki" "$r/fs-wiki/src"
 printf '[package]\nname = "fs-wiki"\n[[bin]]\nname = "fs-wiki"\n' >"$r/fs-wiki/crates/fs-wiki/Cargo.toml"
 printf 'use fs_wiki_core::x; // fs-wikipedia stays\nconst P: &str = "fs-wiki-core";\n' >"$r/fs-wiki/src/lib.rs"
 printf '[[package]]\nname = "fs-wiki-core"\n' >"$r/fs-wiki/Cargo.lock"
-printf 'siehe https://github.com/FreeSynergy/fs-wiki/releases und fs-wiki-core\n' >"$r/fs-wiki/README.md"
+printf 'siehe https://github.com/FreeSynergy-Net/fs-wiki/releases und fs-wiki-core\n' >"$r/fs-wiki/README.md"
 mkrepo "$r/fs-wiki"
 printf 'dirty\n' >"$r/fs-wiki/untracked-but-tracked.txt"; git -C "$r/fs-wiki" add untracked-but-tracked.txt
 expect 1 "uncommitted changes" "rename refuses a dirty tree" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki"
@@ -279,18 +279,18 @@ if [ "$rc" -eq 0 ] && [ -d "$r/fs-wiki/crates/fs-text" ] && [ -d "$r/fs-wiki/cra
   && grep -q 'name = "fs-text-core"' "$r/fs-wiki/Cargo.lock" \
   && [ "$(grep -c 'name = "fs-text"' "$r/fs-wiki/crates/fs-text/Cargo.toml")" -eq 1 ] && grep -q '^name = "fs-wiki"' "$r/fs-wiki/crates/fs-text/Cargo.toml"; then
   echo "ok   rename: crates moved, words replaced, fs-wikipedia and the kept [[bin]] line untouched"; else echo "FAIL rename: rc=$rc"; cat "$tmp/rename.out"; fails=$((fails + 1)); fi
-if grep -q 'github.com/FreeSynergy/fs-wiki/releases und fs-text-core' "$r/fs-wiki/README.md"; then echo "ok   rename: the pin URL stays until the GitHub rename"; else echo "FAIL rename touched the pin URL"; cat "$r/fs-wiki/README.md"; fails=$((fails + 1)); fi
+if grep -q 'github.com/FreeSynergy-Net/fs-wiki/releases und fs-text-core' "$r/fs-wiki/README.md"; then echo "ok   rename: the pin URL stays until the GitHub rename"; else echo "FAIL rename touched the pin URL"; cat "$r/fs-wiki/README.md"; fails=$((fails + 1)); fi
 git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m rename
 before="$(git -C "$r/fs-wiki" status --porcelain | sort | md5sum)"
 expect 0 "nothing to do" "rename twice is a no-op" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --keep "$rk"
 if [ "$before" = "$(git -C "$r/fs-wiki" status --porcelain | sort | md5sum)" ]; then echo "ok   rename twice changes nothing"; else echo "FAIL rename twice changed files"; fails=$((fails + 1)); fi
 # --pins: only the pin URLs, after the GitHub rename; --allow keeps a history page as it is
-printf 'alt fs-wiki, github.com/FreeSynergy/fs-wiki\n' >"$r/fs-wiki/HIST.md"; git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m hist
+printf 'alt fs-wiki, github.com/FreeSynergy-Net/fs-wiki\n' >"$r/fs-wiki/HIST.md"; git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m hist
 expect 0 "green" "rename --allow skips the history page" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --keep "$rk" --allow HIST.md
-if grep -q '^alt fs-wiki, github.com/FreeSynergy/fs-wiki$' "$r/fs-wiki/HIST.md"; then echo "ok   rename --allow: file untouched"; else echo "FAIL --allow ignored"; fails=$((fails + 1)); fi
+if grep -q '^alt fs-wiki, github.com/FreeSynergy-Net/fs-wiki$' "$r/fs-wiki/HIST.md"; then echo "ok   rename --allow: file untouched"; else echo "FAIL --allow ignored"; fails=$((fails + 1)); fi
 git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m x >/dev/null 2>&1
 expect 0 "green" "rename --pins" -- rename --old fs-wiki --new fs-text --repos "$r/fs-wiki" --pins
-if grep -q 'github.com/FreeSynergy/fs-text/releases' "$r/fs-wiki/README.md" && grep -q 'github.com/FreeSynergy/fs-text$' "$r/fs-wiki/HIST.md" && grep -q 'alt fs-wiki, ' "$r/fs-wiki/HIST.md" && [ -d "$r/fs-wiki/crates/fs-text" ]; then echo "ok   rename --pins: only the URLs"; else echo "FAIL --pins"; cat "$r/fs-wiki/HIST.md"; fails=$((fails + 1)); fi
+if grep -q 'github.com/FreeSynergy-Net/fs-text/releases' "$r/fs-wiki/README.md" && grep -q 'github.com/FreeSynergy-Net/fs-text$' "$r/fs-wiki/HIST.md" && grep -q 'alt fs-wiki, ' "$r/fs-wiki/HIST.md" && [ -d "$r/fs-wiki/crates/fs-text" ]; then echo "ok   rename --pins: only the URLs"; else echo "FAIL --pins"; cat "$r/fs-wiki/HIST.md"; fails=$((fails + 1)); fi
 git -C "$r/fs-wiki" add -A; git -C "$r/fs-wiki" -c user.name=t -c user.email=t@t commit -q -m pins
 git -C "$r/fs-wiki" checkout -q -b main 2>/dev/null
 expect 1 "only in a worktree branch" "rename refuses on main" -- rename --old fs-wiki --new fs-other --repos "$r/fs-wiki"

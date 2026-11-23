@@ -23,11 +23,11 @@ Tests and spikes that drive a desktop (typing test, KWin scripts, fake input) ru
 
 ## Make a new program (`fs-blueprint new`)
 
-Install the command, copy the example blueprint, make the program. Start in a checkout of this repo (`git clone https://github.com/FreeSynergy/fs-release && cd fs-release`; the example is in the checkout, the installed command does not carry it). CI runs the commands below word for word (`scripts/readme-run.sh`; it also checks that the install tag is the version of `crates/fs-blueprint`):
+Install the command, copy the example blueprint, make the program. Start in a checkout of this repo (`git clone https://github.com/FreeSynergy-Net/fs-release && cd fs-release`; the example is in the checkout, the installed command does not carry it). CI runs the commands below word for word (`scripts/readme-run.sh`; it also checks that the install tag is the version of `crates/fs-blueprint`):
 
 <!-- readme-run -->
 ```sh
-cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.17 --locked fs-blueprint
+cargo install --git https://github.com/FreeSynergy-Net/fs-release --tag v0.0.17 --locked fs-blueprint
 cp -r examples/leer mein-plan
 cd mein-plan
 fs-blueprint new scaffold.toml --out fs-leer
@@ -48,7 +48,7 @@ fs-blueprint check --repo fs-leer
 
 ## Part of FreeSynergy
 
-Release is the same pipeline for every repo. FreeSynergy is a family of programs that are free for everyone, forever, and that keep your data yours. The documentation, the manifesto and the overall plan live in [fs-documentation](https://github.com/FreeSynergy/fs-documentation); the reading version is at <https://freesynergy.github.io/fs-documentation/>. Start with the [manifesto](https://freesynergy.github.io/fs-documentation/manifesto/) if you want to know why we do this.
+Release is the same pipeline for every repo. FreeSynergy is a family of programs that are free for everyone, forever, and that keep your data yours. The documentation, the manifesto and the overall plan live in [fs-documentation](https://github.com/FreeSynergy-Net/fs-documentation); the reading version is at <https://freesynergy.github.io/fs-documentation/>. Start with the [manifesto](https://freesynergy.github.io/fs-documentation/manifesto/) if you want to know why we do this.
 
 
 ## For developers

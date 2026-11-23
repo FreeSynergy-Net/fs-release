@@ -42,7 +42,7 @@ mkrepo() {
   local both='{"total_count":2,"secrets":[{"name":"GPG_PRIVATE_KEY"},{"name":"GPG_PASSPHRASE"}]}'
   local none='{"total_count":0,"secrets":[]}'
   fx "${R}_${r}_contents_.github_workflows" '[{"type":"file","name":"release.yml"},{"type":"file","name":"ci.yml"}]'
-  fx "${R}_${r}_contents_.github_workflows_release.yml" 'uses: FreeSynergy/fs-release/.github/workflows/release.yml@abc'
+  fx "${R}_${r}_contents_.github_workflows_release.yml" 'uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@abc'
   rs="$none"; es="$both"
   case "$v" in
     ok) fx "${R}_${r}_$ENVP" "{\"name\":\"release-signing\",\"protection_rules\":[$rev,{\"type\":\"branch_policy\"}],\"deployment_branch_policy\":$bp}"; fx "${R}_${r}_$ENVP"_deployment-branch-policies "$pol" ;;

@@ -37,8 +37,8 @@ fn unpinned_installs_are_red() {
         "      - uses: actions/checkout@main # v4",
         "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
         "      - uses: actions/checkout",
-        "    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.17",
-        "      - uses: FreeSynergy/fs-release/actions/sbom@e596ed6",
+        "    uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.17",
+        "      - uses: FreeSynergy-Net/fs-release/actions/sbom@e596ed6",
     ];
     for l in red {
         assert_eq!(violations("f.yml", l).len(), 1, "should be red: {l}");
@@ -60,7 +60,7 @@ fn pinned_installs_and_non_installs_are_green() {
         "# cargo install cargo-deb (a comment)",
         "run: cargo build --locked",
         "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
-        "      - uses: FreeSynergy/fs-release/actions/sbom@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7",
+        "      - uses: FreeSynergy-Net/fs-release/actions/sbom@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7",
         "      - uses: ./release/actions/setup-rust",
     ];
     for l in green {

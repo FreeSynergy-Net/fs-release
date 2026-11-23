@@ -187,7 +187,7 @@ fn whole_flow_halts_for_the_approval_then_pushes_branch_and_tag_when_public_is_l
     assert!(matches!(second, Outcome::Done { .. }), "{}", second.line());
     assert_eq!(
         started,
-        ["workflow run bump.yml --repo FreeSynergy/Catalog"]
+        ["workflow run bump.yml --repo FreeSynergy-Net/Catalog"]
     );
     assert!(w.remote_has("refs/heads/feat") && w.remote_has("refs/tags/v0.0.9"));
 }

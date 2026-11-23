@@ -262,7 +262,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (no second pin way): sets the pin in Cargo.toml to the new tag (`--repo NAME=vX.Y.Z`; fs-interfaces never touches fs-types; fs-types and fs-conformance come from the repo FreeSynergy/fs-types, the lift moves a crate that still comes from the repo fs-interfaces), regenerates Cargo.lock by `cargo update --workspace` (cargo metadata, NEVER by hand), runs fmt, clippy, rules, tests, `lock-sources` and commits with the identity FreeSynergy <support@freesynergy.net>."
+        freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (no second pin way): sets the pin in Cargo.toml to the new tag (`--repo NAME=vX.Y.Z`; fs-interfaces never touches fs-types; fs-types and fs-conformance come from the repo FreeSynergy-Net/fs-types, the lift moves a crate that still comes from the repo fs-interfaces), regenerates Cargo.lock by `cargo update --workspace` (cargo metadata, NEVER by hand), runs fmt, clippy, rules, tests, `lock-sources` and commits with the identity FreeSynergy <support@freesynergy.net>."
   - besonderes:
       call: kaskade-besonderes-ai:0.0.17@fs
       with:
@@ -486,7 +486,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script `scripts/lock-gleich` (read only), end check - in every Cargo.lock of the done Glieder (fresh blobless clones at the TAGS of the done Glieder; both switches of `env` are required, a weaker call is bad input) the SAME fs-types version (the trigger tag) and only ONE source per fs crate in the whole graph (`check_lock_sources.py` with `FS_LOCK_STRICT=1` and `FS_LOCK_ONLY_FROM=1`); EVERY crate of the repo fs-types stands on the trigger tag from the repo FreeSynergy/fs-types, also `fs-conformance` (everywhere the same source and version, no `rev` pin to a FreeSynergy repo is left in any Cargo.toml: also `fs-people-directory`); one differing version, a second source or a left `rev` pin is red."
+        freesynergy.net:summary: "Script `scripts/lock-gleich` (read only), end check - in every Cargo.lock of the done Glieder (fresh blobless clones at the TAGS of the done Glieder; both switches of `env` are required, a weaker call is bad input) the SAME fs-types version (the trigger tag) and only ONE source per fs crate in the whole graph (`check_lock_sources.py` with `FS_LOCK_STRICT=1` and `FS_LOCK_ONLY_FROM=1`); EVERY crate of the repo fs-types stands on the trigger tag from the repo FreeSynergy-Net/fs-types, also `fs-conformance` (everywhere the same source and version, no `rev` pin to a FreeSynergy repo is left in any Cargo.toml: also `fs-people-directory`); one differing version, a second source or a left `rev` pin is red."
   - lock-ende-weiter:
       switch:
         - gruen:

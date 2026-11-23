@@ -6,7 +6,7 @@
 Pattern: none (checker; called by check_rust_rules.py, so every repo's `check` gate runs it).
 A package counts as Blinc when its name starts with `blinc` or its source mentions blinc (any case, any fork such as
 blinc-app-fix / blinc-layout-fix). Each one must have exactly
-`source = "git+https://github.com/FreeSynergy/Blinc?tag=<tag>#<sha>"` with `<tag> <sha>` a line of scripts/blinc-approved.txt
+`source = "git+https://github.com/FreeSynergy-Net/Blinc?tag=<tag>#<sha>"` with `<tag> <sha>` a line of scripts/blinc-approved.txt
 (full sha, so a moved tag is caught). crates.io, path, rev/branch sources and forks are errors, and so is a lock that
 mixes two Blinc sources, even when both are approved (during a transition two tags are approved, a lock still holds ONE).
 A lock without Blinc packages passes. Missing Cargo.lock = nothing to check.
@@ -19,7 +19,7 @@ import datetime, os, re, sys, tomllib
 from pathlib import Path
 
 APPROVED = Path(__file__).resolve().parent / "blinc-approved.txt"
-URL = "https://github.com/FreeSynergy/Blinc"
+URL = "https://github.com/FreeSynergy-Net/Blinc"
 FIX = ("programs take Blinc only through fs-components (tag as approved in scripts/blinc-approved.txt; bump with "
        "scripts/bump-components.sh, then `cargo update`). scripts/approve-blinc.sh <tag> is for maintainers approving a NEW tag")
 TAG_RE = r"fs-blinc-[0-9]+(?:\.[0-9]+)?"          # the same shape approve-blinc.sh accepts

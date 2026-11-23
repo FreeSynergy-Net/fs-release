@@ -3,7 +3,7 @@
 # in every repo that calls `release.yml` of fs-release? Read-only calls of `gh api` (GET); a write flag (-X, --method, -f, -F, --field, --raw-field,
 # --input) is refused inside this script. No secret VALUES are read or printed, only the NAMES of secrets.
 #
-#   scripts/check_release_env.sh [--repos texts,packages,...] [--org FreeSynergy] [--env release-signing]
+#   scripts/check_release_env.sh [--repos texts,packages,...] [--org FreeSynergy-Net] [--env release-signing]
 #                                [--tag v0.0.10 --sha a084f8b9...] [--strict] [--out report.txt]
 #
 # Per repo (one line in the table, TSV block below the readable table):
@@ -20,7 +20,7 @@
 #            2 = call or gh error (401, 403, 5xx, network, no jq/gh): NEVER reported as "fehlt", only a 404 means "fehlt".
 set -euo pipefail
 
-org="FreeSynergy"; env_name="release-signing"; tag=""; sha=""; strict=0; out=""
+org="FreeSynergy-Net"; env_name="release-signing"; tag=""; sha=""; strict=0; out=""
 repos="texts,packages,people,calendars,tasks,groups,maps,capnpc,interfaces,types,rpc,objects,jscalendar,identity,registry,forms,files,activities,broadcast,draw,messages,resources"
 required=(GPG_PRIVATE_KEY GPG_PASSPHRASE)
 gh_bin="${GH:-gh}"

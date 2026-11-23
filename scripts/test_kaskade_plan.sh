@@ -44,8 +44,8 @@ tag_push fs-objects v0.0.2
 py "$here/kaskade-lage" --ausloeser v0.0.3 --glieder "$tmp/ab.json" --ab fs-people --ohne-ci >"$tmp/lage-ab.json"; rc=$?
 chk "lage: with --ab and both tags on the remote: rc 0, two done with proof" [ "$rc" -eq 0 ] && chk "lage: with --ab and both tags on the remote: rc 0, two done with proof [part 2]" [ "$(q "$tmp/lage-ab.json" '[e["repo"] for e in d["erledigt"]]')" = "['fs-interfaces', 'fs-objects']" ]
 # the CI state of exactly this head, from a local stand-in of the public REST API (GET only)
-mkdir -p "$tmp/api/repos/FreeSynergy/fs-interfaces/actions"
-printf '{"workflow_runs":[{"name":"windows","head_sha":"%s","status":"completed","conclusion":"success"},{"name":"windows","head_sha":"0000","status":"completed","conclusion":"failure"}]}' "$ifc_head" >"$tmp/api/repos/FreeSynergy/fs-interfaces/actions/runs"
+mkdir -p "$tmp/api/repos/FreeSynergy-Net/fs-interfaces/actions"
+printf '{"workflow_runs":[{"name":"windows","head_sha":"%s","status":"completed","conclusion":"success"},{"name":"windows","head_sha":"0000","status":"completed","conclusion":"failure"}]}' "$ifc_head" >"$tmp/api/repos/FreeSynergy-Net/fs-interfaces/actions/runs"
 port="$(python3 -I -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')"
 python3 -I -m http.server "$port" --bind 127.0.0.1 -d "$tmp/api" >/dev/null 2>&1 & srv=$!
 for _ in 1 2 3 4 5 6 7 8 9 10; do python3 -I -c "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:$port/')" 2>/dev/null && break; sleep 0.3; done
@@ -91,7 +91,7 @@ chk "the shipped foreign-source list names fs-capnpc and Blinc" grep -q '^FreeSy
 # K3: a Windows caller that is too old (@v0.0.10 < v0.0.11) or floats (@main) is no caller in order (rule B4: a tag >= the fs-release tag)
 for w in win-old:v0.0.10 win-main:main win-new:v0.0.12 win-eq:v0.0.11; do
   newrepo "${w%%:*}"; mkdir -p "$tmp/work/${w%%:*}/.github/workflows"
-  printf 'name: windows\njobs:\n  windows:\n    uses: FreeSynergy/fs-release/.github/workflows/_windows-check.yml@%s\n' "${w##*:}" >"$tmp/work/${w%%:*}/.github/workflows/windows.yml"
+  printf 'name: windows\njobs:\n  windows:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/_windows-check.yml@%s\n' "${w##*:}" >"$tmp/work/${w%%:*}/.github/workflows/windows.yml"
   printf '[package]\nname = "x"\n' >"$tmp/work/${w%%:*}/Cargo.toml"; commit_push "${w%%:*}" one; tag_push "${w%%:*}" v0.0.1
 done
 printf '[{"repo":"win-old","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-main","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-new","art":"bibliothek","tag":"v0.0.1","allow":"x"},{"repo":"win-eq","art":"bibliothek","tag":"v0.0.1","allow":"x"}]' >"$tmp/g5.json"

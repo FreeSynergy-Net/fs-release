@@ -27,7 +27,7 @@ has "red message names the packages that pull them" 'pulled by: demo-app 0.1.0 (
 has "red message names a second puller" 'demo-people 0.1.0'
 expect "V1+ lock without the switch is green" 0 "$fx/red-v1plus.lock"
 expect "V1+ lock with the switch (--only-from) is red" 1 --only-from "$fx/red-v1plus.lock"
-has "V1+ message names the allowed repo" 'allows only https://github.com/FreeSynergy/fs-types'
+has "V1+ message names the allowed repo" 'allows only https://github.com/FreeSynergy-Net/fs-types'
 FS_LOCK_ONLY_FROM=1 python3 -I "$tool" "$fx/red-v1plus.lock" >"$tmp/o" 2>&1 && bad "env switch FS_LOCK_ONLY_FROM=1 must be red" || ok "env switch FS_LOCK_ONLY_FROM=1 is red"
 expect "green stays green with the V1+ switch" 0 --only-from "$fx/green.lock"
 expect "stdin" 1 - < "$fx/red-two-sources.lock"
@@ -60,7 +60,7 @@ printf 'strict = true\nlibraries = []\n[only_from]\nfs-types = "https://github.c
 expect "repo file with libraries = [] does not switch the check off" 1 "$tmp/c1"
 bash "$gate" "$tmp/c1" >"$tmp/o" 2>&1 && bad "gate: repo file libraries = [] with strict must stay red" || ok "gate: repo file libraries = [] with strict stays red"
 cp "$fx/red-v1plus.lock" "$tmp/c1/Cargo.lock"
-printf 'only_from_enabled = true\n[only_from]\nfs-types = "https://github.com/FreeSynergy/fs-interfaces"\n' > "$tmp/c1/.fs-lock-sources.toml"
+printf 'only_from_enabled = true\n[only_from]\nfs-types = "https://github.com/FreeSynergy-Net/fs-interfaces"\n' > "$tmp/c1/.fs-lock-sources.toml"
 expect "repo file cannot replace [only_from] (still red)" 1 "$tmp/c1"
 printf 'version = 4\n\n[[package]]\nname = "fs-types"\nversion = "0.0.1"\n' > "$tmp/c1/Cargo.lock"; rm "$tmp/c1/.fs-lock-sources.toml"
 expect "workspace member fs-types (no source) is no violation with --only-from" 0 --only-from "$tmp/c1"

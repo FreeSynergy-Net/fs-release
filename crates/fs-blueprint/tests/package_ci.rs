@@ -51,11 +51,11 @@ fn a_package_without_cargo_toml_gets_the_blueprint_check_and_no_cargo_gate() {
         assert!(package.contains("fs-blueprint\" check"), "{path}");
         assert!(package.contains("--drift"), "{path}");
         // the reusable workflow of fs-release runs cargo fmt/clippy/test: not in the package job
-        assert!(!package.contains("uses: FreeSynergy/fs-release"), "{path}");
+        assert!(!package.contains("uses: FreeSynergy-Net/fs-release"), "{path}");
         let code = job(&text, code_job);
         assert!(code.contains("needs.kind.outputs.code == 'true'"), "{path}");
         assert!(
-            code.contains("uses: FreeSynergy/fs-release/.github/workflows/"),
+            code.contains("uses: FreeSynergy-Net/fs-release/.github/workflows/"),
             "{path}"
         );
     }
@@ -84,7 +84,7 @@ fn the_package_job_installs_the_command_from_the_pinned_tag() {
     let tag = fs_blueprint::emit::skeleton::RELEASE_TAG;
     assert!(
         package.contains(&format!(
-            "cargo install --git https://github.com/FreeSynergy/fs-release --tag {tag} --locked"
+            "cargo install --git https://github.com/FreeSynergy-Net/fs-release --tag {tag} --locked"
         )),
         "{package}"
     );

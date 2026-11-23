@@ -1,12 +1,12 @@
 # Pattern: none (script of the pin cascade).
-"""Read-only git helpers of the pin-kaskade scripts. The remote base is `FS_KASKADE_BASE` (default https://github.com/FreeSynergy),
+"""Read-only git helpers of the pin-kaskade scripts. The remote base is `FS_KASKADE_BASE` (default https://github.com/FreeSynergy-Net),
 so a test can point it at local bare repos. Nothing here pushes, tags or deletes; every call is `ls-remote`, `clone` into an OWN folder or `show`."""
 import os
 import re
 import subprocess
 
-BASE_DEFAULT = "https://github.com/FreeSynergy"
-ORG = "FreeSynergy"
+BASE_DEFAULT = "https://github.com/FreeSynergy-Net"
+ORG = "FreeSynergy-Net"
 TAG = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
 REPO = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 

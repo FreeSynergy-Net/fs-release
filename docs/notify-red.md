@@ -2,7 +2,7 @@
 
 Silence on green. A red run opens ONE issue in its own repo, `rot: <workflow> <repo>`, label `rot`; a second red run of the same
 workflow only comments; the next green run closes it. No token beyond `GITHUB_TOKEN`, nothing across repos. The coordinator asks
-once for the whole organisation: `gh search issues --owner FreeSynergy --label rot --state open` (empty = nothing to do).
+once for the whole organisation: `gh search issues --owner FreeSynergy-Net --label rot --state open` (empty = nothing to do).
 
 ## Use (template for the last job of a workflow of a repo)
 
@@ -12,7 +12,7 @@ once for the whole organisation: `gh search issues --owner FreeSynergy --label r
     if: always()
     permissions:
       issues: write
-    uses: FreeSynergy/fs-release/.github/workflows/_notify-red.yml@<full-commit-sha>   # pin to a commit of fs-release, never @main
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_notify-red.yml@<full-commit-sha>   # pin to a commit of fs-release, never @main
     with:
       workflow: check
       failed: ${{ contains(needs.*.result, 'failure') }}

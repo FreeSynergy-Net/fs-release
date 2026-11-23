@@ -41,15 +41,15 @@ pub fn problem(check_yml: Option<&str>, own_toml: Option<&str>) -> Option<String
 mod tests {
     use super::problem;
 
-    const NEW: &str = "uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.10\n";
-    const OLD: &str = "uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n";
+    const NEW: &str = "uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.10\n";
+    const OLD: &str = "uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.9\n";
 
     #[test]
     fn green_with_a_new_tag_and_strict() {
         assert_eq!(problem(Some(NEW), Some("strict = true # on V1+\n")), None);
         assert_eq!(
             problem(
-                Some("uses: FreeSynergy/fs-release/.github/workflows/check.yml@main\n"),
+                Some("uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@main\n"),
                 Some("strict=true")
             ),
             None

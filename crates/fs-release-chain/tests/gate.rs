@@ -107,7 +107,7 @@ fn a_release_dir_that_is_not_fs_release_is_red() {
         &[
             "config",
             "remote.origin.url",
-            "https://github.com/FreeSynergy/fs-release.git",
+            "https://github.com/FreeSynergy-Net/fs-release.git",
         ],
     );
     git(

@@ -14,7 +14,7 @@ do:
   - ketten-plan:
       call: chain-plan:0.0.17@fs
       with:
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
         branches: ${ .input.branches }
         head: ${ .input.head }
         base: main
@@ -41,7 +41,7 @@ do:
   - alt-kopf:
       call: ls-remote-head:0.0.17@fs
       with:
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
         branch: ${ $context.kette.aktuell.branch }
       export:
         as: '${ $context + { alt: . } }'
@@ -67,7 +67,7 @@ do:
   - eintrag:
       call: catalog-entry:0.0.17@fs
       with:
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
         branch: ${ $context.kette.aktuell.branch }
         modus: ${ .input.modus }
         program: ${ $context.kette.aktuell.program }
@@ -126,7 +126,7 @@ do:
           name: review
           version: 0.0.17
         input:
-          repo: FreeSynergy/Catalog
+          repo: FreeSynergy-Net/Catalog
           branch: ${ $context.kette.aktuell.branch }
           head: ${ $context.kette.aktuell.head }
           delta: '${ if $context.alt then ($context.alt.head + ".." + $context.kette.aktuell.head) else .input.delta end }'
@@ -176,7 +176,7 @@ do:
       call: sign-run:0.0.17@fs
       with:
         workflow: sign.yml
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
@@ -186,7 +186,7 @@ do:
   - catalog-beleg:
       call: catalog-proof:0.0.17@fs
       with:
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
         program: ${ $context.kette.aktuell.program }
         tag: ${ $context.kette.aktuell.tag }
         modus: ${ .input.modus }
@@ -233,7 +233,7 @@ do:
   - ketten-naechster:
       call: chain-next:0.0.17@fs
       with:
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
         branches: ${ .input.branches }
       then: zaehler-start
       export:
@@ -247,7 +247,7 @@ do:
   - kette-rebase:
       call: chain-rebase:0.0.17@fs
       with:
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
         branch: ${ $context.kette.aktuell.branch }
         lease: ${ $context.alt.head }
         base: main
@@ -290,7 +290,7 @@ do:
       call: sign-run:0.0.17@fs
       with:
         workflow: sign.yml
-        repo: FreeSynergy/Catalog
+        repo: FreeSynergy-Net/Catalog
         wait: 5m
         dispatch: true
       then: catalog-beleg

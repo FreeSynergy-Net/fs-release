@@ -27,10 +27,10 @@ fn world_with_workflows() -> World {
     fs::create_dir_all(&wf).unwrap();
     fs::write(
         wf.join("check.yml"),
-        "jobs:\n  c:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n",
+        "jobs:\n  c:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.9\n",
     )
     .unwrap();
-    fs::write(wf.join("release.yml"), "jobs:\n  r:\n    uses: FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.17\n  s:\n    uses: FreeSynergy/fs-release/actions/sbom@main\n").unwrap();
+    fs::write(wf.join("release.yml"), "jobs:\n  r:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.17\n  s:\n    uses: FreeSynergy-Net/fs-release/actions/sbom@main\n").unwrap();
     git(&w.work(), &["add", "-A"]);
     git(&w.work(), &["commit", "--quiet", "-m", "workflows"]);
     w
@@ -163,10 +163,10 @@ fn the_fs_interfaces_lift_alone_leaves_fs_types_where_it_is() {
     assert_eq!(code, 0, "{}", r.markdown());
     let a = w.read("crates/a/Cargo.toml");
     assert!(
-        a.contains("fs-types = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.1.0\" }"),
+        a.contains("fs-types = { git = \"https://github.com/FreeSynergy-Net/fs-interfaces\", tag = \"v0.1.0\" }"),
         "{a}"
     );
-    assert!(a.contains("fs-interfaces = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.2.0\" }"), "{a}");
+    assert!(a.contains("fs-interfaces = { git = \"https://github.com/FreeSynergy-Net/fs-interfaces\", tag = \"v0.2.0\" }"), "{a}");
 }
 
 #[test]
@@ -180,14 +180,14 @@ fn asking_for_fs_types_moves_it_to_its_own_repo_and_the_lock_holds_exactly_that_
     let a = w.read("crates/a/Cargo.toml");
     assert!(
         a.contains(
-            "fs-types = { git = \"https://github.com/FreeSynergy/fs-types\", tag = \"v0.2.0\" }"
+            "fs-types = { git = \"https://github.com/FreeSynergy-Net/fs-types\", tag = \"v0.2.0\" }"
         ),
         "{a}"
     );
-    assert!(a.contains("fs-interfaces = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.2.0\" }"), "{a}");
+    assert!(a.contains("fs-interfaces = { git = \"https://github.com/FreeSynergy-Net/fs-interfaces\", tag = \"v0.2.0\" }"), "{a}");
     let lock = w.read("Cargo.lock");
     assert!(
-        lock.contains("github.com/FreeSynergy/fs-types?tag=v0.2.0#"),
+        lock.contains("github.com/FreeSynergy-Net/fs-types?tag=v0.2.0#"),
         "{lock}"
     );
     assert!(!lock.contains("fs-interfaces?tag=v0.1.0"), "{lock}");

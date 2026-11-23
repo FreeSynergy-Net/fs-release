@@ -104,7 +104,7 @@ fn pins_of(lock: &str) -> Vec<Pin> {
     for line in lock.lines() {
         let Some(src) = line
             .trim()
-            .strip_prefix("source = \"git+https://github.com/FreeSynergy/")
+            .strip_prefix("source = \"git+https://github.com/FreeSynergy-Net/")
         else {
             continue;
         };

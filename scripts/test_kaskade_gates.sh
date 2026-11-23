@@ -31,7 +31,7 @@ G
 git -C "$rel" add -A; git -C "$rel" commit -qm new; git -C "$rel" tag v0.0.10
 printf '#!/usr/bin/env bash\nexec "$@"\n' >"$tmp/slot.sh"; chmod +x "$tmp/slot.sh"
 app="$tmp/app"; git init -q -b main "$app"; mkdir -p "$app/.github/workflows"
-printf 'jobs:\n  a:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.9\n  b:\n    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.10\n' >"$app/.github/workflows/check.yml"
+printf 'jobs:\n  a:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.9\n  b:\n    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.10\n' >"$app/.github/workflows/check.yml"
 echo x >"$app/a.txt"; git -C "$app" add -A; git -C "$app" commit -qm one; git -C "$app" tag v0.0.1
 export FS_RELEASE_REPO="$rel" FS_GATES_BUILD_SLOT="$tmp/slot.sh" FS_GATES_FMT=true FS_GATES_SCRATCH="$tmp/scratch" FAKE_OUT="$tmp/out.txt"
 # the remote base for the deadline check (ls-remote of fs-release): a local bare repo without the tag v0.0.12 (never the network)
@@ -108,7 +108,7 @@ T=released_changelog_sections_equal_their_tags
 : >"$FAKE_OUT"; exrun "$app" >"$tmp/o.json"
 chk "exception: a repo that is not fs-release (origin-less, folder app) gets no skip in any run" [ "$(grep -c 'skip=$' "$FAKE_OUT")" = 3 ] && chk "exception: a repo that is not fs-release (origin-less, folder app) gets no skip in any run [part 2]" [ "$(q "$tmp/o.json" 'd["ausnahmen"]')" = "[]" ]
 for r in fs-release fs-tasks; do
-  git clone -q "$app" "$tmp/wt-$r"; git -C "$tmp/wt-$r" remote set-url origin "https://github.com/FreeSynergy/$r.git"
+  git clone -q "$app" "$tmp/wt-$r"; git -C "$tmp/wt-$r" remote set-url origin "https://github.com/FreeSynergy-Net/$r.git"
 done
 : >"$FAKE_OUT"; exrun "$tmp/wt-fs-tasks" >"$tmp/o.json"
 chk "exception: the repo name comes from origin (fs-tasks in a folder wt-fs-tasks): no skip" [ "$(grep -c 'skip=$' "$FAKE_OUT")" = 3 ]
@@ -206,7 +206,7 @@ rc=0; python3 -I "$tmp/mut/gates-komplett" --repo-dir "$app" --log-dir "$tmp/log
 chk "mutant deadline (the until-output is missing) is caught by the output case" [ "$(grep -c 'valid until' "$tmp/err3.txt")" = 0 ]
 git -C "$tmp/frw" push -q origin :refs/tags/v0.0.12 2>/dev/null  # the tag is gone again for the cases below
 # per-clone flat target: two clones of the same repo never share it ([EIGENES-TARGET])
-git clone -q "$app" "$tmp/wt2-fs-release"; git -C "$tmp/wt2-fs-release" remote set-url origin "https://github.com/FreeSynergy/fs-release.git"
+git clone -q "$app" "$tmp/wt2-fs-release"; git -C "$tmp/wt2-fs-release" remote set-url origin "https://github.com/FreeSynergy-Net/fs-release.git"
 : >"$FAKE_OUT"; exrun "$tmp/wt-fs-release" >/dev/null; flat1="$(tail -n 1 "$FAKE_OUT" | grep -o 'target=[^ ]*')"
 : >"$FAKE_OUT"; exrun "$tmp/wt2-fs-release" >/dev/null; flat2="$(tail -n 1 "$FAKE_OUT" | grep -o 'target=[^ ]*')"
 chk "flat target: named after repo and clone folder (target/fs-release/wt-fs-release-flach)" [ "$flat1" = "target=$tmp/scratch/target/fs-release/wt-fs-release-flach" ]

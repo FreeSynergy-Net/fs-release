@@ -7,7 +7,7 @@
 # The approved fs-blinc tag (the gate checks every Cargo.lock against it) is set by scripts/approve-blinc.sh, not here.
 # Repos default to every /srv/FreeSynergy/fs-* with a Cargo.toml (any depth, not target/ or .wt-*) that names
 # fs-components, except fs-components itself. Before anything: the tag must exist in the fs-components repo
-# ($FS_COMPONENTS_URL, default https://github.com/FreeSynergy/fs-components; `git ls-remote --tags`).
+# ($FS_COMPONENTS_URL, default https://github.com/FreeSynergy-Net/fs-components; `git ls-remote --tags`).
 # Per repo: a FRESH worktree .wt-bump-<repo> from origin/main on branch bump-components-<tag> (an existing worktree, the branch
 # checked out elsewhere, or the branch already on origin is an error with a clear message: nothing is removed or
 # force-pushed, clean up yourself; a repo without Cargo.lock is an error too, its worktree is kept); scripts/set_components_tag.py sets tag = "<tag>" on EVERY
@@ -25,7 +25,7 @@ dry=0
 if [ "${1:-}" = "--dry-run" ]; then dry=1; shift; fi
 tag="${1:?usage: bump-components.sh [--dry-run] <tag> [repo ...]}"; shift
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.]+)?$ ]] || { echo "not a version tag: $tag" >&2; exit 2; }
-comp_url="${FS_COMPONENTS_URL:-https://github.com/FreeSynergy/fs-components}"
+comp_url="${FS_COMPONENTS_URL:-https://github.com/FreeSynergy-Net/fs-components}"
 [ -n "$(git ls-remote --tags "$comp_url" "refs/tags/$tag" 2>/dev/null)" ] || { echo "tag $tag does not exist in $comp_url" >&2; exit 2; }
 branch="bump-components-$tag"
 repos=("$@")

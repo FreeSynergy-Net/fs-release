@@ -34,7 +34,7 @@ pub fn tag(env: &LiftEnv) -> String {
         .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")))
 }
 
-/// `scripts/pin-refs.sh --dir <repo> <tag>`: every `uses: FreeSynergy/fs-release/...@<ref>` of the repo's `.github/workflows/*.yml`
+/// `scripts/pin-refs.sh --dir <repo> <tag>`: every `uses: FreeSynergy-Net/fs-release/...@<ref>` of the repo's `.github/workflows/*.yml`
 /// (`@main`, an older tag or a commit) becomes `@<tag>`; other actions stay. No workflows = skipped. A pin is never lowered, line by
 /// line: a `uses:` line already on a HIGHER tag stays (the script compares, `release.yml@v0.0.11` against v0.0.10 stays). It changes
 /// files; the step `commit` takes them along.

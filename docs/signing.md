@@ -56,5 +56,5 @@ gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt --
 gpg --verify tool-1.0.0-linux-x86_64.tar.gz.asc tool-1.0.0-linux-x86_64.tar.gz
 dpkg-sig --verify tool_1.0.0-1_amd64.deb      # needs dpkg-sig
 rpm --import FreeSynergy-release-public.asc && rpm -K tool-1.0.0-1.x86_64.rpm
-gh attestation verify tool-1.0.0-linux-x86_64.tar.gz --repo FreeSynergy/<repo>
+gh attestation verify tool-1.0.0-linux-x86_64.tar.gz --repo FreeSynergy-Net/<repo>
 ```

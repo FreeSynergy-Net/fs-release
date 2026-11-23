@@ -29,7 +29,7 @@ MOVABLE = ("fs-types",)  # the lift moves fs-types from the repo fs-interfaces t
 
 
 def scan(repo, fremd):
-    """(deps, fremd_deps) of the Cargo.toml files of main of one Glied repo: FreeSynergy deps with the file name; foreign sources apart."""
+    """(deps, fremd_deps) of the Cargo.toml files of main of one Glied repo: FreeSynergy-Net deps with the file name; foreign sources apart."""
     deps, fdeps = [], []
     with tempfile.TemporaryDirectory(prefix="kaskade-plan-") as tmp:
         d = os.path.join(tmp, repo)

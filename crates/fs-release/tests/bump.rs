@@ -12,7 +12,7 @@ use fs_release_chain::sys::FakeClock;
 use support::gh::MockGh;
 use support::{git, World};
 
-const START: &str = "workflow run bump.yml --repo FreeSynergy/Catalog";
+const START: &str = "workflow run bump.yml --repo FreeSynergy-Net/Catalog";
 
 /// A lifted, committed world whose head carries a JA; the flow list allows public reach.
 fn approved() -> (World, String) {

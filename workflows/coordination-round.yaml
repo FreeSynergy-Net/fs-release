@@ -13,7 +13,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: 'The coordinator acts only on red or at approval gates. One query - `gh search issues --owner FreeSynergy --label rot --state open` (red notices of _notify-red.yml, one issue per workflow and repo). Empty = silence, start nothing. Follow-ups after an approval (bump, sign, catalog check, package repos, docs build) the coordinator never starts by hand; they run by event/CI. Red = `bugfix` or `agent-run` for exactly this run; a gate is never bypassed.'
+        freesynergy.net:summary: 'The coordinator acts only on red or at approval gates. One query - `gh search issues --owner FreeSynergy-Net --label rot --state open` (red notices of _notify-red.yml, one issue per workflow and repo). Empty = silence, start nothing. Follow-ups after an approval (bump, sign, catalog check, package repos, docs build) the coordinator never starts by hand; they run by event/CI. Red = `bugfix` or `agent-run` for exactly this run; a gate is never bypassed.'
   - cost-log:
       call: read-cost-log:0.0.17@fs
       metadata:

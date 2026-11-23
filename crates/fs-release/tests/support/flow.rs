@@ -65,7 +65,7 @@ impl World {
         .unwrap();
         git(&rel, &["add", ".fs"]);
         git(&rel, &["commit", "--quiet", "-m", "list"]);
-        let rurl = "https://github.com/FreeSynergy/fs-release.git";
+        let rurl = "https://github.com/FreeSynergy-Net/fs-release.git";
         git(&rel, &["remote", "add", "origin", rurl]);
         git(
             &rel,

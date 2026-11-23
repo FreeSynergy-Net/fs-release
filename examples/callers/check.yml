@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   check:
-    uses: FreeSynergy/fs-release/.github/workflows/check.yml@main
+    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@main
     # with:
     #   working-directory: "."
     #   apt-packages: "libssl-dev"

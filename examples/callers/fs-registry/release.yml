@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   release:
-    uses: FreeSynergy/fs-release/.github/workflows/release.yml@main
+    uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@main
     with:
       binaries: fs-registry
       cargo-package: fs-registry          # workspace: fs-registry, fs-registry-client, fs-registry-proto

@@ -162,17 +162,17 @@ fn approval_rules_expiry_findings_author_and_the_fixed_folder() {
 fn slug_must_be_the_origin() {
     assert!(check_slug(
         "FreeSynergy/fs-packages",
-        "https://github.com/FreeSynergy/fs-packages.git"
+        "https://github.com/FreeSynergy-Net/fs-packages.git"
     )
     .is_ok());
     assert!(check_slug(
         "FreeSynergy/fs-packages",
-        "git@github.com:FreeSynergy/fs-packages.git"
+        "git@github.com:FreeSynergy-Net/fs-packages.git"
     )
     .is_ok());
     assert!(check_slug(
         "FreeSynergy/fs-packages",
-        "https://github.com/FreeSynergy/fs-tasks"
+        "https://github.com/FreeSynergy-Net/fs-tasks"
     )
     .is_err());
     assert!(check_slug("FreeSynergy/fs-packages", "/tmp/some/path").is_err());

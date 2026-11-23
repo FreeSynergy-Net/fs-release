@@ -73,7 +73,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "One query - gh search issues --owner FreeSynergy --label rot --state open. Empty = silence. Red = bugfix or agent-run for exactly this run; a gate is never bypassed."
+        freesynergy.net:summary: "One query - gh search issues --owner FreeSynergy-Net --label rot --state open. Empty = silence. Red = bugfix or agent-run for exactly this run; a gate is never bypassed."
   - upstream-start:
       set:
         repo: ${ .input.upstream.repo // "project-blinc/Blinc" }

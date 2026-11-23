@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy/fs-release/actions/setup-rust@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
         with:
           toolchain: pinned
           cache-key: blueprint-e2e-${{ matrix.os }}
@@ -98,14 +98,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         continue-on-error: true
         with:
-          repository: FreeSynergy/fs-tasks
+          repository: FreeSynergy-Net/fs-tasks
           ref: unreviewed/bauplan-schema2-2
           path: acceptance/tasks
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         continue-on-error: true
         with:
-          repository: FreeSynergy/fs-people
+          repository: FreeSynergy-Net/fs-people
           ref: unreviewed/bauplan-schema2-2
           path: acceptance/people
           persist-credentials: false
@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy/fs-release/actions/setup-rust@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
         with:
           toolchain: pinned
           cache-key: blueprint-readme-${{ matrix.os }}
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy/fs-release/actions/setup-rust@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
         with:
           toolchain: pinned
           cache-key: blueprint-install
@@ -158,6 +158,6 @@ jobs:
           grep -q 'blueprint-rev: { type: string, default: ""' .github/workflows/check.yml
           rev="$GITHUB_SHA"
           [[ "$rev" =~ ^[0-9a-f]{40}$ ]]
-          cargo install --git https://github.com/FreeSynergy/fs-release --rev "$rev" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
+          cargo install --git https://github.com/FreeSynergy-Net/fs-release --rev "$rev" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
           "$RUNNER_TEMP/fsbp/bin/fs-blueprint" --version
           "$RUNNER_TEMP/fsbp/bin/fs-blueprint" check --repo crates/fs-blueprint/tests/data/repos/ok

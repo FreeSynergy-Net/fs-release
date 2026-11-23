@@ -36,7 +36,7 @@ PRIMARY=16A4A3EE563AEF51FCF0C55DED7B57C4A1904342
 PASSFILE=${PASSFILE:-$HOME/.config/freesynergy/release-passphrase}
 OUT_DIR=${OUT_DIR:-/srv/FreeSynergy/.scratch/keys}
 OUT_OWNER=${OUT_OWNER:-kal:kal}
-ORG=FreeSynergy
+ORG=FreeSynergy-Net
 DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-capnpc fs-packages fs-files)  # the 9 callers of release.yml
 
 die() { echo "error: $*" >&2; exit 1; }
