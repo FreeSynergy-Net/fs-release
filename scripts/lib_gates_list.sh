@@ -21,12 +21,16 @@ gates_lint_shell() { cd "$1" && git ls-files -z '*.sh' | xargs -0 -r shellcheck 
 gates_lint_actions() { cd "$1" && actionlint; }
 # gates_beleg <root> <want> <have> <like-ci> <step rcs...>: the Beleg block (toolchain, flags, every step with its rc, `CI-gleich: ja/nein, reason`); a not CI-equal run adds the rule: the branch CI at the head is the proof.
 gates_beleg() {
-  local root="$1" want="$2" have="$3" like="$4" diff
+  local root="$1" want="$2" have="$3" like="$4" diff base
   shift 4
   diff="$(gates_ci_diff "$want" "$have" "$root")"
   echo "gates-beleg: rustc=${have}; ci-toolchain=${want}; mode=$([ -n "$like" ] && echo like-ci || echo standard); clippy=--workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic; steps: $*"
   if [ -z "$diff" ]; then echo "gates-beleg: CI-gleich: ja"; return 0; fi
   echo "gates-beleg: CI-gleich: NEIN"
   printf 'gates-beleg: grund: %s\n' "$diff"
+  base="$(git -C "$root" merge-base HEAD origin/main 2>/dev/null || true)"
+  if [ -n "$base" ] && [ -r "${finding_work:-/nonexistent}/clippy.out" ]; then
+    { grep -oE -- '--> [^:]+' "$finding_work/clippy.out" | sed 's/^--> //' | sort -u | grep -Fxf <(git -C "$root" diff --name-only "$base") || true; } | sed 's/^/gates-beleg: clippy finding in a CHANGED file (fix it, never "toolchain"): /'
+  fi
   echo "gates-beleg: green here is NOT proof of a green CI: the branch CI at the head is the proof; the report must name what did not run here"
 }
