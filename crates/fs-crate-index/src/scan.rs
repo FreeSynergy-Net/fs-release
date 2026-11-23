@@ -3,32 +3,15 @@
 //! The allow list lives in the registry repo itself (`allowed-sources.txt`): one line per source repo, `owner/repo <first-version> <package>...`, the
 //! packages in dependency order (a package may depend on the ones before it). A change of that file needs a review (CODEOWNERS, docs/crate-index.md).
 
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{bail, ensure, Context, Result};
 use semver::Version;
 
-use crate::guard::version_of_ref;
-use crate::publish::{git_out, package, publish, PublishArgs};
-
-/// One line of the allow list.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Source {
-    pub repo: String,
-    pub from: Version,
-    pub packages: Vec<String>,
-}
-
-/// One tag of a source repo as `git ls-remote --tags` shows it.
-#[derive(Debug, Clone)]
-pub struct TagInfo {
-    pub name: String,
-    pub version: Version,
-    pub tag_object: String,
-    /// The commit the tag points to (`^{}` line); `None` = a lightweight tag.
-    pub commit: Option<String>,
-}
+use crate::allow::{list_tags, parse_allow, url_of, Source, TagInfo};
+use crate::publish::{git_out, package};
 
 /// The arguments of `scan`.
 #[derive(clap::Args, Clone)]
@@ -53,116 +36,12 @@ pub struct ScanArgs {
     pub semver_checks: Option<PathBuf>,
 }
 
-/// The arguments of `apply`.
-#[derive(clap::Args, Clone)]
-pub struct ApplyArgs {
-    #[arg(long)]
-    pub allow: PathBuf,
-    /// The `--out` directory of `scan`.
-    #[arg(long)]
-    pub dir: PathBuf,
-    #[arg(long)]
-    pub registry_dir: PathBuf,
-    #[arg(long)]
-    pub index_url: String,
-    #[arg(long, default_value = "https://github.com")]
-    pub source_base: String,
-}
-
 /// Result of a scan: how many crates are in the plan and the first problem (the scan stops there; earlier tags stay in the plan).
 #[derive(Debug)]
 pub struct ScanReport {
     pub entries: usize,
     pub notes: Vec<String>,
     pub error: Option<String>,
-}
-
-/// Parses the allow list.
-///
-/// # Errors
-/// A line has no repo, no first version or no package, or a name has unexpected characters.
-pub fn parse_allow(text: &str) -> Result<Vec<Source>> {
-    let mut out = Vec::new();
-    for (n, raw) in text.lines().enumerate() {
-        let line = raw.split('#').next().unwrap_or("").trim();
-        if line.is_empty() {
-            continue;
-        }
-        let mut it = line.split_whitespace();
-        let repo = it.next().unwrap_or_default();
-        let from = it
-            .next()
-            .with_context(|| format!("line {}: first version missing", n + 1))?;
-        let packages: Vec<String> = it.map(str::to_string).collect();
-        let name_ok = |s: &str| {
-            !s.is_empty()
-                && s.bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
-        };
-        let repo_ok = repo
-            .split_once('/')
-            .is_some_and(|(o, r)| name_ok(o) && name_ok(r) && !r.contains('/'));
-        ensure!(repo_ok, "line {}: `{repo}` is not owner/repo", n + 1);
-        ensure!(!packages.is_empty(), "line {}: no package", n + 1);
-        ensure!(
-            packages.iter().all(|p| name_ok(p)),
-            "line {}: bad package name",
-            n + 1
-        );
-        out.push(Source {
-            repo: repo.to_string(),
-            from: Version::parse(from).with_context(|| format!("line {}: `{from}`", n + 1))?,
-            packages,
-        });
-    }
-    Ok(out)
-}
-
-fn url_of(base: &str, repo: &str) -> String {
-    format!("{}/{repo}.git", base.trim_end_matches('/'))
-}
-
-/// All release tags `vX.Y.Z` of a repo, oldest first (other tags are ignored).
-///
-/// # Errors
-/// `git ls-remote` fails.
-pub fn list_tags(url: &str) -> Result<Vec<TagInfo>> {
-    let out = Command::new("git")
-        .args(["ls-remote", "--tags", url])
-        .output()
-        .context("cannot start git")?;
-    ensure!(
-        out.status.success(),
-        "git ls-remote {url} failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let text = String::from_utf8_lossy(&out.stdout);
-    let mut tags: Vec<TagInfo> = Vec::new();
-    for line in text.lines() {
-        let Some((sha, r)) = line.split_once('\t') else {
-            continue;
-        };
-        let (r, peeled) = r.strip_suffix("^{}").map_or((r, false), |x| (x, true));
-        let Ok(v) = version_of_ref(r) else { continue };
-        let Ok(version) = Version::parse(&v) else {
-            continue;
-        };
-        let name = r.trim_start_matches("refs/tags/").to_string();
-        if peeled {
-            if let Some(t) = tags.iter_mut().find(|t| t.name == name) {
-                t.commit = Some(sha.to_string());
-            }
-        } else {
-            tags.push(TagInfo {
-                name,
-                version,
-                tag_object: sha.to_string(),
-                commit: None,
-            });
-        }
-    }
-    tags.sort_by(|a, b| a.version.cmp(&b.version));
-    Ok(tags)
 }
 
 fn in_index(reg: &Path, name: &str, version: &Version) -> Result<bool> {
@@ -177,13 +56,6 @@ fn recorded_commit(reg: &Path, repo: &str, tag: &str) -> Result<Option<String>> 
         .lines()
         .find_map(|l| l.strip_prefix(&key))
         .map(|r| r.split_whitespace().next().unwrap_or("").to_string()))
-}
-
-fn source_line(repo: &str, t: &TagInfo, commit: &str) -> String {
-    format!(
-        "{repo} {} commit {commit} tag-object {}",
-        t.name, t.tag_object
-    )
 }
 
 /// Job 1: finds new tags of the allowed repos, checks them, packages them, writes `plan.txt` and the `.crate` files. Nothing is written to the registry.
@@ -293,10 +165,11 @@ fn scan_tag(
         semver_gate(a, &dir, p, &t.version, rep)?;
         let fname = f.file_name().unwrap().to_string_lossy().into_owned();
         std::fs::copy(f, a.out.join(&fname))?;
-        plan.push_str(&format!(
-            "{}\t{}\t{}\t{commit}\t{p}\t{}\t{fname}\n",
+        let _ = writeln!(
+            plan,
+            "{}\t{}\t{}\t{commit}\t{p}\t{}\t{fname}",
             s.repo, t.name, t.tag_object, t.version
-        ));
+        );
         rep.entries += 1;
     }
     Ok(())
@@ -366,55 +239,4 @@ fn semver_gate(
     rep.notes
         .push(format!("semver {pkg} {version} against {base}: green"));
     Ok(())
-}
-
-/// Job 2: enters the planned crates one after the other (dependency order, one commit each). Re-checks every line against the allow list and the tag.
-/// No push here (the workflow pushes once).
-///
-/// # Errors
-/// A plan line is not allowed, the tag moved between the jobs, or `publish` refuses.
-pub fn apply(a: &ApplyArgs) -> Result<Vec<String>> {
-    let sources = parse_allow(&std::fs::read_to_string(&a.allow).context("allow list")?)?;
-    let plan = std::fs::read_to_string(a.dir.join("plan.txt")).context("plan.txt")?;
-    let mut done = Vec::new();
-    for line in plan.lines() {
-        let f: Vec<&str> = line.split('\t').collect();
-        ensure!(f.len() == 7, "bad plan line `{line}`");
-        let (repo, tag, tag_obj, commit, pkg, version, file) =
-            (f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
-        let s = sources
-            .iter()
-            .find(|s| s.repo == repo && s.packages.iter().any(|p| p == pkg))
-            .with_context(|| format!("`{repo}` / `{pkg}` is not on the allow list"))?;
-        ensure!(
-            version_of_ref(&format!("refs/tags/{tag}"))? == version,
-            "tag {tag} is not version {version}"
-        );
-        ensure!(
-            Version::parse(version)? >= s.from,
-            "{tag} is older than the first version of the allow list"
-        );
-        ensure!(
-            file == format!("{pkg}-{version}.crate"),
-            "unexpected file name `{file}`"
-        );
-        let now = list_tags(&url_of(&a.source_base, repo))?
-            .into_iter()
-            .find(|t| t.name == tag)
-            .with_context(|| format!("tag {tag} of {repo} is gone"))?;
-        ensure!(
-            now.tag_object == tag_obj && now.commit.as_deref() == Some(commit),
-            "tag {tag} of {repo} moved between the jobs"
-        );
-        let msg = publish(&PublishArgs {
-            git_ref: format!("refs/tags/{tag}"),
-            crate_file: a.dir.join(file),
-            registry_dir: a.registry_dir.clone(),
-            index_url: a.index_url.clone(),
-            upload: "crates/{crate}".into(),
-            source: source_line(repo, &now, commit),
-        })?;
-        done.push(msg);
-    }
-    Ok(done)
 }

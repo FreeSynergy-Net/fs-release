@@ -2,8 +2,9 @@
 
 use clap::{Parser, Subcommand};
 
+use crate::apply::{apply, ApplyArgs};
 use crate::publish::{publish, PublishArgs};
-use crate::scan::{apply, scan, ApplyArgs, ScanArgs};
+use crate::scan::{scan, ScanArgs};
 use crate::wait::{wait, WaitArgs};
 
 #[derive(Parser)]
