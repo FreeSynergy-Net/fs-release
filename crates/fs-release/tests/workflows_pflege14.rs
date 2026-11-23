@@ -2,6 +2,7 @@
 //! without run ID, conclusion and exact head is not passed on to the review. The real files are green; every mutant (a change of the parsed tree) is red.
 
 #[path = "workflows_pflege13/model.rs"]
+#[allow(dead_code)]
 mod model;
 
 use model::*;
