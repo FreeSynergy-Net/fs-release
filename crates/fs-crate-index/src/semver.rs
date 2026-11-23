@@ -88,11 +88,69 @@ fn registry_checkout(a: &SemverArgs) -> Result<PathBuf> {
     Ok(dir)
 }
 
+/// The lint level of `cargo-semver-checks` stands in the `Cargo.toml` of the CHECKED package (`[package.metadata.cargo-semver-checks.lints]`), so a branch could switch the gate
+/// off by itself. Therefore every manifest of the source is read first: only `enum_variant_added = "warn"` may be there, anything else is RED.
+///
+/// # Errors
+/// A manifest sets a lint level other than `enum_variant_added = "warn"`, or has other `cargo-semver-checks` keys.
+pub fn check_manifest_lints(source: &Path) -> Result<()> {
+    let mut stack = vec![source.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for e in std::fs::read_dir(&dir)? {
+            let p = e?.path();
+            let name = p
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default()
+                .to_string();
+            if p.is_dir() {
+                if !matches!(name.as_str(), "target" | ".git" | ".cargo") {
+                    stack.push(p);
+                }
+            } else if name == "Cargo.toml" {
+                manifest_lints_ok(&p)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn manifest_lints_ok(manifest: &Path) -> Result<()> {
+    let text = std::fs::read_to_string(manifest)?;
+    let doc: toml::Table = text
+        .parse()
+        .with_context(|| format!("{} is not TOML", manifest.display()))?;
+    for top in ["package", "workspace"] {
+        let Some(cfg) = doc
+            .get(top)
+            .and_then(|t| t.get("metadata"))
+            .and_then(|m| m.get("cargo-semver-checks"))
+        else {
+            continue;
+        };
+        let lints = cfg.get("lints").and_then(toml::Value::as_table);
+        let only_lints = cfg
+            .as_table()
+            .is_some_and(|t| t.keys().all(|k| k == "lints"));
+        let lints_ok = lints.is_none_or(|l| {
+            l.iter()
+                .all(|(k, v)| k == "enum_variant_added" && v.as_str() == Some("warn"))
+        });
+        ensure!(
+            only_lints && lints_ok,
+            "{}: [{top}.metadata.cargo-semver-checks] changes the gate (only `enum_variant_added = \"warn\"` is allowed): the checked branch must not release itself",
+            manifest.display()
+        );
+    }
+    Ok(())
+}
+
 /// Runs the gate.
 ///
 /// # Errors
 /// The registry is not reachable or not readable, the baseline `.crate` is missing, or `cargo-semver-checks` is red.
 pub fn gate(a: &SemverArgs) -> Result<Outcome> {
+    check_manifest_lints(&a.source)?;
     let reg = registry_checkout(a)?;
     let pkg = &a.package;
     let base = reg_index::list(&reg, pkg, None)?
