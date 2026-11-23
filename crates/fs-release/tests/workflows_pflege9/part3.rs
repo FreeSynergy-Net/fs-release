@@ -109,7 +109,7 @@ pub(super) fn request(t: &str) -> bool {
 
 /// The channel, approval and send part of `upstream-anfrage`.
 fn request_send(t: &str) -> bool {
-    true && has(
+    has(
         t,
         "blinc-kanal",
         &[
