@@ -6,7 +6,7 @@ Details, threat model and the click list: `docs/crate-index.md` in `FreeSynergy-
 ## How these files get here (once)
 1. Create the repo `FreeSynergy-Net/fs-crates` (public, default branch `main`) and do the click list in `docs/crate-index.md` (section "Click list for fs-crates").
 2. Copy this folder (`templates/fs-crates/` of fs-release) into the repo root: `.github/workflows/index.yml`, `.github/CODEOWNERS`, `allowed-sources.txt`, `config.json`, this README.
-3. Replace `FS_RELEASE_PIN` in `index.yml` (2 places: the checkout `ref` and the `uses`) by the commit of fs-release that contains `crates/fs-crate-index` (full 40 hex).
+3. Replace every `FS_RELEASE_PIN` in `index.yml` (the two `uses:` lines of fs-release actions) by the commit of fs-release that contains `crates/fs-crate-index` (full 40 hex).
 4. Commit `config.json` as the first commit (`cargo index init` writes the same file); push to `main`.
 5. Press `Run workflow` once (Actions -> index) to see it green with an empty plan.
 

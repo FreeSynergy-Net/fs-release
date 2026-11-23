@@ -1,0 +1,46 @@
+name: semver-baseline
+description: "THE one semver gate (K-2 r1): baseline = ALWAYS the newest version of the crate in the registry `freesynergy` (unpacked .crate, `--baseline-root`), never a git tag. Registry reachable and crate without a version: green, says `no baseline: first registry version`. Version present: cargo-semver-checks `--release-type minor`. Registry not reachable: RED with its own text. Used by the pull job in fs-crates and by the early signal in the publisher repos (fs-types semver.yml). Without `package` it only installs the pinned cargo-semver-checks and builds the tool (outputs `tool`, `semver-checks`)."
+inputs:
+  package: { description: "Package (-p) to check; empty = only install and build, no check", default: "" }
+  registry: { description: "Registry clone URL (or a checkout directory)", default: "https://github.com/FreeSynergy-Net/fs-crates" }
+  source-dir: { description: "Checkout of the new version (the workspace that holds the package)", default: "." }
+  version: { description: "The new version (only older registry versions count as baseline); empty = every", default: "" }
+  tool: { description: "Prebuilt fs-crate-index; empty = build it from the checkout this action itself comes from", default: "" }
+outputs:
+  tool: { description: "Path of fs-crate-index", value: "${{ steps.prep.outputs.tool }}" }
+  semver-checks: { description: "Path of cargo-semver-checks", value: "${{ steps.prep.outputs.semver-checks }}" }
+runs:
+  using: composite
+  steps:
+    # ONE place for the pinned version and its sha256 (cargo-semver-checks v0.51.0, x86_64-unknown-linux-musl, checksum as published by the GitHub release)
+    - id: prep
+      shell: bash
+      env:
+        TOOL: ${{ inputs.tool }}
+        SEMVER_CHECKS_VERSION: "0.51.0"
+        SEMVER_CHECKS_SHA256: "396c8508d973c83de52660943a057e971b586f7511c3ba695762373452b43d5b"
+      run: |
+        set -euo pipefail
+        f=cargo-semver-checks-x86_64-unknown-linux-musl.tar.gz
+        curl -fsSL --retry 3 -o "$RUNNER_TEMP/$f" "https://github.com/obi1kenobi/cargo-semver-checks/releases/download/v${SEMVER_CHECKS_VERSION}/$f"
+        echo "$SEMVER_CHECKS_SHA256  $RUNNER_TEMP/$f" | sha256sum -c -
+        mkdir -p "$RUNNER_TEMP/semver-bin" && tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP/semver-bin"
+        if [ -z "$TOOL" ]; then
+          cargo build --locked --release --manifest-path "$GITHUB_ACTION_PATH/../../Cargo.toml" -p fs-crate-index --target-dir "$RUNNER_TEMP/semver-ci-target"
+          TOOL="$RUNNER_TEMP/semver-ci-target/release/fs-crate-index"
+        fi
+        echo "tool=$TOOL" >> "$GITHUB_OUTPUT"
+        echo "semver-checks=$RUNNER_TEMP/semver-bin/cargo-semver-checks" >> "$GITHUB_OUTPUT"
+    - if: inputs.package != ''
+      shell: bash
+      env:
+        TOOL: ${{ steps.prep.outputs.tool }}
+        SEMVER: ${{ steps.prep.outputs.semver-checks }}
+        PACKAGE: ${{ inputs.package }}
+        REGISTRY: ${{ inputs.registry }}
+        SOURCE: ${{ inputs.source-dir }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        v=(); [ -z "$VERSION" ] || v=(--version "$VERSION")
+        "$TOOL" semver --registry "$REGISTRY" --package "$PACKAGE" --source "$SOURCE" "${v[@]}" --semver-checks "$SEMVER" --work-dir "$RUNNER_TEMP/semver-work"
