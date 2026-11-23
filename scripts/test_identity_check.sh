@@ -76,4 +76,26 @@ done
 envrun CI=false GITHUB_ACTIONS=true GIT_DIR="$tmp/d/.git"; chk "N1: GITHUB_ACTIONS=true CI=false with GIT_DIR: rc 1" test $? -eq 1
 env -u CI -u GITHUB_ACTIONS GIT_DIR="$tmp/d/.git" bash "$tool" "$tmp/c" >/dev/null 2>&1; chk "N1: local (no CI) with GIT_DIR: not refused by the CI rule (green on the clean repo)" test $? -eq 0
 sed 's/"\${GITHUB_ACTIONS:-}"/""/g' "$tool" >"$tmp/mutga"; env CI=false GITHUB_ACTIONS=true FS_IDENTITY_BASE=HEAD bash "$tmp/mutga" "$tmp/c" >/dev/null 2>&1; chk "N1 mutant (GITHUB_ACTIONS not read): the bypass turns green (the test sees it)" test $? -eq 0
+# --- Bundle 7 (N1c, S9): identity is the FIRST gate; Repo code (build.rs, tests: here a stub cargo) must not move refs/remotes/origin/main before it ---
+envrun CI=false GITHUB_ACTIONS=true FS_IDENTITY_BASE=HEAD; chk "S9: the CI message names CI or GITHUB_ACTIONS (not only CI=true)" test -n "$(grep -F 'in CI (CI or GITHUB_ACTIONS set)' "$tmp/o")" -a -z "$(grep -F 'CI=true' "$tmp/o")"
+gates_src="$(cd "$here" && pwd)/gates.sh"
+chk "N1c static: in gates.sh the step identity stands before the first cargo step" test "$(grep -n '^  step identity ' "$gates_src" | head -1 | cut -d: -f1)" -lt "$(grep -n '^  step [a-z-]* [a-z]* cargo ' "$gates_src" | head -1 | cut -d: -f1)"
+chk "N1c static: step identity exists exactly once" test "$(grep -c '^  step identity ' "$gates_src")" -eq 1
+# dynamic: a workspace whose stub cargo does what a hostile build.rs would do (origin/main := HEAD); origin/main stands before a foreign commit
+GK="$tmp/gk"; mkdir -p "$GK/scripts" "$GK/bin"
+cp "$here/gates.sh" "$here/lib_gates_guard.sh" "$here/lib_gates_list.sh" "$tool" "$GK/scripts/"
+echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; : >"$GK/scripts/check_rust_rules.py"
+printf '#!/usr/bin/env bash\ngit -C "$FIXTURE" update-ref refs/remotes/origin/main HEAD\nexit 0\n' >"$GK/bin/cargo"
+printf '#!/usr/bin/env bash\necho rustc 0\n' >"$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
+cp -r "$tmp/c" "$tmp/e"; git -C "$tmp/e" update-ref refs/remotes/origin/main "$(git -C "$tmp/e" rev-parse HEAD~2)"; git -C "$tmp/e" config --local --unset freesynergy.identity-test-base 2>/dev/null
+gates_ci() { env -u GATES_ONLY_GUARD -u GIT_DIR PATH="$GK/bin:$PATH" FIXTURE="$tmp/e" CI=true GITHUB_ACTIONS=true TMPDIR="$tmp" FS_GATES_FEHLERLISTE_DIR="$tmp" bash "$1" "$tmp/e" >"$tmp/g.out" 2>&1; }
+gates_ci "$GK/scripts/gates.sh"; grc=$?
+chk "N1c: stub cargo moves origin/main, identity still red: 'gate identity: rc=1', gates rc 1" test "$grc" -eq 1 -a -n "$(grep -x 'gate identity: rc=1' "$tmp/g.out")"
+chk "N1c: the identity line comes before the first cargo gate line" test "$(grep -n '^gate identity: ' "$tmp/g.out" | head -1 | cut -d: -f1)" -lt "$(grep -n '^gate fmt: ' "$tmp/g.out" | head -1 | cut -d: -f1)"
+git -C "$tmp/e" update-ref refs/remotes/origin/main "$(git -C "$tmp/e" rev-parse HEAD~2)"
+# mutant: the old order (identity after files): the stub has moved the ref by then, identity is green on an empty range (the bypass of REVIEW-bundle6 N1c)
+awk '/^  step identity /{next} {print} /^  step files /{print "  step identity error bash \"$here/identity-check\" \"$root\""}' "$GK/scripts/gates.sh" >"$GK/scripts/gates-old.sh"
+gates_ci "$GK/scripts/gates-old.sh"
+chk "N1c mutant (identity last, the old order): identity turns green on the moved ref (the test sees it)" test -n "$(grep -x 'gate identity: rc=0' "$tmp/g.out")"
+git -C "$tmp/e" update-ref refs/remotes/origin/main "$(git -C "$tmp/e" rev-parse HEAD~2)"
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi

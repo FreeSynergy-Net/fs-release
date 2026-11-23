@@ -19,6 +19,9 @@ rules="$here/check_rust_rules.py"
 RUSTUP_TOOLCHAIN="$(tr -d '[:space:]' < "$here/../RUST_VERSION")"
 export RUSTUP_TOOLCHAIN
 cd "$root"
+# N1b: GATES_ONLY_GUARD skips EVERY gate (identity included); it is only the test switch of scripts/test_gates_guard.sh. GITHUB_ACTIONS is set by Actions itself (a caller cannot unset it
+# through test-env): there the switch is refused, rc 2, whatever else is set (CI alone does not count: the self test runs in CI with CI=1 and GITHUB_ACTIONS removed).
+if [ -n "${GATES_ONLY_GUARD:-}" ] && [ -n "${GITHUB_ACTIONS:-}" ]; then echo "gates FAILED: GATES_ONLY_GUARD must not be set in CI (it skips every gate)" >&2; exit 2; fi
 if [ -z "${CI:-}" ]; then
   export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
   export TMPDIR="${TMPDIR_GATES:-/srv/FreeSynergy/.scratch}"
@@ -129,6 +132,9 @@ if [ -n "${GATES_ONLY_GUARD:-}" ]; then
   if [ -n "${GATES_GUARD_MIDDLE:-}" ]; then bash -c "$GATES_GUARD_MIDDLE"; fi
 else
   echo "gates: rustc $(rustc --version)"
+  # N1c: identity is the FIRST gate, before any cargo call: build.rs, proc macros and tests of the caller run in this job and could move refs/remotes/origin/main (the range of the gate) otherwise.
+  # author AND committer of every commit of origin/main..HEAD = FS_ALLOWED_IDENTITY; own file, own self test (scripts/test_identity_check.sh, order: same file)
+  step identity error bash "$here/identity-check" "$root"
   # [GATES-SAMMELLISTE] every gate runs to its end, whatever an earlier one did: `step` keeps the rc of each (never lost, never cut) and the run collects ALL findings in ONE
   # list (see the end of this file). The gate stays HARD: one red step makes the exit code 1; only the stop at the first red is gone.
   # --locked: the gate builds exactly the committed Cargo.lock (a repo without a current lock is red; `cargo update` is a visible commit)
@@ -166,8 +172,6 @@ else
   step lock error bash "$here/gates-lock.sh" "$root"
   # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
   step files error bash "$here/gates-files.sh" "$root"
-  # identity gate ([IDENTITAET]): author AND committer of every commit of origin/main..HEAD = FS_ALLOWED_IDENTITY; own file, own self test (scripts/test_identity_check.sh)
-  step identity error bash "$here/identity-check" "$root"
   # --like-ci: the lint job of CI (the tool missing = "NICHT GEPRUEFT" in the Beleg, never silently skipped) and, with rustup, the MSRV job
   if [ -n "$like_ci" ]; then
     if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi

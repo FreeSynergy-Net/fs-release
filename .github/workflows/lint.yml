@@ -138,6 +138,14 @@ jobs:
         id: set-components-tag
         continue-on-error: true
         run: bash scripts/test_set_components_tag.sh
+      - name: identity gate self test (CI case, GIT_DIR, identity is the first gate, mutants)
+        id: identity-gate-self
+        continue-on-error: true
+        run: bash scripts/test_identity_check.sh
+      - name: test-env step of check.yml self test (allowlist TEST_*; BASH_FUNC_, SHELLOPTS, PS4, BOM and the rest red; block = script; mutants)
+        id: test-env-step
+        continue-on-error: true
+        run: bash scripts/test_check_test_env.sh
       - name: gates guard self test (lock, snapshot compare, sweep, mutants)
         id: gates-guard-self
         continue-on-error: true
@@ -191,6 +199,8 @@ jobs:
             signing-setup-script ${{ steps.signing-setup-script.outcome }}
             lock-check-self ${{ steps.lock-check-self.outcome }}
             set-components-tag ${{ steps.set-components-tag.outcome }}
+            identity-gate-self ${{ steps.identity-gate-self.outcome }}
+            test-env-step ${{ steps.test-env-step.outcome }}
             gates-guard-self ${{ steps.gates-guard-self.outcome }}
             gates-error-list ${{ steps.gates-error-list.outcome }}
             gates-like-ci ${{ steps.gates-like-ci.outcome }}

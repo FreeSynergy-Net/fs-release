@@ -10,6 +10,7 @@ set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+unset GITHUB_ACTIONS   # N1b: gates.sh refuses GATES_ONLY_GUARD when GITHUB_ACTIONS is set (the lint job of CI sets it); the cases below set it themselves
 fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
@@ -170,4 +171,16 @@ foreign_mutant "sweep strips only .end, no name form" 's/pid="\${name#snap\.}"; 
 # 6 gates.sh really uses the guard (the wiring)
 grep -q 'gates_guard_lock' "$here/gates.sh" && grep -q 'gates_guard_compare' "$here/gates.sh" && ok "gates.sh calls lock and compare" || bad "gates.sh has no guard"
 
+
+# 7 N1b: GATES_ONLY_GUARD skips every gate, so it is refused in CI (GITHUB_ACTIONS is set by Actions, a caller cannot unset it): rc 2, nothing ran, and CI=1 alone does not count
+GITHUB_ACTIONS=true run "$tmp/real" "$R" "echo MIDDLE-RAN"; rc=$?
+{ [ "$rc" -eq 2 ] && grep -q 'GATES_ONLY_GUARD must not be set in CI' "$tmp/out" && ! grep -q MIDDLE-RAN "$tmp/out" && ! grep -q '^gates ok' "$tmp/out"; } && ok "N1b: GATES_ONLY_GUARD with GITHUB_ACTIONS=true: rc 2, no gate ran, no 'gates ok'" || bad "N1b: GITHUB_ACTIONS=true, rc $rc"
+GITHUB_ACTIONS=false run "$tmp/real" "$R" "true"; rc=$?
+[ "$rc" -eq 2 ] && ok "N1b: GITHUB_ACTIONS=false (any non-empty value) is refused too" || bad "N1b: GITHUB_ACTIONS=false, rc $rc"
+run "$tmp/real" "$R" "true"; rc=$?
+[ "$rc" -eq 0 ] && ok "N1b: without GITHUB_ACTIONS (the self test case) the switch works" || bad "N1b: no GITHUB_ACTIONS, rc $rc"
+sed 's/ && \[ -n "\${GITHUB_ACTIONS:-}" \]/ \&\& [ -n "${GITHUB_ACTIONS_NEVER:-}" ]/' "$here/gates.sh" >"$tmp/real/s/scripts/gates-mut.sh"
+GATES_ONLY_GUARD=1 GATES_GUARD_MIDDLE=true CI=1 GITHUB_ACTIONS=true bash "$tmp/real/s/scripts/gates-mut.sh" "$R" >"$tmp/out" 2>&1; mrc=$?
+[ "$mrc" -eq 0 ] && ok "N1b mutant (refusal off): GATES_ONLY_GUARD in CI runs 'gates ok' (the test sees it)" || bad "N1b mutant: rc $mrc"
+rm -f "$tmp/real/s/scripts/gates-mut.sh"
 if [ "$fails" -eq 0 ]; then echo "test_gates_guard: all ok"; else echo "test_gates_guard: $fails FAILED"; exit 1; fi

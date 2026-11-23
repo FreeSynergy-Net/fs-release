@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Allowlist for the `test-env` input of .github/workflows/check.yml (N1a/N1b of bundle 6): TEST_ENV (one KEY=VALUE per line) is appended to $GITHUB_ENV only when EVERY
+# non-empty line is `TEST_<name>=<value>` (LC_ALL=C: bytes, so a BOM, a non-ASCII or look-alike letter, a blank, a tab, `<<` or a name like BASH_FUNC_git%%, SHELLOPTS, PS4, HOME,
+# XDG_*, RUST*, CARGO_*, PYTHON*, CI, GITHUB_*, FS_*, GATES_* never matches). One hit = red, nothing written. The runner of Actions takes ANY text before the first `=` as a name
+# (it only strips a BOM), so this is an allowlist, never a denylist.
+# The check.yml step cannot call this file (a reusable workflow runs in the checkout of the CALLER, which has no scripts/): its run block is a COPY of everything below the
+# marker line, and scripts/test_check_test_env.sh fails when the copy and this file differ.
+#   TEST_ENV=... GITHUB_ENV=<file> scripts/check-test-env
+# --- body (the check.yml block is a copy of the lines below) ---
+export LC_ALL=C
+n=0; bad=""
+while IFS= read -r line || [ -n "$line" ]; do
+  n=$((n + 1))
+  if [ -z "$line" ]; then continue; fi
+  if ! [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || ! [[ "$line" =~ ^TEST_[A-Za-z0-9_]+= ]]; then bad="$bad $n"; fi
+done <<< "$TEST_ENV"
+if [ -n "$bad" ]; then
+  echo "::error::test-env refused (line(s)$bad): every line must be TEST_<NAME>=<value> (letters, digits, underscore; nothing else, no BOM, no blank before the name, no <<); nothing was written"
+  exit 1
+fi
+printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"

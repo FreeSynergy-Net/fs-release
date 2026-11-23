@@ -60,10 +60,19 @@ jobs:
         if: inputs.test-env != ''
         env:
           TEST_ENV: ${{ inputs.test-env }}
-        # N1: test-env must not set the variables the gates trust (CI, GITHUB_*, RUNNER_*, FS_*, GATES_*, GIT_*, PATH, BASH_ENV, ENV, LD_*): a hit is red, nothing is written
+        # N1a/N1b: ALLOWLIST. Every line of test-env must be TEST_<NAME>=<value> (bytes, LC_ALL=C); one other line is red and nothing is written. The block below is a copy of the body of
+        # scripts/check-test-env (a reusable workflow cannot call a script of fs-release); scripts/test_check_test_env.sh runs THIS block and fails when the copy differs from the script
         run: |
-          if printf '%s\n' "$TEST_ENV" | grep -qiE '^[[:space:]]*(CI|GITHUB_[A-Z0-9_]*|RUNNER_[A-Z0-9_]*|FS_[A-Z0-9_]*|GATES_[A-Z0-9_]*|GIT_[A-Z0-9_]*|LD_[A-Z0-9_]*|PATH|BASH_ENV|ENV)[[:space:]]*(=|<<)'; then
-            echo "::error::test-env must not set CI, GITHUB_*, RUNNER_*, FS_*, GATES_*, GIT_*, LD_*, PATH, BASH_ENV or ENV (the gates trust them)"; exit 1
+          export LC_ALL=C
+          n=0; bad=""
+          while IFS= read -r line || [ -n "$line" ]; do
+            n=$((n + 1))
+            if [ -z "$line" ]; then continue; fi
+            if ! [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || ! [[ "$line" =~ ^TEST_[A-Za-z0-9_]+= ]]; then bad="$bad $n"; fi
+          done <<< "$TEST_ENV"
+          if [ -n "$bad" ]; then
+            echo "::error::test-env refused (line(s)$bad): every line must be TEST_<NAME>=<value> (letters, digits, underscore; nothing else, no BOM, no blank before the name, no <<); nothing was written"
+            exit 1
           fi
           printf '%s\n' "$TEST_ENV" >> "$GITHUB_ENV"
       # CI cost: on a branch `unreviewed/*` the TEST gate runs only the crates that changed against main and their dependants (scripts/affected_crates.py, via the gates input diff-base);

@@ -52,7 +52,7 @@ chk "no 'CI-gleich: ja' in the output code" bash -c "! grep -q 'CI-gleich: ja' '
 chk "the Beleg wording never prints the gates.sh narrowed line (test_affected_crates mutant)" bash -c "! grep -q 'test NARROWED' '$here/lib_gates_list.sh'"
 # 1. foreign toolchain: NEIN + what did not run + counter-probe + head and time
 run "$G" "$tmp/bin" --like-ci "$app"
-chk "foreign toolchain: NEIN, the proof is the branch CI incl. windows, toolchain named as not CI-equal" bash -c "grep -q 'CI-gleich: NEIN - Zweig-CI am genauen Kopf (inkl. windows) ist der Beleg' '$tmp/o.txt' && grep -q 'lokal NICHT gelaufen: toolchain: Toolchain 1.0.0 nicht verfuegbar -> NICHT CI-gleich' '$tmp/o.txt' && grep -q 'lokal gelaufen: fmt=0' '$tmp/o.txt' && ! grep -q 'CI-gleich: ja' '$tmp/o.txt'"
+chk "foreign toolchain: NEIN, the proof is the branch CI incl. windows, toolchain named as not CI-equal" bash -c "grep -q 'CI-gleich: NEIN - Zweig-CI am genauen Kopf (inkl. windows) ist der Beleg' '$tmp/o.txt' && grep -q 'lokal NICHT gelaufen: toolchain: Toolchain 1.0.0 nicht verfuegbar -> NICHT CI-gleich' '$tmp/o.txt' && grep -q 'lokal gelaufen: identity=[0-9]* fmt=0' '$tmp/o.txt' && ! grep -q 'CI-gleich: ja' '$tmp/o.txt'"
 chk "foreign toolchain: clippy counter-probe with -A of the lib lint" bash -c "grep -q 'clippy-gegenprobe rc=0 with -A clippy::map_unwrap_or' '$tmp/o.txt'"
 chk "Beleg carries the full head and a time stamp, every line the gates-beleg prefix" bash -c "grep -q \"head=$(git -C "$app" rev-parse HEAD); time=20\" '$tmp/o.txt' && ! grep -q '^lokal NICHT' '$tmp/o.txt'"
 # 2. AW18: a REAL lint (format_collect) in a CHANGED test file next to the foreign lib lint must not be allowed away

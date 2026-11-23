@@ -15,7 +15,7 @@ if [ "$ci" = 1 ]; then
     if [ -n "${!v:-}" ]; then echo "identity FAILED: in CI $v must not be set (it would point git at another repo)" >&2; exit 1; fi
   done
   if { [ -n "${FS_IDENTITY_BASE:-}" ] && [ "$FS_IDENTITY_BASE" != origin/main ]; } || { [ -n "${FS_ALLOWED_IDENTITY:-}" ] && [ "$FS_ALLOWED_IDENTITY" != "$default_id" ]; }; then
-    echo "identity FAILED: in CI (CI=true) FS_IDENTITY_BASE and FS_ALLOWED_IDENTITY from the environment must not loosen the gate (only origin/main and the fixed identity count)" >&2
+    echo "identity FAILED: in CI (CI or GITHUB_ACTIONS set) FS_IDENTITY_BASE and FS_ALLOWED_IDENTITY from the environment must not loosen the gate (only origin/main and the fixed identity count)" >&2
     exit 1
   fi
   allowed="$default_id"
