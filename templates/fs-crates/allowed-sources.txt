@@ -1,0 +1,4 @@
+# Allow list of the registry `freesynergy`: which repos may put crates into the index.
+# One line: <owner/repo> <first version> <package> [<package> ...]   (packages in dependency order: a package may depend only on those before it)
+# Only tags >= the first version are taken (older tags are never entered later). Change this file ONLY by a reviewed pull request (CODEOWNERS).
+FreeSynergy-Net/fs-types 0.0.7 fs-types fs-conformance fs-records
