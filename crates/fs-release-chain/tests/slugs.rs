@@ -10,10 +10,10 @@ use support::{git, World};
 #[test]
 fn only_the_two_exact_github_forms_are_accepted() {
     for good in [
-        "https://github.com/FreeSynergy-Net/fs-packages",
-        "https://github.com/FreeSynergy-Net/fs-packages.git",
-        "git@github.com:FreeSynergy-Net/fs-packages.git",
-        "git@github.com:FreeSynergy-Net/fs-packages",
+        "https://github.com/FreeSynergy/fs-packages",
+        "https://github.com/FreeSynergy/fs-packages.git",
+        "git@github.com:FreeSynergy/fs-packages.git",
+        "git@github.com:FreeSynergy/fs-packages",
     ] {
         assert_eq!(
             slug_of(good).as_deref(),
@@ -22,19 +22,19 @@ fn only_the_two_exact_github_forms_are_accepted() {
         );
     }
     for bad in [
-        "https://evil.example/github.com/FreeSynergy-Net/fs-packages",
+        "https://evil.example/github.com/FreeSynergy/fs-packages",
         "https://github.com.evil.example/FreeSynergy/fs-packages",
-        "https://user@github.com/FreeSynergy-Net/fs-packages",
-        "http://github.com/FreeSynergy-Net/fs-packages",
-        "ssh://git@github.com/FreeSynergy-Net/fs-packages",
-        "https://github.com/FreeSynergy-Net/fs-packages/",
-        "https://github.com/FreeSynergy-Net/fs-packages/extra",
-        "https://github.com/FreeSynergy-Net/f\u{0455}-store",
-        "https://github.com/FreeSynergy-Net/fs%2Dstore",
-        "https://github.com/FreeSynergy-Net/fs-packages\0",
-        "https://github.com/FreeSynergy-Net/..",
+        "https://user@github.com/FreeSynergy/fs-packages",
+        "http://github.com/FreeSynergy/fs-packages",
+        "ssh://git@github.com/FreeSynergy/fs-packages",
+        "https://github.com/FreeSynergy/fs-packages/",
+        "https://github.com/FreeSynergy/fs-packages/extra",
+        "https://github.com/FreeSynergy/f\u{0455}-store",
+        "https://github.com/FreeSynergy/fs%2Dstore",
+        "https://github.com/FreeSynergy/fs-packages\0",
+        "https://github.com/FreeSynergy/..",
         "https://github.com/../fs-packages",
-        "https://github.com/FreeSynergy-Net/",
+        "https://github.com/FreeSynergy/",
         "/srv/some/path",
         "",
     ] {

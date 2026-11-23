@@ -13,7 +13,7 @@
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 origin="$tmp/origin"
 export FS_KASKADE_BASE="file://$origin"
-GH="https://github.com/FreeSynergy-Net"
+GH="https://github.com/FreeSynergy"
 
 # newrepo <name>: a bare repo "origin/<name>" and a work clone "work/<name>" on main
 newrepo() {

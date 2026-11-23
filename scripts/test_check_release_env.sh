@@ -31,7 +31,7 @@ chmod +x "$tmp/bin/gh"
 # fx <name> <json>: fixture for an API path, fxe <name> <text>: error answer
 fx() { printf '%s' "$2" >"$M/fx/$1.json"; }
 fxe() { printf '%s' "$2" >"$M/fx/$1.err"; }
-R=repos_FreeSynergy
+R=repos_FreeSynergy-Net
 ENVP="environments_release-signing"
 # mkrepo <short> <variant>
 mkrepo() {
