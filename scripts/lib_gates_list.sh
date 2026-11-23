@@ -18,12 +18,13 @@ gates_ci_diff() {
   [ -n "$4" ] || echo "mode standard: the lint job (shellcheck, actionlint) and the MSRV check did not run (use --like-ci)"
   [ -z "${FS_GATES_SKIP_TEST:-}" ] || echo "test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST)"
   [ -z "${FS_GATES_DIFF_BASE:-}" ] || echo "test NARROWED to the crates changed against $FS_GATES_DIFF_BASE"
+  git -C "$3" merge-base HEAD origin/main >/dev/null 2>&1 || echo "NICHT GEPRUEFT: origin/main fehlt (changed files unknown: clippy findings cannot be assigned to the branch)"
   command -v shellcheck >/dev/null 2>&1 || echo "NICHT GEPRUEFT: shellcheck fehlt (CI job lint)"
   if [ -d "$3/.github/workflows" ]; then
     if ! command -v actionlint >/dev/null 2>&1; then echo "NICHT GEPRUEFT: actionlint fehlt (CI job lint)"
     elif ! gates_tool_version actionlint -version | grep -q "$ACTIONLINT_PIN"; then echo "actionlint version differs from the CI pin $ACTIONLINT_PIN"; fi
   fi
-  if grep -qE '^rust-version[[:space:]]*=' "$3/Cargo.toml" 2>/dev/null && ! command -v rustup >/dev/null 2>&1; then echo "NICHT GEPRUEFT: MSRV (rust-version in Cargo.toml; no rustup, CI msrv job decides)"; fi
+  if grep -qE '^rust-version[[:space:]]*=' "$3/Cargo.toml" 2>/dev/null && ! command -v rustup >/dev/null 2>&1; then echo "NICHT GEPRUEFT: MSRV (rust-version in Cargo.toml; no rustup; CI takes the msrv INPUT of the caller, which may differ from Cargo.toml)"; fi
 }
 # gates_lint_shell / gates_lint_actions <root>: the lint job of CI: the shellcheck line of .github/workflows/lint.yml itself (same files, same flags), else all tracked *.sh; actionlint over the workflows.
 gates_lint_shell() {
@@ -32,23 +33,31 @@ gates_lint_shell() {
   if [ -n "$cmd" ]; then bash -c "$cmd"; else git ls-files -z '*.sh' | xargs -0 -r shellcheck -x -S warning; fi
 }
 gates_lint_actions() { cd "$1" && actionlint; }
-# gates_clippy_probe <root>: under a foreign toolchain the lints of the LIB errors (-D warnings) hide the test targets (AW18). Re-run clippy with exactly those lints allowed (-A), so the test targets are checked;
-# prints the result and every finding in a file CHANGED against origin/main. Never green by itself: the first clippy rc stays a finding.
+# gates_clippy_probe <root>: under a foreign toolchain the lints of the LIB errors (-D warnings) hide the test targets (AW18). Re-run clippy with -A ONLY for lints whose every location in the first run is in an
+# UNCHANGED file (changed against origin/main); a lint that also occurs in a changed file is never allowed. Findings of the probe are listed, files changed against origin/main marked "CHANGED file". Never green by
+# itself: the first clippy rc stays a finding. No origin/main = "NICHT GEPRUEFT" (and gates_ci_diff says NEIN).
 # shellcheck disable=SC2154 # finding_work is set by gates.sh (sourced)
 gates_clippy_probe() {
-  local root="$1" out="$finding_work/clippy.out" po="$finding_work/probe.out" lints=() l rc=0 base changed
+  local root="$1" out="$finding_work/clippy.out" po="$finding_work/probe.out" lints=() l f rc=0 base changed
+  declare -A bad=() seen=()
   [ -r "$out" ] && [ "$(gates_read_rc "$out.rc")" != 0 ] || return 0
-  while read -r l; do [ -n "$l" ] && lints+=(-A "clippy::$l"); done < <(grep -oE 'index\.html#[a-z0-9_]+' "$out" | sed 's/.*#//' | sort -u)
-  if [ "${#lints[@]}" -eq 0 ]; then echo "gates-beleg: clippy: Testziele nicht geprueft (red without a lint name to allow)"; return 0; fi
-  (cd "$root" && cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic "${lints[@]}") >"$po" 2>&1 || rc=$?
-  echo "gates-beleg: clippy-gegenprobe rc=$rc with ${lints[*]} (test targets checked; first clippy stays red)"
   base="$(git -C "$root" merge-base HEAD origin/main 2>/dev/null || true)"
-  if [ "$rc" = 0 ]; then echo "gates-beleg: clippy-gegenprobe: no finding beyond the foreign-toolchain lints"; return 0; fi
-  changed=""; [ -z "$base" ] || changed="$(git -C "$root" diff --name-only "$base")"
-  echo "gates-beleg: clippy-gegenprobe RED: Testziele/Dateien mit Befund (never 'toolchain'):"
+  if [ -z "$base" ]; then echo "gates-beleg: clippy: Testziele nicht geprueft (NICHT GEPRUEFT: origin/main fehlt, changed files unknown)"; return 0; fi
+  changed="$(git -C "$root" diff --name-only "$base")"
+  while read -r l f; do
+    seen[$l]=1
+    if printf '%s\n' "$changed" | grep -qFx -- "$f"; then bad[$l]=1; fi
+  done < <(awk '/^ *--> /{f=$2; sub(/:.*/,"",f)} /index\.html#/{l=$0; sub(/.*#/,"",l); print l, f}' "$out")
+  for l in "${!seen[@]}"; do if [ -z "${bad[$l]:-}" ]; then lints+=(-A "clippy::$l"); fi; done
+  if [ "${#lints[@]}" -eq 0 ]; then echo "gates-beleg: clippy: Testziele nicht geprueft (no lint that is only in unchanged files to allow); lints in changed files: ${!bad[*]}"; return 0; fi
+  (cd "$root" && cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic "${lints[@]}") >"$po" 2>&1 || rc=$?
+  echo "gates-beleg: clippy-gegenprobe rc=$rc with ${lints[*]} (only lints found solely in unchanged files; test targets checked; first clippy stays red)"
+  if [ "$rc" = 0 ]; then echo "gates-beleg: clippy-gegenprobe: no finding beyond the foreign-toolchain lints in unchanged files"; return 0; fi
+  echo "gates-beleg: clippy-gegenprobe ROT/gefunden: files with findings (never 'toolchain'):"
   grep -oE -- '--> [^:]+' "$po" | sed 's/^--> //' | sort -u | while read -r f; do
     if printf '%s\n' "$changed" | grep -qFx -- "$f"; then echo "gates-beleg:   CHANGED file: $f"; else echo "gates-beleg:   $f"; fi
   done
+  for l in "${!bad[@]}"; do echo "gates-beleg:   lint in a CHANGED file, not allowed: clippy::$l"; done
 }
 # gates_beleg <root> <want> <have> <like-ci> <step rcs...>: the Beleg block: head + time (a Beleg of an old head cannot pass), toolchain, tool versions, flags, every step with its rc, `CI-gleich: ja/NEIN` + reasons; NEIN = the branch CI at the head is the proof.
 gates_beleg() {
