@@ -245,3 +245,33 @@ fn aufrufer_mutants_are_caught() {
         "mutant case-insensitive: freesynergy-net turns green, caught"
     );
 }
+
+#[test]
+fn aufrufer_nachher_runs_the_rule_on_the_same_repos() {
+    let f = fixture();
+    let bad = caller(&[u(NEW, "main")]);
+    let run = |extra: &[&str]| {
+        let mut a: Vec<String> = ["fs-release", "address", "nachher", "--ref", "HEAD"]
+            .map(String::from)
+            .to_vec();
+        a.extend(extra.iter().map(ToString::to_string));
+        a.push(bad.path().display().to_string());
+        main_with(a)
+    };
+    assert_eq!(
+        run(&[]),
+        0,
+        "without the pair: old-owner check alone is green"
+    );
+    let clone = f.dir.path().display().to_string();
+    assert_eq!(
+        run(&["--neutral", &f.neutral, "--fs-release", &clone]),
+        1,
+        "with the pair: neu@main is red"
+    );
+    assert_eq!(
+        run(&["--neutral", &f.neutral]),
+        2,
+        "neutral without clone is an error"
+    );
+}

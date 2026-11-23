@@ -71,6 +71,12 @@ struct Nachher {
     /// After part 2: the Cargo classes a and b must be empty too.
     #[arg(long)]
     all_classes: bool,
+    /// With `--fs-release`: also run the `aufrufer` rule on the same repos and ref (owner-neutral commit).
+    #[arg(long, requires = "fs_release")]
+    neutral: Option<String>,
+    /// fs-release clone for the `aufrufer` rule.
+    #[arg(long = "fs-release", requires = "neutral")]
+    fs_release: Option<PathBuf>,
 }
 
 /// Runs the command, prints the result and returns the exit code (0 ok, 1 red, 2 error).
@@ -78,7 +84,7 @@ struct Nachher {
 pub fn run(args: &AddressArgs) -> i32 {
     match &args.action {
         Action::Bestand(c) => stock(c, false, false),
-        Action::Nachher(n) => stock(&n.common, true, n.all_classes),
+        Action::Nachher(n) => nachher(n),
         Action::Aufrufer(a) => aufrufer(&a.neutral, &a.fs_release, &a.git_ref, &a.dirs),
         Action::Ersetzen(c) => replace(c),
     }
@@ -109,6 +115,20 @@ fn replace(c: &Common) -> i32 {
         }
     }
     code
+}
+
+fn nachher(n: &Nachher) -> i32 {
+    let code = stock(&n.common, true, n.all_classes);
+    let (Some(neutral), Some(clone)) = (&n.neutral, &n.fs_release) else {
+        println!("aufrufer: NICHT GEPRUEFT (--neutral/--fs-release fehlen)");
+        return code;
+    };
+    let rc = aufrufer(neutral, clone, &n.common.git_ref, &n.common.dirs);
+    if code == 2 || rc == 2 {
+        2
+    } else {
+        i32::from(code != 0 || rc != 0)
+    }
 }
 
 fn aufrufer(neutral: &str, clone: &std::path::Path, git_ref: &str, dirs: &[PathBuf]) -> i32 {
