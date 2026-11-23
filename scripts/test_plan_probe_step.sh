@@ -28,7 +28,8 @@ cat >"$tmp/plan_run.py" <<'PY'
 import os, re, subprocess, sys, yaml
 repo, outputs, cwd = sys.argv[1:4]
 vals = dict(l.rstrip("\n").split("=", 1) for l in open(outputs, encoding="utf-8") if "=" in l)
-step = yaml.safe_load(open(os.path.join(repo, "actions/plan/action.yml"), encoding="utf-8"))["runs"]["steps"][0]
+step = yaml.safe_load(open(os.path.join(repo, "actions/plan/action.yml"), encoding="utf-8"))["runs"]["steps"]
+step = next(x for x in step if x.get("id") == "plan")  # the step that runs plan.py (steps before it, e.g. tag-on-main, have no plan env)
 env = dict(os.environ, GITHUB_OUTPUT=os.devnull)
 for k, v in step["env"].items():
     m = re.fullmatch(r"\$\{\{ inputs\.([a-z-]+) \}\}", v)
