@@ -34,14 +34,14 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: FreeSynergy-Net/fs-documentation
+          repository: FreeSynergy/fs-documentation
           path: .fs-documentation
           persist-credentials: false
-      - run: cargo install --git https://github.com/FreeSynergy-Net/fs-release --tag v0.0.17 --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
+      - run: cargo install --git https://github.com/FreeSynergy/fs-release --tag v0.0.17 --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
       - run: '"$RUNNER_TEMP/fsbp/bin/fs-blueprint" check --repo "$PWD" --talks "$PWD/.fs-documentation" --drift'
   code:
     needs: kind
     if: needs.kind.outputs.code == 'true'
-    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@v0.0.17
+    uses: FreeSynergy/fs-release/.github/workflows/check.yml@v0.0.17
     with:
       blueprint: warn

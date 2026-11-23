@@ -84,7 +84,7 @@ impl World {
             version: "0.0.9".into(),
             release_dir: self.rel(),
             catalog_dir: None,
-            catalog_slug: "FreeSynergy/Catalog".into(),
+            catalog_slug: "FreeSynergy-Net/Catalog".into(),
             approval_dir: self.root().join("freigaben"),
             approval_days: 7,
             today_days: today,

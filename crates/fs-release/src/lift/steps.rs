@@ -3,6 +3,7 @@
 use std::fs;
 
 use fs_release_chain::outcome::Stop;
+use fs_release_chain::owner::OWNERS;
 
 use super::LiftEnv;
 use crate::task::Task;
@@ -107,7 +108,11 @@ impl Task<LiftEnv<'_>> for Lock {
         let mut done = Vec::new();
         for (repo, tag) in wanted(env) {
             if depends_on(env, repo) {
-                if !lock.contains(&format!("github.com/FreeSynergy-Net/{repo}?tag={tag}#")) {
+                // The two known owners (old and new): a lock written before the move names the old one.
+                if !OWNERS
+                    .iter()
+                    .any(|o| lock.contains(&format!("github.com/{o}/{repo}?tag={tag}#")))
+                {
                     return Err(Stop::red(format!(
                         "Cargo.lock does not hold {repo} {tag} after the update"
                     )));

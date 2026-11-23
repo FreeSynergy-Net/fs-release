@@ -5,7 +5,7 @@
 #   scripts/approve-blinc.sh remove <tag>                                  take a tag out again
 #   scripts/approve-blinc.sh replace <tag>   (also: approve-blinc.sh <tag>)  exactly this one tag is approved afterwards
 # Only after the owner (Opus) approved the tag. The full sha is the commit the tag peels to (annotated tag ^{}), read with
-# `git ls-remote` from $FS_BLINC_URL (default https://github.com/FreeSynergy-Net/Blinc); a missing tag is an error. The file
+# `git ls-remote` from $FS_BLINC_URL (default https://github.com/FreeSynergy/Blinc); a missing tag is an error. The file
 # is rewritten atomically (temp file + mv); comment lines stay. An entry with `--expires` gets `# expires YYYY-MM-DD`;
 # the gate is red for everyone once that day has passed. Programs then move with scripts/bump-components.sh and `cargo update`.
 set -euo pipefail
@@ -14,7 +14,7 @@ file="$here/blinc-approved.txt"
 usage() { echo "usage: approve-blinc.sh list | add <tag> [--expires YYYY-MM-DD] | remove <tag> | replace <tag>" >&2; exit 2; }
 check_tag() { [[ "$1" =~ ^fs-blinc-[0-9]+(\.[0-9]+)?$ ]] || { echo "not an fs-blinc tag: $1" >&2; exit 2; }; }
 sha_of() {
-  local url="${FS_BLINC_URL:-https://github.com/FreeSynergy-Net/Blinc}" sha
+  local url="${FS_BLINC_URL:-https://github.com/FreeSynergy/Blinc}" sha
   sha="$(git ls-remote --tags "$url" "refs/tags/$1^{}" | awk '{print $1}')"
   [ -n "$sha" ] || sha="$(git ls-remote --tags "$url" "refs/tags/$1" | awk '{print $1}')"   # lightweight tag
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "tag $1 not found in $url" >&2; exit 1; }

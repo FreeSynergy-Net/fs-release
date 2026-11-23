@@ -39,6 +39,9 @@ fn unpinned_installs_are_red() {
         "      - uses: actions/checkout",
         "    uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.17",
         "      - uses: FreeSynergy-Net/fs-release/actions/sbom@e596ed6",
+        // a third owner is no own repo: it needs its tag in a comment (the two known owners are the only exception)
+        "      - uses: Evil/fs-release/actions/sbom@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7",
+        "      - uses: FreeSynergy-Netx/fs-release/actions/sbom@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7",
     ];
     for l in red {
         assert_eq!(violations("f.yml", l).len(), 1, "should be red: {l}");
@@ -61,6 +64,8 @@ fn pinned_installs_and_non_installs_are_green() {
         "run: cargo build --locked",
         "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
         "      - uses: FreeSynergy-Net/fs-release/actions/sbom@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7",
+        // the old owner stays accepted until part 2 of the address wave is done
+        "      - uses: FreeSynergy/fs-release/actions/sbom@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7",
         "      - uses: ./release/actions/setup-rust",
     ];
     for l in green {

@@ -52,28 +52,28 @@ fn addr(args: &[&str], dir: &Path) -> i32 {
 const MIX: &[(&str, &str)] = &[
     (
         "README.md",
-        "see https://github.com/FreeSynergy-Net/fs-x for more\n",
+        "see https://github.com/FreeSynergy/fs-x for more\n",
     ),
     (
         ".github/workflows/ci.yml",
-        "      - uses: FreeSynergy-Net/fs-release/actions/a@abc\n",
+        "      - uses: FreeSynergy/fs-release/actions/a@abc\n",
     ),
     ("list.toml", "slugs = [\"FreeSynergy/fs-y\"]\n"),
     (
         "Cargo.toml",
-        "dep = { git = \"https://github.com/FreeSynergy-Net/fs-x\" }\n",
+        "dep = { git = \"https://github.com/FreeSynergy/fs-x\" }\n",
     ),
     (
         "Cargo.lock",
-        "source = \"git+https://github.com/FreeSynergy-Net/fs-x#abc\"\n",
+        "source = \"git+https://github.com/FreeSynergy/fs-x#abc\"\n",
     ),
     (
         "scripts/lock-sources.toml",
-        "fs-types = \"https://github.com/FreeSynergy-Net/fs-types\"\n",
+        "fs-types = \"https://github.com/FreeSynergy/fs-types\"\n",
     ),
     (
         ".cargo/config.toml",
-        "[patch.\"https://github.com/FreeSynergy-Net/fs-x\"]\n",
+        "[patch.\"https://github.com/FreeSynergy/fs-x\"]\n",
     ),
 ];
 
@@ -202,7 +202,7 @@ fn address_cargo_sources_and_lock_sources_stay() {
 
 #[test]
 fn address_stale_allow_entry_is_red() {
-    let r = repo(&[("README.md", "see https://github.com/FreeSynergy-Net/fs-x\n")]);
+    let r = repo(&[("README.md", "see https://github.com/FreeSynergy/fs-x\n")]);
     let allow = r.path().join("allow.json");
     fs::write(
         &allow,
@@ -246,12 +246,12 @@ fn address_stale_allow_entry_is_red() {
 fn address_mention_scanner_forms() {
     let o = "FreeSynergy";
     let kinds = |l: &str| mentions(l, o).iter().map(|m| m.kind).collect::<Vec<_>>();
-    assert_eq!(kinds("git@github.com:FreeSynergy-Net/fs-x.git"), [Kind::Safe]);
+    assert_eq!(kinds("git@github.com:FreeSynergy/fs-x.git"), [Kind::Safe]);
     assert_eq!(
-        kinds("repository: FreeSynergy-Net/fs-documentation"),
+        kinds("repository: FreeSynergy/fs-documentation"),
         [Kind::Safe]
     );
-    assert_eq!(kinds("gh api -R FreeSynergy-Net/Catalog"), [Kind::Safe]);
+    assert_eq!(kinds("gh api -R FreeSynergy/Catalog"), [Kind::Safe]);
     assert_eq!(kinds("ORG = \"FreeSynergy\""), [Kind::Safe]);
     assert_eq!(kinds("x = \"FreeSynergy/fs-y\""), [Kind::Other]);
     assert_eq!(kinds("docker pull ghcr.io/freesynergy/img"), [Kind::Ghcr]);
@@ -268,7 +268,7 @@ fn address_mention_scanner_forms() {
         assert!(kinds(l).is_empty(), "{l}");
     }
     // a half-swapped line still counts, and the swap leaves the new owner alone.
-    let mixed = "a github.com/FreeSynergy-Net/x b github.com/FreeSynergy-Net/y";
+    let mixed = "a github.com/FreeSynergy-Net/x b github.com/FreeSynergy/y";
     assert_eq!(kinds(mixed), [Kind::Safe]);
     assert_eq!(
         swap_safe(mixed, o, "FreeSynergy-Net").unwrap(),

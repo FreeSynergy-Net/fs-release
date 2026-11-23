@@ -3,6 +3,7 @@
 use std::fs;
 use std::path::Path;
 
+use fs_release_chain::owner::OWNERS;
 use fs_release_chain::sys::{Cmd, Runner};
 use serde::Serialize;
 
@@ -102,10 +103,11 @@ pub fn start(opts: &LiftOpts, runner: &dyn Runner) -> Report {
 fn pins_of(lock: &str) -> Vec<Pin> {
     let mut pins: Vec<Pin> = Vec::new();
     for line in lock.lines() {
-        let Some(src) = line
-            .trim()
-            .strip_prefix("source = \"git+https://github.com/FreeSynergy-Net/")
-        else {
+        // The two known owners (old and new), never "any owner": the old one stays until part 2 of the address wave is done.
+        let Some(src) = OWNERS.iter().find_map(|o| {
+            line.trim()
+                .strip_prefix(format!("source = \"git+https://github.com/{o}/").as_str())
+        }) else {
             continue;
         };
         let src = src.trim_end_matches('"');

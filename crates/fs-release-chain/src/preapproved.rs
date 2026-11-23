@@ -6,8 +6,8 @@ use crate::ctx::Ctx;
 use crate::git;
 use crate::meta::Reach;
 use crate::origin::configured_slug;
-use crate::owner::{is_release_repo, same_repo, OWNERS, RELEASE_REPO};
 use crate::outcome::Stop;
+use crate::owner::{is_release_repo, same_repo, OWNERS, RELEASE_REPO};
 
 /// The one ref the list is read from, whatever `--base` the run targets (not settable from the command line).
 pub const LIST_BRANCH: &str = "main";
@@ -91,7 +91,12 @@ impl Preapproved {
                 "the Opus JA entry (`public_ok`) in .fs/preapproved.toml: public reach is locked",
             ));
         }
-        if reach == Reach::Public && !self.catalog_targets.iter().any(|r| same_repo(r, catalog_slug)) {
+        if reach == Reach::Public
+            && !self
+                .catalog_targets
+                .iter()
+                .any(|r| same_repo(r, catalog_slug))
+        {
             return Err(Stop::halt(
                 "catalog-not-preapproved",
                 format!("{catalog_slug} in `catalog_targets` of .fs/preapproved.toml"),

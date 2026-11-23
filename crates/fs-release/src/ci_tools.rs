@@ -8,6 +8,8 @@
 use std::fs;
 use std::path::Path;
 
+use fs_release_chain::owner::OWNERS;
+
 /// `name@MAJOR.MINOR.PATCH` with a crate name of `[a-z0-9_-]`.
 fn is_pinned(tool: &str) -> bool {
     let Some((name, ver)) = tool.split_once('@') else {
@@ -109,7 +111,10 @@ fn uses_line(line: &str) -> Option<String> {
             "`uses: {name}@{r}` is not pinned to a full commit SHA"
         ));
     }
-    let own = name.starts_with("FreeSynergy/fs-release/");
+    // Our own repo under either known owner (the old one stays until part 2 of the address wave is done), never any other owner.
+    let own = OWNERS
+        .iter()
+        .any(|o| name.starts_with(&format!("{o}/fs-release/")));
     (!own && comment.trim().is_empty())
         .then(|| format!("`uses: {name}@<sha>` names no tag in a comment (# vX.Y.Z)"))
 }

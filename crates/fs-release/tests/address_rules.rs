@@ -104,7 +104,7 @@ fn address_global_allow_entry_does_not_make_a_run_for_one_repo_red() {
 
 #[test]
 fn address_too_broad_unscoped_allow_entry_is_refused() {
-    let r = repo(&[("README.md", "see https://github.com/FreeSynergy-Net/fs-x\n")]);
+    let r = repo(&[("README.md", "see https://github.com/FreeSynergy/fs-x\n")]);
     let allow = r.path().join("../allow-broad.json");
     let run = |json: &str| {
         fs::write(&allow, json).unwrap();
@@ -155,10 +155,10 @@ fn address_shell_default_value_is_found_but_xdg_and_prose_are_not() {
             .collect::<Vec<_>>()
     };
     assert_eq!(
-        kinds("REPO=\"${GITHUB_REPOSITORY:-FreeSynergy-Net/Catalog}\""),
+        kinds("REPO=\"${GITHUB_REPOSITORY:-FreeSynergy/Catalog}\""),
         [Kind::Safe]
     );
-    assert_eq!(kinds("x=${R:=FreeSynergy-Net/fs-x}"), [Kind::Safe]);
+    assert_eq!(kinds("x=${R:=FreeSynergy/fs-x}"), [Kind::Safe]);
     for l in [
         "~/.config/freesynergy/tasks",
         "dir=${XDG:-/home/x/.config/freesynergy/tasks}",
@@ -172,14 +172,14 @@ fn address_shell_default_value_is_found_but_xdg_and_prose_are_not() {
 
 #[test]
 fn address_lock_fixtures_are_cargo_sources_and_stay() {
-    let fx = "source = \"git+https://github.com/FreeSynergy-Net/fs-x#abc\"\n";
+    let fx = "source = \"git+https://github.com/FreeSynergy/fs-x#abc\"\n";
     let r = repo(&[
         ("tests/fixtures/lock-sources/green.lock", fx),
         (
             "tests/packaging/rules.sh",
-            "[patch.\"https://github.com/FreeSynergy-Net/fs-x\"]\n",
+            "[patch.\"https://github.com/FreeSynergy/fs-x\"]\n",
         ),
-        ("README.md", "https://github.com/FreeSynergy-Net/fs-x\n"),
+        ("README.md", "https://github.com/FreeSynergy/fs-x\n"),
     ]);
     assert_eq!(addr(&["ersetzen"], &[r.path()]), 0);
     assert_eq!(

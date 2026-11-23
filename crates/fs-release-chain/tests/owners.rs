@@ -66,12 +66,22 @@ fn list(repos: &[&str]) -> Preapproved {
 fn the_list_holds_for_the_repo_under_either_known_owner_but_not_for_a_third_owner() {
     let p = list(&[&format!("{NEW}/fs-tasks")]);
     for slug in [format!("{NEW}/fs-tasks"), format!("{OLD}/fs-tasks")] {
-        assert!(p.allows(&slug, &format!("{OLD}/Catalog"), Reach::Public).is_ok(), "{slug}");
+        assert!(
+            p.allows(&slug, &format!("{OLD}/Catalog"), Reach::Public)
+                .is_ok(),
+            "{slug}"
+        );
     }
     for slug in ["Evil/fs-tasks", "FreeSynergy-Netx/fs-tasks"] {
-        assert!(p.allows(slug, &format!("{NEW}/Catalog"), Reach::Shared).is_err(), "{slug}");
+        assert!(
+            p.allows(slug, &format!("{NEW}/Catalog"), Reach::Shared)
+                .is_err(),
+            "{slug}"
+        );
     }
-    assert!(p.allows(&format!("{NEW}/fs-tasks"), "Evil/Catalog", Reach::Public).is_err());
+    assert!(p
+        .allows(&format!("{NEW}/fs-tasks"), "Evil/Catalog", Reach::Public)
+        .is_err());
 }
 
 #[test]
@@ -84,7 +94,10 @@ fn a_release_dir_whose_origin_is_fs_release_of_the_new_owner_is_accepted() {
     let bare = w.root().join("rel-origin.git");
     let url = format!("https://github.com/{NEW}/fs-release.git");
     git(&rel, &["config", "remote.origin.url", &url]);
-    git(&rel, &["config", &format!("url.{}.insteadOf", bare.display()), &url]);
+    git(
+        &rel,
+        &["config", &format!("url.{}.insteadOf", bare.display()), &url],
+    );
     let o = w.run_names(Reach::Shared, &["review".to_string()]);
     assert!(
         !matches!(&o, Outcome::Red { line, .. } if line.contains("not fs-release")),

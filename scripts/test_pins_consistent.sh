@@ -17,7 +17,7 @@ bad() { echo "FAIL $1"; fails=$((fails + 1)); }
 refs() {
   local f
   for f in "$1"/*.yml; do
-    grep -vE '^[[:space:]]*#' "$f" | grep -oE 'uses:[[:space:]]*FreeSynergy/fs-release/[^[:space:]@]+@[^[:space:]]+' | sed -E 's/.*@/'"$(basename "$f")"':/'
+    grep -vE '^[[:space:]]*#' "$f" | grep -oE 'uses:[[:space:]]*(FreeSynergy-Net|FreeSynergy)/fs-release/[^[:space:]@]+@[^[:space:]]+' | sed -E 's/.*@/'"$(basename "$f")"':/'
   done
 }
 # check <workflows dir>: 0 = consistent (at least one internal use, all refs are one and the same 40-char SHA)

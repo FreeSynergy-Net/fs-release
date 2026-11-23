@@ -2,7 +2,7 @@
 # Self test of scripts/set_components_tag.py for the V1+ lift (ADR 0092/0093): fixture like fs-maps (workspace root + 3 crates, `fs-types` over the repo
 # fs-interfaces in every form: workspace table, `.workspace = true`, `[dependencies.x]` table, `package =` alias with rev).
 #  - lifting fs-interfaces NEVER touches fs-types (name or package), but moves the real fs-interfaces entries;
-#  - `--move fs-types <tag>` puts every fs-types entry on github.com/FreeSynergy-Net/fs-types at the tag (rev removed), leaves fs-interfaces alone,
+#  - `--move fs-types <tag>` puts every fs-types entry on github.com/FreeSynergy/fs-types at the tag (rev removed), leaves fs-interfaces alone,
 #    and afterwards no fs-types points at fs-interfaces; idempotent; another URL (a fork, a rev pin elsewhere) is an error and nothing is written;
 #  - mutants (protection removed, URL check removed, URL not replaced, alias ignored) must turn the suite red.
 #   bash scripts/test_set_components_tag.sh
@@ -14,8 +14,8 @@ trap 'rm -rf "$tmp"; rmdir "$here/../.test-tmp" 2>/dev/null' EXIT
 fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
-IFC='https://github.com/FreeSynergy-Net/fs-interfaces'
-TYP='https://github.com/FreeSynergy-Net/fs-types'
+IFC='https://github.com/FreeSynergy/fs-interfaces'
+TYP='https://github.com/FreeSynergy/fs-types'
 
 # mkfx <dir>: the fs-maps-like workspace
 mkfx() {

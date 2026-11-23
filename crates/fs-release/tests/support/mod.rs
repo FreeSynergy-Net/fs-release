@@ -116,7 +116,7 @@ impl World {
                 ("fs-blinc-4", "blinc-fork", ""),
             ],
         );
-        let dep = "blinc-core = { git = \"https://github.com/FreeSynergy-Net/Blinc\", tag = \"fs-blinc-3\" }\n";
+        let dep = "blinc-core = { git = \"https://github.com/FreeSynergy/Blinc\", tag = \"fs-blinc-3\" }\n";
         upstream(
             &r.join("up/fs-components"),
             &[
@@ -139,7 +139,7 @@ impl World {
         for n in ["fs-components", "fs-interfaces", "fs-types", "Blinc"] {
             let _ = writeln!(
                 cfg,
-                "[url \"{}\"]\n\tinsteadOf = https://github.com/FreeSynergy-Net/{n}",
+                "[url \"{}\"]\n\tinsteadOf = https://github.com/FreeSynergy/{n}",
                 r.join("up").join(n).display()
             );
         }
@@ -202,13 +202,13 @@ impl World {
     fn program(&self) {
         let w = self.work();
         fs::create_dir_all(w.join("crates")).unwrap();
-        let comp = "fs-components = { git = \"https://github.com/FreeSynergy-Net/fs-components\", tag = \"v0.1.0\" }";
+        let comp = "fs-components = { git = \"https://github.com/FreeSynergy/fs-components\", tag = \"v0.1.0\" }";
         fs::write(
             w.join("Cargo.toml"),
             format!("[workspace]\nresolver = \"2\"\nmembers = [\"crates/a\", \"crates/b\"]\n\n[workspace.dependencies]\n{comp}\n"),
         )
         .unwrap();
-        crate_files(&w.join("crates/a"), "demo-a", "fs-components.workspace = true\nfs-interfaces = { git = \"https://github.com/FreeSynergy-Net/fs-interfaces\", tag = \"v0.1.0\" }\n");
+        crate_files(&w.join("crates/a"), "demo-a", "fs-components.workspace = true\nfs-interfaces = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.1.0\" }\n");
         crate_files(&w.join("crates/b"), "demo-b", &format!("{comp}\n"));
         fs::write(w.join(".gitignore"), "target/\n").unwrap();
         git(&w, &["init", "--quiet", "-b", "main"]);
@@ -281,7 +281,7 @@ impl World {
     pub fn with_types_over_interfaces(&self) {
         let p = self.work().join("crates/a/Cargo.toml");
         let t = fs::read_to_string(&p).unwrap();
-        let dep = "fs-types = { git = \"https://github.com/FreeSynergy-Net/fs-interfaces\", tag = \"v0.1.0\" }\n";
+        let dep = "fs-types = { git = \"https://github.com/FreeSynergy/fs-interfaces\", tag = \"v0.1.0\" }\n";
         fs::write(&p, format!("{t}{dep}")).unwrap();
         git(
             &self.work(),

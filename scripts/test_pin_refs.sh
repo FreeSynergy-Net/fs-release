@@ -33,7 +33,7 @@ bad_refs() {
 
 sha=0123456789abcdef0123456789abcdef01234567
 mk "$tmp/real" "$here/pin-refs.sh"
-uses_before="$(git -C "$tmp/real" grep -hE '^[[:space:]]*(-[[:space:]]+)?uses:.*FreeSynergy/fs-release/' | wc -l)"
+uses_before="$(git -C "$tmp/real" grep -hE '^[[:space:]]*(-[[:space:]]+)?uses:.*FreeSynergy-Net/fs-release/' | wc -l)"
 bash "$tmp/real/scripts/pin-refs.sh" "$sha" >/dev/null; rc=$?
 [ "$rc" -eq 0 ] && ok "valid SHA rc 0" || bad "valid SHA rc=$rc"
 changed="$(git -C "$tmp/real" diff -U0 | grep -c '^+[^+]')"
@@ -74,6 +74,8 @@ jobs:
     - uses: FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.6
     - uses: $checkout
     - uses: FreeSynergy-Net/fs-release/actions/sbom@$foreign_sha # pinned
+    - uses: FreeSynergy/fs-release/actions/oldowner@main # the old owner is pinned too (until part 2 of the address wave is done)
+    - uses: Evil/fs-release/actions/x@main # a third owner never
   ref: FreeSynergy/fs-release/.github/workflows/check.yml@main
 YML
   echo "not a workflow" >"$1/.github/workflows/notes.txt"
@@ -85,8 +87,9 @@ dir_checks() {
   mkforeign "$d"
   out="$(cd "$tmp" && bash "$s" --dir "$d" v0.0.10 2>&1)"; rc=$?
   [ "$rc" -eq 0 ] && ok "$l --dir rc 0" || bad "$l --dir rc=$rc"
-  n="$(git -C "$d" grep -hE '^[[:space:]]*(-[[:space:]]+)?uses: FreeSynergy-Net/fs-release/[^@]*@v0.0.10( |$)' | wc -l)"
-  [ "$n" -eq 3 ] && ok "$l 3 fs-release uses: lines now @v0.0.10" || bad "$l uses: lines @v0.0.10: $n (want 3)"
+  n="$(git -C "$d" grep -hE '^[[:space:]]*(-[[:space:]]+)?uses: (FreeSynergy-Net|FreeSynergy)/fs-release/[^@]*@v0.0.10( |$)' | wc -l)"
+  [ "$n" -eq 4 ] && ok "$l 4 fs-release uses: lines (both owners) now @v0.0.10" || bad "$l uses: lines @v0.0.10: $n (want 4)"
+  git -C "$d" grep -q 'uses: Evil/fs-release/actions/x@main # a third owner never' && ok "$l a third owner's uses: line untouched" || bad "$l a third owner's line was changed"
   git -C "$d" grep -q "uses: $checkout" && ok "$l foreign action untouched" || bad "$l foreign action changed"
   git -C "$d" grep -q '# comment: FreeSynergy/fs-release/.github/workflows/check.yml@main' && git -C "$d" grep -q '# note: uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@main (old)' && git -C "$d" grep -q 'note: FreeSynergy/fs-release/x@main' && git -C "$d" grep -q '  ref: FreeSynergy/fs-release/.github/workflows/check.yml@main' && ok "$l comment and non-uses lines untouched" || bad "$l comment or non-uses line changed"
   git -C "$d" grep -q '@v0.0.10 # pinned' && ok "$l trailing comment of a uses: line kept" || bad "$l trailing comment lost"
