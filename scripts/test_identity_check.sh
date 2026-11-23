@@ -23,6 +23,16 @@ c $OK $OK four; run; chk "foreign commit in the middle of the range: red" test $
 git -C "$tmp/r" branch -f base HEAD; run; chk "empty range: green" test $rc -eq 0
 bash "$tool" "$tmp/r" nonexistent >/dev/null 2>&1; chk "missing base: rc 2" test $? -eq 2
 FS_ALLOWED_IDENTITY=other@example.org bash "$tool" "$tmp/r" HEAD~1 >/dev/null 2>&1; chk "FS_ALLOWED_IDENTITY is read (other value: red)" test $? -eq 1
+# special characters in the address must never shift the fields (a blank, a TAB): author "ok ok" with a blank + foreign committer, TAB in author, TAB+blank in committer
+git -C "$tmp/r" branch -f base HEAD
+c "$OK $OK" bad@x blank; run; chk "blank in the author address cannot hide a foreign committer: red" test $rc -eq 1
+git -C "$tmp/r" reset -q --hard HEAD~1; c "$(printf 'x\t%s' "$OK")" "$OK" tab; run; chk "TAB in the author address: red" test $rc -eq 1
+git -C "$tmp/r" reset -q --hard HEAD~1; c "$OK" "$(printf '%s\tx %s' "$OK" "$OK")" tab2; run; chk "TAB and blank in the committer address: red" test $rc -eq 1
+git -C "$tmp/r" reset -q --hard HEAD~1
+# mutant of the old kind (blank separated fields): the blank case turns green, so the test sees the difference
+c "$OK $OK" bad@x blank2; sed 's/-F.\\t. //; s/%x09/ /g; s/NF != 3 || //' "$tool" >"$tmp/old"; run "$tmp/old"; chk "old blank-separated comparison lets the blank address through (green)" test $rc -eq 0
+run; chk "the new tool is red on the same range" test $rc -eq 1
+git -C "$tmp/r" reset -q --hard HEAD~1; git -C "$tmp/r" branch -f base HEAD~2
 # mutant: the comparison always true -> the red cases must turn green (the test sees the difference)
 # shellcheck disable=SC2016
 sed 's/\$2 != ok || \$3 != ok/0/' "$tool" >"$tmp/mut"; git -C "$tmp/r" branch -f base HEAD~2; run "$tmp/mut"; chk "mutant is green where the original is red" test $rc -eq 0

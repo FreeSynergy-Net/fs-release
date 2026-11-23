@@ -2,6 +2,8 @@
 //! the cut of `entscheidung` (connected with `ask` and `record`), checked on the PARSED workflow (steps, switch cases, calls, `if`, `then`), not by text search.
 //! The real file is green; every mutant (a change of the parsed tree) is red.
 
+#[path = "workflows_pflege13/jumps.rs"]
+mod jumps;
 #[path = "workflows_pflege13/model.rs"]
 mod model;
 #[path = "workflows_pflege13/rules.rs"]
@@ -24,7 +26,7 @@ fn the_real_cut_is_connected_and_green() {
     assert_eq!(cut_ok(&load("entscheidung")), Ok(()));
 }
 
-const PR_MUTANTS: [Mut; 26] = [
+const PR_MUTANTS: [Mut; 33] = [
     ("M1 no `if` at pr-hand-text", |d| {
         remove_key(d, "pr-hand-text", "if");
     }),
@@ -100,6 +102,32 @@ const PR_MUTANTS: [Mut; 26] = [
     ("M26 mit-vermerk falls into ohne-vermerk", |d| {
         remove_key(d, "pr-mit-vermerk", "then");
     }),
+    ("X1 pr-ohne-vermerk jumps to pr-freigabe", |d| {
+        set_text(d, "pr-ohne-vermerk", "then", "pr-freigabe");
+    }),
+    ("X2 case andere jumps to pr-freigabe", |d| {
+        set_then(d, "pr-haltung-weiche", "andere", "pr-freigabe");
+    }),
+    ("X5 pr-dubletten jumps to pr-freigabe", |d| {
+        set_text(d, "pr-dubletten", "then", "pr-freigabe");
+    }),
+    ("X4 pr-weiche: first or becomes and", |d| {
+        replace_in_when(d, " or ", " and ");
+    }),
+    ("X6 Blinc condition and false", |d| {
+        set_when(
+            d,
+            "pr-haltung-weiche",
+            "blinc",
+            r#"${ .input.upstream == "blinc" and false }"#,
+        );
+    }),
+    ("K1 no stop for ki == abgelehnt", |d| {
+        drop_case(d, "pr-haltung-weiche", "ziel-lehnt-ki-ab");
+    }),
+    ("K2 ki == abgelehnt goes on", |d| {
+        set_then(d, "pr-haltung-weiche", "ziel-lehnt-ki-ab", "continue");
+    }),
 ];
 
 fn replace_in_when(d: &mut Value, from: &str, to: &str) {
@@ -125,7 +153,7 @@ fn every_pull_request_mutant_is_red() {
     }
 }
 
-const CUT_MUTANTS: [Mut; 6] = [
+const CUT_MUTANTS: [Mut; 7] = [
     ("C1 ask without cut.open", |d| {
         set_text(d, "ask", "if", "${ $context.verdict.open }");
     }),
@@ -134,6 +162,14 @@ const CUT_MUTANTS: [Mut; 6] = [
     }),
     ("C3 ask only by cut", |d| {
         set_text(d, "ask", "if", "${ $context.cut.open }");
+    }),
+    ("X3 ask: or becomes and", |d| {
+        set_text(
+            d,
+            "ask",
+            "if",
+            "${ $context.verdict.open and $context.cut.open }",
+        );
     }),
     ("C4 cut without gate", |d| {
         set_meta(d, "cut", "gate", "none");

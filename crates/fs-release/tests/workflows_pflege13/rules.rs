@@ -1,6 +1,7 @@
 //! The rules the pull request path of `upstream-anfrage` and the cut of `entscheidung` must keep, checked on the parsed tree.
 //! `Err` names the first rule that is broken.
 
+use super::jumps::{exact_cut_ok, exact_ok, jumps_ok};
 use super::model::*;
 use serde_json::Value;
 
@@ -222,7 +223,9 @@ pub fn pr_ok(d: &Value) -> R {
     chain(d)?;
     route(d)?;
     gates_and_attitude(d)?;
-    human(d)
+    human(d)?;
+    exact_ok(d)?;
+    jumps_ok(d)
 }
 
 /// `cut` is connected with `ask` and `record`.
@@ -244,5 +247,6 @@ pub fn cut_ok(d: &Value) -> R {
         with(d, "record", "cut") == "${ $context.cut }",
         "record does not get the cut",
     )?;
+    exact_cut_ok(d)?;
     need(pos(d, "cut") < pos(d, "ask"), "cut after ask")
 }

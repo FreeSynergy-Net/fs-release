@@ -32,12 +32,27 @@ do:
         repo: ${ .input.repo }
         branch: ${ .input.branch }
         head: ${ .input.head }
+      export:
+        as: '${ $context + { ci: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The branch CI of ALL workflows for exactly this head (read only, `scripts/check_job_status.py`, also the Windows jobs) is attached to the file of the review as the finding of the branch CI (standing rule ZWEIG-CI): green, red with the failing job, or still running. Scripts and logs of this step only in the own TMPDIR under a unique name, never in the shared scratchpad ([EIGENES-SKRIPT-EIGENER-ORDNER]). The review does not run the CI again; a red or hanging CI is a finding, a JA never covers a head whose CI nobody read."
+  - ci-beleg-weiche:
+      switch:
+        - ohne-lauf-id:
+            when: '${ $context.ci == null or ($context.ci.runs // [] | length) == 0 or ([$context.ci.runs[] | select(.id == null or .conclusion == null or .headSha != $workflow.input.head)] | length) > 0 }'
+            then: end
+        - belegt:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow (rule CI-BELEG) - the review reads the CI ITSELF at the exact head (`ci-lesen`, `gh run list --json databaseId,name,headSha,conclusion`), it does not take the word of the worker report. A `green` without a run ID, no run at the exact head, or a run of another head is NOT passed on to the review (the step ends here, the report is incomplete); a red run is passed on as a finding (ZWEIG-CI)."
   - read:
       call: review-ai:0.0.17@fs
       with:

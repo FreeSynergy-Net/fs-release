@@ -474,6 +474,9 @@ do:
         freesynergy.net:summary: "Script (no AI), the SAME call as `ki-hinweis` (TEXTS TO THE OUTSIDE (b)): `ki_hinweis` says whether the target allows or asks for the AI note; for a code contribution it is normally yes. The attitude switch below has the last word."
   - pr-haltung-weiche:
       switch:
+        - ziel-lehnt-ki-ab:
+            when: '${ $context.ziel.ki == "abgelehnt" }'
+            then: pr-rot
         - blinc:
             when: '${ .input.upstream == "blinc" }'
             then: pr-ohne-vermerk
@@ -484,7 +487,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow, the rules of the upstream go first (CLAUDE.md of the user, section 8): Blinc has the house rule `NO AI attribution in issue, PR or commit`, so a pull request to Blinc goes to `pr-ohne-vermerk` (NO AI note, no Co-Authored-By); every other upstream goes on to `pr-mit-vermerk` (the AI collaboration is named openly where `ki_hinweis` says so, never hidden, never denied)."
+        freesynergy.net:summary: "Control flow, the rules of the upstream go first (CLAUDE.md of the user, section 8): Blinc has the house rule `NO AI attribution in issue, PR or commit`, a pull request is an AI contribution, so a target that REJECTS AI contributions (`ziel.ki == abgelehnt`, Kanidm) goes to `pr-rot` (held back, nothing is prepared for the human to send); a pull request to Blinc goes to `pr-ohne-vermerk` (NO AI note, no Co-Authored-By); every other upstream goes on to `pr-mit-vermerk` (the AI collaboration is named openly where `ki_hinweis` says so, never hidden, never denied)."
   - pr-mit-vermerk:
       set:
         ki: ${ $context.ki_hinweis == true }

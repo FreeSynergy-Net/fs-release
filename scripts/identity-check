@@ -1,14 +1,30 @@
-#!/usr/bin/env bash
+# Fields are separated by TAB (%x09), never by blank: an address with a blank, a TAB or a line break must not shift the fields (such an address is never equal to FS_ALLOWED_IDENTITY).
+# A TAB or line break in an address makes the line count differ from the commit count: then it is red as well (the commit count is taken from rev-list).
+# Fields are separated by TAB (%x09), never by blank: an address with a blank must not shift the fields. A TAB or line break inside an address changes the line or field count: red as well.
+hits="$(git log --format='%h%x09%ae%x09%ce' "$base..HEAD")" || exit 2
+n="$(git rev-list --count "$base..HEAD")" || exit 2
+n="$(git rev-list --count "$base..HEAD")" || exit 2
+bad="$(awk -F'\t' -v ok="$allowed" 'NF != 3 || $2 != ok || $3 != ok { print $1 }' <<<"$hits")"
+[ "$(grep -c . <<<"$hits")" -eq "$n" ] || bad="$bad count-mismatch"
+[ "$(grep -c . <<<"$hits")" -eq "$n" ] || bad="$bad count"#!/usr/bin/env bash
 # Gate "identity" ([IDENTITAET], docs/usage.md "Identity check before ff"): author AND committer address of EVERY commit of <base>..HEAD must be
 # FS_ALLOWED_IDENTITY (default support@freesynergy.net). Names the commit (short SHA), never the address. rc 0 green, 1 hit, 2 usage/git error.
 #   scripts/identity-check [<repo root>] [<base>]   base default: $FS_IDENTITY_BASE, else origin/main
 set -uo pipefail
-root="${1:-.}"; base="${2:-${FS_IDENTITY_BASE:-origin/main}}"
+root="${1:-.}"
+# In CI (CI=true) a base other than origin/main (FS_IDENTITY_BASE, e.g. set by a caller through `test-env`) can let the gate run empty: it is only allowed with a VISIBLE warning (the self test fixtures use HEAD).
+if [ "${CI:-}" = true ] && [ -n "${FS_IDENTITY_BASE:-}" ] && [ "$FS_IDENTITY_BASE" != origin/main ] && [ -z "${2:-}" ]; then
+  echo "identity WARNING: CI with base FS_IDENTITY_BASE=$FS_IDENTITY_BASE instead of origin/main (the range may be empty)" >&2
+fi
+base="${2:-${FS_IDENTITY_BASE:-origin/main}}"
 allowed="${FS_ALLOWED_IDENTITY:-support@freesynergy.net}"
 cd "$root" || exit 2
 git rev-parse --verify -q "$base^{commit}" >/dev/null || { echo "identity FAILED: base $base not found (fetch it, never skip)" >&2; exit 2; }
-hits="$(git log --format='%h %ae %ce' "$base..HEAD")" || exit 2
-bad="$(awk -v ok="$allowed" '$2 != ok || $3 != ok { print $1 }' <<<"$hits")"
+# Fields are separated by TAB (%x09), never by blank: an address with a blank must not shift the fields. A TAB or line break inside an address changes the line or field count: red as well.
+hits="$(git log --format='%h%x09%ae%x09%ce' "$base..HEAD")" || exit 2
+n="$(git rev-list --count "$base..HEAD")" || exit 2
+bad="$(awk -F'\t' -v ok="$allowed" 'NF != 3 || $2 != ok || $3 != ok { print $1 }' <<<"$hits")"
+[ "$(grep -c . <<<"$hits")" -eq "$n" ] || bad="$bad count-mismatch"
 if [ -n "$bad" ]; then
   echo "identity FAILED: commits with author or committer other than FS_ALLOWED_IDENTITY: $(tr '\n' ' ' <<<"$bad")" >&2
   echo "rewrite the branch as a NEW branch -rN with an equal tree (workflow branch-neu-schreiben), never main or a public tag" >&2
