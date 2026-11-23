@@ -50,8 +50,8 @@ fn upstream_anfrage_sends_only_after_the_rules_and_the_person_approved() {
 fn counter_upstream_anfrage_an_agent_approval_or_a_swapped_order_is_caught() {
     let text = read("upstream-anfrage");
     let ai = text.replacen(
-        "  - approval:\n      call: approve:0.0.17@fs\n      with:\n        draft: ${ $context.draft }\n      metadata:\n        freesynergy.net:actor: human",
-        "  - approval:\n      call: approve:0.0.17@fs\n      with:\n        draft: ${ $context.draft }\n      metadata:\n        freesynergy.net:actor: ai",
+        "  - approval:\n      call: approve:0.0.17@fs\n      with:\n        block: ${ $context.block }\n      metadata:\n        freesynergy.net:actor: human",
+        "  - approval:\n      call: approve:0.0.17@fs\n      with:\n        block: ${ $context.block }\n      metadata:\n        freesynergy.net:actor: ai",
         1,
     );
     assert_ne!(ai, text);

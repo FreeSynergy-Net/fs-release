@@ -5,10 +5,15 @@
 # The agent only prepares the text and the git-bug id; the helper of the strategy sends (agents never call gh or a browser login). Loops are counted: from the third round (`runde` >= 3) `eskalation`.
 # Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence, art`. FS profile: see README.md.
 # TEXTS TO THE OUTSIDE (mandatory for EVERY text that leaves us: issue, PR text, mail, request to Blinc or another upstream; other workflows point here):
-# (a) read the rules of the target (CONTRIBUTING, AI stance, issue template) and cite the place (`ziel-regeln-lesen`); (b) write in the voice of the SENDER (the user), no agent
-# signature or trailer in the text; the AI help is ONE honest sentence when the rules of the target allow or ask for it, never hidden, never scattered; a target that
-# rejects AI contributions (example: Kanidm) gets NOTHING sent and NOTHING prepared without the explicit word of the user (`ki-haltung-weiche`); (c) finished as a copy
-# block in the format of the target, preview checked (`kopierblock`); (d) the sender reads it against and only then it goes out (gate human). A bot or agent never sends itself.
+# (a) read the rules of the target (CONTRIBUTING, AI stance, issue template) and cite the place (`ziel-regeln-lesen`); (b) INFORM, do not advertise, do not nag (decision of the user, 23.11.2026):
+# the AI note stands CLEARLY ONCE at the FIRST contact with a project, as ONE honest sentence or short paragraph inside the text (never a signature, trailer or footer); afterwards only where it makes sense
+# (code contribution, pull request or crate; the rules of the target ask for it; somebody asks). Never hidden when asked, never denied. The memory is ONE list, `workflows/upstream-erstkontakt.txt` (one line per
+# target project: first contact date, source, reaction; step `erstkontakt-lesen`; `erstkontakt-vermerken` sets or updates it after the text was SENT). `ki-haltung-weiche` decides by that entry. A target that
+# rejects AI contributions (example: Kanidm) gets NOTHING sent and NOTHING prepared without the explicit word of the user. (b2) WHO sends is named in the order (`absender`: `mensch` | `bot`). The FIRST contact
+# is always written and sent by the human, in the voice of the user. From the second contact on the bot (Claude) usually writes and sends itself: then the sender is OPENLY the bot and the text is NEVER in the voice of the
+# user. The bot sends only where that is allowed (Blinc: rule 98, git-bug; a target that refuses AI: never; Kanidm: agents and bot NEVER send, the user does; any other target only when its rules cited in `ziel.bot` allow a bot).
+# (c) finished as a copy block in the format of the target; the LOOK is a mandatory gate: the preview in the target format is checked (`kopierblock`, `vorschau-weiche`), without a checked preview nothing goes to the user;
+# (d) the sender reads it against and only then it goes out (gate human, when a human sends). An agent never sends itself except by (b2).
 # Blinc and (d) (decision of the strategy): "the sender reads against" holds when a HUMAN is the sender (every other upstream: steps `approval`, `choose-channel`). At Blinc WE are
 # the sender by THEIR rules and the permission (98) stays: no approval step for Blinc. The steps (a) `ziel-regeln-lesen` and (c) `kopierblock` (format of the target) apply to Blinc too
 # and are never skipped; the gates before them (rules, text gate, proof, duplicates) replace the reading-against there.
@@ -57,7 +62,20 @@ do:
         freesynergy.net:bot-seat: upstream-anfrage.ziel-regeln-lesen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (a), mandatory for every outside text. The agent READS the rules of the target (CONTRIBUTING, code of conduct, AI or LLM stance, issue and PR template, the contributor notes in the README) read only, and cites the place of each finding (file and line or link, at the date read); no citation means not read. Result `ziel` with `ki` (`erlaubt`, `verlangt`, `ohne-vermerk` = the rules forbid an AI note in the text, as at Blinc, or `abgelehnt` = the target refuses AI contributions, as Kanidm), `format` (the format of the target: template fields, language, length) and `fundstellen`. Silent rules count as `erlaubt`."
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (a), mandatory for every outside text. The agent READS the rules of the target (CONTRIBUTING, code of conduct, AI or LLM stance, issue and PR template, the contributor notes in the README) read only, and cites the place of each finding (file and line or link, at the date read); no citation means not read. Result `ziel` with `ki` (`erlaubt`, `verlangt`, `ohne-vermerk` = the rules forbid an AI note in the text, as at Blinc, or `abgelehnt` = the target refuses AI contributions, as Kanidm), `bot` (`erlaubt` only when the cited rules allow a bot or an AI agent to write and send itself; silent rules or none = `nein`), `format` (the format of the target: template fields, language, length) and `fundstellen`. Silent rules count as `erlaubt`."
+  - erstkontakt-lesen:
+      call: first-contact-read:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+        datei: ${ .input.erstkontakt_datei // "workflows/upstream-erstkontakt.txt" }
+      export:
+        as: '${ $context + { erstkontakt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (no AI), read only: finds the line of this target project in the ONE list `workflows/upstream-erstkontakt.txt` (`<owner>/<name> erstkontakt=<date> quelle=... reaktion=...`). Result `erstkontakt` with `vorhanden` (true only with a valid line), `datum` and `reaktion`. No line = first contact. An unreadable or malformed list gives `vorhanden: null`, which counts as NOT known (never a guess): the safe side applies, the sender is the human and the AI note stands."
   - ki-haltung-weiche:
       switch:
         - ki-nein:
@@ -70,7 +88,33 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (a) and (b)) - no `fundstellen` (missing or empty: the rules count as NOT read), a missing `ziel` result or a `ki` value outside the fixed set `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt`; so does a target that rejects AI contributions: nothing is sent and nothing is prepared (no ticket, no draft), unless the explicit word of the user for exactly this target stands in `nutzerwort_ki` (only for `abgelehnt`; the missing citation is never overridden). Only a cited result with a value of the set goes on."
+        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (a) and (b)) - no `fundstellen` (missing or empty: the rules count as NOT read), a missing `ziel` result or a `ki` value outside the fixed set `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt`; so does a target that rejects AI contributions: nothing is sent and nothing is prepared (no ticket, no draft), unless the explicit word of the user for exactly this target stands in `nutzerwort_ki` (only for `abgelehnt`; the missing citation is never overridden). Only a cited result with a value of the set goes on. The AI note for the text is decided right after by `ki-hinweis` from the entry of `erstkontakt-lesen` (first contact: the note stands once, clearly; later only on a condition)."
+  - ki-hinweis:
+      set:
+        erstkontakt_ja: '${ $context.erstkontakt.vorhanden != true }'
+        ki_hinweis: '${ $context.ziel.ki != "ohne-vermerk" and ($context.erstkontakt.vorhanden != true or $context.ziel.ki == "verlangt" or .input.nachfrage == true or (["code", "pull-request", "crate"] | index(.input.bedingung)) != null) }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control data (TEXTS TO THE OUTSIDE (b), decided by the entry of `erstkontakt-lesen`): `erstkontakt_ja` = no valid entry = FIRST contact; `ki_hinweis` = the draft carries the AI note as ONE honest sentence or short paragraph: yes at the first contact, and later only when a condition holds - the rules of the target ask for it (`ziel.ki == verlangt`), somebody asked (`nachfrage`), or the text is a code contribution, pull request or crate (`bedingung` = code | pull-request | crate). Never for `ohne-vermerk` (Blinc: the rules forbid it there); never hidden when asked and never denied (the answer to a question is given by the sender). Nothing is sent by this step."
+  - absender-weiche:
+      switch:
+        - bot-verboten:
+            when: '${ .input.absender == "bot" and (.input.upstream == "kanidm" or $context.ziel.ki == "abgelehnt" or $context.erstkontakt.vorhanden != true or (.input.upstream != "blinc" and $context.ziel.bot != "erlaubt")) }'
+            then: abgelehnt
+        - absender-unklar:
+            when: '${ (["mensch", "bot"] | index(.input.absender)) == null }'
+            then: abgelehnt
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (b2)) - the order names WHO sends: `absender` = `mensch` | `bot`; a missing or other value is held back. The bot as sender is refused (`abgelehnt`) at the FIRST contact (the human writes and sends it), at Kanidm (agents and bot never send themselves), at a target that refuses AI, and at every target except Blinc whose cited rules (`ziel.bot`) do not allow a bot; Blinc stays allowed by rule 98 (git-bug). A text of the bot is openly the bot, never in the voice of the user."
   - belegen:
       call: prove-ai:0.0.17@fs
       with:
@@ -145,6 +189,8 @@ do:
         evidence: ${ $context.belegt }
         ticket: ${ $context.ticket.id }
         ziel: ${ $context.ziel }
+        ki_hinweis: ${ $context.ki_hinweis }
+        absender: ${ .input.absender }
       export:
         as: '${ $context + { draft: . } }'
       metadata:
@@ -153,7 +199,7 @@ do:
         freesynergy.net:bot-seat: upstream-anfrage.draft
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body; it names the git-bug id of the ticket; NO address or personal data, NO AI words except the one honest sentence below, no pull request, no comment in a foreign issue. TEXTS TO THE OUTSIDE (b) - written in the voice of the sender (the user, "we"/"I" as the user would say it), no agent signature, no trailer, no robot footer, no session link; the AI help is stated in exactly ONE honest sentence at the end when `ziel.ki` is `erlaubt` or `verlangt` (never hidden, never repeated per item), and not at all when `ziel.ki` is `ohne-vermerk` (Blinc); the format follows `ziel.format`.
+        freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body; it names the git-bug id of the ticket; NO address or personal data, NO AI words except the one honest AI note below, no pull request, no comment in a foreign issue. TEXTS TO THE OUTSIDE (b) - INFORM, do not advertise, do not nag - when `ki_hinweis` is true (first contact, or a condition of `ki-hinweis`) the text states the AI help ONCE, clearly, as ONE honest sentence or short paragraph inside the text (what the AI did and that a human stands behind or answers) - never a signature, never a trailer, never a robot footer, no session link, never scattered; when `ki_hinweis` is false there is NO AI word (nothing is denied when somebody asks). Voice by `absender` - `mensch` is the voice of the user (we or I as the user would say it), `bot` is OPENLY the bot (Claude), never in the voice of the user, no pretence of a person; the format follows `ziel.format`.
   - rules:
       call: upstream-rules:0.0.17@fs
       with:
@@ -174,6 +220,8 @@ do:
         draft: ${ $context.draft }
         ticket: ${ $context.ticket }
         ziel: ${ $context.ziel }
+        ki_hinweis: ${ $context.ki_hinweis }
+        absender: ${ .input.absender }
       export:
         as: '${ $context + { textcheck: . } }'
       metadata:
@@ -181,7 +229,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - the text gate: the text is ENGLISH, has NO AI words (Claude, Anthropic, AI, LLM, model, agent, robot, bot footer) - except exactly ONE honest AI sentence when `ziel.ki` is `erlaubt` or `verlangt` (two or more AI mentions, a missing sentence when `verlangt`, or any mention when `ohne-vermerk` is a hit) -, NO e-mail address, no phone number, no personal data and no private path, and names the git-bug id; no Co-Authored-By, no session link. Result `textcheck` with `hits` (the broken points) and `runde` (+1 for each jump back from `back-to-draft`)."
+        freesynergy.net:summary: "Script - the text gate: the text is ENGLISH, has NO AI words (Claude, Anthropic, AI, LLM, model, agent, robot, bot footer) - except exactly ONE honest AI note (one sentence or short paragraph, not a signature or trailer) when `ki_hinweis` is true (a missing, repeated or scattered note, or any AI mention when `ki_hinweis` is false or `ziel.ki` is `ohne-vermerk`, is a hit); a text of `absender` bot in the voice of the user, or of `absender` mensch in the voice of the bot, is a hit -, NO e-mail address, no phone number, no personal data and no private path, and names the git-bug id; no Co-Authored-By, no session link. Result `textcheck` with `hits` (the broken points) and `runde` (+1 for each jump back from `back-to-draft`)."
   - back-to-draft:
       switch:
         - runden:
@@ -211,7 +259,20 @@ do:
         freesynergy.net:bot-seat: upstream-anfrage.kopierblock
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (c). The agent sets the clean draft as ONE copy block in the format of the target (GitHub Markdown by default - title, short summary, steps to reproduce, expected / actual, version; the template fields of the target when it has one), with a rendered preview checked for broken lists, fences, links and line breaks. Result `block` with the copy block and the preview check; plain text, ready to paste, without any wrapper or note of ours inside it."
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (c). The agent sets the clean draft as ONE copy block in the format of the target (GitHub Markdown by default - title, short summary, steps to reproduce, expected / actual, version; the template fields of the target when it has one), with a rendered preview IN THE TARGET FORMAT checked for broken lists, fences, links and line breaks (the LOOK is a mandatory gate, `vorschau-weiche`). Result `block` with the copy block and the preview check (`vorschau_ok`); plain text, ready to paste, without any wrapper or note of ours inside it."
+  - vorschau-weiche:
+      switch:
+        - ohne-vorschau:
+            when: '${ $context.block == null or $context.block.vorschau_ok != true }'
+            then: abgelehnt
+        - geprueft:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (c), mandatory gate) - without a copy block whose preview in the target format was checked (`vorschau_ok == true`, a missing result counts as not checked) NOTHING goes to the user or on: `abgelehnt`."
   - blinc-kanal:
       call: blinc-channel:0.0.17@fs
       with:
@@ -263,7 +324,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: Script - sends by the chosen channel, only the approved copy block `block` (exactly what the sender read), only after the YES and the choice (for Blinc without a YES, by rule 98 and the gates above); `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The helper of the strategy runs it; an agent never calls gh or a browser login and never sends itself.
+        freesynergy.net:summary: Script - sends by the chosen channel, only the approved copy block `block` (exactly what the sender read), only after the YES and the choice (for Blinc without a YES, by rule 98 and the gates above); `tracker` creates the issue at the upstream's tracker with the user's account, `git-bug` creates it with git-bug (-F file, labels kind and area) and sends it with `git-bug push bugs` over the SSH remote. Returns the issue id. The helper of the strategy runs it; an agent never calls gh or a browser login. WHO sends is `absender` - a human (first contact always) or, from the second contact on and only where allowed (step `absender-weiche`), openly the bot.
   - hand-text:
       call: hand-text:0.0.17@fs
       if: '${ $context.channel == "direct" }'
@@ -275,6 +336,20 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: Direct contact (Discord, mail) - the person writes and sends the message themselves, with the approved copy block `block` as the template; the machine sends nothing and the agent does nothing in this step.
+  - erstkontakt-vermerken:
+      call: first-contact-note:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+        datei: ${ .input.erstkontakt_datei // "workflows/upstream-erstkontakt.txt" }
+        id: ${ $context.send.id }
+        channel: ${ $context.channel }
+        absender: ${ .input.absender }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Script - AFTER the text was SENT (or the person confirmed that they sent it by `direct`): sets the line of this target project in `workflows/upstream-erstkontakt.txt` when there was none (`erstkontakt=<UTC date>`, `quelle=<issue id or direct>`, `reaktion=offen`), otherwise only updates it; the `reaktion` is added later when an answer arrives (also by `upstream-watch`). One list, one source; nothing is written when nothing was sent."
   - link-ins-ticket:
       call: ticket-link:0.0.17@fs
       with:
@@ -309,7 +384,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Nothing is sent: a pull request or a comment was asked for, the statement is not proven, or a duplicate exists (the link goes into the report; no comment is written in the foreign issue). The strategy reads the reason and decides; a held-back request may come back with proof. This flow ends."
+        freesynergy.net:summary: "Nothing is sent: a pull request or a comment was asked for, the statement is not proven, or a duplicate exists (the link goes into the report; no comment is written in the foreign issue), the preview in the target format was not checked, or the sender `bot` is not allowed here (first contact, Kanidm, a target that refuses AI or a bot) or not named. The strategy reads the reason and decides; a held-back request may come back with proof. This flow ends."
   - ki-abgelehnt:
       set:
         todo: ki-abgelehnt
