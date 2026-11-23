@@ -33,6 +33,7 @@ S
 printf '#!/usr/bin/env bash\necho rustc-stub\n' >"$tmp/bin/rustc"; chmod +x "$tmp/bin/cargo" "$tmp/bin/rustc"
 printf '#!/usr/bin/env bash\nexec "$@"\n' >"$tmp/slot.sh"; chmod +x "$tmp/slot.sh"
 export STUBLOG="$tmp/cargo.log"
+export FS_IDENTITY_BASE=HEAD # fixture repos have no origin/main: the identity gate reads an empty range
 
 # a mechanism folder (scripts + RUST_VERSION) and a repo with its own copy of it (no fs-release tag is pinned: the repo's own scripts count)
 mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; echo 1.0.0 >"$1/RUST_VERSION"; }
@@ -40,14 +41,14 @@ mkrepo() { mkmech "$1"; git init -q -b main "$1"; echo x >"$1/a.txt"; echo "__py
 app="$tmp/app"; mkrepo "$app"
 gates() { # <gates.sh> <list dir> [env...]: stdout+stderr in $tmp/o.txt; the rc is returned
   local g="$1" d="$2"; shift 2
-  : >"$STUBLOG"; env "$@" PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$d" bash "$g" "$app" >"$tmp/o.txt" 2>&1
+  : >"$STUBLOG"; env "$@" PATH="$tmp/bin:$PATH" CI=true FS_IDENTITY_BASE=HEAD FS_GATES_FEHLERLISTE_DIR="$d" bash "$g" "$app" >"$tmp/o.txt" 2>&1
 }
 list() { cat "$1"/fehlerliste-*.md 2>/dev/null; }
 
 # 1. two intentional errors in different steps: both are on the list, the run goes to the end, the exit code is red
 gates "$app/scripts/gates.sh" "$tmp/l1" RED_FMT=1 RED_TEST=1; rc=$?
 chk "two errors: exit code 1" [ "$rc" -eq 1 ]
-chk "two errors: every step ran (an rc line for each of the 7 gates)" [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/o.txt")" -eq 7 ]
+chk "two errors: every step ran (an rc line for each of the 7 gates)" [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/o.txt")" -eq 8 ]
 chk "two errors: both findings are on the list" bash -c "grep -q '\*\*fmt\*\*' '$tmp/l1'/fehlerliste-*.md && grep -q '\*\*test\*\*' '$tmp/l1'/fehlerliste-*.md"
 chk "two errors: the list says 2 findings" grep -q '^2 findings' "$tmp/l1"/fehlerliste-main.md
 chk "two errors: the red rc is printed (fmt rc=1, test rc=101)" bash -c "grep -q '^gate fmt: rc=1' '$tmp/o.txt' && grep -q '^gate test: rc=101' '$tmp/o.txt'"
@@ -184,7 +185,7 @@ PY
     gates) # two errors: a list with both, exit 1, 7 rc lines, nachpruefung
       local dd="$tmp/mm-$RANDOM"; mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m
       : >"$STUBLOG"; env RED_FMT=1 RED_TEST=1 PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$dd" bash "$tmp/app-m/scripts/gates.sh" "$tmp/app-m" >"$tmp/mo.txt" 2>&1; local rc=$?
-      [ "$rc" -eq 1 ] && [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/mo.txt")" -eq 7 ] && grep -q '\*\*fmt\*\*' "$dd"/*.md 2>/dev/null && grep -q '\*\*test\*\*' "$dd"/*.md && grep -q 'nachpruefung: cargo fmt --check' "$dd"/*.md && grep -q 'cargo test .*--no-fail-fast' "$STUBLOG" && [ -z "$(git -C "$tmp/app-m" status --porcelain)" ] && [ ! -e "$tmp/app-m"/fehlerliste-main.md ] || r=1
+      [ "$rc" -eq 1 ] && [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/mo.txt")" -eq 8 ] && grep -q '\*\*fmt\*\*' "$dd"/*.md 2>/dev/null && grep -q '\*\*test\*\*' "$dd"/*.md && grep -q 'nachpruefung: cargo fmt --check' "$dd"/*.md && grep -q 'cargo test .*--no-fail-fast' "$STUBLOG" && [ -z "$(git -C "$tmp/app-m" status --porcelain)" ] && [ ! -e "$tmp/app-m"/fehlerliste-main.md ] || r=1
       ;;
     teil) # the partial check: tick, injection, no gate result, no abort at the first green
       mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m; rm -f "$tmp/PWNED"
