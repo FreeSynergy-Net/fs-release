@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Gate "identity" ([IDENTITAET], docs/usage.md "Identity check before ff"): author AND committer address of EVERY commit of <base>..HEAD must be
+# FS_ALLOWED_IDENTITY (default support@freesynergy.net). Names the commit (short SHA), never the address. rc 0 green, 1 hit, 2 usage/git error.
+#   scripts/identity-check [<repo root>] [<base>]   base default: $FS_IDENTITY_BASE, else origin/main
+set -uo pipefail
+root="${1:-.}"; base="${2:-${FS_IDENTITY_BASE:-origin/main}}"
+allowed="${FS_ALLOWED_IDENTITY:-support@freesynergy.net}"
+cd "$root" || exit 2
+git rev-parse --verify -q "$base^{commit}" >/dev/null || { echo "identity FAILED: base $base not found (fetch it, never skip)" >&2; exit 2; }
+hits="$(git log --format='%h %ae %ce' "$base..HEAD")" || exit 2
+bad="$(awk -v ok="$allowed" '$2 != ok || $3 != ok { print $1 }' <<<"$hits")"
+if [ -n "$bad" ]; then
+  echo "identity FAILED: commits with author or committer other than FS_ALLOWED_IDENTITY: $(tr '\n' ' ' <<<"$bad")" >&2
+  echo "rewrite the branch as a NEW branch -rN with an equal tree (workflow branch-neu-schreiben), never main or a public tag" >&2
+  exit 1
+fi
+echo "identity ok: $(grep -c . <<<"$hits") commit(s) in $base..HEAD, author and committer = FS_ALLOWED_IDENTITY"

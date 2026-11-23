@@ -86,6 +86,7 @@ nachpruefung_of() {
     rust-rules) echo "python3 -I {SCRIPTS}/check_rust_rules.py {ROOT}" ;;
     lock) echo "bash {SCRIPTS}/gates-lock.sh {ROOT}" ;;
     files) echo "bash {SCRIPTS}/gates-files.sh {ROOT}" ;;
+    identity) echo "bash {SCRIPTS}/identity-check {ROOT}" ;;
     *) ;; # guard: no local check (a change of the tree while the gates run is only found by the full run)
   esac
 }
@@ -165,6 +166,8 @@ else
   step lock error bash "$here/gates-lock.sh" "$root"
   # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
   step files error bash "$here/gates-files.sh" "$root"
+  # identity gate ([IDENTITAET]): author AND committer of every commit of origin/main..HEAD = FS_ALLOWED_IDENTITY; own file, own self test (scripts/test_identity_check.sh)
+  step identity error bash "$here/identity-check" "$root"
   # --like-ci: the lint job of CI (the tool missing = "NICHT GEPRUEFT" in the Beleg, never silently skipped) and, with rustup, the MSRV job
   if [ -n "$like_ci" ]; then
     if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi

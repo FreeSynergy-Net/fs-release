@@ -118,7 +118,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Fresh blobless clone in the own work folder (input workdir; no wildcard path, the folder is new and empty), so that no old state of an agent worktree flows into the check."
+        freesynergy.net:summary: "Fresh blobless clone in the own work folder (with `user.name=FreeSynergy` and `user.email=support@freesynergy.net` set in the clone, FS_ALLOWED_IDENTITY, author and committer) (input workdir; no wildcard path, the folder is new and empty), so that no old state of an agent worktree flows into the check."
   - kopf-und-ff:
       call: head-ff-check:0.0.17@fs
       with:
@@ -139,7 +139,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step `adresse-pruefen` of release-flow on the fresh clone: only the identity in FS_ALLOWED_IDENTITY is author and committer in the range (`git log --format='%ae %ce' main..HEAD | sort -u` shows exactly one line); every other address is a hit, the check names the commit and never an address; red goes to `branch-neu-schreiben`."
+        freesynergy.net:summary: "Step `adresse-pruefen` of release-flow on the fresh clone: run by `scripts/identity-check` (gate `identity`); only the identity in FS_ALLOWED_IDENTITY is author and committer in the range (`git log --format='%ae %ce' main..HEAD | sort -u` shows exactly one line); every other address is a hit, the check names the commit and never an address; red goes to `branch-neu-schreiben`."
   - version:
       call: version-check:0.0.17@fs
       with:
@@ -173,6 +173,18 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "`git diff --name-only main..HEAD` lists only the paths of the order (input allow); an unexpected path is red (the head is not the one that was reviewed)."
+  - nachblick:
+      call: nachblick-read:0.0.17@fs
+      with:
+        head: ${ .input.head }
+        range: main..HEAD
+        allowed_identity_key: FS_ALLOWED_IDENTITY
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Re-look template of the tag chain (pattern `REVIEW-tk1.md` / `REVIEW-tk2.md`, read only, nothing pushed), one line per point, a verdict `JA` or `NEIN` bound to the exact head: (1) head = branch head = head of the order; (2) diff against main only the expected paths; (3) pins, lock, version = Cargo = lock = first CHANGELOG heading, tag free; (4) main is an ancestor of the head; (5) IDENTITY: `scripts/identity-check <clone>` is green (`git log --format='%ae %ce' origin/main..HEAD | sort -u` is exactly the one line FS_ALLOWED_IDENTITY), the commit named, never an address; (6) TREE EQUAL to the reviewed head: `git diff --exit-code <reviewed head> <this head>` has rc 0 (after an identity rewrite the new branch -rN carries the same tree as the reviewed one); (7) branch CI at the exact head: every expected run green. A single red point is NEIN; red identity goes to `branch-neu-schreiben` (new branch -rN, no force), then the re-look runs again for the new head."
   - ja-fuer-kopf:
       call: approval-check:0.0.17@fs
       with:
