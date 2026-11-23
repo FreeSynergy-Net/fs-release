@@ -35,6 +35,12 @@ enum Sub {
     Push(StepArgs),
     /// After the Pre-release: start bump.yml of the catalog (--reach public); needs the approval and the pre-approved list.
     Bump(StepArgs),
+    /// Every `cargo install` / `cargo binstall` / install-action line in `.github/` and `actions/` pins an exact version and uses --locked (rc 1 = a line to fix).
+    CheckCiTools {
+        /// The checkout to scan.
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+    },
     /// lift --commit, review-request, tag, push, bump in one run; halts until the approval and the Pre-release exist, run again to go on.
     Flow {
         #[command(flatten)]
@@ -114,6 +120,7 @@ pub fn main_with(args: Vec<String>) -> i32 {
         Sub::Push(s) => one(&s, 2),
         Sub::Bump(s) => one(&s, 3),
         Sub::Flow { lift, flow } => full(&lift, &flow),
+        Sub::CheckCiTools { dir } => check_ci_tools(&dir),
     }
 }
 
@@ -229,4 +236,12 @@ fn full(l: &LiftArgs, f: &FlowArgs) -> i32 {
     with_ctx(f, &l.repo, &l.release_dir, |ctx| {
         flow::run(&o, ctx, &SystemRunner::default())
     })
+}
+
+fn check_ci_tools(dir: &Path) -> i32 {
+    let bad = crate::ci_tools::scan(dir);
+    for line in &bad {
+        println!("{line}");
+    }
+    i32::from(!bad.is_empty())
 }

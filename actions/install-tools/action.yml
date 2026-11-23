@@ -1,13 +1,13 @@
 name: install-tools
 description: Install prebuilt cargo tools (cargo-binstall, falling back to a source build).
 inputs:
-  tools: { description: "Space separated crates, e.g. 'cargo-deb cargo-generate-rpm'", required: true }
+  tools: { description: "Space separated crates, each as name@x.y.z, e.g. 'cargo-deb@3.8.0 cargo-generate-rpm@0.21.1'", required: true }
 runs:
   using: composite
   steps:
     - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
       with:
-        tool: cargo-binstall
+        tool: cargo-binstall@1.28.0
     - shell: bash
       env:
         TOOLS: ${{ inputs.tools }}

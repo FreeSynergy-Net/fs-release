@@ -31,7 +31,7 @@ jobs:
       - if: contains(fromJSON(inputs.plan).windows_formats, 'msi') && matrix.arch == 'x86_64'
         uses: FreeSynergy/fs-release/actions/install-tools@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
         with:
-          tools: cargo-wix
+          tools: cargo-wix@0.3.9
       - uses: FreeSynergy/fs-release/actions/package-windows@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
         with:
           plan: ${{ inputs.plan }}
