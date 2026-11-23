@@ -196,3 +196,63 @@ fn one_work_dir_for_several_packages_in_a_row_each_case_stays_correct() {
     assert!(e.contains("NOT REACHABLE"), "{e}");
     assert!(!e.contains("first registry version"), "{e}");
 }
+
+/// Review r2, M1: the first fix deleted ANY `<work-dir>/registry`. Now a foreign `registry` (with a file) stays untouched, the result is still correct, our own clone is gone after the call.
+#[test]
+fn a_foreign_registry_directory_in_the_work_dir_is_never_touched() {
+    let mut w = World::new();
+    entered(&mut w);
+    let (bin, _log) = fake(&w, 0);
+    let shared = w.root.join("semver-foreign");
+    let foreign = shared.join("registry");
+    fs::create_dir_all(&foreign).unwrap();
+    fs::write(foreign.join("precious.txt"), "mine").unwrap();
+    let url = w.url.clone();
+    let mut a = args(&mut w, &url, Some(bin));
+    a.work_dir = shared.clone();
+    for _ in 0..2 {
+        assert_eq!(
+            gate(&a).unwrap(),
+            Outcome::Compared("0.0.7".parse().unwrap())
+        );
+        assert_eq!(
+            fs::read_to_string(foreign.join("precious.txt")).unwrap(),
+            "mine"
+        );
+    }
+    let left: Vec<String> = fs::read_dir(&shared)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n.starts_with("registry-"))
+        .collect();
+    assert!(left.is_empty(), "own clone must be removed: {left:?}");
+    // a missing registry is still RED "NOT REACHABLE", and the foreign directory is still there
+    a.registry = format!("file://{}/missing-registry", w.root.display());
+    let e = format!("{:#}", gate(&a).unwrap_err());
+    assert!(
+        e.contains("NOT REACHABLE") && !e.contains("first registry version"),
+        "{e}"
+    );
+    assert!(foreign.join("precious.txt").is_file());
+}
+
+/// Review r2, M1: `--work-dir ""` (= the current directory) deletes nothing: an existing `./registry` of the caller stays.
+#[test]
+fn an_empty_work_dir_deletes_nothing() {
+    let mut w = World::new();
+    entered(&mut w);
+    let (bin, _log) = fake(&w, 0);
+    let url = w.url.clone();
+    let mut a = args(&mut w, &url, Some(bin));
+    a.work_dir = PathBuf::new();
+    let own = PathBuf::from("registry");
+    assert!(!own.exists(), "the test dir must not have a ./registry");
+    fs::create_dir_all(&own).unwrap();
+    fs::write(own.join("precious.txt"), "mine").unwrap();
+    let r = gate(&a);
+    let kept = own.join("precious.txt").is_file();
+    fs::remove_dir_all(&own).unwrap();
+    fs::remove_dir_all("baseline-demo-base-0.0.7").unwrap();
+    assert!(kept, "a foreign ./registry must stay");
+    assert_eq!(r.unwrap(), Outcome::Compared("0.0.7".parse().unwrap()));
+}

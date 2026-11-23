@@ -28,7 +28,7 @@ pub struct SemverArgs {
     /// `cargo-semver-checks` binary (the subcommand needs it).
     #[arg(long)]
     pub semver_checks: Option<PathBuf>,
-    /// Directory for the clone and the unpacked baseline; may be reused by later calls (an earlier `registry` clone in it is replaced).
+    /// Directory for the clone and the unpacked baseline; may be reused by later calls and may hold other files: each call clones into its own new subdirectory and removes only that again, nothing else in it is touched.
     #[arg(long)]
     pub work_dir: PathBuf,
 }
@@ -60,15 +60,22 @@ impl Outcome {
     }
 }
 
-fn registry_checkout(a: &SemverArgs) -> Result<PathBuf> {
+/// The directory of the registry; for a clone URL also the guard that removes the clone again (only what THIS call made).
+fn registry_checkout(a: &SemverArgs) -> Result<(PathBuf, Option<tempfile::TempDir>)> {
     std::fs::create_dir_all(&a.work_dir)?;
-    let dir = if a.registry.contains("://") {
-        let d = a.work_dir.join("registry");
-        // The work dir may be shared by several calls of one job (one call per package): a clone of an earlier call is stale, never reused (always a fresh read), never a reason to fail.
-        if d.exists() {
-            std::fs::remove_dir_all(&d)
-                .with_context(|| format!("cannot remove the earlier clone {}", d.display()))?;
-        }
+    let (dir, guard) = if a.registry.contains("://") {
+        // Every call clones into its OWN new directory below the work dir (never a fixed name): nothing that was already there is touched or deleted (a foreign `registry` stays
+        // as it is), a clone of an earlier call is never reused (always a fresh read), and the work dir may be shared by several calls. The guard removes our own clone at the end.
+        let tmp = tempfile::Builder::new()
+            .prefix("registry-")
+            .tempdir_in(&a.work_dir)
+            .with_context(|| {
+                format!(
+                    "cannot create a clone directory in {}",
+                    a.work_dir.display()
+                )
+            })?;
+        let d = tmp.path().to_path_buf();
         let out = Command::new("git")
             .args(["clone", "-q", "--depth", "1", &a.registry])
             .arg(&d)
@@ -80,9 +87,9 @@ fn registry_checkout(a: &SemverArgs) -> Result<PathBuf> {
             a.registry,
             String::from_utf8_lossy(&out.stderr).trim()
         );
-        d
+        (d, Some(tmp))
     } else {
-        PathBuf::from(&a.registry)
+        (PathBuf::from(&a.registry), None)
     };
     reg_index::load_config(&dir).with_context(|| {
         format!(
@@ -90,7 +97,7 @@ fn registry_checkout(a: &SemverArgs) -> Result<PathBuf> {
             a.registry
         )
     })?;
-    Ok(dir)
+    Ok((dir, guard))
 }
 
 /// The lint level of `cargo-semver-checks` stands in the `Cargo.toml` of the CHECKED package, so a branch could switch the gate off by itself. Therefore every manifest of the
@@ -157,7 +164,7 @@ fn manifest_lints_ok(manifest: &Path) -> Result<()> {
 /// The registry is not reachable or not readable, the baseline `.crate` is missing, or `cargo-semver-checks` is red.
 pub fn gate(a: &SemverArgs) -> Result<Outcome> {
     check_manifest_lints(&a.source)?;
-    let reg = registry_checkout(a)?;
+    let (reg, _clone) = registry_checkout(a)?;
     let pkg = &a.package;
     let base = reg_index::list(&reg, pkg, None)?
         .into_iter()
