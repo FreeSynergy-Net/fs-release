@@ -1,0 +1,22 @@
+[package]
+name = "fs-crate-index"
+version = "0.0.17"
+description = "Writes one crate version into the git index registry `freesynergy` (cargo registry format) - only from a tag run, never by hand"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "fs-crate-index"
+path = "src/main.rs"
+
+[dependencies]
+# Existing first (CLAUDE.md section 8): the index format, the checksum and the commit come from `reg-index` (library of `cargo-index`, author: member of the cargo team,
+# MIT OR Apache-2.0). Pinned exactly; this crate is only the adapter with our guards (tag run only, tag = version, layout of `dl`).
+reg-index = "=0.6.0"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"

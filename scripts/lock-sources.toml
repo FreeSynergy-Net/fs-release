@@ -8,9 +8,9 @@ libraries = ["fs-types", "fs-objects", "fs-interfaces", "fs-rpc", "fs-jscalendar
 # true = the violation is a red gate. Switch a repo to true (in its .fs-lock-sources.toml) when it has been lifted to V1+.
 strict = false
 
-# V1+ addition: `fs-types` may come ONLY from the repo FreeSynergy-Net/fs-types (catches the old way through the fs-interfaces
-# repo, also with one entry). OFF until V1+ is done, so today's repos do not turn red. Env: FS_LOCK_ONLY_FROM=1.
+# V1+ addition: `fs-types` may come ONLY from the registry `freesynergy` (git index repo FreeSynergy-Net/fs-crates; ENTSCHEID-kaskade B2, K-3): the index URL, as in
+# `registry+<URL>` of the lock. A fs-types from git (any repo, also FreeSynergy-Net/fs-types) is red then. OFF until the wave K-5 is done, so today's repos do not turn red. Env: FS_LOCK_ONLY_FROM=1.
 only_from_enabled = false
 
 [only_from]
-fs-types = "https://github.com/FreeSynergy-Net/fs-types"
+fs-types = "https://github.com/FreeSynergy-Net/fs-crates"
