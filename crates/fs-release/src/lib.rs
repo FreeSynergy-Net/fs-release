@@ -6,6 +6,7 @@
 
 pub mod approval;
 pub mod ci_tools;
+pub mod address;
 pub mod cli;
 pub mod flow;
 pub mod lift;

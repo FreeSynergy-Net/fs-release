@@ -43,6 +43,8 @@ enum Sub {
     },
     /// `JA am <SHA>` only with the proof of the runner (cost-log row, run record, byte-equal report); rc 1 = refused (hand-written verdict).
     CheckApproval(ApprovalArgs),
+    /// Owner swap in GitHub addresses: bestand, ersetzen, nachher (workflow adresse-wechseln).
+    Address(crate::address::cmd::AddressArgs),
     /// lift --commit, review-request, tag, push, bump in one run; halts until the approval and the Pre-release exist, run again to go on.
     Flow {
         #[command(flatten)]
@@ -132,6 +134,7 @@ pub fn main_with(args: Vec<String>) -> i32 {
     };
     match cli.command {
         Sub::Lift(a) => lift_cmd(&a),
+        Sub::Address(a) => crate::address::cmd::run(&a),
         Sub::ReviewRequest(s) => one(&s, 0),
         Sub::Tag(s) => one(&s, 1),
         Sub::Push(s) => one(&s, 2),
