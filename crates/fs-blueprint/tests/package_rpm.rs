@@ -216,3 +216,18 @@ fn the_release_package_is_refused_without_a_pages_address_or_with_a_secret_key()
     assert_eq!(code, 2);
     assert!(!out.exists());
 }
+
+#[test]
+fn changelog_and_build_host_tags_exist_and_the_package_is_reproducible_with_a_source_date() {
+    if !have_rpm() {
+        return;
+    }
+    let (a, b) = (scratch("rep-a"), scratch("rep-b"));
+    let fa = make_demo(&a, &["--source-date", "1700000000"]);
+    let fb = make_demo(&b, &["--source-date", "1700000000"]);
+    assert_eq!(std::fs::read(&fa).unwrap(), std::fs::read(&fb).unwrap());
+    let tags = rpm(&["-qp", "--qf", "%{BUILDHOST}|%{CHANGELOGNAME}"], &fa);
+    assert_eq!(tags, "fs-blueprint|FreeSynergy");
+    let desc = rpm(&["-qp", "--qf", "%{DESCRIPTION}"], &fa);
+    assert!(desc.lines().all(|l| l.len() <= 79), "{desc}");
+}

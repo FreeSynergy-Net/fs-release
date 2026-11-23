@@ -223,7 +223,7 @@ pub fn release_spec(
         release: release.into(),
         license: LICENSE.into(),
         summary: "FreeSynergy package source and signing key".into(),
-        description: "The dnf source of FreeSynergy (stable on, nightly off) and the public key that signs the packages and the repo data.".into(),
+        description: "The package source of FreeSynergy (stable on, nightly off).\nAnd the public key that signs the packages and the repo data.".into(),
         url: Some(REPOSITORY_URL.into()),
         files: vec![
             cfg(REPO_FILE, repo_file(pages).into_bytes()),
