@@ -31,7 +31,25 @@ has "V1+ message names the allowed index URL" 'allows only https://github.com/Fr
 FS_LOCK_ONLY_FROM=1 python3 -I "$tool" "$fx/red-v1plus.lock" >"$tmp/o" 2>&1 && bad "env switch FS_LOCK_ONLY_FROM=1 must be red" || ok "env switch FS_LOCK_ONLY_FROM=1 is red"
 expect "registry fs-types is green with the V1+ switch" 0 --only-from "$fx/green-registry.lock"
 expect "registry fs-types is green without the switch" 0 "$fx/green-registry.lock"
-expect "TRANSITION: git fs-types of FreeSynergy-Net/fs-types is still green with the V1+ switch (lift and lock-gleich of the cascade)" 0 --only-from "$fx/green.lock"
+# K-5 PRODUCT RULE (ENTSCHEID-kaskade K-5, MUST): the SHIPPED scripts/lock-sources.toml must hold exactly ONE entry for fs-types (the index URL) after the wave. Until then the second entry
+# (git FreeSynergy-Net/fs-types) is a documented EXCEPTION (lift and lock-gleich of the running cascade check against it). K-5 deletes the second entry AND sets K5_DONE=1 here; with K5_DONE=1 two entries are RED.
+K5_DONE=0
+shipped_entries() { grep '^fs-types' "$1" | grep -o '"[^"]*"' | wc -l; }
+shipped_rule() { # <config> <k5 done 0|1>: prints ok/FAIL for the shipped state
+  local cfg="$1" done="$2" n r
+  n=$(shipped_entries "$cfg"); r=$(rc_of --only-from --config "$cfg" "$fx/green.lock")
+  if [ "$n" = 1 ] && [ "$r" = 1 ]; then ok "shipped config: ONE only_from entry, git fs-types of FreeSynergy-Net/fs-types is red (K-5 state)"
+  elif [ "$n" != 1 ] && [ "$done" = 0 ] && [ "$r" = 0 ]; then ok "shipped config: $n entries, git fs-types still green: DOCUMENTED EXCEPTION until K-5 (K-5 must delete the second entry and set K5_DONE=1)"
+  else bad "shipped config: $n entries, git fs-types rc=$r, K5_DONE=$done (after K-5 exactly one entry and a red git fs-types are required)"; fi
+}
+shipped_rule "$here/lock-sources.toml" "$K5_DONE"
+# the rule itself has teeth: a config with two entries is FAIL once K-5 is done, one entry is not (counter-proofs on copies, not on the shipped file)
+cp "$here/lock-sources.toml" "$tmp/two.toml"; sed -i 's#^fs-types = .*#fs-types = ["https://github.com/FreeSynergy-Net/fs-crates", "https://github.com/FreeSynergy-Net/fs-types"]#; s#^only_from_enabled = .*#only_from_enabled = true#' "$tmp/two.toml"
+fails_before=$fails; shipped_rule "$tmp/two.toml" 1 >"$tmp/o" 2>&1
+if [ "$fails" -gt "$fails_before" ]; then fails=$fails_before; ok "counter-proof: two entries with K5_DONE=1 is RED"; else bad "counter-proof: two entries with K5_DONE=1 must be red"; fi
+sed 's#^fs-types = .*#fs-types = "https://github.com/FreeSynergy-Net/fs-crates"#' "$tmp/two.toml" > "$tmp/one.toml"
+fails_before=$fails; shipped_rule "$tmp/one.toml" 1 >"$tmp/o" 2>&1
+[ "$fails" -eq "$fails_before" ] && ok "counter-proof: one entry with K5_DONE=1 is green" || bad "counter-proof: one entry with K5_DONE=1 must be green"
 printf 'libraries = ["fs-types"]\nonly_from_enabled = true\n[only_from]\nfs-types = "https://github.com/FreeSynergy-Net/fs-crates"\n' > "$tmp/after-wave.toml"
 expect "AFTER THE WAVE (config = index URL only, K-5): git fs-types of FreeSynergy-Net/fs-types is red" 1 --config "$tmp/after-wave.toml" "$fx/green.lock"
 has "after the wave: the message names the index URL" 'allows only https://github.com/FreeSynergy-Net/fs-crates'

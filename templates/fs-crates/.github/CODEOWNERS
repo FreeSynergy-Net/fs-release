@@ -1,0 +1,4 @@
+# The allow list and the workflow decide what enters the registry: part of the trust set, changes only by review.
+/allowed-sources.txt   @FreeSynergy-Net/registry-owners
+/.github/              @FreeSynergy-Net/registry-owners
+/config.json           @FreeSynergy-Net/registry-owners
