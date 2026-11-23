@@ -18,7 +18,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
 
-use crate::pin_chain_text::{is_sha, normalize, uses_of, Use};
+use crate::pin_chain_text::{foreign_uses, is_sha, normalize, uses_of, Use};
 
 /// `git -C <repo> <args>` stdout when it succeeds.
 fn git(repo: &Path, args: &[&str]) -> Option<String> {
@@ -62,6 +62,11 @@ struct Walk<'a> {
 impl Walk<'_> {
     /// Follow every pin of `text` (a file as it stands at `at`, reached from `from`).
     fn follow(&mut self, from: &str, text: &str) {
+        for t in foreign_uses(text) {
+            self.red.push(format!(
+                "{from}: `uses: {t}` names an owner of fs-release that is not spelled exactly FreeSynergy-Net or FreeSynergy (unknown owner spelling; the chain would not follow it)"
+            ));
+        }
         for u in uses_of(text) {
             self.reach(from, &u);
         }
