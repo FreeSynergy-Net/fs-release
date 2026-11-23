@@ -90,15 +90,20 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (a) and (b)) - no `fundstellen` (missing or empty: the rules count as NOT read), a missing `ziel` result or a `ki` value outside the fixed set `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt`; so does a target that rejects AI contributions: nothing is sent and nothing is prepared (no ticket, no draft), unless the explicit word of the user for exactly this target stands in `nutzerwort_ki` (only for `abgelehnt`; the missing citation is never overridden). Only a cited result with a value of the set goes on. The AI note for the text is decided right after by `ki-hinweis` from the entry of `erstkontakt-lesen` (first contact: the note stands once, clearly; later only on a condition)."
   - ki-hinweis:
-      set:
-        erstkontakt_ja: '${ $context.erstkontakt.vorhanden != true }'
-        ki_hinweis: '${ $context.ziel.ki != "ohne-vermerk" and ($context.erstkontakt.vorhanden != true or $context.ziel.ki == "verlangt" or .input.nachfrage == true or (["code", "pull-request", "crate"] | index(.input.bedingung)) != null) }'
+      call: ai-note-decide:0.0.17@fs
+      with:
+        erstkontakt: ${ $context.erstkontakt }
+        ziel: ${ $context.ziel }
+        nachfrage: ${ .input.nachfrage }
+        bedingung: ${ .input.bedingung }
+      export:
+        as: '${ $context + { ki_hinweis: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control data (TEXTS TO THE OUTSIDE (b), decided by the entry of `erstkontakt-lesen`): `erstkontakt_ja` = no valid entry = FIRST contact; `ki_hinweis` = the draft carries the AI note as ONE honest sentence or short paragraph: yes at the first contact, and later only when a condition holds - the rules of the target ask for it (`ziel.ki == verlangt`), somebody asked (`nachfrage`), or the text is a code contribution, pull request or crate (`bedingung` = code | pull-request | crate). Never for `ohne-vermerk` (Blinc: the rules forbid it there); never hidden when asked and never denied (the answer to a question is given by the sender). Nothing is sent by this step."
+        freesynergy.net:summary: "Script (no AI) (TEXTS TO THE OUTSIDE (b), decided by the entry of `erstkontakt-lesen`; no valid entry = FIRST contact). Result `ki_hinweis` (true or false) = the draft carries the AI note as ONE honest sentence or short paragraph: yes at the first contact, and later only when a condition holds - the rules of the target ask for it (`ziel.ki == verlangt`), somebody asked (`nachfrage`), or the text is a code contribution, pull request or crate (`bedingung` = code | pull-request | crate). Never for `ohne-vermerk` (Blinc: the rules forbid it there); never hidden when asked and never denied (the answer to a question is given by the sender). Nothing is sent by this step."
   - absender-weiche:
       switch:
         - bot-verboten:
