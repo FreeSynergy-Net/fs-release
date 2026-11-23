@@ -9,6 +9,8 @@ set -euo pipefail
 # Every gate prints its rc; a failing one prints its line and rc on stderr (the ERR trap). Never cut a gate output with `tail`/`head`
 # (a pipe into them hides the exit code of the gate): rule [GATE-PIPEFAIL], pinned by crates/fs-release/tests/workflows_pflege12.rs.
 trap 'echo "gates FAILED: line $LINENO: rc=$?" >&2' ERR
+like_ci=""
+if [ "${1:-}" = "--like-ci" ]; then like_ci=1; shift; fi # [GATE-BELEG] also the lint job of CI (shellcheck, actionlint) and the MSRV note; the Beleg is printed in every mode
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$1" && pwd)"
 rules="$here/check_rust_rules.py"
@@ -44,6 +46,7 @@ gates_guard_snapshot "$root" "$guard_snap"
 # It never stops the run. The rc is taken from the command itself (not from tee): pipefail does not help here, a pipe would hide it.
 findings=()
 finding_names=()
+step_rcs=()
 step() {
   local name="$1" severity="$2"
   shift 2
@@ -51,6 +54,7 @@ step() {
   { rc=0; "$@" 2>&1 || rc=$?; echo "$rc" > "$out.rc"; } | tee "$out" || true
   rc="$(gates_read_rc "$out.rc")"
   echo "gate $name: rc=$rc"
+  step_rcs+=("$name=$rc")
   if [ "$rc" != 0 ]; then
     findings+=("$name|$severity|$rc|$*")
     finding_names+=("$name")
@@ -102,7 +106,7 @@ gates_findings_write() {
   {
     echo "# Fehlerliste $branch ($(git rev-parse --short HEAD 2>/dev/null || echo '?'))"
     echo
-    echo "${#findings[@]} findings, $((7 - ${#findings[@]})) of 7 steps green (fmt, clippy, test, rust-rules, lock, files, guard)."
+    echo "${#findings[@]} findings, $((${#step_rcs[@]} - ${#findings[@]})) of ${#step_rcs[@]} steps green (steps and rcs: see the gates-beleg lines)."
     for f in "${findings[@]}"; do
       IFS='|' read -r name severity rc cmd <<< "$f"
       echo
@@ -159,6 +163,13 @@ else
   step lock error bash "$here/gates-lock.sh" "$root"
   # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
   step files error bash "$here/gates-files.sh" "$root"
+  # --like-ci: the lint job of CI (the tool missing = "NICHT GEPRUEFT" in the Beleg, never silently skipped) and, with rustup, the MSRV job
+  if [ -n "$like_ci" ]; then
+    if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi
+    if [ -d .github/workflows ] && command -v actionlint >/dev/null 2>&1; then step actionlint lint gates_lint_actions "$root"; fi
+    msrv="$(sed -n 's/^rust-version[[:space:]]*=[[:space:]]*"\([0-9.]*\)".*/\1/p' Cargo.toml 2>/dev/null | head -n1 || true)"
+    if [ -n "$msrv" ] && command -v rustup >/dev/null 2>&1; then step msrv error env RUSTUP_TOOLCHAIN="$msrv" cargo check --workspace --all-targets --locked; fi
+  fi
 fi
 gates_guard_snapshot "$root" "$guard_snap.end"
 if [ -n "${GATES_ONLY_GUARD:-}" ]; then
@@ -167,6 +178,7 @@ if [ -n "${GATES_ONLY_GUARD:-}" ]; then
 else
   step guard error gates_guard_compare "$guard_snap" "$guard_snap.end"
   gates_findings_write
+  gates_beleg "$root" "$RUSTUP_TOOLCHAIN" "$(rustc --version)" "$like_ci" "${step_rcs[@]}" | tee -a "$findings_file"
   if [ "${#findings[@]}" -ne 0 ]; then
     echo "gates FAILED: ${#findings[@]} step(s) red: $(printf '%s ' "${finding_names[@]}")(list: $findings_file)" >&2
     exit 1

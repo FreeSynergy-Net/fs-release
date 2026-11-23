@@ -84,3 +84,20 @@ fn branch_ci_runs_the_gates_on_push_to_unreviewed_and_the_reusable_workflows_sta
         assert!(t.contains("workflow_call:") && !t.contains("push:"), "{f}");
     }
 }
+
+/// LC1 [GATE-BELEG]: `gates.sh` knows `--like-ci` and prints the Beleg; the worker flows and the docs state the rule (counter-check on a changed copy).
+#[test]
+fn the_gate_beleg_rule_is_in_gates_sh_the_flows_and_the_docs() {
+    let g = file("scripts/gates.sh");
+    assert!(g.contains("--like-ci") && g.contains("gates_beleg"));
+    assert!(!g.replace("gates_beleg", "").contains("gates_beleg"));
+    assert!(file("scripts/lib_gates_list.sh").contains("CI-gleich: NEIN"));
+    for t in [
+        read("agent-run"),
+        read("testlauf"),
+        file("docs/usage.md"),
+        file("docs/prompt-template.md"),
+    ] {
+        assert!(t.contains("GATE-BELEG") && t.contains("CI-gleich"));
+    }
+}

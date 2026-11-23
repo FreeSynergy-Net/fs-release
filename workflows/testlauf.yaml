@@ -7,6 +7,10 @@
 # The full run is `scripts/workspace-test-background` (self test: scripts/test_workspace_test_background.sh): `start` returns at once, `wait` blocks on a lock (no
 # polling loop) with a timeout of 2 hours and returns the result file contract {head, red, runde, seconds, exit, summary}; a timeout, a failed wait or no result goes to `eskalation`. A red head started again is run again and counted (`runde`), so a fix without a new commit ends in `runde` 3 and `eskalation`.
 # Every full run is bound to the CURRENT head (resolved right before the run, after any `fix` commit), never to the head of the start.
+# [GATE-BELEG] (local gates = CI, from ONE source: RUST_VERSION + scripts/gates.sh): the worker runs `scripts/gates.sh --like-ci <repo>` (never single cargo commands in place of it) and the report
+# carries the `gates-beleg:` lines of that run (toolchain, flags, every step with its rc, `CI-gleich: ja|nein` + reason). `nein` (foreign toolchain, a tool such as shellcheck/actionlint/rustup missing)
+# means: green here is NOT proof, the branch CI at the exact head is, and the report names what did not run here. A clippy finding in a file the branch changed is never dismissed as "toolchain, foreign code".
+# Origin: AW18 (clippy::format_collect, CI 1.99.1 vs local 1.100.0) and T1 (rust-rules on a test file, never run); shellcheck SC2164 (WP). Self test: scripts/test_gates_like_ci.sh.
 # [PROZESSE] no `pkill` / `killall` (and no `kill $(pgrep ...)`) with patterns: several agents share one machine, a pattern kill ends the processes of OTHER agents.
 # An agent ends only its OWN processes, through the PID of the build-slot.sh process it started itself (`scripts/build-slot.sh ... & pid=$!`, then `kill "$pid"`).
 # Script check: `scripts/check-no-pkill` (red = a pattern kill in workflows/, scripts/, actions/ or .github/; self test scripts/test_check_no_pkill.sh).
