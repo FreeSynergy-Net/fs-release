@@ -31,6 +31,8 @@ jobs:
           toolchain: pinned
           components: rustfmt,clippy
           cache-key: branch-ci
+      - name: tools of the package tests (rpm, cpio: the rpm tests must run, a missing tool is red)
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends rpm cpio
       - name: gates of this branch (scripts/gates.sh, one rc per gate)
         id: gates-of-this
         continue-on-error: true

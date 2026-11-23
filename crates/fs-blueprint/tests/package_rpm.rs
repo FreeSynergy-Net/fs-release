@@ -27,9 +27,21 @@ fn cli(words: &[&str]) -> (i32, String, String) {
     )
 }
 
+/// `rpm` must be there: a missing tool is a RED test, never a silent pass (review S5). The one way out is the explicit `FS_SKIP_RPM_TESTS=1`, and never when `CI` is set; it is said loudly.
 fn have_rpm() -> bool {
-    Command::new("rpm").arg("--version").output().is_ok()
+    if Command::new("rpm").arg("--version").output().is_ok() {
+        return true;
+    }
+    let skip = std::env::var("FS_SKIP_RPM_TESTS").is_ok_and(|v| v == "1");
+    assert!(
+        skip && std::env::var_os("CI").is_none(),
+        "rpm is not installed: install it (CI installs it) or set FS_SKIP_RPM_TESTS=1 outside CI"
+    );
+    eprintln!("SKIPPED: rpm is not installed (FS_SKIP_RPM_TESTS=1)");
+    false
 }
+
+const FP: &str = "16A4A3EE563AEF51FCF0C55DED7B57C4A1904342";
 
 fn rpm(args: &[&str], file: &Path) -> String {
     let o = Command::new("rpm").args(args).arg(file).output().unwrap();
@@ -158,6 +170,8 @@ fn the_release_package_has_repo_file_and_key_with_stable_on_and_nightly_off() {
         "release",
         "--key",
         key().to_str().unwrap(),
+        "--fingerprint",
+        FP,
         "--pages-url",
         "https://pages.invalid/Repository",
         "--out",
@@ -208,6 +222,8 @@ fn the_release_package_is_refused_without_a_pages_address_or_with_a_secret_key()
         "release",
         "--key",
         sk.to_str().unwrap(),
+        "--fingerprint",
+        FP,
         "--pages-url",
         "https://x.invalid",
         "--out",
