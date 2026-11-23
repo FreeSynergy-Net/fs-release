@@ -158,7 +158,8 @@ fn emit_writes_a_header_that_is_green_and_keeps_the_current_order() {
     .to_vec();
     let out = emit(&g, "fs-types", &cur).unwrap();
     assert_eq!(out, GOOD);
-    assert!(check(&g, &parse_header(&out), "fs-types").is_empty());
+    let found = check(&g, &parse_header(&out), "fs-types");
+    assert!(found.is_empty(), "check found problems: {found:?}");
     // from a wrong current order the generated one is still topological
     let bad: Vec<String> = [
         "fs-app",
@@ -170,7 +171,8 @@ fn emit_writes_a_header_that_is_green_and_keeps_the_current_order() {
     .map(String::from)
     .to_vec();
     let out = emit(&g, "fs-types", &bad).unwrap();
-    assert!(check(&g, &parse_header(&out), "fs-types").is_empty());
+    let found = check(&g, &parse_header(&out), "fs-types");
+    assert!(found.is_empty(), "check found problems: {found:?}");
 }
 
 #[test]
