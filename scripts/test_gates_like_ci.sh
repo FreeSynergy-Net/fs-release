@@ -64,6 +64,14 @@ run "$G" "$tmp/alt2" --like-ci "$app"
 chk "other actionlint version: NEIN with the pin named" bash -c "grep -q 'CI-gleich: NEIN' '$tmp/o.txt' && grep -q 'actionlint version differs from the CI pin' '$tmp/o.txt'"
 FS_GATES_SKIP_TEST=released_changelog_sections_equal_their_tags run "$G" "$tmp/alt" --like-ci "$app"
 chk "a skipped test is a NEIN reason" bash -c "grep -q 'CI-gleich: NEIN' '$tmp/o.txt' && grep -q 'SKIPPED (FS_GATES_SKIP_TEST)' '$tmp/o.txt'"
+# 3b. the self tests of the CI jobs (lint.yml `run: bash scripts/test_*.sh`) run in --like-ci: a failing one is red (CI-red-while-local-green: test_affected_crates)
+printf 'jobs:\n  a:\n    steps:\n      - name: x\n        run: bash scripts/test_fail.sh\n' >"$app/.github/workflows/lint.yml"; printf '#!/usr/bin/env bash\necho boom\nexit 1\n' >"$app/scripts/test_fail.sh"
+git -C "$app" add -A; git -C "$app" commit -qm lintyml
+run "$G" "$tmp/alt" --like-ci "$app"; rc=$?
+chk "failing CI self test: red (rc 1), its rc is printed, no 'gates ok'" bash -c "[ $rc -eq 1 ] && grep -q '^selftest rc=1: bash scripts/test_fail.sh' '$tmp/o.txt' && grep -q '^gate selftests: rc=1' '$tmp/o.txt' && ! grep -q '^gates ok' '$tmp/o.txt'"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$app/scripts/test_fail.sh"; git -C "$app" add -A; git -C "$app" commit -qm lintyml-ok
+run "$G" "$tmp/alt" --like-ci "$app"; rc=$?
+chk "passing CI self test: rc 0 and counted" bash -c "[ $rc -eq 0 ] && grep -q 'selftests run: 1' '$tmp/o.txt'"
 # 4. a 301-line TEST file: rust-rules red, never gates ok
 { echo "//! Pattern: none (test)."; for i in $(seq 1 300); do echo "// line $i"; done; } >"$app/crates/x/tests/big.rs"
 git -C "$app" add -A; git -C "$app" commit -qm big
@@ -85,6 +93,7 @@ mut "Beleg call removed" gates.sh 'gates_beleg "$root"' ': "$root"' 'grep -q "ga
 mut "head left out of the Beleg" lib_gates_list.sh 'head=$(git -C "$root" rev-parse HEAD 2>/dev/null || echo unknown)' 'head=none' 'grep -q "head=[0-9a-f]\{40\}" "$tmp/om.txt"'
 MPATH="$tmp/bin" MENV=BADTEST=1 MARGS=--like-ci mut "probe allows every lint" lib_gates_list.sh 'if [ -z "${bad[$l]:-}" ]; then lints' 'if true; then lints' 'grep -q "CHANGED file: tests/t.rs" "$tmp/om.txt"'
 MPATH="$tmp/bin" MENV=BADTEST=1 MARGS=--like-ci mut "unmarked changed files" lib_gates_list.sh 'then echo "gates-beleg:   CHANGED file: $f"' 'then echo "gates-beleg:   $f"' 'grep -q "CHANGED file: tests/t.rs" "$tmp/om.txt"'
+mut "selftests step removed" gates.sh 'step selftests error gates_lint_selftests' ': selftests' 'printf "jobs:\\n  a:\\n    steps:\\n      - name: x\\n        run: bash scripts/test_x.sh\\n" >"$tmp/m/.github/workflows/lint.yml"; printf "#!/usr/bin/env bash\\nexit 1\\n" >"$tmp/m/scripts/test_x.sh"; git -C "$tmp/m" add -A; git -C "$tmp/m" commit -qm x; env PATH="$tmp/alt:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$tmp/m/scripts/gates.sh" --like-ci "$tmp/m" 2>&1 | grep -q "selftest rc=1"'
 mut "origin/main reason removed" lib_gates_list.sh 'echo "NICHT GEPRUEFT: origin/main fehlt (changed' ': "(changed' 'git -C "$tmp/m" update-ref -d refs/remotes/origin/main; env PATH="$tmp/alt:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$tmp/m/scripts/gates.sh" --like-ci "$tmp/m" 2>&1 | grep -q "origin/main fehlt"'
 if [ "$fails" -ne 0 ]; then echo; echo "test_gates_like_ci: $fails failures"; exit 1; fi
 echo; echo "test_gates_like_ci: all ok"

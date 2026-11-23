@@ -17,7 +17,7 @@ gates_ci_diff() {
   case "$2" in "rustc $1 "*) ;; *) echo "toolchain: local '$2' != CI $1 (rustup missing: RUSTUP_TOOLCHAIN has no effect); lints of the newer toolchain are not CI lints" ;; esac
   [ -n "$4" ] || echo "mode standard: the lint job (shellcheck, actionlint) and the MSRV check did not run (use --like-ci)"
   [ -z "${FS_GATES_SKIP_TEST:-}" ] || echo "test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST)"
-  [ -z "${FS_GATES_DIFF_BASE:-}" ] || echo "test NARROWED to the crates changed against $FS_GATES_DIFF_BASE"
+  [ -z "${FS_GATES_DIFF_BASE:-}" ] || echo "test scope narrowed (FS_GATES_DIFF_BASE=$FS_GATES_DIFF_BASE): not the whole workspace"
   git -C "$3" merge-base HEAD origin/main >/dev/null 2>&1 || echo "NICHT GEPRUEFT: origin/main fehlt (changed files unknown: clippy findings cannot be assigned to the branch)"
   command -v shellcheck >/dev/null 2>&1 || echo "NICHT GEPRUEFT: shellcheck fehlt (CI job lint)"
   if [ -d "$3/.github/workflows" ]; then
@@ -33,6 +33,20 @@ gates_lint_shell() {
   if [ -n "$cmd" ]; then bash -c "$cmd"; else git ls-files -z '*.sh' | xargs -0 -r shellcheck -x -S warning; fi
 }
 gates_lint_actions() { cd "$1" && actionlint; }
+# gates_lint_selftests <root>: every self test / compile line of the CI jobs in lint.yml (`run: bash scripts/test_*.sh`, `scripts/test-packaging.sh`, `python3 -I -m py_compile ...`), same lines, run one by one;
+# the rc of each is printed, the step is red when one failed. (CI runs them in the jobs lint, changelog-released, packaging-tests.) Byte code goes to the scratch folder, never into the tree.
+# shellcheck disable=SC2154 # finding_work is set by gates.sh (sourced)
+gates_lint_selftests() {
+  local c bad=0 n=0; cd "$1" || return 1
+  while read -r c; do
+    n=$((n + 1)); local rc=0
+    PYTHONPYCACHEPREFIX="$finding_work/pyc" bash -c "$c" >"$finding_work/st.out" 2>&1 || rc=$?
+    if [ "$rc" != 0 ]; then bad=1; cat "$finding_work/st.out"; fi
+    echo "selftest rc=$rc: $c" | cut -c1-150
+  done < <(sed -nE 's/^ *run: (bash scripts\/test_[A-Za-z0-9_]+\.sh|scripts\/test-packaging\.sh|python3 -I -m py_compile .*)$/\1/p' .github/workflows/lint.yml 2>/dev/null)
+  echo "selftests run: $n"
+  return "$bad"
+}
 # gates_clippy_probe <root>: under a foreign toolchain the lints of the LIB errors (-D warnings) hide the test targets (AW18). Re-run clippy with -A ONLY for lints whose every location in the first run is in an
 # UNCHANGED file (changed against origin/main); a lint that also occurs in a changed file is never allowed. Findings of the probe are listed, files changed against origin/main marked "CHANGED file". Never green by
 # itself: the first clippy rc stays a finding. No origin/main = "NICHT GEPRUEFT" (and gates_ci_diff says NEIN).
