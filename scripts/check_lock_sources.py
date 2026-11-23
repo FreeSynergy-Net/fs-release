@@ -10,6 +10,8 @@ each one (a package without a source is the workspace member itself). Exit codes
 1 violation, 2 usage/read error. A repo root is searched for every Cargo.lock outside target/ and .git.
 V1+ addition (`--only-from`, config `only_from_enabled`, env FS_LOCK_ONLY_FROM=1; default OFF): a library listed in `[only_from]`
 (fs-types) must come from that repo only, also when it appears once (an entry without `source`, the workspace member itself, is fine).
+K-3 addition (registry `freesynergy`, ENTSCHEID-kaskade B2): a registry source (`registry+URL`, `sparse+URL`) is normalised like a git source, so `[only_from]` can name an index URL, and the fix
+message of two versions from a registry is `cargo update -p <lib>`. `strict` stays off until after the wave (K-5).
 A repo's own `.fs-lock-sources.toml` can set only `strict` and `only_from_enabled`; anything else in it is ignored.
 Whether a violation is a warning or red is decided by the caller (scripts/gates.sh, switch `strict`), not here.
 """
@@ -23,10 +25,17 @@ def norm(url: str) -> str:
     return re.sub(r"(\.git)?/*$", "", url.strip().lower())
 
 def repo_of(source: str) -> str:
-    """git+https://host/org/repo.git?tag=x#sha -> https://host/org/repo; registry and path sources -> the source itself."""
-    if not source.startswith("git+"):
-        return source or "(path)"
-    return norm(re.split(r"[?#]", source[4:], maxsplit=1)[0])
+    """git+https://host/org/repo.git?tag=x#sha -> https://host/org/repo; registry+URL and sparse+URL -> the index URL (also normalised);
+    path sources -> "(path)"."""
+    if not source:
+        return "(path)"
+    for kind in ("git+", "registry+", "sparse+"):
+        if source.startswith(kind):
+            return norm(re.split(r"[?#]", source[len(kind):], maxsplit=1)[0])
+    return norm(source)
+
+def is_registry(source: str) -> bool:
+    return source.startswith(("registry+", "sparse+"))
 
 def load_config(path: Path, repo_root: Path | None, only_from: bool) -> dict:
     cfg = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -59,14 +68,17 @@ def check_lock(text: str, label: str, cfg: dict) -> list:
             lines = [f"ERROR {label}: `{lib}` has {len(entries)} sources in the lock, it must have exactly ONE:"]
             for e in entries:
                 lines.append(f"    {lib} {e['version']} from {e.get('source') or '(path)'}\n      pulled by: " + ", ".join(pullers(pkgs, lib, e)))
-            lines.append("  fix: pin every dependent to the same tag of the same repo (`cargo update -p " + lib + "` after aligning the pins).")
+            if any(is_registry(e.get("source", "")) for e in entries):
+                lines.append("  fix: `cargo update -p " + lib + "` (the dependents ask for a range of the registry, the lock still holds an older version).")
+            else:
+                lines.append("  fix: pin every dependent to the same tag of the same repo (`cargo update -p " + lib + "` after aligning the pins).")
             errors.append("\n".join(lines))
         want = cfg.get("only_from", {}).get(lib)
         if cfg["only_from_on"] and want:
             for e in entries:
                 if not e.get("source"):  # a workspace member (e.g. fs-types inside the repo fs-types itself) is not a foreign source
                     continue
-                if repo_of(e.get("source", "")) != norm(want):
+                if repo_of(e.get("source", "")) != repo_of(want):
                     errors.append(f"ERROR {label}: `{lib}` {e['version']} comes from {e.get('source') or '(path)'}, V1+ allows only {want}\n"
                                   f"      pulled by: " + ", ".join(pullers(pkgs, lib, e)))
     return errors

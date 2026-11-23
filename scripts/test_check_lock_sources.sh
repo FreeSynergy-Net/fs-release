@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self test of scripts/check_lock_sources.py and scripts/gates-lock.sh (fixtures: tests/fixtures/lock-sources/): one source is green, two sources of a
-# library are red with a message that names both sources and who pulls them, V1+ (fs-types only from FreeSynergy-Net/fs-types, old org name and foreign org are red) is red only with
+# library are red with a message that names both sources and who pulls them, V1+ (fs-types only from the registry `freesynergy` = index URL FreeSynergy-Net/fs-crates; every git source is red; registry sources are normalised, two registry versions are red with the fix `cargo update -p`) is red only with
 # the switch, a mutant (library list emptied) lets the red lock through = the test would be red, the gate warns first and fails with `strict`.
 #   bash scripts/test_check_lock_sources.sh
 set -uo pipefail
@@ -27,12 +27,27 @@ has "red message names the packages that pull them" 'pulled by: demo-app 0.1.0 (
 has "red message names a second puller" 'demo-people 0.1.0'
 expect "V1+ lock without the switch is green" 0 "$fx/red-v1plus.lock"
 expect "V1+ lock with the switch (--only-from) is red" 1 --only-from "$fx/red-v1plus.lock"
-has "V1+ message names the allowed repo" 'allows only https://github.com/FreeSynergy-Net/fs-types'
+has "V1+ message names the allowed index URL" 'allows only https://github.com/FreeSynergy-Net/fs-crates'
 FS_LOCK_ONLY_FROM=1 python3 -I "$tool" "$fx/red-v1plus.lock" >"$tmp/o" 2>&1 && bad "env switch FS_LOCK_ONLY_FROM=1 must be red" || ok "env switch FS_LOCK_ONLY_FROM=1 is red"
-expect "green stays green with the V1+ switch" 0 --only-from "$fx/green.lock"
+expect "registry fs-types is green with the V1+ switch" 0 --only-from "$fx/green-registry.lock"
+expect "registry fs-types is green without the switch" 0 "$fx/green-registry.lock"
+expect "git fs-types (also FreeSynergy-Net/fs-types) is red with the V1+ switch" 1 --only-from "$fx/green.lock"
+expect "git fs-types is green without the switch (strict/only_from stay off until after the wave)" 0 "$fx/green.lock"
+expect "two registry versions of fs-types are red" 1 "$fx/red-registry-two.lock"
+has "registry doubles: message names both sources" 'registry+https://github.com/FreeSynergy-Net/fs-crates'
+has "registry doubles: message names a version" '0.0.6'
+has "registry doubles: fix is cargo update -p fs-types" '`cargo update -p fs-types` (the dependents ask for a range'
+expect "git doubles keep the old fix text" 1 "$fx/red-two-sources.lock"
+has "git doubles: pin every dependent" 'pin every dependent to the same tag'
+sed 's#registry+https://github.com/FreeSynergy-Net/fs-crates#registry+HTTPS://GitHub.com/FreeSynergy-Net/FS-Crates.git/#' "$fx/green-registry.lock" > "$tmp/case.lock"
+expect "registry source is normalised (case, .git, slash) before the comparison" 0 --only-from "$tmp/case.lock"
+sed 's#registry+https://github.com/FreeSynergy-Net/fs-crates#sparse+https://github.com/FreeSynergy-Net/fs-crates#' "$fx/green-registry.lock" > "$tmp/case.lock"
+expect "a sparse+ source of the same index URL is normalised too" 0 --only-from "$tmp/case.lock"
+sed 's#registry+https://github.com/FreeSynergy-Net/fs-crates#registry+https://github.com/FreeSynergy-Net/other-crates#' "$fx/green-registry.lock" > "$tmp/case.lock"
+expect "a registry of another index URL is red with the V1+ switch" 1 --only-from "$tmp/case.lock"
 expect "V1+: fs-types from the OLD org name FreeSynergy/ is red" 1 --only-from "$fx/red-old-org.lock"
 expect "V1+: fs-types from a foreign org is red" 1 --only-from "$fx/red-foreign-org.lock"
-expect "V1+: fs-types from FreeSynergy-Net/ is green" 0 --only-from "$fx/green.lock"
+expect "V1+: fs-types from the registry of FreeSynergy-Net/ is green" 0 --only-from "$fx/green-registry.lock"
 expect "stdin" 1 - < "$fx/red-two-sources.lock"
 expect "missing file is rc 2" 2 "$tmp/none.lock"
 # repo root: every Cargo.lock outside target/ is found
@@ -46,6 +61,10 @@ mkdir -p "$tmp/empty"; expect "repo root without a lock is green" 0 "$tmp/empty"
 printf 'libraries = []\nonly_from_enabled = false\n' > "$tmp/mut.toml"
 r=$(rc_of --config "$tmp/mut.toml" "$fx/red-two-sources.lock")
 if [ "$r" = 0 ]; then ok "mutant (check switched off) passes the red lock, so the red test above is real"; else bad "mutant must pass the red lock, rc=$r"; fi
+# mutant: repo_of without the registry normalisation (the old code) -> the normalisation test above would be red
+sed 's#for kind in ("git+", "registry+", "sparse+"):#for kind in ("git+",):#' "$tool" > "$tmp/mut_tool.py"
+sed 's#registry+https://github.com/FreeSynergy-Net/fs-crates#registry+HTTPS://GitHub.com/FreeSynergy-Net/FS-Crates.git/#' "$fx/green-registry.lock" > "$tmp/case.lock"
+python3 -I "$tmp/mut_tool.py" --config "$here/lock-sources.toml" --only-from "$tmp/case.lock" >/dev/null 2>&1 && bad "mutant (repo_of without registry) must be red on the normalisation case" || ok "mutant (repo_of without registry normalisation) is red on the case, so the normalisation test above is real"
 # the gate: warning first, error later
 mkdir -p "$tmp/g"; cp "$fx/red-two-sources.lock" "$tmp/g/Cargo.lock"
 bash "$gate" "$tmp/g" >"$tmp/o" 2>&1 && ok "gate: violation is only a warning while strict = false" || bad "gate: must stay green without strict: $(cat "$tmp/o")"
