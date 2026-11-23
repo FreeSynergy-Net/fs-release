@@ -119,7 +119,7 @@ env CI=true GITHUB_EVENT_NAME=pull_request GITHUB_SHA=00000000000000000000000000
 # --- Decision 9f (first check): no origin/main ON THE REMOTE = check ALL commits of the branch and say so; a fetch or network error is NOT "no main" ---
 # Threat model: the gate protects against MISTAKES, not against someone who can change workflow, toolchain or scripts.
 fx() { # fx <dir> <remote-state: none|main|broken>: clone-like repo with origin; commits: root(OK) + one
-  rm -rf "$tmp/$1" "$tmp/$1.git"; git init -q --bare -b main "$tmp/$1.git"; git init -q -b feat "$tmp/$1"; git -C "$tmp/$1" remote add origin "$tmp/$1.git"
+  rm -rf "${tmp:?}/$1" "${tmp:?}/$1.git"; git init -q --bare -b main "$tmp/$1.git"; git init -q -b feat "$tmp/$1"; git -C "$tmp/$1" remote add origin "$tmp/$1.git"
   [ "$2" = broken ] && git -C "$tmp/$1" remote set-url origin "$tmp/$1-does-not-exist.git"
   r="$tmp/$1"; echo root >"$r/root"; git -C "$r" add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL=$OK git -C "$r" -c commit.gpgsign=false commit -q -m root
   if [ "$2" = main ]; then git -C "$r" push -q origin feat:main; git -C "$r" fetch -q origin; fi
