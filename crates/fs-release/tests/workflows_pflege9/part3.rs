@@ -138,8 +138,10 @@ pub(super) fn request(t: &str) -> bool {
 }
 
 /// The calls of the flow are a FIXED list (a new call, e.g. one that opens a pull request or writes a comment, is red until the list is changed on purpose).
-pub(super) const CALLS: [&str; 14] = [
+pub(super) const CALLS: [&str; 16] = [
     "request-kind",
+    "target-rules",
+    "copy-block",
     "prove-ai",
     "search-duplicates-ai",
     "git-bug-ticket",
