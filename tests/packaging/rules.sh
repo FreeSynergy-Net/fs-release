@@ -88,7 +88,7 @@ D="$TR/src/dummy_v1"; mkdir -p "$D" "$TR/locks"
 printf '//! Entry.\n//! Pattern: none\nfn main() {}\n' > "$TR/src/main.rs"
 printf '//! Old module without a pattern line.\npub fn x() {}\n' > "$D/a.rs"
 # the procedure of tools/hash-ordner.sh (per file "<relpath>\0<sha256>\n", sorted, LC_ALL=C), here for the dummy folder
-hash_dir() { ( export LC_ALL=C; cd "$1"; find . -type f -printf '%P\0' | sort -z | while IFS= read -r -d '' f; do printf '%s\0%s\n' "$f" "$(sha256sum -- "$f" | cut -d' ' -f1)"; done | sha256sum | cut -d' ' -f1 ); }
+hash_dir() { ( export LC_ALL=C; cd "$1" || exit 1; find . -type f -printf '%P\0' | sort -z | while IFS= read -r -d '' f; do printf '%s\0%s\n' "$f" "$(sha256sum -- "$f" | cut -d' ' -f1)"; done | sha256sum | cut -d' ' -f1 ); }
 lock() { printf '# lock\nordner: %s\nsha256: %s\n' "$1" "$2" > "$TR/locks/$3.sha256"; }
 H="$(hash_dir "$D")"
 bad "frozen folder: no lock file, Pattern rule applies"
