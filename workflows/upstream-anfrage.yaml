@@ -18,8 +18,9 @@
 # the sender (bot) by THEIR rules and the permission (98) stays: no approval for the sender `bot` at Blinc; with `absender: mensch` the approval and the channel choice run at Blinc too. The steps (a) `ziel-regeln-lesen` and (c) `kopierblock` (format of the target) apply to Blinc too
 # and are never skipped; the gates before them (rules, text gate, proof, duplicates) replace the reading-against there.
 # PULL REQUEST (a contribution with a patch; this flow never sends one itself, the human does): step `pr-nach-antwort`. A PR leaves only when (a) the issue is ANSWERED (answer read, the rules of the upstream kept) or (b) the time limit
-# has run out (`frist_tage`, default 14 days). Time limit without an answer = factual only: ONE follow-up question is allowed, never nag. The rules of the upstream go first; the AI note stands openly in the text (code contribution:
-# `ki-haltung-weiche` rules apply); sent only from the account of the user after their YES (gate human). Until then the PR stays red (`pr-wartet`). Optional parameters of a PR: `issue`, `frist_tage`, `pr_text`.
+# has run out (`frist_tage`, default 14 days). Time limit without an answer = factual only: ONE follow-up question is allowed, never nag. The rules of the upstream go first; the AI note follows the rules of the target (steps `pr-ziel-regeln`, `pr-ki-weiche`, `pr-haltung-weiche`):
+# openly in the text where `ki_hinweis` says so, BUT at Blinc NO AI attribution (house rule, line 2). The pull request goes through the SAME gates as an issue (rules read, duplicates, text gate, copy block with a checked preview; steps
+# `pr-dubletten`, `pr-text-gate`, `pr-kopierblock`, `pr-vorschau-weiche`) and never gets less checking than an issue; sent only from the account of the user after their YES (gate human). Until then the PR stays red (`pr-wartet`). Optional parameters of a PR: `issue`, `frist_tage`, `pr_text`.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -393,6 +394,7 @@ do:
         upstream: ${ .input.upstream }
         issue: ${ .input.issue }
         frist_tage: ${ .input.frist_tage // 14 }
+        datei: ${ .input.erstkontakt_datei // "workflows/upstream-erstkontakt.txt" }
       export:
         as: '${ $context + { pr_tor: . } }'
       metadata:
@@ -400,7 +402,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script, read only (no gh write, no comment): checks for a pull request whether (a) the issue `issue` of the upstream was ANSWERED (answer read, `antwort` with link; the rules of the upstream (CONTRIBUTING, AI stance, PR template) read and cited in `fundstellen`) or (b) the time limit `frist_tage` (default 14 days since our issue) has run out. Result `pr_tor` with `frei` (true only for (a) with kept rules or (b)), `grund` (`antwort` | `frist`), `frist_ohne_antwort` and `nachfrage_erlaubt` (true once: a time limit without an answer allows ONE factual follow-up question, written and sent by the human, never nagging). The rules of the upstream go before our time limit: if they forbid or delay a PR, `frei` stays false."
+        freesynergy.net:summary: "Script, read only (no gh write, no comment): checks for a pull request whether (a) the issue `issue` of the upstream was ANSWERED (answer read, `antwort` with link; the rules of the upstream (CONTRIBUTING, AI stance, PR template) read and cited in `fundstellen`) or (b) the time limit `frist_tage` (default 14 days since our issue) has run out. Result `pr_tor` with `frei` (true only for (a) with kept rules or (b)), `grund` (`antwort` | `frist`), `frist_ohne_antwort` and `nachfrage_erlaubt` (true once: a time limit without an answer allows ONE factual follow-up question, written and sent by the human, never nagging; the question already asked is noted in the ONE list `workflows/upstream-erstkontakt.txt` as `nachfrage=<UTC date>` on the line of the target, and `nachfrage_erlaubt` is false as soon as that field stands there; the human adds it when they sent the question). The rules of the upstream go before our time limit: if they forbid or delay a PR, `frei` stays false."
   - pr-weiche:
       switch:
         - pr-wartet:
@@ -414,10 +416,200 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a missing result, no answer and no expired time limit, or rules of the upstream not cited (`fundstellen` empty) keep the pull request RED: `pr-rot`; only `frei == true` with cited rules goes on to the approval of the user."
+  - pr-ziel-regeln:
+      call: target-rules:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+        art: pr
+      export:
+        as: '${ $context + { ziel: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.pr-ziel-regeln
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (a) for the pull request: the SAME call as `ziel-regeln-lesen` (no copy of its logic) - the rules of the target (CONTRIBUTING, AI or LLM stance, PR template) are read read only and cited in `fundstellen`, with `ki` and `format`. The rules of the upstream go first."
+  - pr-erstkontakt-lesen:
+      call: first-contact-read:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+        datei: ${ .input.erstkontakt_datei // "workflows/upstream-erstkontakt.txt" }
+      export:
+        as: '${ $context + { erstkontakt: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (no AI), read only: the SAME call as `erstkontakt-lesen` - the ONE list `workflows/upstream-erstkontakt.txt` says whether this target was contacted before (the AI note stands once at the first contact)."
+  - pr-ki-weiche:
+      switch:
+        - ki-nein:
+            when: '${ $context.ziel.ki == null or $context.ziel.fundstellen == null or ($context.ziel.fundstellen | length) == 0 or (["erlaubt", "verlangt", "ohne-vermerk", "abgelehnt"] | index($context.ziel.ki)) == null }'
+            then: ki-abgelehnt
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow, the same rule as `ki-haltung-weiche` (TEXTS TO THE OUTSIDE (a), (b)) - no `fundstellen`, no `ziel` result or a `ki` value outside `erlaubt | verlangt | ohne-vermerk | abgelehnt` goes to `ki-abgelehnt`: the rules are NOT read."
+  - pr-ki-hinweis:
+      call: ai-note-decide:0.0.17@fs
+      with:
+        erstkontakt: ${ $context.erstkontakt }
+        ziel: ${ $context.ziel }
+        nachfrage: ${ .input.nachfrage }
+        bedingung: ${ .input.bedingung }
+        art: pr
+      export:
+        as: '${ $context + { ki_hinweis: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script (no AI), the SAME call as `ki-hinweis` (TEXTS TO THE OUTSIDE (b)): `ki_hinweis` says whether the target allows or asks for the AI note; for a code contribution it is normally yes. The attitude switch below has the last word."
+  - pr-haltung-weiche:
+      switch:
+        - blinc:
+            when: '${ .input.upstream == "blinc" }'
+            then: pr-ohne-vermerk
+        - andere:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow, the rules of the upstream go first (CLAUDE.md of the user, section 8): Blinc has the house rule `NO AI attribution in issue, PR or commit`, so a pull request to Blinc goes to `pr-ohne-vermerk` (NO AI note, no Co-Authored-By); every other upstream goes on to `pr-mit-vermerk` (the AI collaboration is named openly where `ki_hinweis` says so, never hidden, never denied)."
+  - pr-mit-vermerk:
+      set:
+        ki: ${ $context.ki_hinweis == true }
+      export:
+        as: '${ $context + { vermerk: . } }'
+      then: pr-dubletten
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Not Blinc - `vermerk.ki` is true exactly when `ki_hinweis` is true: the text carries the ONE honest AI note (one sentence or short paragraph inside the text, never a signature or trailer) as the rules of the target and the first-contact list say."
+  - pr-ohne-vermerk:
+      set:
+        ki: false
+      export:
+        as: '${ $context + { vermerk: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Blinc - `vermerk.ki` is false whatever `ki_hinweis` says: NO AI attribution in the pull request text (rule of the maintainer, quoted in the head of this flow). The text gate then refuses every AI word."
+  - pr-dubletten:
+      call: search-duplicates-ai:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+        belegt: ${ $context.pr_tor }
+        art: pr
+      export:
+        as: '${ $context + { dubletten: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.pr-dubletten
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The SAME call as `dubletten`, here for the open pull requests (and closed ones) of the target: READ ONLY, no login, no comment, no reaction, no new pull request. A hit that says the same is a duplicate. Result `dubletten` with `treffer`."
+  - pr-dubletten-weiche:
+      switch:
+        - doppelt:
+            when: '${ $context.dubletten.treffer == null or ($context.dubletten.treffer | length) > 0 }'
+            then: abgelehnt
+        - neu:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow, the same rule as `dubletten-weiche` - a duplicate pull request or a missing result goes to `abgelehnt` with the link, no comment is written there; only an empty hit list goes on."
+  - pr-regeln:
+      call: upstream-rules:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+        draft: ${ .input.pr_text }
+        ziel: ${ $context.ziel }
+      export:
+        as: '${ $context + { rules: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, the SAME call as `rules` - checks the PR text against the CLAUDE.md of the upstream clone and the rules cited in `ziel` (for Blinc: no Claude, Anthropic or AI mention, no Co-Authored-By)."
+  - pr-text-gate:
+      call: text-gate:0.0.17@fs
+      with:
+        draft: ${ .input.pr_text }
+        ticket: ${ .input.issue }
+        ziel: ${ $context.ziel }
+        ki_hinweis: ${ $context.vermerk.ki }
+        absender: mensch
+      export:
+        as: '${ $context + { textcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, the SAME call as `text-gate` (TEXTS TO THE OUTSIDE, mandatory for every text): English, no addresses and no personal data, no AI words except exactly ONE honest note when `vermerk.ki` is true (never for Blinc). The sender of a pull request is always the human."
+  - pr-text-weiche:
+      switch:
+        - treffer:
+            when: '${ $context.rules.hits == null or $context.textcheck.hits == null or ($context.rules.hits | length) > 0 or ($context.textcheck.hits | length) > 0 }'
+            then: pr-rot
+        - sauber:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a hit of `pr-regeln` or `pr-text-gate` (a missing `hits` result counts as a hit) keeps the pull request RED (`pr-rot`, the hits are the reason); the text is corrected and the flow runs again. A clean text goes on to the copy block."
+  - pr-kopierblock:
+      call: copy-block:0.0.17@fs
+      with:
+        draft: ${ .input.pr_text }
+        format: ${ $context.ziel.format }
+      export:
+        as: '${ $context + { block: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.pr-kopierblock
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (c), the SAME call as `kopierblock`: the clean PR text as ONE copy block in the format of the target (its PR template), with a checked preview (`vorschau_ok`)."
+  - pr-vorschau-weiche:
+      switch:
+        - ohne-vorschau:
+            when: '${ $context.block == null or $context.block.vorschau_ok != true }'
+            then: abgelehnt
+        - geprueft:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (c), mandatory gate), the same rule as `vorschau-weiche` - without a copy block whose preview in the target format was checked NOTHING goes to the user: `abgelehnt`."
   - pr-freigabe:
       call: approve:0.0.17@fs
       with:
-        block: ${ .input.pr_text }
+        block: ${ $context.block }
       export:
         as: '${ $context + { freigabe: . } }'
       metadata:
@@ -425,13 +617,13 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The sender (the user) reads the pull request text and the patch against the cited rules of the upstream and gives the YES for exactly this text, beforehand. The AI collaboration is named openly in the text (code contribution), never hidden, never denied. Without the YES nothing goes out."
+        freesynergy.net:summary: "The sender (the user) reads the pull request text and the patch against the cited rules of the upstream and gives the YES for exactly this text, beforehand. This step comes only after the same gates as an issue (rules read, attitude switch, duplicates, text gate, copy block with a checked preview). The AI note follows the rules of the target: openly named where `vermerk.ki` is true, never hidden, never denied; at Blinc there is NO AI attribution (house rule). Without the YES nothing goes out."
   - pr-hand-text:
       call: hand-text:0.0.17@fs
       then: end
       if: '${ $context.freigabe.ja == true }'
       with:
-        block: ${ .input.pr_text }
+        block: ${ $context.block }
       metadata:
         freesynergy.net:actor: human
         freesynergy.net:actor-type: Person
