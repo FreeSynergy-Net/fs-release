@@ -17,6 +17,9 @@
 # Blinc and (d) (decision of the strategy): "the sender reads against" holds when a HUMAN is the sender (every other upstream: steps `approval`, `choose-channel`). At Blinc WE are
 # the sender (bot) by THEIR rules and the permission (98) stays: no approval for the sender `bot` at Blinc; with `absender: mensch` the approval and the channel choice run at Blinc too. The steps (a) `ziel-regeln-lesen` and (c) `kopierblock` (format of the target) apply to Blinc too
 # and are never skipped; the gates before them (rules, text gate, proof, duplicates) replace the reading-against there.
+# PULL REQUEST (a contribution with a patch; this flow never sends one itself, the human does): step `pr-nach-antwort`. A PR leaves only when (a) the issue is ANSWERED (answer read, the rules of the upstream kept) or (b) the time limit
+# has run out (`frist_tage`, default 14 days). Time limit without an answer = factual only: ONE follow-up question is allowed, never nag. The rules of the upstream go first; the AI note stands openly in the text (code contribution:
+# `ki-haltung-weiche` rules apply); sent only from the account of the user after their YES (gate human). Until then the PR stays red (`pr-wartet`). Optional parameters of a PR: `issue`, `frist_tage`, `pr_text`.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -36,9 +39,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - the kind of the request: only an `issue` (a question or a wish as a new issue). A pull request, a comment in a foreign issue or thread, a review or a reaction is red and is not sent by this flow. Result `art` with `red`."
+        freesynergy.net:summary: "Script - the kind of the request: only an `issue` (a question or a wish as a new issue). A pull request, a comment in a foreign issue or thread, a review or a reaction is red and is not sent by this flow. Result `art` with `red` and `art.art` (`issue` | `pr` | `comment` | other). A pull request is red HERE and goes to the step `pr-nach-antwort` (it is released only by answer or time limit and only the human sends it)."
   - art-weiche:
       switch:
+        - pr:
+            when: '${ $context.art.art == "pr" }'
+            then: pr-nach-antwort
         - verboten:
             when: '${ $context.art.red != false }'
             then: abgelehnt
@@ -49,7 +55,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a pull request, a comment or a missing result goes to `abgelehnt`; only `red == false` goes on to the proof."
+        freesynergy.net:summary: "Control flow - a pull request goes to `pr-nach-antwort` (red until the answer or the time limit, and only the human sends it); a comment or a missing result goes to `abgelehnt`; only `red == false` goes on to the proof."
   - ziel-regeln-lesen:
       call: target-rules:0.0.17@fs
       with:
@@ -381,6 +387,68 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
         freesynergy.net:summary: The agent notes the history - upstream, channel, issue id (none for `direct`), date, the approved text, later answers - in the report; no planning files in the upstream.
+  - pr-nach-antwort:
+      call: pr-gate:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+        issue: ${ .input.issue }
+        frist_tage: ${ .input.frist_tage // 14 }
+      export:
+        as: '${ $context + { pr_tor: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Script, read only (no gh write, no comment): checks for a pull request whether (a) the issue `issue` of the upstream was ANSWERED (answer read, `antwort` with link; the rules of the upstream (CONTRIBUTING, AI stance, PR template) read and cited in `fundstellen`) or (b) the time limit `frist_tage` (default 14 days since our issue) has run out. Result `pr_tor` with `frei` (true only for (a) with kept rules or (b)), `grund` (`antwort` | `frist`), `frist_ohne_antwort` and `nachfrage_erlaubt` (true once: a time limit without an answer allows ONE factual follow-up question, written and sent by the human, never nagging). The rules of the upstream go before our time limit: if they forbid or delay a PR, `frei` stays false."
+  - pr-weiche:
+      switch:
+        - pr-wartet:
+            when: '${ $context.pr_tor == null or $context.pr_tor.frei != true or ($context.pr_tor.fundstellen // [] | length) == 0 }'
+            then: pr-rot
+        - pr-frei:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a missing result, no answer and no expired time limit, or rules of the upstream not cited (`fundstellen` empty) keep the pull request RED: `pr-rot`; only `frei == true` with cited rules goes on to the approval of the user."
+  - pr-freigabe:
+      call: approve:0.0.17@fs
+      with:
+        block: ${ .input.pr_text }
+      export:
+        as: '${ $context + { freigabe: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The sender (the user) reads the pull request text and the patch against the cited rules of the upstream and gives the YES for exactly this text, beforehand. The AI collaboration is named openly in the text (code contribution), never hidden, never denied. Without the YES nothing goes out."
+  - pr-hand-text:
+      call: hand-text:0.0.17@fs
+      then: end
+      if: '${ $context.freigabe.ja == true }'
+      with:
+        block: ${ .input.pr_text }
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The person opens the pull request themselves, from their own account, with the approved text as the template (agents and bot never call gh for a pull request). If the YES is missing this step is skipped and the flow ends in `pr-rot`."
+  - pr-rot:
+      set:
+        todo: pr-wartet
+        status: held-back
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The pull request stays RED: no answer yet and the time limit has not run out, the rules of the upstream are not cited or forbid it, or the user did not say YES. Nothing is sent, no comment is written. The strategy reads the reason; after the answer or the time limit the flow is run again. This flow ends."
   - abgelehnt:
       set:
         todo: abgelehnt
