@@ -12,6 +12,8 @@
 # and one `lokal NICHT gelaufen: <what>` line per thing that did not run (foreign toolchain, Windows job, a tool or a multi-line CI step that was not run). The proof for landing is the branch CI at the exact head incl. the
 # windows job (report names the run id); a clippy finding in a file the branch changed is never dismissed as "toolchain, foreign code". A report without these lines is not finished.
 # Origin: AW18 (clippy::format_collect, CI 1.99.1 vs local 1.100.0), T1 (rust-rules on a test file, never run), SQ-2/SQ-1b (assert-is-empty in tests), PKG-2 (Windows cfg "unused self"), WP (shellcheck SC2164). Self test: scripts/test_gates_like_ci.sh.
+# [KERNDUMP] (review 23.11., 7 core dumps of an overflowing mutant): every slot run and every mutant run starts with `ulimit -c 0` (no core dumps; no root needed, the machine setting stays).
+# `scripts/workspace-test-background` does it for the full run; a worker that starts `build-slot.sh` or a mutant script by hand puts `ulimit -c 0;` in front in the same shell. A mutant that overflows the stack is a killed run (= red), not a crash to keep.
 # [PROZESSE] no `pkill` / `killall` (and no `kill $(pgrep ...)`) with patterns: several agents share one machine, a pattern kill ends the processes of OTHER agents.
 # An agent ends only its OWN processes, through the PID of the build-slot.sh process it started itself (`scripts/build-slot.sh ... & pid=$!`, then `kill "$pid"`).
 # Script check: `scripts/check-no-pkill` (red = a pattern kill in workflows/, scripts/, actions/ or .github/; self test scripts/test_check_no_pkill.sh).
