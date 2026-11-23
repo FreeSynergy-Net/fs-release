@@ -6,6 +6,7 @@
 use crate::emit::slot::pascal;
 use crate::model::Blueprint;
 use crate::rpm_spec::{Req, RpmSpec, SpecFile};
+use std::fmt::Write as _;
 use std::path::Path;
 
 /// Where the data of programs lives on the target system.
@@ -77,18 +78,16 @@ fn desktop(bp: &Blueprint) -> String {
         "[Desktop Entry]\nType=Application\nName={}\n",
         pascal(&p.name)
     );
-    s += &format!(
-        "Comment={}\nComment[de]={}\n",
+    let _ = write!(
+        s,
+        "Comment={}\nComment[de]={}\nExec=fs-starter {}\nCategories={};\n",
         line(&p.summary.en),
-        line(&p.summary.de)
-    );
-    s += &format!(
-        "Exec=fs-starter {}\nCategories={};\n",
+        line(&p.summary.de),
         p.name,
         p.categories.join(";")
     );
     if let Some(icon) = &p.icon {
-        s += &format!("Icon={icon}\n");
+        let _ = writeln!(s, "Icon={icon}");
     }
     s
 }
