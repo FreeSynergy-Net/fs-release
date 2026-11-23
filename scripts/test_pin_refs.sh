@@ -168,6 +168,7 @@ nolower_checks() {
   }
   nl_two v0.0.9 v0.1.0 v0.0.10 3
   nl_two v0.1.0 v0.0.9 v0.0.10 3
+  nl_two v0.0.9 v0.0.11 v0.0.10 3
   nl_two v0.0.9 v0.0.6 v0.0.10 0
 }
 nolower_checks "$here/pin-refs.sh" real
@@ -188,6 +189,7 @@ red_by nocheck 's@^  check_no_lower .*@  true@'
 red_by noancestor 's@ \|\| git -C "\$repo" merge-base --is-ancestor "\$o" "\$n"@@'
 red_by unknown-ok 's@rc=3; continue; }@continue; }@'
 red_by first-pin-only 's@\| sort -u\)@| sort -u | head -1)@'
+red_by last-pin-only 's@\| sort -u\)@| sort -u | tail -1)@'
 red_by target-unknown-ok 's@(not found in \$repo" >&2; )return 3;@\1true;@'
 red_by noboundary-awk 's@if \(RSTART > 1\) \{ c =@if (0) { c =@'
 red_by noboundary-grep 's@\(\^\|[^)]*\)\(\$owners\)/fs-release@(\$owners)/fs-release@'
