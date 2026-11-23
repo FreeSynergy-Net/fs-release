@@ -9,6 +9,8 @@ use crate::rpm_spec::{Req, RpmSpec, SpecFile};
 use std::fmt::Write as _;
 use std::path::Path;
 
+pub use crate::release_args::{check_fingerprint, checked_key, checked_pages_url};
+
 /// Where the data of programs lives on the target system.
 pub const PROGRAMS_DIR: &str = "/usr/share/freesynergy/programs";
 /// The default licence of the project (`workspace.package.license`).
@@ -84,10 +86,14 @@ fn desktop(bp: &Blueprint) -> String {
         line(&p.summary.en),
         line(&p.summary.de),
         p.name,
-        p.categories.join(";")
+        p.categories
+            .iter()
+            .map(|c| line(&Some(c.clone())))
+            .collect::<Vec<_>>()
+            .join(";")
     );
-    if let Some(icon) = &p.icon {
-        let _ = writeln!(s, "Icon={icon}");
+    if p.icon.is_some() {
+        let _ = writeln!(s, "Icon={}", line(&p.icon));
     }
     s
 }
@@ -190,57 +196,6 @@ pub fn repo_file(pages: &str) -> String {
     format!("{stable}\n{nightly}")
 }
 
-/// The Pages address for the `.repo` file: `https` only, one parsable URL with a host, no user info, no query, no fragment, and no white space or control
-/// character anywhere (a line break would put a new line into the `.repo` file). The placeholder is refused. Returned without a trailing slash.
-///
-/// # Errors
-/// A text naming what is wrong.
-pub fn checked_pages_url(pages: &str) -> Result<String, String> {
-    if pages == PAGES_URL || pages.is_empty() {
-        return Err("the Pages address is not set: give --pages-url (it is not known yet)".into());
-    }
-    if pages.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return Err("the Pages address holds white space or a control character".into());
-    }
-    let u = url::Url::parse(pages).map_err(|e| format!("the Pages address is not a URL: {e}"))?;
-    if u.scheme() != "https" {
-        return Err("the Pages address must start with https://".into());
-    }
-    if u.host_str().is_none_or(str::is_empty)
-        || !u.username().is_empty()
-        || u.password().is_some()
-        || u.query().is_some()
-        || u.fragment().is_some()
-    {
-        return Err(
-            "the Pages address must be https://host/path (no user info, query or fragment)".into(),
-        );
-    }
-    Ok(pages.trim_end_matches('/').to_string())
-}
-
-/// The key must parse as an armored `OpenPGP` PUBLIC key (crate `pgp`) and its primary fingerprint must be the expected one (40 hex digits, given by the caller, never fixed in code).
-///
-/// # Errors
-/// A text when the fingerprint option is malformed, the key does not parse as a public key, or the fingerprints differ.
-pub fn check_fingerprint(armor: &str, expected: &str) -> Result<(), String> {
-    use pgp::composed::{Deserializable, SignedPublicKey};
-    use pgp::types::KeyDetails;
-    let want = expected.to_ascii_uppercase();
-    if want.len() != 40 || !want.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Err("--fingerprint must be 40 hex digits (no spaces)".into());
-    }
-    let (key, _) = SignedPublicKey::from_armor_single(armor.as_bytes())
-        .map_err(|e| format!("the key file is not an armored PGP public key: {e}"))?;
-    let have = format!("{:X}", key.fingerprint());
-    if have != want {
-        return Err(format!(
-            "the fingerprint of the key is {have}, not the expected one"
-        ));
-    }
-    Ok(())
-}
-
 /// The package `freesynergy-release`: the dnf source and the PUBLIC key. Its version follows the fs-blueprint version; when the key or the URL changes, `--pkg-version` MUST be raised (else dnf sees no update).
 ///
 /// # Errors
@@ -254,11 +209,7 @@ pub fn release_spec(
 ) -> Result<RpmSpec, String> {
     let pages = checked_pages_url(pages)?;
     let pages = pages.as_str();
-    let armor = std::str::from_utf8(key).map_err(|_| "the key is not armored text".to_string())?;
-    if armor.contains("PRIVATE KEY") {
-        return Err("the key file holds a private key: refused".into());
-    }
-    check_fingerprint(armor, fingerprint)?;
+    let key = checked_key(key, fingerprint)?;
     let cfg = |dest: &str, bytes: Vec<u8>| SpecFile {
         dest: dest.into(),
         bytes: Some(bytes),
@@ -275,7 +226,7 @@ pub fn release_spec(
         url: Some(REPOSITORY_URL.into()),
         files: vec![
             cfg(REPO_FILE, repo_file(pages).into_bytes()),
-            SpecFile { dest: KEY_PATH.into(), bytes: Some(key.to_vec()), mode: 0o644, config: false },
+            SpecFile { dest: KEY_PATH.into(), bytes: Some(key), mode: 0o644, config: false },
         ],
         requires: Vec::new(),
         source_date: None,

@@ -1,5 +1,7 @@
 //! Review S3/S4: the Pages address and the public key of `freesynergy-release` are checked before anything goes into the package.
-use fs_blueprint::package_rpm::{check_fingerprint, checked_pages_url, release_spec, repo_file};
+use fs_blueprint::package_rpm::{
+    check_fingerprint, checked_key, checked_pages_url, release_spec, repo_file, KEY_PATH,
+};
 use std::path::Path;
 
 const FP: &str = "16A4A3EE563AEF51FCF0C55DED7B57C4A1904342";
@@ -106,4 +108,69 @@ fn a_release_package_needs_every_check() {
         "1",
     );
     assert!(secret.is_err());
+}
+
+// Review round 2 (M1, M2): only ONE checked public key may travel into the package, and it is written anew.
+const PROBE_FP: &str = "93221421976AA9D02CC46D42A2F6E14508F844D7";
+
+fn probe(name: &str) -> String {
+    let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/release-key");
+    std::fs::read_to_string(p.join(name)).unwrap()
+}
+
+/// The throw-away secret key of the test is stored without its armor lines (so no scanner takes it for a leak).
+fn probe_secret() -> String {
+    probe("probe-two-secret.txt")
+        .replace("@@BEGIN@@", "-----BEGIN PGP PRIVATE KEY BLOCK-----")
+        .replace("@@END@@", "-----END PGP PRIVATE KEY BLOCK-----")
+}
+
+#[test]
+fn the_probe_key_alone_is_taken() {
+    let out = checked_key(probe("probe-one.asc").as_bytes(), PROBE_FP).unwrap();
+    let text = String::from_utf8(out).unwrap();
+    assert_eq!(text.matches("-----BEGIN PGP").count(), 1);
+}
+
+#[test]
+fn a_second_key_block_appended_is_refused() {
+    let both = format!("{}\n{}", probe("probe-one.asc"), probe("probe-two.asc"));
+    let e = checked_key(both.as_bytes(), PROBE_FP).unwrap_err();
+    assert!(e.contains("exactly one armored block"), "{e}");
+    assert!(release_spec("https://example.org/x", both.as_bytes(), PROBE_FP, "1", "1").is_err());
+}
+
+#[test]
+fn two_primary_keys_in_one_block_are_refused() {
+    let both = probe("probe-both-in-one-block.asc");
+    assert_eq!(both.matches("-----BEGIN PGP").count(), 1);
+    let e = checked_key(both.as_bytes(), PROBE_FP).unwrap_err();
+    assert!(e.contains("more than one primary key"), "{e}");
+    assert!(release_spec("https://example.org/x", both.as_bytes(), PROBE_FP, "1", "1").is_err());
+}
+
+#[test]
+fn a_secret_key_appended_to_a_public_key_is_refused() {
+    let both = format!("{}\n{}", probe("probe-one.asc"), probe_secret());
+    let e = checked_key(both.as_bytes(), PROBE_FP).unwrap_err();
+    assert!(e.contains("private key"), "{e}");
+    assert!(release_spec("https://example.org/x", both.as_bytes(), PROBE_FP, "1", "1").is_err());
+}
+
+#[test]
+fn the_package_holds_the_key_written_anew_without_trailing_text() {
+    let with_tail = format!("{}\nsome text after the key\n", probe("probe-one.asc"));
+    let spec = release_spec(
+        "https://example.org/x",
+        with_tail.as_bytes(),
+        PROBE_FP,
+        "1",
+        "1",
+    )
+    .unwrap();
+    let file = spec.files.iter().find(|f| f.dest == KEY_PATH).unwrap();
+    let text = String::from_utf8(file.bytes.clone().unwrap()).unwrap();
+    assert!(!text.contains("some text after"));
+    assert_eq!(text.matches("-----BEGIN PGP").count(), 1);
+    assert!(check_fingerprint(&text, PROBE_FP).is_ok());
 }
