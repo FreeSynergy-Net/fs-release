@@ -1,11 +1,12 @@
 # Licence inventory (one-off survey, task licence-bestand): runs `cargo deny check licenses` with the ONE policy configs/deny.toml and the cargo-deny of scripts/cargo-deny.pin
 # (same sha256 check and --version check as scripts/licence-gate.sh) over every repo of the org FreeSynergy-Net that has a Cargo.toml. Nothing here changes the gate.
-# Repo list: the repos of the org FreeSynergy-Net whose root holds a Cargo.toml (`gh repo list FreeSynergy-Net` + contents/Cargo.toml, state 2026-11-24, 33 repos).
+# Repo list: the repos of the org FreeSynergy-Net whose root holds a Cargo.toml (`gh repo list FreeSynergy-Net` + contents/Cargo.toml, state 2026-11-24): 41 repos = 33 fs-* + group-nesting (our own Rust code, in the matrix: 34 jobs)
+# + 7 forks / third-party code (Blinc, blinc-app-fix, blinc-layout-fix, cargo-generate-rpm, kanidm, tuwunel, zentinel): deliberately NOT checked.
+# DEVIATION FROM THE GATE (open): the gate (scripts/licence-gate.sh) always runs with --locked. Here, when the run with --locked fails with an rc other than 0/4 (e.g. lock file out of date), it is repeated ONCE without --locked, so the
+# inventory still sees the licences. Such a job gets its own rc 65 and stays RED (the gate would be red there too); the table shows it as such. This repeat exists only in this inventory, never in the gate.
 # Every repo is its own job (fail-fast false): a red repo never hides the others. The table is in the step summary of the job `table`. No secrets, read access only.
 name: licence-bestand
 on:
-  push:
-    branches: ['unreviewed/licence-bestand']
   workflow_dispatch:
 
 permissions:
@@ -33,6 +34,7 @@ jobs:
           - fs-files
           - fs-forms
           - fs-groups
+          - group-nesting
           - fs-identity
           - fs-interfaces
           - fs-jscalendar
@@ -82,8 +84,15 @@ jobs:
           run() { "$bin" "$@" --manifest-path target/Cargo.toml --workspace "${locked[@]}" --config fsr/configs/deny.toml check licenses; }
           run --format json 2> deny.jsonl || rc=$?
           if [ "$rc" -ne 0 ] && [ "$rc" -ne 4 ] && [ "${#locked[@]}" -gt 0 ]; then
-            # not a licence finding (rc 4) but a metadata error with --locked (lock file out of date): repeat once without it, the inventory wants the licences
-            locked=(); note=" (lock out of date, repeated without --locked)"; rc=0; run --format json 2> deny.jsonl || rc=$?
+            # not a licence finding (rc 4) but a metadata error with --locked: repeat once without it, the inventory wants the licences (DEVIATION FROM THE GATE, see the head of the file)
+            first_rc="$rc"; grep -qiE "needs to be updated|--locked was passed" deny.jsonl && lockout=1 || lockout=0
+            locked=(); rc=0; run --format json 2> deny.jsonl || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              # green only without --locked: the gate would be RED here, so the job stays red with its own rc 65
+              rc=65; if [ "$lockout" -eq 1 ]; then note=" (lock out of date: green only without --locked, the gate would be red)"; else note=" (metadata error with --locked, rc $first_rc: green only without --locked, the gate would be red)"; fi
+            else
+              note=" (repeated without --locked after rc $first_rc)"
+            fi
           fi
           run 2>&1 | tail -n 60 || true
           findings="$(jq -r 'select(.type=="diagnostic" and .fields.severity=="error") | "\(.fields.code): \((.fields.graphs[0].Krate | "\(.name) \(.version)") // .fields.message)"' deny.jsonl 2>/dev/null | sort -u | paste -sd';' -)"
@@ -113,7 +122,7 @@ jobs:
         run: |
           {
             echo "## Licence inventory (cargo deny check licenses, policy configs/deny.toml)"
-            echo "rc 0 = green, 4 = licence finding, 64 = NOT RUN (a repo without a row did not run at all)."
+            echo "rc 0 = green, 4 = licence finding, 65 = licences ok only without --locked (the gate would be red), 64 = NOT RUN (a repo without a row did not run at all)."
             echo
             echo "| repo | rc | errors | findings |"
             echo "|---|---|---|---|"

@@ -1,0 +1,5 @@
+[package]
+name = "fs-components-render"
+version = "0.0.14"
+edition = "2021"
+license = "(MIT OR Apache-2.0) AND OFL-1.1"

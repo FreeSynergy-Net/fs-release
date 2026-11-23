@@ -45,7 +45,7 @@ allow = ["CDLA-Permissive-2.0"]
 [[licenses.exceptions]]
 # OFL-1.1: fs-components-render 0.0.13 and 0.0.20 carry JetBrains Mono (crates/fs-components-render/assets/fonts/ with the OFL text, README and the copyright line of the
 # JetBrains Mono Project Authors: all in the package, no include list); the font is gone since 0.0.23 (licence MIT OR Apache-2.0 again). Used by fs-tasks (0.0.13) and
-# fs-texts (0.0.20). Exact versions on purpose (cargo-deny 0.22 does not apply a version RANGE in `crate` reliably: tested). Date 2026-11-24. Remove these entries when
+# fs-texts (0.0.20). Exact versions on purpose: only these two versions are in use, and `name@version` is the narrowest form (a range would be `name:req`, e.g. `:>=0.0.13, <0.0.23`; careful: cargo-deny 0.22.0 treats `name@x` always as an EXACT version and silently drops an operator after `@`, so `@<0.0.23` means exactly 0.0.23). Date 2026-11-24. Remove these entries when
 # the callers use 0.0.23 or later, or the font is a package of its own.
 crate = "fs-components-render@0.0.13"
 allow = ["OFL-1.1"]

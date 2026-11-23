@@ -3,7 +3,8 @@
 # Self test of the gate `licence` (scripts/licence-gate.sh, step `licence` of scripts/gates.sh). Part A (stub cargo-deny, no network): "not run is never green" (no binary, wrong version, no policy, no
 # manifest, bad pin = rc 64 with the line `licence gate NOT RUN`), the exact cargo-deny call, the rc of cargo-deny is passed on, the step is in gates.sh. Part B (the REAL cargo-deny of
 # scripts/cargo-deny.pin, downloaded and sha256-checked by the gate itself): a workspace with a path dependency under AGPL-3.0-only is RED, one under `MIT OR Apache-2.0` is green
-# (tests/fixtures/licence-gate/). Mutants (the allow list gets AGPL; the step is removed from gates.sh; the call loses `licenses`) must each turn a check red.
+# (tests/fixtures/licence-gate/); the per-crate exceptions of configs/deny.toml: fixtures exc-ok (webpki-roots, webpki-root-certs, fs-components-render 0.0.20: green), exc-ok-0-0-13 (green),
+# exc-red (the same licences on other crates and on fs-components-render 0.0.23: red) and exc-red-0-0-14 (red). Mutants (the allow list gets AGPL; the step is removed from gates.sh; the call loses `licenses`) must each turn a check red.
 #   bash scripts/test_licence_gate.sh        (FS_CARGO_DENY=<binary of the pinned version> skips the download)
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -56,9 +57,15 @@ cp "$tmp/r.txt" "$tmp/ok.txt"
 exc_ok() { real "$1" exc-ok; [ $? -eq 0 ]; }
 exc_red() { real "$1" exc-red; local r=$?; [ "$r" -eq 4 ] && grep -q "other-cdla" "$tmp/r.txt" && grep -q "other-ofl" "$tmp/r.txt" && grep -q "fs-components-render v0.0.23" "$tmp/r.txt"; }
 chk "exceptions: webpki-roots, webpki-root-certs (CDLA-Permissive-2.0) and fs-components-render 0.0.20 (OFL-1.1) are green (rc 0)" exc_ok "$tmp/real"
+exc_ok13() { real "$1" exc-ok-0-0-13; [ $? -eq 0 ]; }
+exc_red14() { real "$1" exc-red-0-0-14; local r=$?; [ "$r" -eq 4 ] && grep -q "fs-components-render v0.0.14" "$tmp/r.txt"; }
+chk "exceptions: fs-components-render 0.0.13 (OFL-1.1, the second entry) is green (rc 0)" exc_ok13 "$tmp/real"
+chk "mutant of the data: OFL-1.1 on fs-components-render 0.0.14 (between the two exact versions) stays RED (rc 4)" exc_red14 "$tmp/real"
 chk "mutant of the data: CDLA-Permissive-2.0 / OFL-1.1 on OTHER crates and OFL on fs-components-render 0.0.23 stay RED (rc 4)" exc_red "$tmp/real"
 mkmech "$tmp/mut-exc"; perl -0pi -e 's/\[\[licenses\.exceptions\]\].*?(?=\[bans\])//s' "$tmp/mut-exc/configs/deny.toml"
 if exc_ok "$tmp/mut-exc"; then bad "mutant: exceptions removed survived"; else ok "mutant: policy without the exceptions is caught (exc-ok is no longer green)"; fi
+mkmech "$tmp/mut-exc3"; sed -i "s/^crate = \"fs-components-render@0.0.13\"/crate = \"fs-components-render@0.0.14\"/" "$tmp/mut-exc3/configs/deny.toml"
+if exc_ok13 "$tmp/mut-exc3"; then bad "mutant: wrong version in the second entry survived"; else ok "mutant: wrong version in the second entry is caught (0.0.13 is no longer green)"; fi
 mkmech "$tmp/mut-exc2"; sed -i 's/^    "MIT",$/    "MIT",\n    "CDLA-Permissive-2.0",\n    "OFL-1.1",/' "$tmp/mut-exc2/configs/deny.toml"
 if exc_red "$tmp/mut-exc2"; then bad "mutant: licences in the general allow list survived"; else ok "mutant: licences in the general allow list are caught (exc-red is no longer red)"; fi
 # mutant: AGPL on the allow list -> the check agpl_red must turn red (the test sees the loosened policy)
