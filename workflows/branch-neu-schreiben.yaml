@@ -92,7 +92,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "`git log --format='%ae %ce' main..HEAD | sort -u` is exactly ONE line, the identity FS_ALLOWED_IDENTITY (author and committer, also after a rebase); the check names the commit, never an address."
+        freesynergy.net:summary: "`git log --format='%ae%x09%ce' main..HEAD | sort -u` is exactly ONE line, the identity FS_ALLOWED_IDENTITY (author and committer, also after a rebase); the check names the commit, never an address."
   - wip-weg:
       call: wip-check:0.0.17@fs
       with:

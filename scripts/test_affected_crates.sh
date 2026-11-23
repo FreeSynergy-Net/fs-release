@@ -30,7 +30,7 @@ printf '[workspace]\nmembers = ["crates/*", "crates/outer/inner"]\nresolver = "2
 (cd "$W" && "$real_cargo" generate-lockfile >/dev/null 2>&1) || { echo "FAIL fixture: cargo generate-lockfile"; exit 1; }
 git -C "$W" init -q -b main
 G=(git -C "$W" -c user.name=t -c user.email=t@t)
-"${G[@]}" add -A; "${G[@]}" commit -q -m base
+"${G[@]}" add -A; "${G[@]}" commit -q -m base; git -C "$W" config --local freesynergy.identity-test-base HEAD
 
 AC="$repo/scripts/affected_crates.py"
 # files_case NAME WANT FILE...  (files relative to the workspace)
@@ -87,7 +87,7 @@ printf '#!/usr/bin/env bash\nif [ "$1" = metadata ]; then unset RUSTUP_TOOLCHAIN
 printf '#!/usr/bin/env bash\nunset RUSTUP_TOOLCHAIN\nexec "%s" "$@"\n' "$(command -v rustc)" >"$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
 gates_run() { # <script> <diff base or empty>; the repo under test is $W (HEAD = the stray commit); output in $GK/out, cargo words in $GK/cargo.log
   : >"$GK/cargo.log"; rm -f "$W/stray.txt"; "${G[@]}" commit -q -am unstray >/dev/null 2>&1
-  PATH="$GK/bin:$PATH" CI=true FS_IDENTITY_BASE=HEAD TMPDIR="$tmp" FS_GATES_FEHLERLISTE_DIR="$tmp" FS_GATES_DIFF_BASE="$2" bash "$1" "$W" >"$GK/out" 2>&1
+  PATH="$GK/bin:$PATH" CI=true TMPDIR="$tmp" FS_GATES_FEHLERLISTE_DIR="$tmp" FS_GATES_DIFF_BASE="$2" bash "$1" "$W" >"$GK/out" 2>&1
 }
 gate_cases() { # <script>; counts failures in cases_fail when QUIET
   local s=$1 rc=0 why=""

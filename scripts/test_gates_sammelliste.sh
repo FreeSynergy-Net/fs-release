@@ -33,15 +33,15 @@ S
 printf '#!/usr/bin/env bash\necho rustc-stub\n' >"$tmp/bin/rustc"; chmod +x "$tmp/bin/cargo" "$tmp/bin/rustc"
 printf '#!/usr/bin/env bash\nexec "$@"\n' >"$tmp/slot.sh"; chmod +x "$tmp/slot.sh"
 export STUBLOG="$tmp/cargo.log"
-export FS_IDENTITY_BASE=HEAD # fixture repos have no origin/main: the identity gate reads an empty range
+# fixture repos have no origin/main: every fixture repo names HEAD as identity base in its LOCAL config (freesynergy.identity-test-base); no environment variable can do that in CI
 
 # a mechanism folder (scripts + RUST_VERSION) and a repo with its own copy of it (no fs-release tag is pinned: the repo's own scripts count)
 mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; echo 1.0.0 >"$1/RUST_VERSION"; }
-mkrepo() { mkmech "$1"; git init -q -b main "$1"; echo x >"$1/a.txt"; echo "__pycache__/" >"$1/.gitignore"; git -C "$1" add -A; git -C "$1" commit -qm one; }
+mkrepo() { mkmech "$1"; git init -q -b main "$1"; echo x >"$1/a.txt"; echo "__pycache__/" >"$1/.gitignore"; git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" config --local freesynergy.identity-test-base HEAD; }
 app="$tmp/app"; mkrepo "$app"
 gates() { # <gates.sh> <list dir> [env...]: stdout+stderr in $tmp/o.txt; the rc is returned
   local g="$1" d="$2"; shift 2
-  : >"$STUBLOG"; env "$@" PATH="$tmp/bin:$PATH" CI=true FS_IDENTITY_BASE=HEAD FS_GATES_FEHLERLISTE_DIR="$d" bash "$g" "$app" >"$tmp/o.txt" 2>&1
+  : >"$STUBLOG"; env "$@" PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$d" bash "$g" "$app" >"$tmp/o.txt" 2>&1
 }
 list() { cat "$1"/fehlerliste-*.md 2>/dev/null; }
 

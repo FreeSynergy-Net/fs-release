@@ -38,11 +38,11 @@ mkdir -p "$tmp/sysroot/lib/rustlib/x86_64-pc-windows-msvc" "$tmp/alt-win" "$tmp/
 cp "$tmp"/alt/* "$tmp/alt-win/"; printf '#!/usr/bin/env bash\n[ "$1" = --print ] && { echo "%s"; exit 0; }\necho "rustc 1.0.0 (stub)"\n' "$tmp/sysroot" >"$tmp/alt-win/rustc"
 cp "$tmp"/alt/* "$tmp/alt-sc/"; rm -f "$tmp/alt-sc/shellcheck"
 mkrepo() { rm -rf "$1"; mkdir -p "$1/crates/x/tests" "$1/crates/x/src" "$1/.github/workflows"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; echo 1.0.0 >"$1/RUST_VERSION"
-  printf '__pycache__/\n.test-tmp/\n' >"$1/.gitignore"; git init -q -b main "$1"; git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" update-ref refs/remotes/origin/main HEAD; }
+  printf '__pycache__/\n.test-tmp/\n' >"$1/.gitignore"; git init -q -b main "$1"; git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" update-ref refs/remotes/origin/main HEAD; git -C "$1" config --local freesynergy.identity-test-base HEAD; }
 app="$tmp/app"; mkrepo "$app"
 run() { # <script> <path dir> <args...>: output in $tmp/o.txt, the rc is returned
   local s="$1" p="$2"; shift 2
-  PATH="$p:$PATH" CI=true FS_IDENTITY_BASE=HEAD FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$s" "$@" >"$tmp/o.txt" 2>&1
+  PATH="$p:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$s" "$@" >"$tmp/o.txt" 2>&1
 }
 G="$app/scripts/gates.sh"
 commit() { git -C "$app" add -A; git -C "$app" commit -qm "$1"; }
@@ -120,7 +120,7 @@ mut() { # <name> <file> <old> <new> <check command that must FAIL on the mutant>
   printf '%s\n' "${s/"$old"/"$new"}" >"$m/scripts/$f"; mkdir -p "$m/tests"; printf '//! Pattern: none (test).\n' >"$m/tests/t.rs"
   [ -z "${MFIX:-}" ] || (cd "$m" && eval "$MFIX")
   git -C "$m" add -A; git -C "$m" commit -qm mut
-  env ${MENV:-X=1} PATH="${MPATH:-$tmp/alt}:$PATH" CI=true FS_IDENTITY_BASE=HEAD FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$m/scripts/gates.sh" ${MARGS:---like-ci} "$m" >"$tmp/om.txt" 2>&1
+  env ${MENV:-X=1} PATH="${MPATH:-$tmp/alt}:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/l" bash "$m/scripts/gates.sh" ${MARGS:---like-ci} "$m" >"$tmp/om.txt" 2>&1
   if bash -c "$*"; then bad "mutant $name survived"; else ok "mutant $name is caught"; fi
 }
 export tmp

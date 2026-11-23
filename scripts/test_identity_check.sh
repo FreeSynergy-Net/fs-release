@@ -22,7 +22,7 @@ git -C "$tmp/r" reset -q --hard HEAD~1; c $OK agent@localhost three; run; chk "f
 c $OK $OK four; run; chk "foreign commit in the middle of the range: red" test $rc -eq 1
 git -C "$tmp/r" branch -f base HEAD; run; chk "empty range: green" test $rc -eq 0
 bash "$tool" "$tmp/r" nonexistent >/dev/null 2>&1; chk "missing base: rc 2" test $? -eq 2
-FS_ALLOWED_IDENTITY=other@example.org bash "$tool" "$tmp/r" HEAD~1 >/dev/null 2>&1; chk "FS_ALLOWED_IDENTITY is read (other value: red)" test $? -eq 1
+env -u CI FS_ALLOWED_IDENTITY=other@example.org bash "$tool" "$tmp/r" HEAD~1 >/dev/null 2>&1; chk "FS_ALLOWED_IDENTITY is read (other value: red)" test $? -eq 1
 # special characters in the address must never shift the fields (a blank, a TAB): author "ok ok" with a blank + foreign committer, TAB in author, TAB+blank in committer
 git -C "$tmp/r" branch -f base HEAD
 c "$OK $OK" bad@x blank; run; chk "blank in the author address cannot hide a foreign committer: red" test $rc -eq 1
@@ -37,4 +37,31 @@ git -C "$tmp/r" reset -q --hard HEAD~1; git -C "$tmp/r" branch -f base HEAD~2
 # shellcheck disable=SC2016
 sed 's/\$2 != ok || \$3 != ok/0/' "$tool" >"$tmp/mut"; git -C "$tmp/r" branch -f base HEAD~2; run "$tmp/mut"; chk "mutant is green where the original is red" test $rc -eq 0
 run; chk "original is red on the same range" test $rc -eq 1
+# --- Bundle 5 cases ---
+git -C "$tmp/r" branch -f base HEAD~2
+# MUST: a call from a foreign cwd (a directory without Git) with the root argument works (junk lines before the shebang once ran before the cd)
+mkdir "$tmp/nogit"; (cd "$tmp/nogit" && bash "$tool" "$tmp/r" HEAD~1 >"$tmp/o" 2>&1); chk "foreign cwd without Git, root argument: green (rc 0)" test $? -eq 0
+chk "the script starts with the shebang (line 1)" test "$(head -n 1 "$tool")" = '#!/usr/bin/env bash'
+sed '1a hits="$(git log --format=%h ..HEAD)" || exit 2' "$tool" >"$tmp/mutcwd"; (cd "$tmp/nogit" && bash "$tmp/mutcwd" "$tmp/r" HEAD~1 >/dev/null 2>&1); chk "mutant (a git call before the cd) is red in a foreign cwd" test $? -eq 2
+# S3: in CI the environment cannot loosen the gate; a repo with origin/main behind a foreign commit stays red
+mkdir "$tmp/c"; git -C "$tmp/c" init -q -b main; echo a >"$tmp/c/a"; git -C "$tmp/c" add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$BAD GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL=$BAD git -C "$tmp/c" -c commit.gpgsign=false commit -q -m bad
+git -C "$tmp/c" update-ref refs/remotes/origin/main HEAD
+c2() { echo "$1" >"$tmp/c/$1"; git -C "$tmp/c" add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL="$2" GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL="$2" git -C "$tmp/c" -c commit.gpgsign=false commit -q -m "$1"; }
+c2 good1 $OK; c2 bad2 $BAD
+envrun() { env "$@" bash "$tool" "$tmp/c" >"$tmp/o" 2>&1; }
+envrun CI=true; chk "CI, origin/main base, foreign commit in range: red (rc 1)" test $? -eq 1
+envrun CI=true FS_IDENTITY_BASE=HEAD; chk "CI with FS_IDENTITY_BASE=HEAD: rc 1 (an error, not a warning)" test $? -eq 1
+envrun CI=true FS_ALLOWED_IDENTITY=$BAD; chk "CI with a changed FS_ALLOWED_IDENTITY: rc 1" test $? -eq 1
+envrun CI=true FS_IDENTITY_BASE=origin/main; chk "CI with FS_IDENTITY_BASE=origin/main (the same): the gate runs, red on the foreign commit" test $? -eq 1
+envrun CI=true GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=freesynergy.identity-test-base GIT_CONFIG_VALUE_0=HEAD; chk "CI: GIT_CONFIG_* from the environment cannot name a test base (still red)" test $? -eq 1
+env -u CI FS_IDENTITY_BASE=HEAD bash "$tool" "$tmp/c" >/dev/null 2>&1; chk "local (no CI): FS_IDENTITY_BASE=HEAD is allowed (empty range, green)" test $? -eq 0
+git -C "$tmp/c" config --local freesynergy.identity-test-base HEAD; envrun CI=true; chk "CI: the fixture key in the LOCAL repo config names the test base (green on the empty range)" test $? -eq 0
+git -C "$tmp/c" config --local --unset freesynergy.identity-test-base
+sed 's/"\${CI:-}" = true/"${CI:-}" = nope/g' "$tool" >"$tmp/mutci"; chk "mutant (CI branch off) differs from the original" test "$(cmp -s "$tool" "$tmp/mutci" && echo same)" != same
+env CI=true FS_IDENTITY_BASE=HEAD bash "$tmp/mutci" "$tmp/c" >/dev/null 2>&1; chk "mutant (CI branch off): the CI case turns green (the test sees it)" test $? -eq 0
+# S2: git replace must not hide a foreign commit
+badsha="$(git -C "$tmp/c" rev-parse HEAD)"; goodsha="$(git -C "$tmp/c" rev-parse HEAD~1)"
+git -C "$tmp/c" replace "$badsha" "$goodsha"; env -u CI bash "$tool" "$tmp/c" origin/main >/dev/null 2>&1; chk "git replace of the foreign commit: still red" test $? -eq 1
+sed 's/--no-replace-objects //' "$tool" >"$tmp/mutrep"; env -u CI bash "$tmp/mutrep" "$tmp/c" origin/main >/dev/null 2>&1; chk "mutant (without --no-replace-objects): the replace trick turns green" test $? -eq 0
+git -C "$tmp/c" replace -d "$badsha" >/dev/null
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi

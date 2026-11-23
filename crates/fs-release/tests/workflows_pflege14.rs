@@ -10,7 +10,7 @@ use serde_json::Value;
 
 type R = Result<(), String>;
 
-const WHEN: &str = "${ $context.ci == null or ($context.ci.runs // [] | length) == 0 or ([$context.ci.runs[] | select(.id == null or .conclusion == null or .headSha != $workflow.input.head)] | length) > 0 }";
+const WHEN: &str = "${ $context.ci == null or ($context.ci.runs // [] | length) == 0 or (($workflow.input.erwartete_laeufe // []) | length) == 0 or ([$context.ci.runs[] | select(.id == null or .conclusion == null or .conclusion == \"\" or .headSha != $workflow.input.head)] | length) > 0 or ([($workflow.input.erwartete_laeufe // [])[] as $n | select(([$context.ci.runs[].name] | index($n)) == null) | $n] | length) > 0 }";
 
 fn need(ok: bool, msg: &str) -> R {
     if ok {
@@ -65,7 +65,7 @@ fn review(d: &Value) -> R {
 
 type Mut = (&'static str, fn(&mut Value));
 
-const MUTANTS: [Mut; 6] = [
+const MUTANTS: [Mut; 8] = [
     ("G1 no gate step", |d| drop_step(d, "ci-beleg-weiche")),
     ("G2 stop case continues", |d| {
         set_then(d, "ci-beleg-weiche", "ohne-lauf-id", "continue");
@@ -84,6 +84,21 @@ const MUTANTS: [Mut; 6] = [
                 set_with(d, n, "head", "${ .input.branch }");
             }
         }
+    }),
+    ("G7 empty conclusion counts as proof", |d| {
+        let w = WHEN.replace(" or .conclusion == \"\"", "");
+        set_when(d, "ci-beleg-weiche", "ohne-lauf-id", &w);
+    }),
+    ("G8 expected runs not checked", |d| {
+        let i = WHEN
+            .find(" or ([($workflow.input.erwartete_laeufe")
+            .unwrap();
+        set_when(
+            d,
+            "ci-beleg-weiche",
+            "ohne-lauf-id",
+            &format!("{} }}", &WHEN[..i]),
+        );
     }),
     ("G6 gate behind the review", |d| {
         move_step_to_end(d, "ci-beleg-weiche");

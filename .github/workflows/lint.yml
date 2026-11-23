@@ -23,7 +23,7 @@ jobs:
       - name: shellcheck
         id: shellcheck
         continue-on-error: true
-        run: shellcheck -x -S warning scripts/*.sh scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh actions/*/*.sh
+        run: shellcheck -x -S warning scripts/*.sh $(grep -slE "^#!(/usr/bin/env |/bin/)(ba)?sh" scripts/*) scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh actions/*/*.sh
       - name: python
         id: python
         continue-on-error: true
