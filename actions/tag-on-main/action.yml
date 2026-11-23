@@ -1,0 +1,7 @@
+name: tag-on-main
+description: Refuse a release unless the commit of the tag is an ancestor of origin/main (the checkout must be full, fetch-depth 0).
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: bash "$GITHUB_ACTION_PATH/check.sh"

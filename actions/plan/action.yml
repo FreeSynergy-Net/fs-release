@@ -28,6 +28,9 @@ outputs:
 runs:
   using: composite
   steps:
+    # a binary release only from a commit of main (the caller's checkout has fetch-depth 0)
+    - shell: bash
+      run: bash "$GITHUB_ACTION_PATH/../tag-on-main/check.sh"
     - id: plan
       shell: bash
       # no working-directory here: plan.py enters WORKDIR itself (a relative one would be applied twice)

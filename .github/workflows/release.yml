@@ -54,6 +54,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the plan checks that the tag commit is on main (actions/tag-on-main)
       - id: plan
         uses: FreeSynergy/fs-release/actions/plan@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
         with:

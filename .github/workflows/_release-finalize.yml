@@ -28,6 +28,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the next step needs origin/main
+      - name: the commit of the tag is on main
+        uses: FreeSynergy/fs-release/actions/tag-on-main@e596ed65e56e5cdca1a9a453d0f12f7bc4b2edf7
       - name: the checkout is the commit of the tag
         run: |
           set -euo pipefail

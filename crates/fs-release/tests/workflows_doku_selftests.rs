@@ -51,6 +51,11 @@ fn library_release_passes_its_self_test() {
 }
 
 #[test]
+fn tag_on_main_passes_its_self_test() {
+    run_self_test("test_tag_on_main.sh");
+}
+
+#[test]
 fn the_signing_environment_check_passes_its_self_test() {
     run_self_test("test_check_signing_env.sh");
 }
