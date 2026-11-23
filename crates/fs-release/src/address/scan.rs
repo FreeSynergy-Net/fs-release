@@ -25,7 +25,7 @@ impl Hit {
     }
 }
 
-fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
+pub(super) fn git(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
     Command::new("git")
         .arg("-C")
         .arg(dir)

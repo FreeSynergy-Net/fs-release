@@ -1,4 +1,4 @@
-//! Pattern: Facade (`fs-release address bestand|ersetzen|nachher`; every error is exit code 2 with a message, red is 1).
+//! Pattern: Facade (`fs-release address bestand|ersetzen|nachher|aufrufer`; every error is exit code 2 with a message, red is 1).
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use clap::{Args, Subcommand};
 
 use super::allow::Allow;
+use super::aufrufer::{Ctx, Report, Rules};
 use super::class::Class;
 use super::replace::replace_tree;
 use super::scan::{repo_name, scan, Hit};
@@ -24,6 +25,24 @@ enum Action {
     Ersetzen(Common),
     /// After-check with the broad pattern: green only if nothing is left outside `allow` and outside the Cargo classes.
     Nachher(Nachher),
+    /// Callers: every fs-release `uses:` names the exact owner and a ref that contains owner-neutral and lies on origin/main.
+    Aufrufer(Aufrufer),
+}
+
+#[derive(Args)]
+struct Aufrufer {
+    /// The owner-neutral commit on main of fs-release (40 hex, no default).
+    #[arg(long)]
+    neutral: String,
+    /// Local fs-release clone (fetched by the caller; read: origin/main and tags).
+    #[arg(long = "fs-release")]
+    fs_release: PathBuf,
+    /// State of the caller repos to read.
+    #[arg(long = "ref", default_value = "HEAD")]
+    git_ref: String,
+    /// Caller repo directories.
+    #[arg(required = true)]
+    dirs: Vec<PathBuf>,
 }
 
 #[derive(Args)]
@@ -60,6 +79,7 @@ pub fn run(args: &AddressArgs) -> i32 {
     match &args.action {
         Action::Bestand(c) => stock(c, false, false),
         Action::Nachher(n) => stock(&n.common, true, n.all_classes),
+        Action::Aufrufer(a) => aufrufer(&a.neutral, &a.fs_release, &a.git_ref, &a.dirs),
         Action::Ersetzen(c) => replace(c),
     }
 }
@@ -89,6 +109,24 @@ fn replace(c: &Common) -> i32 {
         }
     }
     code
+}
+
+fn aufrufer(neutral: &str, clone: &std::path::Path, git_ref: &str, dirs: &[PathBuf]) -> i32 {
+    let ctx = match Ctx::new(clone, neutral, Rules::strict()) {
+        Ok(c) => c,
+        Err(e) => return fail(&e),
+    };
+    let mut rep = Report {
+        lines: Vec::new(),
+        quiet_repos: Vec::new(),
+    };
+    for d in dirs {
+        if let Err(e) = ctx.check_repo(d, git_ref, &mut rep) {
+            return fail(&e);
+        }
+    }
+    print!("{}", rep.text(dirs.len() - rep.quiet_repos.len()));
+    i32::from(rep.red() > 0)
 }
 
 fn fail(msg: &str) -> i32 {
