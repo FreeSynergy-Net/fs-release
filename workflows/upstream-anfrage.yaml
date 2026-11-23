@@ -4,6 +4,11 @@
 # text is ENGLISH, has NO AI words and NO addresses or personal data, and carries the git-bug id. NEVER a pull request and NEVER a comment in a foreign issue or thread. Other upstreams keep the approval of the person (step `approval`).
 # The agent only prepares the text and the git-bug id; the helper of the strategy sends (agents never call gh or a browser login). Loops are counted: from the third round (`runde` >= 3) `eskalation`.
 # Agents never push to our repos, tag or merge. Order: `Workflow upstream-anfrage, step draft, parameters upstream, evidence, art`. FS profile: see README.md.
+# TEXTS TO THE OUTSIDE (mandatory for EVERY text that leaves us: issue, PR text, mail, request to Blinc or another upstream; other workflows point here):
+# (a) read the rules of the target (CONTRIBUTING, AI stance, issue template) and cite the place (`ziel-regeln-lesen`); (b) write in the voice of the SENDER (the user), no agent
+# signature or trailer in the text; the AI help is ONE honest sentence when the rules of the target allow or ask for it, never hidden, never scattered; a target that
+# rejects AI contributions (example: Kanidm) gets NOTHING sent and NOTHING prepared without the explicit word of the user (`ki-haltung-weiche`); (c) finished as a copy
+# block in the format of the target, preview checked (`kopierblock`); (d) the sender reads it against and only then it goes out (gate human). A bot or agent never sends itself.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -37,6 +42,32 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a pull request, a comment or a missing result goes to `abgelehnt`; only `red == false` goes on to the proof."
+  - ziel-regeln-lesen:
+      call: target-rules:0.0.17@fs
+      with:
+        upstream: ${ .input.upstream }
+      export:
+        as: '${ $context + { ziel: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.ziel-regeln-lesen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (a), mandatory for every outside text. The agent READS the rules of the target (CONTRIBUTING, code of conduct, AI or LLM stance, issue and PR template, the contributor notes in the README) read only, and cites the place of each finding (file and line or link, at the date read); no citation means not read. Result `ziel` with `ki` (`erlaubt`, `verlangt`, `ohne-vermerk` = the rules forbid an AI note in the text, as at Blinc, or `abgelehnt` = the target refuses AI contributions, as Kanidm), `format` (the format of the target: template fields, language, length) and `fundstellen`. Silent rules count as `erlaubt`."
+  - ki-haltung-weiche:
+      switch:
+        - abgelehnt:
+            when: '${ $context.ziel.ki == null or ($context.ziel.ki == "abgelehnt" and .input.nutzerwort_ki != true) }'
+            then: ki-abgelehnt
+        - weiter:
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow (TEXTS TO THE OUTSIDE (b)) - a target that rejects AI contributions (or a missing `ziel` result) goes to `ki-abgelehnt`: nothing is sent and nothing is prepared (no ticket, no draft), unless the explicit word of the user for exactly this target stands in `nutzerwort_ki`. Every other value goes on."
   - belegen:
       call: prove-ai:0.0.17@fs
       with:
@@ -118,7 +149,7 @@ do:
         freesynergy.net:bot-seat: upstream-anfrage.draft
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body; it names the git-bug id of the ticket; NO AI words and NO address or personal data, no pull request, no comment in a foreign issue.
+        freesynergy.net:summary: The agent drafts the issue - short, friendly, English, backed by evidence (reproducer, version, measured numbers); title on the first line, a blank line, then the body; it names the git-bug id of the ticket; NO address or personal data, no pull request, no comment in a foreign issue. TEXTS TO THE OUTSIDE (b) - written in the voice of the sender (the user, "we"/"I" as the user would say it), no agent signature, no trailer, no robot footer, no session link; the AI help is stated in exactly ONE honest sentence at the end when `ziel.ki` is `erlaubt` or `verlangt` (never hidden, never repeated per item), and not at all when `ziel.ki` is `ohne-vermerk` (Blinc); the format follows `ziel.format`.
   - rules:
       call: upstream-rules:0.0.17@fs
       with:
@@ -144,7 +175,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Script - the text gate: the text is ENGLISH, has NO AI words (Claude, Anthropic, AI, LLM, model, agent, robot, bot footer), NO e-mail address, no phone number, no personal data and no private path, and names the git-bug id; no Co-Authored-By, no session link. Result `textcheck` with `hits` (the broken points) and `runde` (+1 for each jump back from `back-to-draft`)."
+        freesynergy.net:summary: "Script - the text gate: the text is ENGLISH, has NO AI words (Claude, Anthropic, AI, LLM, model, agent, robot, bot footer) - except exactly ONE honest AI sentence when `ziel.ki` is `erlaubt` or `verlangt` (two or more AI mentions, a missing sentence when `verlangt`, or any mention when `ohne-vermerk` is a hit) -, NO e-mail address, no phone number, no personal data and no private path, and names the git-bug id; no Co-Authored-By, no session link. Result `textcheck` with `hits` (the broken points) and `runde` (+1 for each jump back from `back-to-draft`)."
   - back-to-draft:
       switch:
         - runden:
@@ -161,6 +192,20 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: Control flow - a hit of `rules` or `text-gate` (a missing `hits` result counts as a hit) goes back to draft with the hits as the order, from the third round (`runde` >= 3) to `eskalation`; a clean draft goes on to the approval.
+  - kopierblock:
+      call: copy-block:0.0.17@fs
+      with:
+        draft: ${ $context.draft }
+        format: ${ $context.ziel.format }
+      export:
+        as: '${ $context + { block: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: upstream-anfrage.kopierblock
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (c). The agent sets the clean draft as ONE copy block in the format of the target (GitHub Markdown by default - title, short summary, steps to reproduce, expected / actual, version; the template fields of the target when it has one), with a rendered preview checked for broken lists, fences, links and line breaks. Result `block` with the copy block and the preview check; plain text, ready to paste, without any wrapper or note of ours inside it."
   - blinc-kanal:
       call: blinc-channel:0.0.17@fs
       with:
@@ -183,7 +228,7 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The user's YES for exactly this text, given beforehand; without it nothing is sent, a changed text needs a new YES.
+        freesynergy.net:summary: TEXTS TO THE OUTSIDE (d) - the SENDER (the user) reads the copy block `block` against the preview and the cited rules of the target, and gives the YES for exactly this text, beforehand; without it nothing is sent, a changed text needs a new YES. A bot or agent never sends itself.
       if: '${ .input.upstream != "blinc" }'
   - choose-channel:
       call: choose-channel:0.0.17@fs
@@ -259,6 +304,17 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Nothing is sent: a pull request or a comment was asked for, the statement is not proven, or a duplicate exists (the link goes into the report; no comment is written in the foreign issue). The strategy reads the reason and decides; a held-back request may come back with proof. This flow ends."
+  - ki-abgelehnt:
+      set:
+        todo: ki-abgelehnt
+        status: held-back
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "TEXTS TO THE OUTSIDE (b): the target refuses AI contributions (example: Kanidm) or its rules could not be read. Nothing is sent and nothing is prepared; only the explicit word of the user for exactly this target (`nutzerwort_ki`) starts the flow again. This flow ends."
   - eskalation:
       set:
         todo: eskalation
