@@ -8,7 +8,7 @@ use anyhow::{ensure, Context, Result};
 
 use crate::guard::{index_file, split_v2, version_of_ref};
 
-/// The arguments of `publish` (job 2 of the workflow: no cargo, no build script runs here).
+/// The arguments of `publish` (job 2 of the workflow: no source build script runs here; the one cargo call is `cargo metadata --no-deps` in the unpacked `.crate`, with the toolchain fixed by the workflow).
 #[derive(clap::Args, Clone)]
 pub struct PublishArgs {
     /// The full git ref of the tag (`refs/tags/vX.Y.Z`); only that writes.

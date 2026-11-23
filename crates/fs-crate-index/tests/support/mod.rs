@@ -163,8 +163,20 @@ impl World {
             source_base: format!("file://{}", self.root.display()),
             work_dir: self.root.join(format!("work-{}", self.n)),
             out: self.root.join(format!("out-{}", self.n)),
-            semver_checks: None,
+            semver_checks: Some(self.ok_semver()),
         }
+    }
+    /// A stand-in for cargo-semver-checks that always succeeds (`scan` requires the binary, r3 M2).
+    pub fn ok_semver(&self) -> PathBuf {
+        let bin = self.root.join("semver-ok.sh");
+        fs::write(&bin, "#!/bin/sh\nexit 0\n").unwrap();
+        ok(&run(
+            &self.root,
+            "chmod",
+            &["+x", bin.to_str().unwrap()],
+            &[],
+        ));
+        bin
     }
     pub fn apply_args(&self, scan: &ScanArgs) -> ApplyArgs {
         ApplyArgs {
