@@ -1,4 +1,4 @@
-//! Pattern: Pipeline (job 2 of the pull path: only enters, no cargo).
+//! Pattern: Pipeline (job 2 of the pull path: only enters; no source build code, the one cargo call is `cargo metadata --no-deps` with a fixed toolchain).
 
 use std::path::PathBuf;
 

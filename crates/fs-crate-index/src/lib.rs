@@ -3,7 +3,9 @@
 //! PULL path (ADR 0093, decision of the strategy: no secret, no right across repos): a workflow IN the registry repo `FreeSynergy-Net/fs-crates`
 //! (template: `templates/fs-crates/`) runs on a schedule. Job 1 (`contents: read`) calls `scan`: `git ls-remote --tags` of the repos on the allow list,
 //! checks, `cargo package --locked`, semver gate with `--baseline-root` on the newest `.crate` of the own checkout. Job 2 (`contents: write`) calls
-//! `apply`: no cargo, only the entries (`publish` per crate, dependency order) and one push. The token never meets `cargo build` or `cargo package`.
+//! `apply`: only the entries (`publish` per crate, dependency order) and one push; the tool comes from its own job (no source repo, no cache) and job 2 checks its sha256.
+//! The only cargo call in job 2 is `cargo metadata --no-deps` of `reg-index` inside the unpacked `.crate`, with a fixed toolchain. HONEST: the CONTENT of the `.crate` files is decided
+//! by the code that runs in job 1 (the build scripts of the source crates and of their dependencies run during `cargo package`); `apply` cannot check it.
 //!
 //! Guards (threat model: protects against MISTAKES, not against someone who can change workflow, toolchain or scripts; whoever can write
 //! to the registry repo can swap crates, the checksum lies in the same repo):

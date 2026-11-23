@@ -121,18 +121,15 @@ fn a_checked_branch_cannot_switch_a_lint_off_in_its_manifest() {
     let reg = w.reg.to_string_lossy().into_owned();
     let manifest = w.src.join("demo-base/Cargo.toml");
     let orig = fs::read_to_string(&manifest).unwrap();
-    // allowed: nothing, or exactly `enum_variant_added = "warn"`
+    // allowed: NO lint table (r3, M3: not even `warn`, the filter by type is not built)
     assert!(gate(&args(&mut w, &reg, Some(bin.clone()))).is_ok());
     let with =
         |lints: &str| format!("{orig}\n[package.metadata.cargo-semver-checks.lints]\n{lints}\n");
-    fs::write(&manifest, with("enum_variant_added = \"warn\"")).unwrap();
-    assert!(
-        gate(&args(&mut w, &reg, Some(bin.clone()))).is_ok(),
-        "the one allowed deviation"
-    );
     // MUTANT: a lint set to allow (any lint, also a table form), a warn for another lint, a workspace-level table: RED, cargo-semver-checks is not even called
     let n = fs::read_to_string(&log).unwrap().lines().count();
     for bad in [
+        with("enum_variant_added = \"warn\""),
+        format!("{orig}\n[lints.cargo-semver-checks]\nenum_variant_added = \"allow\"\n"),
         with("enum_variant_missing = \"allow\""),
         with("enum_variant_added = \"allow\""),
         with("enum_missing = \"warn\""),

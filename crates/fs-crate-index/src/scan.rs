@@ -1,4 +1,4 @@
-//! Pattern: Pipeline (pull path, ADR 0093): `scan` = job 1 (reads, packages, checks, writes a plan), `apply` = job 2 (only enters; no cargo).
+//! Pattern: Pipeline (pull path, ADR 0093): `scan` = job 1 (reads, packages, checks, writes a plan), `apply` = job 2 (only enters; the tool comes from its own job and is checked by sha256).
 //!
 //! The allow list lives in the registry repo itself (`allowed-sources.txt`): one line per source repo, `owner/repo <first-version> <package>...`, the
 //! packages in dependency order (a package may depend on the ones before it). A change of that file needs a review (CODEOWNERS, docs/crate-index.md).
@@ -11,7 +11,7 @@ use semver::Version;
 
 use crate::allow::{list_tags, parse_allow, url_of, Source, TagInfo};
 use crate::publish::{git_out, package};
-use crate::semver::{gate, work_for, SemverArgs};
+use crate::semver::{gate, work_for, Outcome, SemverArgs};
 
 /// The arguments of `scan`.
 #[derive(clap::Args, Clone)]
@@ -31,8 +31,8 @@ pub struct ScanArgs {
     /// New, empty directory for the result: `plan.txt` and the `.crate` files (the hand-over to `apply`).
     #[arg(long)]
     pub out: PathBuf,
-    /// `cargo-semver-checks` binary (pinned, checksum checked by the workflow). Without it the gate is reported as NOT RUN.
-    #[arg(long)]
+    /// `cargo-semver-checks` binary (pinned, checksum checked by the workflow). REQUIRED (r3, M2): without it a crate with a baseline cannot be checked, and then nothing is planned (RED).
+    #[arg(long, required = true)]
     pub semver_checks: Option<PathBuf>,
 }
 
@@ -170,6 +170,10 @@ fn scan_tag(
             semver_checks: a.semver_checks.clone(),
             work_dir: work_for(&a.work_dir, &format!("{p}-{}", t.version)),
         })?;
+        ensure!(
+            !matches!(o, Outcome::NotRun(_)),
+            "semver gate NOT RUN for {p} (baseline exists, no --semver-checks): not planned, NOT RUN is never green"
+        );
         rep.notes.push(o.line(p));
         let fname = f.file_name().unwrap().to_string_lossy().into_owned();
         std::fs::copy(f, a.out.join(&fname))?;

@@ -1,10 +1,16 @@
 # Template for the registry repo FreeSynergy-Net/fs-crates (PULL path, ADR 0093, decision of the strategy 23 Nov. 2026): this workflow lives IN fs-crates and pulls new
 # release tags of the repos on the allow list `allowed-sources.txt`. No secret, no write right across repos: the only token is the GITHUB_TOKEN of this repo.
-# Threat model (docs/crate-index.md in fs-release): protects against MISTAKES (wrong tag, replayed tag, a tag moved afterwards, a changed .crate), NOT against someone who can
-# change this workflow, the allow list, the toolchain or the scripts: whoever writes to fs-crates can swap a crate and its checksum together.
-# Two jobs: `package` (contents: read) builds the tool and the crates, `enter` (contents: write) only enters and pushes, it compiles nothing (the token never meets cargo build or cargo package).
-# Install: see README.md. REPLACE the pin `FS_RELEASE_PIN` (40 hex) by the fs-release commit that contains `crates/fs-crate-index` (the pin tool of fs-release sets it); until then the
-# `uses:` lines are not callable (the old pin 78992eea does not know the tool).
+# Threat model (docs/crate-index.md in fs-release): protects against MISTAKES (wrong tag, replayed tag, a tag moved afterwards, a changed .crate, a tool swapped between the jobs),
+# NOT against someone who can change this workflow, the allow list, the toolchain or the scripts: whoever writes to fs-crates can swap a crate and its checksum together.
+# HONEST: the CONTENT of the .crate files of a run is decided by the code that runs in job `package` (`cargo package` and cargo-semver-checks compile the source crates: their
+# build.rs and the build code of their crates.io dependencies run there). Whoever controls a source repo on the allow list (main + annotated tag) or such a dependency decides the
+# .crate files of that run, with several source repos in one run also those of the OTHER repos. What the job split does guarantee: the tool that enters them is not theirs.
+# Three jobs:
+# - `tool` (contents: read): builds fs-crate-index from the pinned fs-release, WITHOUT checkout of any source repo, WITHOUT cache; outputs its sha256.
+# - `package` (contents: read): runs the tool and builds the crates (foreign build code runs here, the token is not here). Uploads only plan.txt and the .crate files.
+# - `enter` (contents: write): takes the tool from `tool`, checks it against the sha256 (red if it differs), enters the plan with a fixed toolchain, pushes.
+# Install: see README.md. REPLACE the pin `FS_RELEASE_PIN` (40 hex) by hand (the pin tool pin-refs.sh refuses it: rc 3, unknown pin) with the fs-release commit that contains
+# `crates/fs-crate-index`; until then the `uses:` lines are not callable (the old pin 78992eea does not know the tool).
 name: index
 on:
   schedule:
@@ -22,7 +28,37 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  tool:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      sha256: ${{ steps.sum.outputs.sha256 }}
+      toolchain: ${{ steps.sum.outputs.toolchain }}
+    steps:
+      # no checkout: nothing of fs-crates or of a source repo is in this job; cache "false": the tool is never built from a cache that a package job could have written
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@FS_RELEASE_PIN
+        with:
+          cache: "false"
+      # builds fs-crate-index from the pinned checkout of this action (and fetches the pinned cargo-semver-checks, checked by sha256, not used here)
+      - id: tools
+        uses: FreeSynergy-Net/fs-release/actions/semver-baseline@FS_RELEASE_PIN
+      - id: sum
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tool"
+          cp "${{ steps.tools.outputs.tool }}" "$RUNNER_TEMP/tool/fs-crate-index"
+          echo "sha256=$(sha256sum "$RUNNER_TEMP/tool/fs-crate-index" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$RUSTUP_TOOLCHAIN" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tool
+          path: ${{ runner.temp }}/tool/fs-crate-index
+          if-no-files-found: error
+
   package:
+    needs: tool
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -34,27 +70,44 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      # cache "false": foreign build code runs in this job, so its state must never be saved for a later run
       - uses: FreeSynergy-Net/fs-release/actions/setup-rust@FS_RELEASE_PIN
-      # ONE implementation of the semver gate and ONE place of the pinned cargo-semver-checks: the action (without `package` it only installs and builds the tool)
+        with:
+          cache: "false"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tool
+          path: ${{ runner.temp }}/tool
+      # the tool of job `tool`, checked here too (job 1 runs source build code only AFTER this point; `enter` checks again at the end)
+      - name: tool
+        env:
+          WANT: ${{ needs.tool.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          echo "$WANT  $RUNNER_TEMP/tool/fs-crate-index" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/tool/fs-crate-index"
+      # ONE implementation of the semver gate and ONE place of the pinned cargo-semver-checks: the action (with `tool` it only installs cargo-semver-checks, it builds nothing)
       - id: tools
         uses: FreeSynergy-Net/fs-release/actions/semver-baseline@FS_RELEASE_PIN
-      - name: hand-over directory with the tool
-        run: mkdir -p "$RUNNER_TEMP/handover" && cp "${{ steps.tools.outputs.tool }}" "$RUNNER_TEMP/handover/fs-crate-index"
+        with:
+          tool: ${{ runner.temp }}/tool/fs-crate-index
       # reads the allow list, `git ls-remote --tags` of every repo on it, checks (annotated tag, tag commit on main of the source repo, tag = package version,
-      # not in the index yet, tag not moved), `cargo package --locked`, semver gate with --baseline-root on the newest .crate of THIS checkout; writes plan.txt and the .crate files
+      # not in the index yet, tag not moved), `cargo package --locked`, semver gate with --baseline-root on the newest .crate of THIS checkout (`--semver-checks` is REQUIRED:
+      # the tool is red without it, never "NOT RUN = green"); writes plan.txt and the .crate files
       - id: scan
         continue-on-error: true
         run: |
           set -euo pipefail
           rc=0
-          "$RUNNER_TEMP/handover/fs-crate-index" scan --allow allowed-sources.txt --registry-dir . --work-dir "$RUNNER_TEMP/work" --out "$RUNNER_TEMP/handover/out" \
+          "$RUNNER_TEMP/tool/fs-crate-index" scan --allow allowed-sources.txt --registry-dir . --work-dir "$RUNNER_TEMP/work" --out "$RUNNER_TEMP/out" \
             --semver-checks "${{ steps.tools.outputs.semver-checks }}" | tee "$RUNNER_TEMP/scan.log" || rc=$?
           grep '^entries=' "$RUNNER_TEMP/scan.log" >> "$GITHUB_OUTPUT" || true
           exit "$rc"
+      # only plan.txt and the .crate files; no tool in this artifact
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: handover
-          path: ${{ runner.temp }}/handover
+          path: ${{ runner.temp }}/out
           if-no-files-found: error
       # a red scan is red here, even though `enter` still enters the crates of the tags before the bad one
       - if: steps.scan.outcome == 'failure'
@@ -63,31 +116,44 @@ jobs:
           exit 1
 
   enter:
-    needs: package
-    if: ${{ always() && needs.package.outputs.entries != '' && needs.package.outputs.entries != '0' }}
+    needs: [tool, package]
+    if: ${{ always() && needs.tool.result == 'success' && needs.package.outputs.entries != '' && needs.package.outputs.entries != '0' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
+      # the toolchain first and fixed (RUSTUP_TOOLCHAIN in the environment beats a rust-toolchain.toml inside a .crate: `cargo metadata` runs in the unpacked .crate)
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@FS_RELEASE_PIN
+        with:
+          cache: "false"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          name: tool
+          path: ${{ runner.temp }}/tool
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
           name: handover
-          path: ${{ runner.temp }}/handover
-      # no cargo here: only the prebuilt tool, which re-checks every plan line against the allow list and the tag, enters the crates in dependency order (one commit each)
+          path: ${{ runner.temp }}/out
+      # the tool must be the one `tool` built: without the matching sha256 this step is RED. The tool re-checks every plan line against the allow list and the tag, enters
+      # the crates in dependency order (one commit each); `cargo metadata --no-deps` inside runs with the toolchain fixed by the environment
       - name: enter
         env:
           INDEX_URL: ${{ github.server_url }}/${{ github.repository }}
+          WANT: ${{ needs.tool.outputs.sha256 }}
+          RUSTUP_TOOLCHAIN: ${{ needs.tool.outputs.toolchain }}
         run: |
           set -euo pipefail
-          chmod +x "$RUNNER_TEMP/handover/fs-crate-index"
+          test -n "$WANT" && test -n "$RUSTUP_TOOLCHAIN"
+          echo "$WANT  $RUNNER_TEMP/tool/fs-crate-index" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/tool/fs-crate-index"
           git config user.name FreeSynergy
           git config user.email support@freesynergy.net
-          "$RUNNER_TEMP/handover/fs-crate-index" apply --allow allowed-sources.txt --dir "$RUNNER_TEMP/handover/out" --registry-dir . --index-url "$INDEX_URL"
+          "$RUNNER_TEMP/tool/fs-crate-index" apply --allow allowed-sources.txt --dir "$RUNNER_TEMP/out" --registry-dir . --index-url "$INDEX_URL"
       # one push, never forced; the token only lives in this step
       - name: push
         env:

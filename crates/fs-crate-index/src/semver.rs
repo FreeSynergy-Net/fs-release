@@ -40,7 +40,7 @@ pub enum Outcome {
     NoBaseline,
     /// Case 2: compared with this version, green.
     Compared(Version),
-    /// A baseline exists but no `cargo-semver-checks` binary was given: NOT checked (never reported as green).
+    /// A baseline exists but no `cargo-semver-checks` binary was given: NOT checked (never green: `scan` and the subcommand `semver` are RED then).
     NotRun(Version),
 }
 
@@ -88,11 +88,15 @@ fn registry_checkout(a: &SemverArgs) -> Result<PathBuf> {
     Ok(dir)
 }
 
-/// The lint level of `cargo-semver-checks` stands in the `Cargo.toml` of the CHECKED package (`[package.metadata.cargo-semver-checks.lints]`), so a branch could switch the gate
-/// off by itself. Therefore every manifest of the source is read first: only `enum_variant_added = "warn"` may be there, anything else is RED.
+/// The lint level of `cargo-semver-checks` stands in the `Cargo.toml` of the CHECKED package, so a branch could switch the gate off by itself. Therefore every manifest of the
+/// source is read first: ANY `cargo-semver-checks` table (`[package|workspace.metadata.cargo-semver-checks]`, `[lints|workspace.lints.cargo-semver-checks]`) is RED.
+///
+/// Not even `enum_variant_added = "warn"` is allowed (r3, review M3): with `warn` the tool reports the hit but does NOT fail, and the filter by type (only `BasicType` and
+/// `CommandKind` may get a new variant, ADR 0093) is not built, so a new variant of any exhaustive enum (`ZoneKind`) would be green. Until that filter exists a new variant
+/// in `BasicType` or `CommandKind` is a deliberate, visible break.
 ///
 /// # Errors
-/// A manifest sets a lint level other than `enum_variant_added = "warn"`, or has other `cargo-semver-checks` keys.
+/// A manifest has a `cargo-semver-checks` table.
 pub fn check_manifest_lints(source: &Path) -> Result<()> {
     let mut stack = vec![source.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -120,26 +124,23 @@ fn manifest_lints_ok(manifest: &Path) -> Result<()> {
     let doc: toml::Table = text
         .parse()
         .with_context(|| format!("{} is not TOML", manifest.display()))?;
-    for top in ["package", "workspace"] {
-        let Some(cfg) = doc
-            .get(top)
-            .and_then(|t| t.get("metadata"))
-            .and_then(|m| m.get("cargo-semver-checks"))
-        else {
-            continue;
+    for (top, sub) in [
+        ("package", "metadata"),
+        ("workspace", "metadata"),
+        ("lints", ""),
+        ("workspace", "lints"),
+    ] {
+        let t = doc.get(top);
+        let t = if sub.is_empty() {
+            t
+        } else {
+            t.and_then(|t| t.get(sub))
         };
-        let lints = cfg.get("lints").and_then(toml::Value::as_table);
-        let only_lints = cfg
-            .as_table()
-            .is_some_and(|t| t.keys().all(|k| k == "lints"));
-        let lints_ok = lints.is_none_or(|l| {
-            l.iter()
-                .all(|(k, v)| k == "enum_variant_added" && v.as_str() == Some("warn"))
-        });
         ensure!(
-            only_lints && lints_ok,
-            "{}: [{top}.metadata.cargo-semver-checks] changes the gate (only `enum_variant_added = \"warn\"` is allowed): the checked branch must not release itself",
-            manifest.display()
+            t.and_then(|t| t.get("cargo-semver-checks")).is_none(),
+            "{}: a `cargo-semver-checks` table ({top}{}{sub}) changes the gate (no lint table is allowed, not even `warn`): the checked branch must not release itself",
+            manifest.display(),
+            if sub.is_empty() { "" } else { "." }
         );
     }
     Ok(())
