@@ -59,6 +59,7 @@ start)
   # shellcheck disable=SC2016  # the inner script is single-quoted on purpose
   setsid bash -c '
     slot="$1"; repo="$2"; head="$3"; result="$4"; log="$5"; runs="$6"
+    ulimit -c 0  # no core dumps from slot runs (overflowing mutants fill coredumpctl; review 23.11.)
     t0=$(date +%s)
     ( cd "$repo" && "$slot" cargo test --workspace ) >"$log" 2>&1; rc=$?
     secs=$(( $(date +%s) - t0 ))
