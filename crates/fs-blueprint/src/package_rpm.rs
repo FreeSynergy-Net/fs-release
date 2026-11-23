@@ -241,7 +241,7 @@ pub fn check_fingerprint(armor: &str, expected: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The package `freesynergy-release`: the dnf source and the PUBLIC key.
+/// The package `freesynergy-release`: the dnf source and the PUBLIC key. Its version follows the fs-blueprint version; when the key or the URL changes, `--pkg-version` MUST be raised (else dnf sees no update).
 ///
 /// # Errors
 /// A text when `pages` is refused (see `checked_pages_url`), or `key` is not an armored public key with the expected fingerprint (a secret key must never end up in a package).
