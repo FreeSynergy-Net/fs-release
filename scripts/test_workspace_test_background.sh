@@ -24,7 +24,7 @@ cat >"$tmp/slot.sh" <<SLOT
 #!/usr/bin/env bash
 mode="\$(cat "$tmp/mode")"
 case "\$mode" in
-  green) echo "test result: ok. 3 passed; 0 failed"; exit 0 ;;
+  green) ulimit -c >"$tmp/corelimit"; echo "test result: ok. 3 passed; 0 failed"; exit 0 ;;
   red) echo "test result: FAILED. 2 passed; 1 failed"; exit 101 ;;
   slow) exec "$tmp/sleeper" ;;
 esac
@@ -36,10 +36,12 @@ head="$(g -C "$tmp/repo" rev-parse HEAD)"
 field() { python3 -I -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"; }
 
 echo green >"$tmp/mode"
+ulimit -S -c "$(ulimit -H -c)" 2>/dev/null || true  # raise the soft limit first, so the check below proves the run lowers it
 out="$("$tool" start --repo "$tmp/repo" --head "$head")"; chk "start returns at once with started true" isval started "$out" True
 res="$("$tool" wait --repo "$tmp/repo" --head "$head" --timeout 30)"; rc=$?
 chk "wait: result green (rc 0, red false)" rce 0; chk "wait: bound to the head" isval head "$res" "$head"
 chk "wait: only the summary line" grep -q "3 passed" <<<"$res"; chk "wait: red false" isval red "$res" False
+chk "slot run has core dumps off (ulimit -c 0)" test "$(cat "$tmp/corelimit")" = 0
 out="$("$tool" start --repo "$tmp/repo" --head "$head")"; chk "a second start for the same head is no second run" isval started "$out" False
 
 # red twice in a row: runde counts per head only for the same head, a new commit is a new head
