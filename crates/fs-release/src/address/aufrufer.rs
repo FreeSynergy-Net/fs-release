@@ -189,7 +189,7 @@ impl Ctx {
                 return Err(format!("{repo}: {path} nicht lesbar"));
             }
             for (i, text) in String::from_utf8_lossy(&show.stdout).lines().enumerate() {
-                let Some((owner, r)) = parse_uses(text) else {
+                let Some((owner, name, r)) = parse_uses(text) else {
                     continue;
                 };
                 let mut red = Vec::new();
@@ -200,6 +200,12 @@ impl Ctx {
                 };
                 if !same {
                     red.push((1, format!("Owner `{owner}` statt {OWNER}")));
+                }
+                if name != "fs-release" {
+                    red.push((
+                        1,
+                        format!("Repo-Name `{name}` statt fs-release (Look-alike)"),
+                    ));
                 }
                 let (more, commit) = self.judge_ref(&r);
                 red.extend(more);
@@ -258,14 +264,14 @@ fn is_caller_file(p: &str) -> bool {
     if let Some(rest) = p.strip_prefix(".github/workflows/") {
         return !rest.contains('/') && yaml(rest);
     }
-    p.strip_prefix("actions/")
-        .is_some_and(|_| matches!(p.rsplit('/').next(), Some("action.yml" | "action.yaml")))
+    let action = matches!(p.rsplit('/').next(), Some("action.yml" | "action.yaml"));
+    action && (p.starts_with("actions/") || p.starts_with(".github/actions/"))
 }
 
 /// `uses: <owner>/fs-release/...@<ref>` without the comment part: the owner (maximal `[A-Za-z0-9-]` run left of
 /// `/fs-release/`, left-anchored) and the ref.
 #[must_use]
-pub fn parse_uses(line: &str) -> Option<(String, String)> {
+pub fn parse_uses(line: &str) -> Option<(String, String, String)> {
     let code = line.split_once(" #").map_or(line, |(c, _)| c);
     let target = code
         .trim_start()
@@ -277,7 +283,8 @@ pub fn parse_uses(line: &str) -> Option<(String, String)> {
     if target.starts_with("./") {
         return None;
     }
-    let at = target.find("fs-release/")?;
+    let at = target.to_ascii_lowercase().find("fs-release/")?; // recognised case-insensitively (GitHub resolves owner/repo so), judged exactly by the caller
+    let name = target[at..at + "fs-release".len()].to_string();
     let before = &target[..at];
     let head = before.strip_suffix('/').unwrap_or(before);
     if head.len() == before.len() && !before.is_empty() {
@@ -288,5 +295,5 @@ pub fn parse_uses(line: &str) -> Option<(String, String)> {
         .map_or(0, |i| i + 1);
     let owner = head[start..].to_string();
     let r = target.split_once('@').map_or("", |(_, r)| r).trim();
-    Some((owner, r.to_string()))
+    Some((owner, name, r.to_string()))
 }
