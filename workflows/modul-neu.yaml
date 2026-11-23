@@ -5,6 +5,10 @@
 # Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
 # Inputs: `name`, `kategorie` (plan section b2.7), `art` (konfiguration | agent | fachmodul), `nutzer` (list of programs), `standard`, `programmseite` (program page in fs-documentation en + de, for the help part), `hilfe_marker` (optional).
 # Rules. (1) Existing first (N10): catalog, module repos, `unreviewed/` branches and `.scratch` are searched before anything new. (2) A shared module needs at least 2 users, a specialist module at least 1 (plan section b2.3 e). (3) Data of others only through a contract; own data with export, import, share, delete, media type, version. (4) No `[[exception]]` without `talk` (use `ausnahme-gespraech`).
+# RULES ADDED BY workflow-pflege-1 (23.11.2026, card 8): [LAYERS-PFLEGEN] a new module (crate) in fs-components gets its entry in `contract/layers.toml` in the SAME change (layer and allowed dependencies;
+#   a crate without an entry is red, see the gates of `testlauf` [ENDE-GATES]); the module is part of the test run `-p fs-components-catalog` (the catalog reads the layers); the stage `ende` of `testlauf` runs for the module with the
+#   gate options of gates.sh (clippy `--all-targets --all-features --locked -- -D warnings -W clippy::pedantic`, `check_rust_rules.py` with files <= 300 lines). A module that changes a generator also tests `cligen-fixtures`.
+
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -268,7 +272,7 @@ do:
         freesynergy.net:bot-seat: modul-neu.anlegen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Create the crate in the target repo and the manifest (AppStream `addon`, `extends`, `fs:requires`) on a branch `unreviewed/modul-<name>`; local commit, no push."
+        freesynergy.net:summary: "Create the crate in the target repo and the manifest (AppStream `addon`, `extends`, `fs:requires`) on a branch `unreviewed/modul-<name>`; local commit, no push. [LAYERS-PFLEGEN] In fs-components the same commit adds the entry in `contract/layers.toml`."
   - anlegen-check:
       call: manifest-pruefen:0.0.18@fs
       with:
@@ -280,7 +284,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Check: the manifest is valid (AppStream addon, extends, fs:requires)."
+        freesynergy.net:summary: "Check: the manifest is valid (AppStream addon, extends, fs:requires). [LAYERS-PFLEGEN] Also checks that `contract/layers.toml` has the entry of the new crate (fs-components) and that `-p fs-components-catalog` is in the targeted test run; a missing entry is red."
   - anlegen-again:
       switch:
         - runden:

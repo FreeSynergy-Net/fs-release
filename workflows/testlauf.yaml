@@ -40,6 +40,16 @@
 #   release  = everything, no filter, no retries, no fail-fast: the release gate, CI only (hard limit 1).
 #   cargo profile `fast` = `dev` without debug info (`debug = 0`): smaller, faster to link, for quick test builds.
 #  A new test follows the file-name convention in the header of that nextest.toml, so it lands in the right profile.
+# RULES ADDED BY workflow-pflege-1 (23.11.2026, cards of the strategy; each rule names its occasion):
+# [NICHT-GELAUFEN-NIE-GRUEN] (card 2) For ALL gates (gates.sh and every single gate in it, semver, check scripts, the tests of this flow): a gate that did not run, was skipped or cancelled, has no result, no `rc`
+#   or says `NotRun` is NEVER green; the report lists it as `lokal NICHT gelaufen: <what>` and the head is not green. Occasion: K-2-r2 M2 (a semver check with `NotRun` was counted GREEN).
+# [ENDE-GATES] (card 8) Stage `ende` of a module is only done when ALL of these ran for exactly this head (each with its own rc, [RC]); every missing one is `lokal NICHT gelaufen`:
+#   1. clippy: `cargo clippy --all-targets --all-features --locked -- -D warnings -W clippy::pedantic` (the exact options of gates.sh; fewer options = not the gate).
+#   2. `scripts/check_rust_rules.py` (files <= 300 lines, also test files; occasions: T1 rust-rules on a test file never run, pin-dag-r1 cli.rs 358 > 300) with the line `N errors` seen and N = 0.
+#   3. fs-components: `contract/layers.toml` is kept up to date when a crate is added, moved or its dependencies change (a new crate without a layer entry is red; modul-neu step `anlegen` writes it), and
+#      `-p fs-components-catalog` is part of the test run of every component change (the catalog reads the layers and the components).
+#   4. When the change touches a GENERATOR (fs-capnpc, the code generators and their golden files): the crate `cligen-fixtures` is tested with it (`-p cligen-fixtures`), otherwise the generator change is not proven.
+#   Toolchain: the local rustc can differ from CI `RUST_VERSION` (local 1.100.0 against CI 1.99.1): a clippy or fmt finding only seen locally is named, the CI at the exact head decides (see `pin-kaskade` [TOOLCHAIN-ABWEICHUNG]).
 # Order: `Workflow testlauf, step <id>, parameters repo, branch, head, delta, scope`. FS profile: see README.md.
 document:
   dsl: 1.0.3
@@ -212,7 +222,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Rule for the stage `ende` (CLAUDE.md 4): a finished module gets exactly ONE end test, only for that module (`-p`); afterwards it counts as frozen (not rebuilt, not retested while it does not change). Order: the small/lower modules first, then the bigger ones above them, each module alone, never the whole workspace for one module (the full run below is the end gate of the whole chain or the CI)."
+        freesynergy.net:summary: "Rule for the stage `ende` (CLAUDE.md 4): a finished module gets exactly ONE end test, only for that module (`-p`); afterwards it counts as frozen (not rebuilt, not retested while it does not change). Order: the small/lower modules first, then the bigger ones above them, each module alone, never the whole workspace for one module (the full run below is the end gate of the whole chain or the CI). The checks of stage `ende` are those of the header rule [ENDE-GATES] (clippy pedantic with all options, rust-rules, layers.toml, `-p fs-components-catalog`, `cligen-fixtures` for a generator change); a gate of them that did not run is [NICHT-GELAUFEN-NIE-GRUEN]."
   - release-nur-ci:
       switch:
         - lokal:
