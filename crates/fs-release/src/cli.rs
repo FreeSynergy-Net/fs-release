@@ -41,6 +41,8 @@ enum Sub {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
+    /// Chain gate: the code reached through the self-pins (release.yml -> _release-publish.yml -> publish-release ...) equals the code at the start head, except the pins (rc 1 = red, 2 = bad input).
+    CheckPinChain(crate::pin_chain::PinChainArgs),
     /// `JA am <SHA>` only with the proof of the runner (cost-log row, run record, byte-equal report); rc 1 = refused (hand-written verdict).
     CheckApproval(ApprovalArgs),
     /// Owner swap in GitHub addresses: bestand, ersetzen, nachher (workflow adresse-wechseln).
@@ -140,7 +142,8 @@ pub fn main_with(args: Vec<String>) -> i32 {
         Sub::Push(s) => one(&s, 2),
         Sub::Bump(s) => one(&s, 3),
         Sub::Flow { lift, flow } => full(&lift, &flow),
-        Sub::CheckCiTools { dir } => check_ci_tools(&dir),
+        Sub::CheckCiTools { dir } => crate::ci_tools::run(&dir),
+        Sub::CheckPinChain(a) => crate::pin_chain::run(&a),
         Sub::CheckApproval(a) => check_approval(&a),
     }
 }
@@ -257,14 +260,6 @@ fn full(l: &LiftArgs, f: &FlowArgs) -> i32 {
     with_ctx(f, &l.repo, &l.release_dir, |ctx| {
         flow::run(&o, ctx, &SystemRunner::default())
     })
-}
-
-fn check_ci_tools(dir: &Path) -> i32 {
-    let bad = crate::ci_tools::scan(dir);
-    for line in &bad {
-        println!("{line}");
-    }
-    i32::from(!bad.is_empty())
 }
 
 fn check_approval(a: &ApprovalArgs) -> i32 {

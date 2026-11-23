@@ -176,3 +176,13 @@ pub fn scan(root: &Path) -> Vec<String> {
     }
     out
 }
+
+/// The command `check-ci-tools`: prints every violation, rc 1 when there is one.
+#[must_use]
+pub fn run(dir: &Path) -> i32 {
+    let bad = scan(dir);
+    for line in &bad {
+        println!("{line}");
+    }
+    i32::from(!bad.is_empty())
+}
