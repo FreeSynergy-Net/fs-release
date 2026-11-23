@@ -36,7 +36,7 @@ structure() {
     sed -n '/^# --- body/,$p' "$repo/scripts/identity-check" | tail -n +2 | cmp -s - "$tmp/jb.$$" || echo "the identity block differs from the body of scripts/identity-check"
     grep -q '^        shell: bash {0}$' <<<"$job" || echo "the identity step does not run as shell: bash {0}"
   fi
-  jobtext "$f" check | grep -Eq '^    needs: \[?identity\]?$' || echo "the job check has no needs: identity"
+  grep -Eq '^    needs: \[?identity\]?$' <<<"$(jobtext "$f" check)" || echo "the job check has no needs: identity"
   local p r
   p=$(grep -n 'RUSTUP_TOOLCHAIN=' "$a" | head -1 | cut -d: -f1); r=$(grep -n 'uses: Swatinem/rust-cache' "$a" | head -1 | cut -d: -f1)
   { [ -n "$p" ] && [ -n "$r" ] && [ "$p" -lt "$r" ] && grep -q 'RUSTUP_TOOLCHAIN=.*GITHUB_ENV' "$a"; } || echo "setup-rust does not write RUSTUP_TOOLCHAIN to GITHUB_ENV before rust-cache"
