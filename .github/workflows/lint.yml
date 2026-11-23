@@ -150,7 +150,7 @@ jobs:
         id: apt-packages-step
         continue-on-error: true
         run: bash scripts/test_check_apt_packages.sh
-      - name: identity job of check.yml and toolchain pin of setup-rust self test (isolated job, needs, PR head commit, block = script, RUSTUP_TOOLCHAIN before rust-cache; mutants)
+      - name: identity job of check.yml and toolchain pin of setup-rust self test (isolated job, needs, PR head commit, block = script, the toolchain fixed before rust-cache; mutants)
         id: identity-job
         continue-on-error: true
         run: bash scripts/test_check_job_identity.sh
