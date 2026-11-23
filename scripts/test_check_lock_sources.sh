@@ -27,12 +27,16 @@ has "red message names the packages that pull them" 'pulled by: demo-app 0.1.0 (
 has "red message names a second puller" 'demo-people 0.1.0'
 expect "V1+ lock without the switch is green" 0 "$fx/red-v1plus.lock"
 expect "V1+ lock with the switch (--only-from) is red" 1 --only-from "$fx/red-v1plus.lock"
-has "V1+ message names the allowed index URL" 'allows only https://github.com/FreeSynergy-Net/fs-crates'
+has "V1+ message names the allowed index URL" 'allows only https://github.com/FreeSynergy-Net/fs-crates or'
 FS_LOCK_ONLY_FROM=1 python3 -I "$tool" "$fx/red-v1plus.lock" >"$tmp/o" 2>&1 && bad "env switch FS_LOCK_ONLY_FROM=1 must be red" || ok "env switch FS_LOCK_ONLY_FROM=1 is red"
 expect "registry fs-types is green with the V1+ switch" 0 --only-from "$fx/green-registry.lock"
 expect "registry fs-types is green without the switch" 0 "$fx/green-registry.lock"
-expect "git fs-types (also FreeSynergy-Net/fs-types) is red with the V1+ switch" 1 --only-from "$fx/green.lock"
-expect "git fs-types is green without the switch (strict/only_from stay off until after the wave)" 0 "$fx/green.lock"
+expect "TRANSITION: git fs-types of FreeSynergy-Net/fs-types is still green with the V1+ switch (lift and lock-gleich of the cascade)" 0 --only-from "$fx/green.lock"
+printf 'libraries = ["fs-types"]\nonly_from_enabled = true\n[only_from]\nfs-types = "https://github.com/FreeSynergy-Net/fs-crates"\n' > "$tmp/after-wave.toml"
+expect "AFTER THE WAVE (config = index URL only, K-5): git fs-types of FreeSynergy-Net/fs-types is red" 1 --config "$tmp/after-wave.toml" "$fx/green.lock"
+has "after the wave: the message names the index URL" 'allows only https://github.com/FreeSynergy-Net/fs-crates'
+expect "after the wave: the registry fs-types is green" 0 --config "$tmp/after-wave.toml" "$fx/green-registry.lock"
+expect "after the wave: the old org name and a foreign org stay red" 1 --config "$tmp/after-wave.toml" "$fx/red-foreign-org.lock"
 expect "two registry versions of fs-types are red" 1 "$fx/red-registry-two.lock"
 has "registry doubles: message names both sources" 'registry+https://github.com/FreeSynergy-Net/fs-crates'
 has "registry doubles: message names a version" '0.0.6'

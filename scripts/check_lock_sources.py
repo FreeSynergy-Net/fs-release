@@ -10,7 +10,7 @@ each one (a package without a source is the workspace member itself). Exit codes
 1 violation, 2 usage/read error. A repo root is searched for every Cargo.lock outside target/ and .git.
 V1+ addition (`--only-from`, config `only_from_enabled`, env FS_LOCK_ONLY_FROM=1; default OFF): a library listed in `[only_from]`
 (fs-types) must come from that repo only, also when it appears once (an entry without `source`, the workspace member itself, is fine).
-K-3 addition (registry `freesynergy`, ENTSCHEID-kaskade B2): a registry source (`registry+URL`, `sparse+URL`) is normalised like a git source, so `[only_from]` can name an index URL, and the fix
+K-3 addition (registry `freesynergy`, ENTSCHEID-kaskade B2): `[only_from]` may be a list; a registry source (`registry+URL`, `sparse+URL`) is normalised like a git source, so `[only_from]` can name an index URL, and the fix
 message of two versions from a registry is `cargo update -p <lib>`. `strict` stays off until after the wave (K-5).
 A repo's own `.fs-lock-sources.toml` can set only `strict` and `only_from_enabled`; anything else in it is ignored.
 Whether a violation is a warning or red is decided by the caller (scripts/gates.sh, switch `strict`), not here.
@@ -74,12 +74,13 @@ def check_lock(text: str, label: str, cfg: dict) -> list:
                 lines.append("  fix: pin every dependent to the same tag of the same repo (`cargo update -p " + lib + "` after aligning the pins).")
             errors.append("\n".join(lines))
         want = cfg.get("only_from", {}).get(lib)
-        if cfg["only_from_on"] and want:
+        wants = [want] if isinstance(want, str) else list(want or [])  # a list = several allowed sources (the transition until the wave K-5 is done)
+        if cfg["only_from_on"] and wants:
             for e in entries:
                 if not e.get("source"):  # a workspace member (e.g. fs-types inside the repo fs-types itself) is not a foreign source
                     continue
-                if repo_of(e.get("source", "")) != repo_of(want):
-                    errors.append(f"ERROR {label}: `{lib}` {e['version']} comes from {e.get('source') or '(path)'}, V1+ allows only {want}\n"
+                if repo_of(e.get("source", "")) not in [repo_of(w) for w in wants]:
+                    errors.append(f"ERROR {label}: `{lib}` {e['version']} comes from {e.get('source') or '(path)'}, V1+ allows only {' or '.join(wants)}\n"
                                   f"      pulled by: " + ", ".join(pullers(pkgs, lib, e)))
     return errors
 
