@@ -181,7 +181,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The Opus approval names exactly this head. A JA is void for every other head: new head, new JA (rule of `review`); no JA, no push. No tag as long as a delta or re-look result for this head has an open condition: line 1 of the Opus result file must be `JA` for EXACTLY this head; a later NEIN or condition blocks the tag (lesson fs-messages v0.0.3: a condition that came after the tag left an outdated sentence in the release)."
+        freesynergy.net:summary: "The Opus approval names exactly this head. A JA is void for every other head: new head, new JA (rule of `review`); no JA, no push. No tag as long as a delta or re-look result for this head has an open condition: line 1 of the Opus result file must be `JA` for EXACTLY this head; the JA also needs the runner proof (`fs-release check-approval <verdict file> --sha <head> --run-id <run id of the review run>`, rc 0): a cost-log row of a review run (rev-..., Opus, exit 0) and a run record whose BERICHT.md write is byte-equal to the verdict file; a hand-written verdict file has no run behind it and aborts the flow (known limit: the log has no MODE column, the runner files belong to the same user as the agents - the real wall is a separate user for verdicts, G6 no. 8-10); a later NEIN or condition blocks the tag (lesson fs-messages v0.0.3: a condition that came after the tag left an outdated sentence in the release)."
   - push-ff:
       call: push-ff:0.0.17@fs
       with:

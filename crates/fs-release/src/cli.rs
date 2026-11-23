@@ -41,6 +41,8 @@ enum Sub {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
+    /// `JA am <SHA>` only with the proof of the runner (cost-log row, run record, byte-equal report); rc 1 = refused (hand-written verdict).
+    CheckApproval(ApprovalArgs),
     /// lift --commit, review-request, tag, push, bump in one run; halts until the approval and the Pre-release exist, run again to go on.
     Flow {
         #[command(flatten)]
@@ -78,6 +80,21 @@ struct LiftArgs {
     /// Throw-away git config for local tags.
     #[arg(long, default_value = lift::LOCAL_TAGS)]
     git_config: PathBuf,
+}
+
+#[derive(Args, Clone)]
+struct ApprovalArgs {
+    /// The verdict file (`review-<topic>-opus.md`).
+    verdict: PathBuf,
+    /// The full 40-character SHA that is to be pushed.
+    #[arg(long)]
+    sha: String,
+    /// The run id of the review run (`runid=` of run.sh, last column of the cost log).
+    #[arg(long)]
+    run_id: String,
+    /// The folder of the runner (`api-kosten.log`, `out-*.json`).
+    #[arg(long, default_value = "/srv/FreeSynergy/.scratch/api-runner")]
+    runner_dir: PathBuf,
 }
 
 #[derive(Args, Clone)]
@@ -121,6 +138,7 @@ pub fn main_with(args: Vec<String>) -> i32 {
         Sub::Bump(s) => one(&s, 3),
         Sub::Flow { lift, flow } => full(&lift, &flow),
         Sub::CheckCiTools { dir } => check_ci_tools(&dir),
+        Sub::CheckApproval(a) => check_approval(&a),
     }
 }
 
@@ -244,4 +262,36 @@ fn check_ci_tools(dir: &Path) -> i32 {
         println!("{line}");
     }
     i32::from(!bad.is_empty())
+}
+
+fn check_approval(a: &ApprovalArgs) -> i32 {
+    let (verdict, log) = (
+        std::fs::read_to_string(&a.verdict),
+        std::fs::read_to_string(a.runner_dir.join("api-kosten.log")),
+    );
+    let (Ok(verdict), Ok(log)) = (verdict, log) else {
+        println!("RED check-approval: verdict file or cost log not readable");
+        return 1;
+    };
+    let records = crate::approval::run_records(&a.runner_dir, &log, &a.run_id);
+    let ev = crate::approval::Evidence {
+        verdict: &verdict,
+        sha: &a.sha,
+        run_id: &a.run_id,
+        log: &log,
+        records: &records,
+    };
+    match crate::approval::verify(&ev) {
+        Ok(()) => {
+            println!(
+                "GREEN check-approval: JA am {} has a runner proof ({})",
+                a.sha, a.run_id
+            );
+            0
+        }
+        Err(e) => {
+            println!("RED check-approval: {e}");
+            1
+        }
+    }
 }

@@ -24,9 +24,15 @@ fn is_pinned(tool: &str) -> bool {
             .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
 }
 
+/// `x.y.z` (or `=x.y.z`).
+fn is_exact(v: &str) -> bool {
+    is_pinned(&format!("x@{}", v.trim_start_matches('=')))
+}
+
 fn is_sha(s: &str) -> bool {
     let s = s.trim_matches(|c| c == '"' || c == '\'');
-    s.len() == 40 && s.chars().all(|c| c.is_ascii_hexdigit()) || s.starts_with('$')
+    (s.len() == 40 && s.chars().all(|c| c.is_ascii_hexdigit()))
+        || matches!(s, "$REV" | "${REV}" | "$rev" | "$GITHUB_SHA")
 }
 
 /// The value of a YAML line `key: value` (`TOOLS: ...`, `tool: ...`, `tools: ...`), not an input definition (`{ description ... }`).
@@ -39,9 +45,22 @@ fn yaml_value<'a>(line: &'a str, key: &str) -> Option<&'a str> {
 fn install_line(line: &str) -> Option<String> {
     let words: Vec<&str> = line.split_whitespace().collect();
     let at = words
-        .windows(2)
-        .position(|w| w[0] == "cargo" && (w[1] == "install" || w[1] == "binstall"))?;
-    let (kind, args) = (words[at + 1], &words[at + 2..]);
+        .iter()
+        .position(|w| *w == "cargo" || *w == "cargo-binstall")?;
+    let direct = words[at] == "cargo-binstall";
+    let rest: Vec<&str> = words[at + 1..]
+        .iter()
+        .copied()
+        .filter(|w| !w.starts_with('+'))
+        .collect();
+    let (kind, args) = if direct {
+        ("binstall", &rest[..])
+    } else {
+        match rest.first() {
+            Some(&k) if k == "install" || k == "binstall" => (k, &rest[1..]),
+            _ => return None,
+        }
+    };
     if !args.contains(&"--locked") {
         return Some(format!("`cargo {kind}` without --locked"));
     }
@@ -53,7 +72,12 @@ fn install_line(line: &str) -> Option<String> {
                 _ => Some("`cargo install --git` without `--rev <full commit>`".into()),
             };
         }
-        let versioned = args.iter().any(|a| *a == "--version" || is_pinned(a));
+        let versioned = args.iter().any(|a| is_pinned(a))
+            || args
+                .iter()
+                .position(|a| *a == "--version")
+                .and_then(|i| args.get(i + 1))
+                .is_some_and(|v| is_exact(v));
         return (!versioned)
             .then(|| "`cargo install` without an exact version (name@x.y.z)".into());
     }

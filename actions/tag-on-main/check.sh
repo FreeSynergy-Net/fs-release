@@ -12,4 +12,10 @@ if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main 2>/dev/null; then
   echo "::error::tag-on-main: the tag commit $GITHUB_SHA is not on main (or origin/main is missing): a release is made only from a commit of main"
   exit 1
 fi
+# the tag that is released (input tag, else the ref) must point at this very commit, not at another one
+tag=${TAG:-${GITHUB_REF_NAME:-}}
+if [ -n "$tag" ] && git rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null && [ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$GITHUB_SHA" ]; then
+  echo "::error::tag-on-main: tag $tag does not point at $GITHUB_SHA"
+  exit 1
+fi
 echo "tag-on-main: $GITHUB_SHA is on main"

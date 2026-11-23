@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Self test of actions/tag-on-main/check.sh (a binary release only from a commit of main) with counter-checks on fixture clones, and of its use:
-# the plan action and the finalize job call it, and both checkouts are full (fetch-depth 0). Mutations on copies (the ancestor check removed,
-# the call removed from finalize, fetch-depth removed from the plan job) must turn the tests red.
+# Self test of actions/tag-on-main/check.sh (a binary release only from a commit of main) with counter-checks on fixture clones and a mutation
+# (the ancestor check removed). Its use in plan and finalize is checked in crates/fs-release/tests/ci_tools_pinned.rs.
 #   bash scripts/test_tag_on_main.sh
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,24 +32,4 @@ cases "$repo/actions/tag-on-main/check.sh" real 1
 mkdir -p "$tmp/mut"; sed 's/merge-base --is-ancestor/rev-parse/' "$repo/actions/tag-on-main/check.sh" >"$tmp/mut/check.sh"
 [ "$(chk "$tmp/mut/check.sh" "$tmp/clone" "$side_sha" tag)" = 0 ] && ok "mutation (no ancestor check): off-main passes, so the real test is sharp" || bad "mutation not recognised"
 
-# use: plan action, finalize job, full checkouts
-used() { # <repo root> <label>
-  local r="$1" l="$2"
-  grep -q 'tag-on-main/check.sh' "$r/actions/plan/action.yml" && ok "$l: plan action runs the check" || bad "$l: plan action does not run the check"
-  grep -q 'actions/tag-on-main@' "$r/.github/workflows/_release-finalize.yml" && ok "$l: finalize runs the check" || bad "$l: finalize does not run the check"
-  python3 - "$r" <<'PY' && ok "$l: plan and finalize checkouts are full" || bad "$l: a checkout is shallow"
-import sys, yaml
-r = sys.argv[1]
-for f, job in ((".github/workflows/release.yml", "plan"), (".github/workflows/_release-finalize.yml", "finalize")):
-    steps = yaml.safe_load(open(f"{r}/{f}"))["jobs"][job]["steps"]
-    co = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout@")][0]
-    assert co["with"].get("fetch-depth") == 0, (f, co)
-PY
-}
-python3 -c "import yaml" 2>/dev/null || { echo "skipped: no PyYAML (the structure was NOT checked)"; exit 2; }
-used "$repo" real
-cp -r "$repo/.github" "$repo/actions" "$tmp/mut/"
-sed -i '/tag-on-main@/d' "$tmp/mut/.github/workflows/_release-finalize.yml"
-sed -i '/fetch-depth: 0/d' "$tmp/mut/.github/workflows/release.yml"
-out="$(used "$tmp/mut" mut)"; [ "$(grep -c '^FAIL' <<<"$out")" -ge 2 ] && ok "mutations (call removed, fetch-depth removed) are caught" || bad "mutations not caught: $out"
 [ "$fails" -eq 0 ] && echo "all ok" || { echo "$fails failed"; exit 1; }

@@ -29,6 +29,10 @@ fn unpinned_installs_are_red() {
         "          tools: cargo-deb@3.8.0 cargo-generate-rpm",
         "        tool: cargo-binstall",
         "        TOOLS: cargo-deny@latest",
+        "run: cargo install --git https://x/y --rev \"$BRANCH\" --locked fs-blueprint",
+        "run: cargo install --version ^3 --locked cargo-deb",
+        "run: cargo +stable install cargo-deb --locked",
+        "run: cargo-binstall --locked cargo-deb",
         "      - uses: actions/checkout@v4",
         "      - uses: actions/checkout@main # v4",
         "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -62,4 +66,29 @@ fn pinned_installs_and_non_installs_are_green() {
     for l in green {
         assert!(violations("f.yml", l).is_empty(), "should be green: {l}");
     }
+}
+
+#[test]
+fn plan_and_finalize_run_the_main_check_on_a_full_checkout() {
+    let wf = |f: &str| std::fs::read_to_string(root().join(f)).expect(f);
+    let finalize = wf(".github/workflows/_release-finalize.yml");
+    let (co, check) = (
+        finalize.find("actions/checkout@").unwrap(),
+        finalize.find("actions/tag-on-main@").unwrap(),
+    );
+    assert!(
+        finalize.contains("fetch-depth: 0") && co < check,
+        "finalize: full checkout, then the check"
+    );
+    assert!(
+        check < finalize.find("actions/sign-files@").unwrap(),
+        "the check comes before signing"
+    );
+    assert!(wf("actions/plan/action.yml").contains("tag-on-main/check.sh"));
+    let release = wf(".github/workflows/release.yml");
+    let plan = &release[release.find("  plan:").unwrap()..release.find("  linux:").unwrap()];
+    assert!(
+        plan.contains("fetch-depth: 0"),
+        "the plan job checks out the full history"
+    );
 }
