@@ -99,6 +99,17 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Identity check before the review (b7), run by `scripts/identity-check` (the same command is the gate `identity` of `scripts/gates.sh`, so the local gates and `branch-ci` of this repo are red the same way; the callers' `check.yml` runs `actions/gates@e596ed65` (v0.0.17) WITHOUT this gate and checks identity only after that pin is raised to a tag that has `scripts/identity-check` (follow-up after the next fs-release tag); base `origin/main`, `FS_IDENTITY_BASE` overrides): `git log --format='%h%x09%ae%x09%ce' main..HEAD` lists author and committer address of every commit of the range; only the identity in the key/config `FS_ALLOWED_IDENTITY` is allowed. Every other address as author or as committer is a hit (no exception, also no machine or bot address): red, the branch is rewritten first (author and committer = the allowed identity) and the check runs again. The check names the commit, never an address. It sits BEFORE the review because a rewrite makes a new head, and a JA is bound to exactly one head; after the review or after the tag a rewrite would void the JA or leave a public tag on the old commits."
+  - attestation-identitaet:
+      call: attestation-check:0.0.17@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Attestation identity BEFORE the tag (hand run, the check of the chain is a script): (1) `scripts/check_pin_chain.sh` at the head is green: the caller pin `release.yml@X` reaches a `_release-publish.yml` whose `publish-release` pin contains the identity fix (`scripts/pin-chain-fix.txt`, commit 9134bcf8; root cause: fs-release pins itself one round behind, so the caller pin of a round shows the old publish-release); `scripts/test_pin_chain.sh` proves it with mutants (pin on an old state is red). (2) After the release job has built the DRAFT and BEFORE it is published: `gh attestation verify <asset> --repo <owner>/<repo> --signer-repo <owner>/fs-release` on an asset of the draft; the signer identity must be the owner of the calling repo, the source ref the run's tag. Red = do not publish, fix the chain first. Threat model: protects against OVERSIGHT, not against someone who can change workflow, toolchain or scripts. Never loosen the check."
   - review-request:
       call: review-request:0.0.17@fs
       metadata:

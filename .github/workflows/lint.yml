@@ -106,6 +106,12 @@ jobs:
         id: pin-consistency-one
         continue-on-error: true
         run: bash scripts/test_pins_consistent.sh
+      - name: pin chain gate (caller pin must reach a publish-release at or after the attestation fix) and its mutants
+        id: pin-chain
+        continue-on-error: true
+        run: |
+          bash scripts/check_pin_chain.sh
+          bash scripts/test_pin_chain.sh
       - name: README runner self test (stub cargo; refused and failing READMEs, CRLF, stdin, hidden failures)
         id: readme-runner-self
         continue-on-error: true
@@ -199,6 +205,7 @@ jobs:
             no-composite-action ${{ steps.no-composite-action.outcome }}
             job-status-lint ${{ steps.job-status-lint.outcome }}
             pin-consistency-one ${{ steps.pin-consistency-one.outcome }}
+            pin-chain ${{ steps.pin-chain.outcome }}
             readme-runner-self ${{ steps.readme-runner-self.outcome }}
             blueprint-check-step ${{ steps.blueprint-check-step.outcome }}
             plan-probe-step ${{ steps.plan-probe-step.outcome }}
