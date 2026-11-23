@@ -1,0 +1,112 @@
+# Template for the registry repo FreeSynergy-Net/fs-crates (PULL path, ADR 0093, decision of the strategy 23 Nov. 2026): this workflow lives IN fs-crates and pulls new
+# release tags of the repos on the allow list `allowed-sources.txt`. No secret, no write right across repos: the only token is the GITHUB_TOKEN of this repo.
+# Threat model (docs/crate-index.md in fs-release): protects against MISTAKES (wrong tag, replayed tag, a tag moved afterwards, a changed .crate), NOT against someone who can
+# change this workflow, the allow list, the toolchain or the scripts: whoever writes to fs-crates can swap a crate and its checksum together.
+# Two jobs: `package` (contents: read) builds the tool and the crates, `enter` (contents: write) only enters and pushes, it compiles nothing (the token never meets cargo build or cargo package).
+# Install: see README.md. REPLACE the pin `FS_RELEASE_PIN` (40 hex) by the fs-release commit that contains `crates/fs-crate-index` (the pin tool of fs-release sets it); until then the
+# `uses:` lines are not callable (the old pin 78992eea does not know the tool).
+name: index
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: index
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  # cargo-semver-checks release v0.51.0, x86_64-unknown-linux-musl; sha256 as published by the GitHub release (same as fs-types semver.yml)
+  SEMVER_CHECKS_VERSION: "0.51.0"
+  SEMVER_CHECKS_SHA256: "396c8508d973c83de52660943a057e971b586f7511c3ba695762373452b43d5b"
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    outputs:
+      entries: ${{ steps.scan.outputs.entries }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: FreeSynergy-Net/fs-release
+          ref: FS_RELEASE_PIN
+          path: .fs-release
+          persist-credentials: false
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@FS_RELEASE_PIN
+      - name: build the tool and install cargo-semver-checks (pinned, sha256 checked)
+        run: |
+          set -euo pipefail
+          cargo build --locked --release --manifest-path .fs-release/Cargo.toml -p fs-crate-index --target-dir "$RUNNER_TEMP/ci-target"
+          f=cargo-semver-checks-x86_64-unknown-linux-musl.tar.gz
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$f" "https://github.com/obi1kenobi/cargo-semver-checks/releases/download/v${SEMVER_CHECKS_VERSION}/$f"
+          echo "$SEMVER_CHECKS_SHA256  $RUNNER_TEMP/$f" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin" && tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP/bin"
+          mkdir -p "$RUNNER_TEMP/handover" && cp "$RUNNER_TEMP/ci-target/release/fs-crate-index" "$RUNNER_TEMP/handover/"
+      # reads the allow list, `git ls-remote --tags` of every repo on it, checks (annotated tag, tag commit on main of the source repo, tag = package version,
+      # not in the index yet, tag not moved), `cargo package --locked`, semver gate with --baseline-root on the newest .crate of THIS checkout; writes plan.txt and the .crate files
+      - id: scan
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          rc=0
+          "$RUNNER_TEMP/handover/fs-crate-index" scan --allow allowed-sources.txt --registry-dir . --work-dir "$RUNNER_TEMP/work" --out "$RUNNER_TEMP/handover/out" \
+            --semver-checks "$RUNNER_TEMP/bin/cargo-semver-checks" | tee "$RUNNER_TEMP/scan.log" || rc=$?
+          grep '^entries=' "$RUNNER_TEMP/scan.log" >> "$GITHUB_OUTPUT" || true
+          exit "$rc"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: handover
+          path: ${{ runner.temp }}/handover
+          if-no-files-found: error
+      # a red scan is red here, even though `enter` still enters the crates of the tags before the bad one
+      - if: steps.scan.outcome == 'failure'
+        run: |
+          echo "::error::scan is RED (see the scan step); crates before the bad tag are still entered"
+          exit 1
+
+  enter:
+    needs: package
+    if: ${{ always() && needs.package.outputs.entries != '' && needs.package.outputs.entries != '0' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: handover
+          path: ${{ runner.temp }}/handover
+      # no cargo here: only the prebuilt tool, which re-checks every plan line against the allow list and the tag, enters the crates in dependency order (one commit each)
+      - name: enter
+        env:
+          INDEX_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          chmod +x "$RUNNER_TEMP/handover/fs-crate-index"
+          git config user.name FreeSynergy
+          git config user.email support@freesynergy.net
+          "$RUNNER_TEMP/handover/fs-crate-index" apply --allow allowed-sources.txt --dir "$RUNNER_TEMP/handover/out" --registry-dir . --index-url "$INDEX_URL"
+      # one push, never forced; the token only lives in this step
+      - name: push
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+          echo "::add-mask::${auth##* }"
+          git -c "http.extraheader=$auth" push --quiet origin HEAD:main

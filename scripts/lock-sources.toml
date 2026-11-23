@@ -10,7 +10,7 @@ strict = false
 
 # V1+ addition: `fs-types` may come ONLY from the registry `freesynergy` (git index repo FreeSynergy-Net/fs-crates; ENTSCHEID-kaskade B2, K-3): the index URL, as in
 # `registry+<URL>` of the lock. TRANSITION until the wave K-5 is done: the git repo FreeSynergy-Net/fs-types is still allowed (lift and `lock-gleich` of the running cascade
-# check against it); K-5 DELETES that second entry, then a git fs-types is red (self test: scripts/test_check_lock_sources.sh, config with the index URL only).
+# check against it); K-5 MUST DELETE that second entry (ENTSCHEID-kaskade K-5, MUST) and set K5_DONE=1 in scripts/test_check_lock_sources.sh: that test checks THIS shipped file (two entries are a documented exception only while K5_DONE=0), then a git fs-types is red.
 # OFF until then, so today's repos do not turn red. Env: FS_LOCK_ONLY_FROM=1.
 only_from_enabled = false
 
