@@ -5,6 +5,7 @@ set -euo pipefail
 export GH_REPO=$REPO
 
 footer=$(mktemp)
+trap 'rm -f "$footer"' EXIT
 # shellcheck disable=SC2016  # envsubst wants the literal ${REPO}
 REPO=$REPO envsubst '${REPO}' < "$(dirname "${BASH_SOURCE[0]}")/footer.md" > "$footer"
 
