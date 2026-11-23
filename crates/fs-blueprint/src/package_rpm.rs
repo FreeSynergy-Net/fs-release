@@ -190,27 +190,75 @@ pub fn repo_file(pages: &str) -> String {
     format!("{stable}\n{nightly}")
 }
 
-/// The package `freesynergy-release`: the dnf source and the PUBLIC key.
+/// The Pages address for the `.repo` file: `https` only, one parsable URL with a host, no user info, no query, no fragment, and no white space or control
+/// character anywhere (a line break would put a new line into the `.repo` file). The placeholder is refused. Returned without a trailing slash.
 ///
 /// # Errors
-/// A text when `pages` is still the placeholder, or `key` is not an armored public key (a secret key must never end up in a package).
-pub fn release_spec(
-    pages: &str,
-    key: &[u8],
-    version: &str,
-    release: &str,
-) -> Result<RpmSpec, String> {
+/// A text naming what is wrong.
+pub fn checked_pages_url(pages: &str) -> Result<String, String> {
     if pages == PAGES_URL || pages.is_empty() {
         return Err("the Pages address is not set: give --pages-url (it is not known yet)".into());
     }
-    let armor = std::str::from_utf8(key).map_err(|_| "the key is not armored text".to_string())?;
-    if !armor
-        .trim_start()
-        .starts_with("-----BEGIN PGP PUBLIC KEY BLOCK-----")
-        || armor.contains("PRIVATE KEY")
-    {
-        return Err("the key file is not an armored PGP public key".into());
+    if pages.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("the Pages address holds white space or a control character".into());
     }
+    let u = url::Url::parse(pages).map_err(|e| format!("the Pages address is not a URL: {e}"))?;
+    if u.scheme() != "https" {
+        return Err("the Pages address must start with https://".into());
+    }
+    if u.host_str().is_none_or(str::is_empty)
+        || !u.username().is_empty()
+        || u.password().is_some()
+        || u.query().is_some()
+        || u.fragment().is_some()
+    {
+        return Err(
+            "the Pages address must be https://host/path (no user info, query or fragment)".into(),
+        );
+    }
+    Ok(pages.trim_end_matches('/').to_string())
+}
+
+/// The key must parse as an armored `OpenPGP` PUBLIC key (crate `pgp`) and its primary fingerprint must be the expected one (40 hex digits, given by the caller, never fixed in code).
+///
+/// # Errors
+/// A text when the fingerprint option is malformed, the key does not parse as a public key, or the fingerprints differ.
+pub fn check_fingerprint(armor: &str, expected: &str) -> Result<(), String> {
+    use pgp::composed::{Deserializable, SignedPublicKey};
+    use pgp::types::KeyDetails;
+    let want = expected.to_ascii_uppercase();
+    if want.len() != 40 || !want.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("--fingerprint must be 40 hex digits (no spaces)".into());
+    }
+    let (key, _) = SignedPublicKey::from_armor_single(armor.as_bytes())
+        .map_err(|e| format!("the key file is not an armored PGP public key: {e}"))?;
+    let have = format!("{:X}", key.fingerprint());
+    if have != want {
+        return Err(format!(
+            "the fingerprint of the key is {have}, not the expected one"
+        ));
+    }
+    Ok(())
+}
+
+/// The package `freesynergy-release`: the dnf source and the PUBLIC key.
+///
+/// # Errors
+/// A text when `pages` is refused (see `checked_pages_url`), or `key` is not an armored public key with the expected fingerprint (a secret key must never end up in a package).
+pub fn release_spec(
+    pages: &str,
+    key: &[u8],
+    fingerprint: &str,
+    version: &str,
+    release: &str,
+) -> Result<RpmSpec, String> {
+    let pages = checked_pages_url(pages)?;
+    let pages = pages.as_str();
+    let armor = std::str::from_utf8(key).map_err(|_| "the key is not armored text".to_string())?;
+    if armor.contains("PRIVATE KEY") {
+        return Err("the key file holds a private key: refused".into());
+    }
+    check_fingerprint(armor, fingerprint)?;
     let cfg = |dest: &str, bytes: Vec<u8>| SpecFile {
         dest: dest.into(),
         bytes: Some(bytes),

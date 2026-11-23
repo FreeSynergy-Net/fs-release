@@ -14,3 +14,6 @@ sha2 = "0.11"
 toml_edit = "=0.22.27"
 # Adapter only (pattern: pin + adapter): builds noarch RPMs of data packages. No signing here (signing is CI); no zstd/xz (no C libraries).
 rpm = { version = "=0.30.2", default-features = false, features = ["payload", "gzip-compression"] }
+# S3/S4 of the package review: the Pages address is parsed (url) and the public key is read by a real OpenPGP parser (pgp, pure Rust, MIT OR Apache-2.0), nothing is parsed by hand.
+url = "2"
+pgp = { version = "0.21.1", default-features = false }

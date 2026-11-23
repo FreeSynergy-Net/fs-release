@@ -17,6 +17,7 @@ struct Extra {
     release: String,
     pages: String,
     key: Option<PathBuf>,
+    fingerprint: Option<String>,
     version: Option<String>,
     source_date: Option<u32>,
 }
@@ -27,6 +28,7 @@ fn split(words: &[String]) -> Result<(Extra, Vec<String>), String> {
         release: "1".into(),
         pages: PAGES_URL.into(),
         key: None,
+        fingerprint: None,
         version: None,
         source_date: std::env::var("SOURCE_DATE_EPOCH")
             .ok()
@@ -44,6 +46,7 @@ fn split(words: &[String]) -> Result<(Extra, Vec<String>), String> {
             "--rpm-release" => x.release = v()?,
             "--pages-url" => x.pages = v()?,
             "--key" => x.key = Some(PathBuf::from(v()?)),
+            "--fingerprint" => x.fingerprint = Some(v()?),
             "--pkg-version" => x.version = Some(v()?),
             "--source-date" => {
                 x.source_date = Some(
@@ -120,9 +123,12 @@ fn release(x: &Extra, o: &Options, out: &mut dyn Write) -> Result<i32, String> {
         .as_ref()
         .ok_or("package release needs --key FILE (the armored PUBLIC key)")?;
     let bytes = std::fs::read(key).map_err(|e| format!("cannot read {}: {e}", key.display()))?;
+    let fp = x.fingerprint.as_deref().ok_or(
+        "package release needs --fingerprint <40 hex> (the expected fingerprint of the key)",
+    )?;
     let version = x.version.as_deref().unwrap_or(env!("CARGO_PKG_VERSION"));
     finish(
-        release_spec(&x.pages, &bytes, version, &x.release)?,
+        release_spec(&x.pages, &bytes, fp, version, &x.release)?,
         x,
         o,
         out,
