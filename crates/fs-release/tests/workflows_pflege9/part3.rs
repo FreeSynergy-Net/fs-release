@@ -115,11 +115,22 @@ pub(super) fn request(t: &str) -> bool {
                 "upstream == \"blinc\"",
             ],
         )
-        && has(t, "approval", &["actor: human", "upstream != \"blinc\""])
-        && has(t, "choose-channel", &["upstream != \"blinc\""])
+        && has(
+            t,
+            "approval",
+            &[
+                "actor: human",
+                "upstream == \"blinc\" and .input.absender == \"bot\"",
+            ],
+        )
+        && has(
+            t,
+            "choose-channel",
+            &["upstream == \"blinc\" and .input.absender == \"bot\""],
+        )
         && has(t, "send", &["helper of the strategy", "never calls gh"])
         && has(t, "send", &["without a YES, by rule 98"])
-        && t.contains("parameters upstream, evidence, art`")
+        && t.contains("parameters upstream, evidence, art, absender`")
         && [
             "art",
             "belegt",
@@ -197,9 +208,10 @@ fn counter_upstream_request_mutants_are_caught() {
         "then: continue",
         1
     )));
-    assert!(!request(
-        &t.replace("upstream != \"blinc\"", "upstream != \"x\"")
-    ));
+    assert!(!request(&t.replace(
+        "and .input.absender == \"bot\") | not",
+        "and .input.absender == \"x\") | not"
+    )));
     // a pull request or a comment step
     assert!(!request(
         &t.replace("call: send-issue:", "call: comment-issue:")
