@@ -98,4 +98,13 @@ awk '/^  step identity /{next} {print} /^  step files /{print "  step identity e
 gates_ci "$GK/scripts/gates-old.sh"
 chk "N1c mutant (identity last, the old order): identity turns green on the moved ref (the test sees it)" test -n "$(grep -x 'gate identity: rc=0' "$tmp/g.out")"
 git -C "$tmp/e" update-ref refs/remotes/origin/main "$(git -C "$tmp/e" rev-parse HEAD~2)"
+# --- Bundle 8 (decision 9f): on pull_request in CI the checkout is GitHub's merge commit (committer GitHub); the tip is its 2nd parent, the PR head, as in the job identity ---
+mkdir "$tmp/m"; M() { git -C "$tmp/m" "$@"; }
+mc() { echo "$1" >"$tmp/m/$1"; M add . && GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK GIT_COMMITTER_NAME=a GIT_COMMITTER_EMAIL=$OK M -c commit.gpgsign=false commit -q -m "$1"; }
+M init -q -b main; mc base; M checkout -q -b pr; mc prc; M checkout -q main; mc m1; M update-ref refs/remotes/origin/main HEAD
+GIT_AUTHOR_NAME=a GIT_AUTHOR_EMAIL=$OK GIT_COMMITTER_NAME=GitHub GIT_COMMITTER_EMAIL=noreply@github.com M -c commit.gpgsign=false merge -q --no-ff -m merge pr
+mrun() { env "$@" bash "$tool" "$tmp/m" >"$tmp/o" 2>&1; }
+mrun CI=true GITHUB_EVENT_NAME=pull_request; chk "9f: pull_request, merge commit of GitHub, PR head clean: green (rc 0)" test $? -eq 0
+mrun CI=true GITHUB_EVENT_NAME=push; chk "9f: the same merge commit on another event: red (the tip stays HEAD)" test $? -eq 1
+sed "s/tip='HEAD^2'/tip=HEAD/" "$tool" >"$tmp/mutpr"; env CI=true GITHUB_EVENT_NAME=pull_request bash "$tmp/mutpr" "$tmp/m" >/dev/null 2>&1; chk "9f mutant (tip stays HEAD): the pull_request case turns red (the test sees it)" test $? -eq 1
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi
