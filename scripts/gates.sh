@@ -167,7 +167,7 @@ else
   if [ -n "$like_ci" ]; then
     if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi
     if [ -d .github/workflows ] && command -v actionlint >/dev/null 2>&1; then step actionlint lint gates_lint_actions "$root"; fi
-    msrv="$(sed -n 's/^rust-version[[:space:]]*=[[:space:]]*"\([0-9.]*\)".*/\1/p' Cargo.toml 2>/dev/null | head -n1 || true)"
+    msrv="$(grep -m1 -E '^rust-version[[:space:]]*=' Cargo.toml 2>/dev/null | sed 's/[^"]*"\([0-9.]*\)".*/\1/' || true)"
     if [ -n "$msrv" ] && command -v rustup >/dev/null 2>&1; then step msrv error env RUSTUP_TOOLCHAIN="$msrv" cargo check --workspace --all-targets --locked; fi
   fi
 fi
