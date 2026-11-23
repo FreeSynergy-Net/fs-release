@@ -90,7 +90,9 @@ fn branch_ci_runs_the_gates_on_push_to_unreviewed_and_the_reusable_workflows_sta
 fn the_gate_beleg_rule_is_in_gates_sh_the_flows_and_the_docs() {
     let g = file("scripts/gates.sh");
     assert!(g.contains("--like-ci") && g.contains("gates_beleg"));
-    assert!(!g.replace("gates_beleg \"$root\"", "").contains("gates_beleg \"$root\""));
+    assert!(!g
+        .replace("gates_beleg \"$root\"", "")
+        .contains("gates_beleg \"$root\""));
     assert!(file("scripts/lib_gates_list.sh").contains("CI-gleich: NEIN"));
     for t in [
         read("agent-run"),
