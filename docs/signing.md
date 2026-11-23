@@ -58,3 +58,7 @@ dpkg-sig --verify tool_1.0.0-1_amd64.deb      # needs dpkg-sig
 rpm --import FreeSynergy-release-public.asc && rpm -K tool-1.0.0-1.x86_64.rpm
 gh attestation verify tool-1.0.0-linux-x86_64.tar.gz --repo FreeSynergy-Net/<repo>
 ```
+
+The publish step (`actions/publish-release/publish.sh`) runs the same check before a draft becomes a Pre-release, with exactly one accepted
+identity: `--signer-workflow <owner of the calling repo>/fs-release/.github/workflows/_release-finalize.yml` and `--source-ref refs/tags/<tag>`
+(no second name, no fixed name). This protects against mistakes, not against someone who can change the workflow, the toolchain or the scripts.

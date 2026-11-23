@@ -37,16 +37,20 @@ GH
   sed -i 's|^case "\$1 \$2" in|MOCK_ARGS="$*"\ncase "$1 $2" in|' "$TP/bin/gh"; chmod +x "$TP/bin/gh"
   P() { # <publish.sh> [VAR=val ...] -> rc; log in $TP/log
     local sc=$1; shift; : > "$TP/log"
-    env PATH="$TP/bin:$PATH" MOCK_LOG="$TP/log" MOCK_VIEW="$TP/view.json" MOCK_ASSETS="$TP/as" TAG=v0.0.1 REPO=o/r GH_TOKEN=x DRY_RUN=false ATTEST=true "$@" bash "$sc" >"$TP/out" 2>&1; }
+    env PATH="$TP/bin:$PATH" MOCK_LOG="$TP/log" MOCK_VIEW="$TP/view.json" MOCK_ASSETS="$TP/as" TAG=v0.0.1 REPO=FreeSynergy-Net/r GH_TOKEN=x DRY_RUN=false ATTEST=true "$@" bash "$sc" >"$TP/out" 2>&1; }
   S="$TP/t/actions/publish-release/publish.sh"
   edited() { grep -q '^release edit' "$TP/log"; }
   attested() { grep -q '^attestation verify' "$TP/log"; }
   tree; assets
   P "$S" && edited && attested && pass "publish: all good publishes (edit called, attestation checked)" || fail "publish: all good must publish: $(cat "$TP/out")"
   check_in "publish: the attestation call names the signing workflow" "$(cat "$TP/log")" "--signer-workflow FreeSynergy-Net/fs-release/.github/workflows/_release-finalize.yml"
-  # the two known owners are accepted (old one: releases built before the move), a third one is not
-  P "$S" MOCK_ATTEST_BAD=FreeSynergy-Net/ && edited && pass "publish: an attestation by the old owner only is accepted" || fail "publish: old-owner attestation must be accepted"
-  P "$S" MOCK_ATTEST_ONLY=FreeSynergy/fs-release/ && edited && pass "publish: attestation signed by the old owner (new refused by the mock) publishes" || fail "publish: old owner only"
+  check_in "publish: the attestation call names the tag of the run" "$(cat "$TP/log")" "--source-ref refs/tags/v0.0.1"
+  # exactly one signer identity: the owner of the calling repo, and the tag of the run. Negative probes: wrong org, wrong tag, old name
+  P "$S" MOCK_ATTEST_ONLY=FreeSynergy-Net/fs-release/ && edited && pass "publish: a signature by the owner of the calling repo publishes" || fail "publish: own owner must publish"
+  P "$S" REPO=evil/r MOCK_ATTEST_ONLY=FreeSynergy-Net/fs-release/ && fail "publish: a wrong org (caller evil, signed by FreeSynergy-Net) must be red" || { edited && fail "publish: wrong org but edit called" || pass "publish: a wrong org is red, no edit"; }
+  P "$S" MOCK_ATTEST_ONLY=refs/tags/v0.0.9 && fail "publish: a wrong tag must be red" || { edited && fail "publish: wrong tag but edit called" || pass "publish: a wrong tag is red, no edit"; }
+  P "$S" MOCK_ATTEST_ONLY=" FreeSynergy/fs-release/" && fail "publish: the old name FreeSynergy/ must be red" || { edited && fail "publish: old name but edit called" || pass "publish: the old name FreeSynergy/ is red, no edit"; }
+  P "$S" MOCK_ATTEST_BAD=FreeSynergy-Net/ && fail "publish: an attestation refused for the own owner must be red (no second name)" || { edited && fail "publish: second name used, edit called" || pass "publish: no second name is tried, red, no edit"; }
   P "$S" MOCK_ATTEST_ONLY=evil/fs-release/ && fail "publish: an attestation by a third owner must be red" || { edited && fail "publish: third owner but edit called" || pass "publish: an attestation by a third owner is red, no edit"; }
   P "$S" MOCK_ATTEST_ONLY=FreeSynergy-Netx/fs-release && fail "publish: a look-alike owner must be red" || pass "publish: a look-alike owner is red"
   P "$S" DRY_RUN=true && ! edited && pass "publish: dry-run is green and calls no edit" || fail "publish: dry-run must not edit"
