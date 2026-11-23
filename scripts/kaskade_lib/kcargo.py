@@ -5,7 +5,9 @@ import os
 import re
 import tomllib
 
-ORG = "FreeSynergy"
+ORG = "FreeSynergy"  # the old owner only: scripts/lock-gleich (a Cargo source file, part 2 of the address wave) still reads it
+# The two known owners of our Cargo git sources, lower case, exactly (never "any owner"): the old owner stays until part 2 of the address wave is done.
+ORGS = ("freesynergy-net", "freesynergy")
 GIT = re.compile(r"^(?:git\+)?https?://github\.com/([^/]+)/([^/?#]+?)(?:\.git)?/?(?:[?#].*)?$")
 # crate -> owner repo (the repo that carries the crate), for the wrong-source test; most repos carry the crate of their own name
 OWNER_EXACT = {

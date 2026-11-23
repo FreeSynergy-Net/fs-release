@@ -94,9 +94,10 @@ jobs:
         run: |
           case "$MODE" in warn|block) ;; *) echo "::error::input blueprint must be off, warn or block, not $MODE"; exit 2 ;; esac
           # the revision: the input, or when it is empty the commit of this workflow file (only when that file comes from fs-release; a copy elsewhere must name the revision)
+          # the two known owners of fs-release, exactly (never "any owner"): the old owner stays until part 2 of the address wave is done
           REV="$INPUT_REV"
           if [ -z "$REV" ]; then
-            REV=$(printf '%s' "$JOB" | python3 -I -c 'import json, sys; j = json.load(sys.stdin); print(j.get("workflow_sha", "") if j.get("workflow_repository") == "FreeSynergy/fs-release" else "")') || REV=""
+            REV=$(printf '%s' "$JOB" | python3 -I -c 'import json, sys; j = json.load(sys.stdin); print(j.get("workflow_sha", "") if j.get("workflow_repository") in ("FreeSynergy/fs-release", "FreeSynergy-Net/fs-release") else "")') || REV=""
           fi
           # a full commit SHA, never a branch or a tag name: the install must be the same bytes tomorrow
           if ! [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::input blueprint-rev must be a full commit SHA (40 lowercase hex digits), or empty when this workflow runs from fs-release"; exit 2; fi
@@ -127,7 +128,9 @@ jobs:
               with open(out, "a", encoding="utf-8") as f:
                   f.write(f"{k}={v}\n")
           doc = yaml.safe_load(open(os.path.join(root, ".github/workflows/release.yml"), encoding="utf-8"))
-          calls = [j for j in (doc.get("jobs") or {}).values() if isinstance(j, dict) and str(j.get("uses", "")).startswith("FreeSynergy/fs-release/.github/workflows/release.yml@")]
+          # the two known owners of fs-release, exactly (never "any owner"): the old owner stays until part 2 of the address wave is done
+          RELEASE_USES = ("FreeSynergy/fs-release/.github/workflows/release.yml@", "FreeSynergy-Net/fs-release/.github/workflows/release.yml@")
+          calls = [j for j in (doc.get("jobs") or {}).values() if isinstance(j, dict) and str(j.get("uses", "")).startswith(RELEASE_USES)]
           if not calls:
               print("::notice::release.yml does not call the fs-release release workflow: no plan probe")
               put("probe", "false")

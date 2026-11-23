@@ -6,11 +6,13 @@
 # actions across repositories, so the references are explicit and rewritten at release time.
 #
 # Option `--dir <repo>` (before or after the ref): work in ANOTHER repository (a program or library that calls fs-release).
-# Only `<repo>/.github/workflows/*.yml` is touched, only `uses: FreeSynergy/fs-release/<path>@<old>` becomes `@<ref>`; other
+# Only `<repo>/.github/workflows/*.yml` is touched, only `uses: <owner>/fs-release/<path>@<old>` (owner = one of the two known owners) becomes `@<ref>`; other
 # actions (actions/checkout@..., ...) stay as they are. No `.github/workflows/` there = rc 2. Prints the changed files, rc 0.
 # A pin is never lowered: with a tag as <ref>, a `uses:` line that is already on a HIGHER tag stays (checked line by line).
 # Without `--dir` the script rewrites this repository (workflows and actions) and prints `git diff --stat`, as before.
 set -euo pipefail
+# The two known owners of fs-release, exactly (never "any owner"): the old one stays until part 2 of the address wave is done.
+owners='FreeSynergy-Net|FreeSynergy'
 usage="pin-refs: usage: pin-refs.sh [--dir <repo>] <40-char-sha or vX.Y.Z>"
 ref=""
 dir=""
@@ -31,14 +33,14 @@ done
 # The ref goes into a sed expression (`#` is the delimiter, `&` and flags are special): only a full SHA or vX.Y.Z is accepted.
 [[ $ref =~ ^([0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "pin-refs: usage: pin-refs.sh [--dir <repo>] <40-char-sha or vX.Y.Z> (got: ${ref:-nothing})" >&2; exit 2; }
 
-# One `uses:` line at a time (awk, POSIX): `FreeSynergy/fs-release/<path>@<old>` becomes `@<ref>`, everything else on the line and in the file stays.
+# One `uses:` line at a time (awk, POSIX): `<owner>/fs-release/<path>@<old>` becomes `@<ref>`, everything else on the line and in the file stays.
 # keep=1 (`--dir`, a foreign repo): a pin is never lowered. When <ref> is a tag, an `@<old>` that is a tag with a HIGHER version (v0.0.11 against
 # v0.0.10) stays, line by line (release.yml@v0.0.11 stays while check.yml@v0.0.9 is raised). @main, a SHA, an older or equal tag are replaced.
 pin_file() {
   local keep=$1 f=$2 tmpf="$2.pin-new"
-  awk -v ref="$ref" -v keep="$keep" '
+  awk -v ref="$ref" -v keep="$keep" -v owners="$owners" '
     function ver(t,   p) { if (t !~ /^v[0-9]+[.][0-9]+[.][0-9]+$/) return ""; split(substr(t, 2), p, "."); return sprintf("%09d%09d%09d", p[1], p[2], p[3]) }
-    BEGIN { re = "FreeSynergy/fs-release/[A-Za-z0-9_./-]+@[A-Za-z0-9_.-]+" }
+    BEGIN { re = "(" owners ")/fs-release/[A-Za-z0-9_./-]+@[A-Za-z0-9_.-]+" }
     $0 ~ "^[[:space:]]*(-[[:space:]]+)?uses:" {
       out = ""; rest = $0
       while (match(rest, re)) {
@@ -72,7 +74,7 @@ if [ -n "$dir" ]; then
 fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-grep -rlE 'FreeSynergy/fs-release/.+@' .github actions | while read -r f; do
+grep -rlE "($owners)/fs-release/.+@" .github actions | while read -r f; do
   pin_file 0 "$f"
 done
 git diff --stat

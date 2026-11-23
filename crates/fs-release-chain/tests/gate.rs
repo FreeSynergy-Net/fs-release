@@ -98,7 +98,7 @@ fn a_release_dir_that_is_not_fs_release_is_red() {
     );
     let o = w.run_names(Reach::Shared, &names(&["review"]));
     assert!(
-        matches!(&o, Outcome::Red { line, .. } if line.contains("not FreeSynergy/fs-release")),
+        matches!(&o, Outcome::Red { line, .. } if line.contains("not fs-release of FreeSynergy-Net or FreeSynergy")),
         "{}",
         o.line()
     );

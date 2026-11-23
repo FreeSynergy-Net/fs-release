@@ -57,9 +57,15 @@ have=$(cd "$assets" && printf '%s\n' * | sort)
 [[ "$have" == "$(sort <<<"$names")" ]] || die "$REPO $TAG stays a draft: the downloaded files differ from the release assets"
 "$here/../../scripts/verify_release_assets.sh" "$assets" "$here/../../release-signing-key.asc" "$FPR" || die "$REPO $TAG stays a draft: hash or signature check failed"
 if [[ "${ATTEST:-true}" == "true" ]]; then
+  # Security boundary: only the two known owners of fs-release may have signed the build (never "any owner"). Releases built before the move carry
+  # the old owner in the attestation, later ones the new owner. The old owner stays until part 2 of the address wave is done.
+  signers="FreeSynergy-Net/fs-release FreeSynergy/fs-release"
   for f in "$assets"/*; do
-    gh attestation verify "$f" --repo "$REPO" --signer-workflow FreeSynergy/fs-release/.github/workflows/_release-finalize.yml >/dev/null \
-      || fail "$(basename "$f"): no valid build attestation of $REPO from _release-finalize.yml"
+    ok=false
+    for s in $signers; do
+      gh attestation verify "$f" --repo "$REPO" --signer-workflow "$s/.github/workflows/_release-finalize.yml" >/dev/null && { ok=true; break; }
+    done
+    $ok || fail "$(basename "$f"): no valid build attestation of $REPO from _release-finalize.yml"
   done
   [[ $problems -eq 0 ]] || die "$REPO $TAG stays a draft: attestation check failed"
 fi

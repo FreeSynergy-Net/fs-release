@@ -10,7 +10,8 @@ import urllib.request
 import kgit
 
 CALLER = ".github/workflows/windows.yml"
-USES = re.compile(r"^\s*uses:\s*FreeSynergy/fs-release/\.github/workflows/_windows-check\.yml@(\S+)", re.M)
+# the two known owners of fs-release, exactly (never "any owner"); the old one stays until part 2 of the address wave is done
+USES = re.compile(r"^\s*uses:\s*(?:FreeSynergy-Net|FreeSynergy)/fs-release/\.github/workflows/_windows-check\.yml@(\S+)", re.M)
 
 
 def caller(text, minimum):

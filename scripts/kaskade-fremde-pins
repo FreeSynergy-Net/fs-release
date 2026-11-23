@@ -62,7 +62,7 @@ def main(argv):
                     if kcargo.is_fremd(d, fremd):
                         fdeps.add(f"{d['owner']}/{d['repo']}")
                         continue
-                    if d["owner"].lower() != kcargo.ORG.lower() or d["repo"] == glied.get("repo"):
+                    if d["owner"].lower() not in kcargo.ORGS or d["repo"] == glied.get("repo"):
                         continue
                     owner = kcargo.owner_of_crate(d["crate"])
                     if owner and owner != d["repo"]:

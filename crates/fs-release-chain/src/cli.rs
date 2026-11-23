@@ -75,7 +75,7 @@ struct Common {
     /// Checkout of the catalog repo (for bump, sign, check).
     #[arg(long)]
     catalog: Option<PathBuf>,
-    #[arg(long, default_value = "FreeSynergy/Catalog")]
+    #[arg(long, default_value = "FreeSynergy-Net/Catalog")]
     catalog_slug: String,
     #[arg(long)]
     state_dir: Option<PathBuf>,

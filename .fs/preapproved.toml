@@ -1,22 +1,22 @@
 # Repos the owner pre-approved for the release chain (versions Opus has checked green). Fixed list: a change is a commit.
 # The chain reads this file from origin/<base> of the fs-release checkout (never from HEAD or a working tree), and only when
-# that checkout's origin is exactly FreeSynergy/fs-release. Anything else halts with `not-preapproved`.
+# that checkout's origin is fs-release of the new or the old owner (crates/fs-release-chain/src/owner.rs). Anything else halts with `not-preapproved`.
 repos = [
-  "FreeSynergy/fs-interfaces",
-  "FreeSynergy/fs-components",
-  "FreeSynergy/fs-packages",
-  "FreeSynergy/fs-files",
-  "FreeSynergy/fs-people",
-  "FreeSynergy/fs-groups",
-  "FreeSynergy/fs-tasks",
-  "FreeSynergy/fs-texts",
-  "FreeSynergy/fs-calendars",
-  "FreeSynergy/fs-maps",
-  "FreeSynergy/fs-messages",
-  "FreeSynergy/fs-release",
+  "FreeSynergy-Net/fs-interfaces",
+  "FreeSynergy-Net/fs-components",
+  "FreeSynergy-Net/fs-packages",
+  "FreeSynergy-Net/fs-files",
+  "FreeSynergy-Net/fs-people",
+  "FreeSynergy-Net/fs-groups",
+  "FreeSynergy-Net/fs-tasks",
+  "FreeSynergy-Net/fs-texts",
+  "FreeSynergy-Net/fs-calendars",
+  "FreeSynergy-Net/fs-maps",
+  "FreeSynergy-Net/fs-messages",
+  "FreeSynergy-Net/fs-release",
 ]
 # Catalog repos that bump and sign may push to (public reach only).
-catalog_targets = ["FreeSynergy/Catalog"]
+catalog_targets = ["FreeSynergy-Net/Catalog"]
 
 # Public reach (`--reach public`) stays locked until the reference of the Opus JA that lifts the lock stands here.
 public_ok = ""

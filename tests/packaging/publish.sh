@@ -26,7 +26,9 @@ case "$1 $2" in
     while [ $# -gt 0 ]; do case "$1" in --pattern) pat=$2; shift ;; --dir) dir=$2; shift ;; esac; shift; done
     [ -z "${MOCK_DL_FAIL:-}" ] || exit 1
     if [ -n "$pat" ]; then cp "$MOCK_ASSETS/$pat" "$dir/"; else cp "$MOCK_ASSETS"/* "$dir/"; fi ;;
-  "attestation verify") exit "${MOCK_ATTEST_RC:-0}" ;;
+  "attestation verify") [ -z "${MOCK_ATTEST_BAD:-}" ] || case "$*" in *"$MOCK_ATTEST_BAD"*) exit 1 ;; esac
+    [ -z "${MOCK_ATTEST_ONLY:-}" ] || case "$*" in *"$MOCK_ATTEST_ONLY"*) ;; *) exit 1 ;; esac
+    exit "${MOCK_ATTEST_RC:-0}" ;;
   "release edit") exit "${MOCK_EDIT_RC:-0}" ;;
   *) exit 3 ;;
 esac
@@ -41,7 +43,12 @@ GH
   attested() { grep -q '^attestation verify' "$TP/log"; }
   tree; assets
   P "$S" && edited && attested && pass "publish: all good publishes (edit called, attestation checked)" || fail "publish: all good must publish: $(cat "$TP/out")"
-  check_in "publish: the attestation call names the signing workflow" "$(cat "$TP/log")" "--signer-workflow FreeSynergy/fs-release/.github/workflows/_release-finalize.yml"
+  check_in "publish: the attestation call names the signing workflow" "$(cat "$TP/log")" "--signer-workflow FreeSynergy-Net/fs-release/.github/workflows/_release-finalize.yml"
+  # the two known owners are accepted (old one: releases built before the move), a third one is not
+  P "$S" MOCK_ATTEST_BAD=FreeSynergy-Net/ && edited && pass "publish: an attestation by the old owner only is accepted" || fail "publish: old-owner attestation must be accepted"
+  P "$S" MOCK_ATTEST_ONLY=FreeSynergy/fs-release/ && edited && pass "publish: attestation signed by the old owner (new refused by the mock) publishes" || fail "publish: old owner only"
+  P "$S" MOCK_ATTEST_ONLY=evil/fs-release/ && fail "publish: an attestation by a third owner must be red" || { edited && fail "publish: third owner but edit called" || pass "publish: an attestation by a third owner is red, no edit"; }
+  P "$S" MOCK_ATTEST_ONLY=FreeSynergy-Netx/fs-release && fail "publish: a look-alike owner must be red" || pass "publish: a look-alike owner is red"
   P "$S" DRY_RUN=true && ! edited && pass "publish: dry-run is green and calls no edit" || fail "publish: dry-run must not edit"
   P "$S" MOCK_ATTEST_RC=1 && fail "publish: a missing attestation must be red" || { edited && fail "publish: missing attestation but edit called" || pass "publish: a missing attestation is red, no edit"; }
   P "$S" ATTEST=false && edited && ! attested && pass "publish: ATTEST=false publishes without the attestation call" || fail "publish: ATTEST=false"

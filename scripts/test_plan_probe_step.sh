@@ -46,6 +46,7 @@ fixture() { rm -rf "$1"; mk "$1/crates/fs-forms" fs-forms 0.3.1; mk "$1/crates/f
 # release_yml DIR USES WITH-LINES...
 release_yml() { local d=$1 u=$2; shift 2; { printf 'name: release\non:\n  push:\n    tags: ["v*"]\njobs:\n  release:\n    uses: %s\n    with:\n' "$u"; printf '      %s\n' "$@"; } >"$d/.github/workflows/release.yml"; }
 REL=FreeSynergy/fs-release/.github/workflows/release.yml@v0.0.17
+RELNEW=FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.17   # the new owner: the probe must really run (it was skipped silently before)
 
 # run_case SCRIPT DIR -> prints "probe=<true|false|none> plan_rc=<rc>" and leaves the output in $tmp/case.out
 run_case() {
@@ -94,6 +95,12 @@ all_cases() { # <script>: every case against it
   expect "empty windows-targets stays empty: green" "$s" "$D" "probe=true plan_rc=0"
   release_yml "$D" "$REL" "binaries: fs-forms" "ignore-binaries: fs-forms-run" "linux-targets: arm9000"
   expect "an unknown target is red (inputs are really passed)" "$s" "$D" "probe=true plan_rc=1" "unknown linux target"
+  release_yml "$D" "$RELNEW" "binaries: fs-forms" "kind: cli"
+  expect "the NEW owner's release workflow is probed, not skipped silently (red: fs-forms-run)" "$s" "$D" "probe=true plan_rc=1" "fs-forms-run"
+  release_yml "$D" "$RELNEW" "binaries: fs-forms" "ignore-binaries: fs-forms-run"
+  expect "the new owner, nothing to complain about: green" "$s" "$D" "probe=true plan_rc=0"
+  release_yml "$D" "FreeSynergy-Netx/fs-release/.github/workflows/release.yml@v0.0.17" "binaries: fs-forms"
+  expect "a third owner that only looks like the new one: no probe" "$s" "$D" "probe=false plan_rc=-"
   release_yml "$D" "someone/else/.github/workflows/release.yml@main" "binaries: fs-forms"
   expect "a release.yml that does not call fs-release: no probe" "$s" "$D" "probe=false plan_rc=-"
   release_yml "$D" "$REL" 'binaries: ${{ vars.BINARIES }}'
@@ -126,7 +133,7 @@ steps = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))["jobs"]["check"]["st
 ids = [s.get("id") for s in steps]
 assert ids.index("release-inputs") < ids.index("release-plan-probe"), "order"
 p = steps[ids.index("release-plan-probe")]
-assert p["continue-on-error"] is True and re.fullmatch(r"FreeSynergy/fs-release/actions/plan@[0-9a-f]{40}", p["uses"]), p["uses"]
+assert p["continue-on-error"] is True and re.fullmatch(r"FreeSynergy(-Net)?/fs-release/actions/plan@[0-9a-f]{40}", p["uses"]), p["uses"]
 assert "release-inputs" in p["if"] and "probe" in p["if"]
 want = set(yaml.safe_load(open(sys.argv[2], encoding="utf-8"))["inputs"])
 assert set(p["with"]) == want, sorted(want ^ set(p["with"]))
@@ -154,7 +161,8 @@ mutant "binaries not read" 's/"binaries": ""/"binariez": ""/'
 mutant "kind default empty" 's/"kind": "cli"/"kind": ""/'
 mutant "tag always 0.0.0" 's/put\("tag", .*$/put("tag", "v0.0.0")/'
 mutant "probe never true" 's/put\("probe", "true"\)/put("probe", "false")/'
-mutant "no check of the called workflow" 's/startswith\("FreeSynergy\/fs-release\/.github\/workflows\/release.yml@"\)/startswith("")/'
+mutant "no check of the called workflow" 's/startswith\(RELEASE_USES\)/startswith("")/'
+mutant "the new owner is not probed (silent skip)" 's/, "FreeSynergy-Net\/fs-release\/.github\/workflows\/release.yml@"\)$/)/'
 mutant "expressions are passed on" 's/"\$" \+ "\{\{" in v or //'
 mutant "booleans are passed as Python words" 's/\("true" if v else "false"\) if isinstance\(v, bool\) else str\(v\)/str(v)/'
 mutant "owner not looked for (first package)" 's/ or mine$/ or mine\nowners = mine/'

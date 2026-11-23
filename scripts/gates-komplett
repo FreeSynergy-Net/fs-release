@@ -38,7 +38,8 @@ import kgit  # noqa: E402
 import kio  # noqa: E402
 import teil  # noqa: E402
 
-PIN = re.compile(r"FreeSynergy/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+)\b")
+# the two known owners of fs-release, exactly (never "any owner"); the old one stays until part 2 of the address wave is done
+PIN = re.compile(r"(?:FreeSynergy-Net|FreeSynergy)/fs-release/\S+@(v[0-9]+\.[0-9]+\.[0-9]+)\b")
 # The ONE list of named exceptions (never scattered in the code): repo + run + test. EMPTY since v0.0.12 (the flat run of fs-release fetches its tags, see the flat clone step below); the mechanism stays.
 # An entry needs `bis` (the fs-release release that replaces it): once fs-release `bis` is tagged (ls-remote of fs-release, `FS_KASKADE_BASE`; not readable = red, never a guess) and the list is not empty, gates-komplett is RED.
 # Entry form: {"name": ..., "repo": ..., "lauf": ..., "bis": "vX.Y.Z", "test": ..., "grund": ...}; `grund` is printed on every run.

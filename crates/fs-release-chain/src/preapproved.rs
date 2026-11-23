@@ -6,10 +6,8 @@ use crate::ctx::Ctx;
 use crate::git;
 use crate::meta::Reach;
 use crate::origin::configured_slug;
+use crate::owner::{is_release_repo, same_repo, OWNERS, RELEASE_REPO};
 use crate::outcome::Stop;
-
-/// The only repo whose `.fs/preapproved.toml` counts.
-pub const RELEASE_SLUG: &str = "FreeSynergy/fs-release";
 
 /// The one ref the list is read from, whatever `--base` the run targets (not settable from the command line).
 pub const LIST_BRANCH: &str = "main";
@@ -30,7 +28,7 @@ pub struct Preapproved {
 
 impl Preapproved {
     /// Reads the list from `origin/main` ([`LIST_BRANCH`]) of the fs-release checkout (`--release-dir`): the checkout's origin
-    /// must be exactly `FreeSynergy/fs-release`, the ref is fetched first (when that fails, an existing ref is used below
+    /// must be fs-release of one of the two known owners ([`OWNERS`]), the ref is fetched first (when that fails, an existing ref is used below
     /// public reach, public reach is red), and the working tree, `HEAD`, any local branch and the run's `--base` count for
     /// nothing. A release of fs-release itself, or any other branch pushed to its origin, cannot bring its own list.
     ///
@@ -40,10 +38,11 @@ impl Preapproved {
     pub fn load(ctx: &Ctx) -> Result<Preapproved, Stop> {
         let dir = &ctx.target.release_dir;
         let who = configured_slug(ctx.runner, dir).map_err(Stop::red)?;
-        if who != RELEASE_SLUG {
+        if !is_release_repo(&who) {
             return Err(Stop::red(format!(
-                "--release-dir {} is {who}, not {RELEASE_SLUG}",
-                dir.display()
+                "--release-dir {} is {who}, not {RELEASE_REPO} of {}",
+                dir.display(),
+                OWNERS.join(" or ")
             )));
         }
         let fetched = git::fetch_raw(ctx, dir, LIST_BRANCH)?;
@@ -71,7 +70,7 @@ impl Preapproved {
         toml::from_str(&o.stdout).map_err(|e| Stop::red(format!(".fs/preapproved.toml: {e}")))
     }
 
-    /// A run that touches more than this machine needs the repo on the list; public reach also needs the lifted lock and
+    /// A run that touches more than this machine needs the repo on the list (the same repo under either known owner counts, any other owner never); public reach also needs the lifted lock and
     /// the catalog repo among the catalog targets.
     ///
     /// # Errors
@@ -80,7 +79,7 @@ impl Preapproved {
         if reach == Reach::Local {
             return Ok(());
         }
-        if !self.repos.iter().any(|r| r == slug) {
+        if !self.repos.iter().any(|r| same_repo(r, slug)) {
             return Err(Stop::halt(
                 "not-preapproved",
                 format!("{slug} on the list in .fs/preapproved.toml (on origin of fs-release)"),
@@ -92,7 +91,7 @@ impl Preapproved {
                 "the Opus JA entry (`public_ok`) in .fs/preapproved.toml: public reach is locked",
             ));
         }
-        if reach == Reach::Public && !self.catalog_targets.iter().any(|r| r == catalog_slug) {
+        if reach == Reach::Public && !self.catalog_targets.iter().any(|r| same_repo(r, catalog_slug)) {
             return Err(Stop::halt(
                 "catalog-not-preapproved",
                 format!("{catalog_slug} in `catalog_targets` of .fs/preapproved.toml"),

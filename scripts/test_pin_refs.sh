@@ -133,7 +133,8 @@ red_by() { # <label> <sed expression on the script>
   if echo "$res" | grep -q '^FAIL'; then ok "mutation $1 turns the --dir checks red"; else bad "mutation $1 stayed green"; fi
 }
 red_by noanchor 's@\$0 ~ "\^\[\[:space:\]\]\*\(-\[\[:space:\]\]\+\)\?uses:"@$0 ~ "uses:"@'
-red_by widened 's@re = "FreeSynergy/fs-release/@re = "[A-Za-z0-9_]+/@'
+red_by widened 's@re = "\(" owners "\)/fs-release/@re = "[A-Za-z0-9_-]+/fs-release/@'
+red_by only-old-owner "s@^owners=.*@owners='FreeSynergy'@"
 red_by lowers 's@if \(!\(keep == 1.*\)\) tok@if (1) tok@'
 red_by semver-as-text 's@ver\(old\) > ver\(ref\)@old > ref@'
 red_by dirignored 's@^if \[ -n "\$dir" \]; then@if false; then@'

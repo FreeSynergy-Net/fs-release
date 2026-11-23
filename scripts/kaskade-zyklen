@@ -33,7 +33,7 @@ def read_edges(folder, fremd):
     for f in kcargo.cargo_files(folder):
         with open(f, encoding="utf-8") as fh:
             for d in kcargo.git_deps(fh.read()):
-                if d["owner"].lower() == kcargo.ORG.lower() and not kcargo.is_fremd(d, fremd):
+                if d["owner"].lower() in kcargo.ORGS and not kcargo.is_fremd(d, fremd):
                     out.add(d["repo"])
     return out
 

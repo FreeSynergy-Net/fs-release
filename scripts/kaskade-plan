@@ -41,7 +41,7 @@ def scan(repo, fremd):
                 dep["datei"] = f
                 if kcargo.is_fremd(dep, fremd):
                     fdeps.append(dep)
-                elif dep["owner"].lower() == kcargo.ORG.lower():
+                elif dep["owner"].lower() in kcargo.ORGS:
                     deps.append(dep)
     return deps, fdeps
 

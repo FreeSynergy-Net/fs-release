@@ -101,7 +101,7 @@ for r in ${repos//,/ }; do
     call="nein"
     for f in $(names_of "$API_OUT" '.[]? | select(.type=="file") | .name | select(test("^release.*[.]ya?ml$"))'); do
       api -H 'Accept: application/vnd.github.raw+json' "$base/contents/.github/workflows/$f"
-      if [ "$API_ST" = ok ] && grep -q 'FreeSynergy/fs-release/.github/workflows/release.yml' <<<"$API_OUT"; then call="ja"; break; fi
+      if [ "$API_ST" = ok ] && grep -Eq '(FreeSynergy-Net|FreeSynergy)/fs-release/[.]github/workflows/release[.]yml' <<<"$API_OUT"; then call="ja"; break; fi
       [ "$API_ST" = ok ] || { call="unbekannt"; break; }
     done
   fi

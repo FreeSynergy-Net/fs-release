@@ -90,7 +90,9 @@ all_cases() { # <script>: runs every case against it; counts failures in cases_f
   case_run "$s" "empty input: the workflow commit" warn "" 0 0 "--rev $wf --locked" "$r" ""
   case_run "$s" "empty input, block, the workflow commit" block "" 0 0 "--rev $wf --locked" "" ""
   case_run "$s" "empty input, a workflow of another repo" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_sha": "'"$wf"'", "workflow_repository": "someone/else"}'
-  for other in someone/fs-release FreeSynergy/fs-release-evil evil-FreeSynergy/fs-release freesynergy/fs-release "FreeSynergy/fs-release "; do
+  # the two known owners are accepted (the old one stays until part 2 of the address wave is done); a third owner or a look-alike is not
+  case_run "$s" "empty input, the new owner's workflow commit" warn "" 0 0 "--rev $wf --locked" "" "" '{"workflow_sha": "'"$wf"'", "workflow_repository": "FreeSynergy-Net/fs-release"}'
+  for other in someone/fs-release FreeSynergy/fs-release-evil evil-FreeSynergy/fs-release freesynergy/fs-release "FreeSynergy/fs-release " FreeSynergy-Net/fs-release-evil FreeSynergy-Netx/fs-release evil/FreeSynergy-Net/fs-release; do
     case_run "$s" "empty input, a repo that only looks like fs-release ($other)" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_sha": "'"$wf"'", "workflow_repository": "'"$other"'"}'
   done
   case_run "$s" "empty input, no repo given" warn "" 0 2 "" "cargo|fs-blueprint" "::error::" '{"workflow_sha": "'"$wf"'"}'
@@ -118,8 +120,10 @@ mutant "rev check without the length" 's/\{40\}/+/'
 mutant "rev check accepts upper case" 's/\[0-9a-f\]/[0-9a-fA-F]/'
 mutant "rev check without the end anchor" 's/\{40\}\$ \]\]/{40} ]]/'
 mutant "workflow commit not read" 's/j\.get\("workflow_sha", ""\)/""/'
-mutant "repo of the workflow not checked" 's/ if j\.get\("workflow_repository"\) == "FreeSynergy\/fs-release" else ""//'
-mutant "repo of the workflow only contains fs-release" 's/j\.get\("workflow_repository"\) == "FreeSynergy\/fs-release"/"fs-release" in j.get("workflow_repository", "")/'
+mutant "repo of the workflow not checked" 's/ if j\.get\("workflow_repository"\) in \([^)]*\) else ""//'
+mutant "repo of the workflow only contains fs-release" 's/j\.get\("workflow_repository"\) in \([^)]*\)/"fs-release" in j.get("workflow_repository", "")/'
+mutant "the new owner is not accepted (probe would be skipped)" 's/, "FreeSynergy-Net\/fs-release"//'
+mutant "any owner is accepted" 's/j\.get\("workflow_repository"\) in \([^)]*\)/j.get("workflow_repository", "").endswith("\/fs-release")/'
 mutant "input ignored (always the workflow commit)" 's/^( *)REV="\$INPUT_REV"$/\1REV=""/'
 mutant "workflow commit wins over the input" 's/^( *)if \[ -z "\$REV" \]; then$/\1if true; then/'
 mutant "failure of the reading is not caught" 's/ \|\| REV=""//'

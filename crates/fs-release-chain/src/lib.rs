@@ -13,6 +13,7 @@ pub mod git;
 pub mod ledger;
 pub mod meta;
 pub mod origin;
+pub mod owner;
 pub mod outcome;
 pub mod packages;
 pub mod poll;

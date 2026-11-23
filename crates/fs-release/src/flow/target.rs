@@ -59,7 +59,7 @@ pub fn build_target(
         version: version.to_string(),
         release_dir: release_dir.to_path_buf(),
         catalog_dir: None,
-        catalog_slug: "FreeSynergy/Catalog".into(),
+        catalog_slug: "FreeSynergy-Net/Catalog".into(),
         approval_dir: PathBuf::from(APPROVAL_DIR),
         approval_days: APPROVAL_DAYS,
         today_days: today_days(),
