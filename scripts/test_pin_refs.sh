@@ -128,7 +128,7 @@ bash "$here/pin-refs.sh" v0.0.10 v0.0.11 >/dev/null 2>&1; rc=$?
 
 # never lower (--dir): target equal or descendant of every existing pin = ok; older, unrelated, unknown, or a foreign org = rc 3 and NOTHING written
 nolower_checks() {
-  local s=$1 l=$2 d="$tmp/n-$2" rc t before
+  local s=$1 l=$2 d="$tmp/n-$2" rc
   nl_case() { # <name> <old pin line ref or full owner/ref> <target> <want: ok|noop|red>
     local want=$4
     rm -rf "$d"; mkdir -p "$d/.github/workflows"
