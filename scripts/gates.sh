@@ -9,10 +9,12 @@ set -euo pipefail
 # Every gate prints its rc; a failing one prints its line and rc on stderr (the ERR trap). Never cut a gate output with `tail`/`head`
 # (a pipe into them hides the exit code of the gate): rule [GATE-PIPEFAIL], pinned by crates/fs-release/tests/workflows_pflege12.rs.
 trap 'echo "gates FAILED: line $LINENO: rc=$?" >&2' ERR
-like_ci=""
-if [ "${1:-}" = "--like-ci" ]; then like_ci=1; shift; fi # [GATE-BELEG] also the lint job of CI (shellcheck, actionlint) and the MSRV note; the Beleg is printed in every mode
+like_ci=""; repo_arg=""
+for a in "$@"; do # [GATE-BELEG] --like-ci (anywhere) also runs the lint job of CI and MSRV; "CI-gleich: ja" needs it; the Beleg is printed in every mode
+  case "$a" in --like-ci) like_ci=1 ;; -*) echo "gates FAILED: unknown option $a" >&2; exit 2 ;; *) [ -z "$repo_arg" ] || { echo "gates FAILED: second path $a" >&2; exit 2; }; repo_arg="$a" ;; esac
+done
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-root="$(cd "$1" && pwd)"
+root="$(cd "${repo_arg:?usage: gates.sh [--like-ci] <repo root>}" && pwd)"
 rules="$here/check_rust_rules.py"
 RUSTUP_TOOLCHAIN="$(tr -d '[:space:]' < "$here/../RUST_VERSION")"
 export RUSTUP_TOOLCHAIN
@@ -168,7 +170,7 @@ else
     if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi
     if [ -d .github/workflows ] && command -v actionlint >/dev/null 2>&1; then step actionlint lint gates_lint_actions "$root"; fi
     msrv="$(grep -m1 -E '^rust-version[[:space:]]*=' Cargo.toml 2>/dev/null | sed 's/[^"]*"\([0-9.]*\)".*/\1/' || true)"
-    if [ -n "$msrv" ] && command -v rustup >/dev/null 2>&1; then step msrv error env RUSTUP_TOOLCHAIN="$msrv" cargo check --workspace --all-targets --locked; fi
+    if [ -n "$msrv" ] && command -v rustup >/dev/null 2>&1; then step msrv error env RUSTUP_TOOLCHAIN="$msrv" cargo check --all-targets --locked; fi
   fi
 fi
 gates_guard_snapshot "$root" "$guard_snap.end"
