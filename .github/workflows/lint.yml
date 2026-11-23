@@ -250,6 +250,7 @@ jobs:
       - name: chain gate (report only)
         id: pin-chain
         continue-on-error: true
+        shell: bash # pipefail: a build error or rc 2 of the tool must not pass as success behind the tee
         run: cargo run --locked --quiet -p fs-release -- check-pin-chain --melden | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
       - name: Collect the results (every step above ran; the job is red when one was)
         if: always()

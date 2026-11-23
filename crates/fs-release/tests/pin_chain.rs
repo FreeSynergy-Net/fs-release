@@ -282,3 +282,46 @@ fn the_command_is_hard_by_default_and_only_reports_with_melden() {
         2
     );
 }
+
+/// Rewrites the self-pin line of `_pub.yml` at the start with another spelling of the owner and commits.
+fn commit_with_owner(r: &Repo, owner_repo: &str) -> String {
+    let c = git(r.path(), &["rev-parse", "HEAD"]);
+    r.write(
+        ".github/workflows/extra.yml",
+        &format!("jobs:\n  e:\n    steps:\n      - uses: {owner_repo}/actions/pub@{c}\n"),
+    );
+    git(r.path(), &["add", "-A"]);
+    git(r.path(), &["commit", "-q", "-m", "extra"]);
+    git(r.path(), &["rev-parse", "HEAD"])
+}
+
+#[test]
+fn a_lowercase_owner_pinned_to_old_code_is_red() {
+    // before the fix: the owner was not followed and normalize hid the pin: green although the code behind it is old.
+    let mut r = Repo::new();
+    let (_, _, c2) = r.fixed_point();
+    let _ = c2;
+    r.pub_sh = "publish v2".into();
+    let c3 = r.commit(&git(r.path(), &["rev-parse", "HEAD"]));
+    // c3 pins c2's code (publish v1) through the proper owner; extra.yml uses the lower-case spelling
+    let s = commit_with_owner(&r, "freesynergy-net/fs-release");
+    let _ = c3;
+    let found = red(&r, &s);
+    assert!(
+        found.iter().any(|f| f.contains("unknown owner spelling")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_foreign_owner_is_red() {
+    let r = Repo::new();
+    let (_, _, c2) = r.fixed_point();
+    let s = commit_with_owner(&r, "Evil/fs-release");
+    let _ = c2;
+    let found = red(&r, &s);
+    assert!(
+        found.iter().any(|f| f.contains("unknown owner spelling")),
+        "{found:?}"
+    );
+}
