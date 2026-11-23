@@ -28,5 +28,9 @@ fn counter_pull_request_is_red_until_answer_or_time_limit_and_only_the_human_sen
     assert!(has(&t, "pr-freigabe", &["actor: human", "gate: human"]));
     assert!(has(&t, "pr-hand-text", &["actor: human", "never call gh"]));
     assert!(has(&t, "pr-nach-antwort", &["ONE factual follow-up"]));
-    assert!(!has(&t.replace("actor: human", "actor: ai"), "pr-freigabe", &["actor: human"]));
+    assert!(!has(
+        &t.replace("actor: human", "actor: ai"),
+        "pr-freigabe",
+        &["actor: human"]
+    ));
 }
