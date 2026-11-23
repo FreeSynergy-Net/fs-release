@@ -160,7 +160,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "HANDLAUF (no script; resolve-head@fs). git rev-parse HEAD in the branch worktree gives the FULL 40-character hash of the tip (output object { head: <sha> }, kept as $context.kopf); then git ls-remote origin refs/heads/<branch> to prove the same hash is the one on the remote; read the CI at exactly this hash yourself - gh run list -R <repo> --commit <sha> --json workflowName,status,conclusion and gh run view for each run; a missing or red run at this hash is a finding, a run of an older hash does not count. In a run from step 1 there is no input head (the head is created by pin); on re-entry at head or review the input head is checked against the branch tip and a difference stops the run."
+        freesynergy.net:summary: "HANDLAUF (no script; resolve-head@fs). git rev-parse HEAD in the branch worktree gives the FULL 40-character hash of the tip (output object { head: <sha> }, kept as $context.kopf); then git ls-remote origin refs/heads/<branch> to prove the same hash is the one on the remote; read the CI at exactly this hash yourself - gh run list -R <repo> --commit <sha> --json workflowName,status,conclusion and gh run view for each run; a missing or red run at this hash is a finding, a run of an older hash does not count. In a run from step 1 there is no input `head` (the head is created by pin); on re-entry at head or review the input head is checked against the branch tip and a difference stops the run."
   - review:
       run:
         workflow:
