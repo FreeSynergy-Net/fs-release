@@ -99,6 +99,17 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Identity check before the review (b7), run by `scripts/identity-check` (the same command is the gate `identity` of `scripts/gates.sh`, so the local gates and `branch-ci` of this repo are red the same way; the callers' `check.yml` runs `actions/gates@e596ed65` (v0.0.17) WITHOUT this gate and checks identity only after that pin is raised to a tag that has `scripts/identity-check` (follow-up after the next fs-release tag); base `origin/main`, `FS_IDENTITY_BASE` overrides): `git log --format='%h%x09%ae%x09%ce' main..HEAD` lists author and committer address of every commit of the range; only the identity in the key/config `FS_ALLOWED_IDENTITY` is allowed. Every other address as author or as committer is a hit (no exception, also no machine or bot address): red, the branch is rewritten first (author and committer = the allowed identity) and the check runs again. The check names the commit, never an address. It sits BEFORE the review because a rewrite makes a new head, and a JA is bound to exactly one head; after the review or after the tag a rewrite would void the JA or leave a public tag on the old commits."
+  - attestation-identitaet:
+      call: attestation-check:0.0.17@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Attestation identity BEFORE the tag. (1) Chain gate, HARD: `fs-release check-pin-chain <head>` (Rust, crates/fs-release/src/pin_chain.rs; no marker file): the code reached through the self-pins of fs-release (release.yml -> _release-publish.yml -> actions/publish-release, and every other chain, all levels) equals the code at the head, except the pins themselves. Root cause: a commit cannot contain its own hash, so fs-release pins itself one round behind and the caller pin of a round shows old code (depth 2 = two rounds). Red = `bash scripts/pin-refs.sh <sha of the head>`, commit, run again (at most 2 rounds); the same hard call runs before a re-pin wave of the callers. In lint the same check only REPORTS (`--melden`), otherwise main is red until the second round. (2) After the release job has built the DRAFT and BEFORE it is published (hand run): `gh attestation verify <asset> --repo <owner>/<repo> --signer-workflow <owner>/fs-release/.github/workflows/_release-finalize.yml --source-ref refs/tags/<tag>` on an asset of the draft (the same flags as actions/publish-release/publish.sh, not the looser `--signer-repo`). Red = do not publish, fix the chain first. Threat model: protects against OVERSIGHT, not against someone who can change workflow, toolchain or scripts. Never loosen the check."
   - review-request:
       call: review-request:0.0.17@fs
       metadata:

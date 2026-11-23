@@ -10,4 +10,6 @@ pub mod ci_tools;
 pub mod cli;
 pub mod flow;
 pub mod lift;
+pub mod pin_chain;
+mod pin_chain_text;
 pub mod task;

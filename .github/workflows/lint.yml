@@ -232,3 +232,41 @@ jobs:
           cat "$list"
           cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
           exit "$red"
+  # Chain gate (Rust: crates/fs-release/src/pin_chain.rs): the code reached through the self-pins equals the code at this head except the pins. Here it only
+  # REPORTS (--melden): after every change of a reached file main is red until the second pin round. It runs HARD (no --melden) before the re-pin wave of
+  # the callers and before the tag (workflow release-flow, step attestation-identitaet). Red = `bash scripts/pin-refs.sh <sha of the head>`, at most 2 rounds.
+  pin-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the pins name commits of the history
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@78992eea0128a9871117ae0af81ae68cb275d61f
+        with:
+          toolchain: pinned
+          cache-key: lint-pin-chain
+      - name: chain gate (report only)
+        id: pin-chain
+        continue-on-error: true
+        run: cargo run --locked --quiet -p fs-release -- check-pin-chain --melden | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+      - name: Collect the results (every step above ran; the job is red when one was)
+        if: always()
+        env:
+          RESULTS: |
+            pin-chain ${{ steps.pin-chain.outcome }}
+        run: |
+          red=0
+          list="$(mktemp)"
+          {
+            echo "### Results of this job (one line per step, none stops the others)"
+            while read -r label outcome; do
+              [ -n "$label" ] || continue
+              echo "- $label: $outcome"
+              case "$outcome" in failure|cancelled) red=1 ;; esac
+            done <<< "$RESULTS"
+          } > "$list"
+          cat "$list"
+          cat "$list" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          exit "$red"
