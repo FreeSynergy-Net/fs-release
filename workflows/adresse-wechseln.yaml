@@ -1,11 +1,11 @@
 # adresse-wechseln: swap the GitHub owner in all addresses of our repos (old `FreeSynergy`, new `FreeSynergy-Net`; the old address redirects, but is replaced everywhere).
-# Order: `Workflow adresse-wechseln, step <id>, parameters old_owner, new_owner, repos, allow, branch, teil, fs_release_tag` (docs/prompt-template.md). FS profile: see README.md.
-# Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy). The machine steps `bestand`, `ersetzen`, `nachher` are the Rust commands `fs-release address bestand|ersetzen|nachher` (crates/fs-release/src/address/, tests in crates/fs-release/tests/address.rs); `scripts/adresse-wechseln` is only a short caller. No Python. The `@fs` calls of the gates are the usual ones and have no script of their own.
+# Order: `Workflow adresse-wechseln, step <id>, parameters old_owner, new_owner, repos, allow, branch, teil, fs_release_ref, fs_release_neutral, fs_release_dir` (docs/prompt-template.md). FS profile: see README.md.
+# Run through `workflow-pflege` (detect, write, schema-check, glance, to-main by the strategy). The machine steps `bestand`, `ersetzen`, `nachher`, `aufrufer-pruefen` are the Rust commands `fs-release address bestand|ersetzen|nachher|aufrufer` (crates/fs-release/src/address/, tests in crates/fs-release/tests/address.rs); `scripts/adresse-wechseln` is only a short caller. No Python. The `@fs` calls of the gates are the usual ones and have no script of their own.
 # Classes (as in the stock list `.scratch/adress-welle/BESTAND-vorher.md`): a Cargo git pin and every other file that decides a Cargo source, b Cargo.lock, c CI `uses:`, d scripts ORG=/OWNER=, e catalog data, f docs, g workflow YAML, h rest.
 # The tool finds mentions BROADLY (every `Owner/<name>` and every bare owner value behind a host or key: `github.com/`, `repos/`, `uses:`, `ORG=`, `repo =`, `repository:`, `-R`, `--repo`, any case) and replaces only the SAFE forms (behind a host or key). `nachher` uses the broad finder, not the replace forms: what `ersetzen` cannot replace (bare `"FreeSynergy/fs-x"` strings in TOML/YAML/Rust/Python, `.fs/preapproved.toml`, `workflows/*.yaml` `repo:` values in code) stays red until it is done by hand or named in `allow` with a reason. XDG paths (`~/.config/freesynergy/..`, `/srv/FreeSynergy`) and npm scopes (`@freesynergy/..`) are no owner mention for the finder (a mention right after `/` counts only behind a known host; lower case without host or key does not count). `ghcr.io/<owner>/` is reported as its own line `<repo> ghcr <n>`, never replaced and not part of the after-check (own decision).
 # `allow` is a JSON file, an array of `{pattern, reason, scope, repo}`: `pattern` = text in the line (any case), `scope` = path prefix, `repo` = optional, `reason` required. One meaning in all three commands (path scope plus line text). An entry that matches nothing is RED (stale), like `umbenennen --keep`; an entry without `repo` is judged only in a run over several repos (a run for one repo cannot show it is stale); an entry without `scope` must be narrow (the tool refuses empty patterns, patterns under 4 characters and the owner name or a part of it). Every error (missing ref, no repo, repo without main, broken `allow` file) is exit code 2 with a message, never "0 hits".
 # PART 1 (`teil` = 1) is c, d, f, g, h per repo and the catalog last; PART 2 (`teil` = 2, own run, later) is a + b along the dependency edges. PART 2 ALSO owns every other file that names a Cargo source: `scripts/lock-sources.toml` (`[only_from]`, compared by `check_lock_sources.py` with the lock file), `scripts/lock-gleich`, `scripts/check_rust_rules.py`, `.cargo/config*`, `deny.toml`, `[patch]` sections. The tool never writes them in part 1 (class a); they change together with the pins, with a new fs-release tag. WHY the Cargo files are NOT part 1: cargo treats a different git URL as a different source (the source URL is part of the package identity: `[patch]` keys are source URLs, and a lock file lists the same name and version twice with `git+<url-1>#<sha>` and `git+<url-2>#<sha>`; checked by experiment with cargo 1.100, evidence in the report). If a repo switches its pins while its tagged dependencies still pin the old address inside, the graph gets two sources per `fs-*` name = duplicate crates with types the compiler treats as different. So the pins change only bottom-up along the edges, with a new tag per repo, in the bundled release (CLAUDE.md 4b).
-# ORDER (corrects the earlier rule "order free, tag stays"): fs-release FIRST. fs-release compares the owner literally in many places (`check.yml` plan probe and `workflow_repository`, `publish.sh` `--signer-workflow`, `preapproved.rs` and `.fs/preapproved.toml`, `pin-refs.sh`, `gates-komplett`, `kwindows.py`, `check_release_env.sh`, `lint.yml`, ...). A caller that switches its `uses:` with an unchanged tag would switch gates off silently or turn the chain red. So: step `fs-release-zuerst` makes fs-release owner-neutral (old AND new owner accepted, or the owner derived from the run, e.g. `github.repository_owner`) and gets a NEW tag (`fs-release-tag`); only then the callers switch owner AND tag together (`aufrufer-umstellen`, through `pin-refs`/`lift`). From there the order of the other repos is free; Catalog stays last.
+# ORDER (corrects the earlier rule "order free, tag stays"): fs-release FIRST. fs-release compares the owner literally in many places (`check.yml` plan probe and `workflow_repository`, `publish.sh` `--signer-workflow`, `preapproved.rs` and `.fs/preapproved.toml`, `pin-refs.sh`, `gates-komplett`, `kwindows.py`, `check_release_env.sh`, `lint.yml`, ...). A caller that switches its `uses:` with an unchanged tag would switch gates off silently or turn the chain red. So: step `fs-release-zuerst` makes fs-release owner-neutral (old AND new owner accepted, or the owner derived from the run, e.g. `github.repository_owner`) and lands on main WITHOUT a tag (step `fs-release-ref`: the callers pin the full SHA L of that main commit; v0.0.18 follows only in the bundled release after stage 0); only then the callers switch owner AND ref together (`aufrufer-umstellen`, through `pin-refs`/`lift`), and `fs-release address aufrufer` must be rc 0 before the push (rules: exact owner `FreeSynergy-Net`, ref = full SHA or existing tag, the ref contains owner-neutral and is an ancestor of origin/main of fs-release, one ref per repo). From there the order of the other repos is free; Catalog stays last.
 # RULES (special cases): accepted ADRs and history/protocol pages (`todo/`, `temp/`) are not rewritten (they go into `allow` with the reason); `scripts/retired-names.txt` and history texts that name the old address on purpose stay (`allow`); foreign forks (kanidm, tuwunel, Blinc forks): only the own `uses:` lines on FreeSynergy repos, the order names the `allow` entries per fork (`repo` + `scope`); repos without `main` (fs-decisions, fs-server, fs-settings) are an error of `bestand` (reported as FEHLT, exit code 2), not edited; the Pages host `freesynergy.github.io` is not an owner address (own decision). The OLD owner `FreeSynergy` must stay in our hands until part 2 is finished and checked (a freed name could serve tag-pinned `uses: FreeSynergy-Net/..@v0.0.x` and Cargo `tag=` pins to strangers). Agents never push, tag or merge; the ff to main is the coordinator's.
 document:
   dsl: 1.0.3
@@ -61,31 +61,27 @@ do:
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
         freesynergy.net:summary: "(Spezifikation, Folgeauftrag) FIRST work step after the plan gate, in fs-release itself: make every owner comparison owner-neutral - the owner comes from the run (`github.repository_owner`) or old AND new owner are accepted (the rule is written down in the order; no hard-coded owner stays). Work list of the places (from the review of the first draft, plus grep): `.github/workflows/check.yml` (plan probe `startswith(\"FreeSynergy/fs-release/.github/workflows/release.yml@\")`, `workflow_repository ==`), `actions/publish-release/publish.sh` (`--signer-workflow`), `crates/fs-release-chain/src/preapproved.rs` and `.fs/preapproved.toml` (security module: full test + Opus review), `scripts/pin-refs.sh`, `scripts/gates-komplett`, `scripts/kaskade_lib/kwindows.py`, `scripts/check_release_env.sh`, `.github/workflows/lint.yml` (guard against `@ref` in composite actions), `crates/fs-release/src/cli.rs`, `crates/fs-release/src/flow/target.rs`, `workflows/katalog.yaml`, `workflows/catalog-bump.yaml`, Blueprint templates (`repository: FreeSynergy-Net/fs-documentation`). Risk class HIGH: Opus review, a security module (`preapproved`) gets the full test before release. Own branch per repo head, no push."
-  - fs-release-tag:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: ff-und-tag
-          version: 0.0.17
-        input:
-          repo: fs-release
-          branch: ${ "unreviewed/" + .input.branch + "-fs-release-zuerst" }
-          head: ${ $context.kopf_fs_release.head }
-          tag: ${ .input.fs_release_tag }
+  - fs-release-ref:
+      call: resolve-head:0.0.17@fs
+      with:
+        repo: fs-release
+        branch: main
       if: ${ .input.teil == 1 }
+      export:
+        as: '${ $context + { ref_fs_release: . } }'
       metadata:
-        freesynergy.net:actor: human
-        freesynergy.net:actor-type: Person
-        freesynergy.net:gate: human
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The owner-neutral fs-release gets a NEW tag through `ff-und-tag` (review JA for exactly this head, release built by the CI from the tag, never a local binary). Only after this tag exists the callers may change; their `uses:` lines then carry the new owner AND the new tag/SHA."
+        freesynergy.net:summary: "Read only: the head of main of fs-release AFTER the landing of the owner-neutral branch (the coordinator's ff; the result `head` is the full 40-hex SHA L = `fs_release_ref`, it must equal the input and contain `fs_release_neutral`). NO tag: a tag needs the version round 0.0.18 and two pin-refs rounds and `ff-und-tag` does not fit fs-release yet (known gap, see `ff-und-tag`); G6 no. 4 and check-ci-tools want a full SHA for `uses:` anyway. The callers pin `FreeSynergy-Net/fs-release/...@<L>`; `scripts/gates-komplett` takes the scripts of that SHA (`git archive <sha>`)."
   - aufrufer-umstellen:
       call: caller-switch:0.0.17@fs
       with:
         repos: ${ .input.repos }
         old_owner: ${ .input.old_owner }
         new_owner: ${ .input.new_owner }
-        tag: ${ .input.fs_release_tag }
+        ref: ${ $context.ref_fs_release.head }
       if: ${ .input.teil == 1 }
       metadata:
         freesynergy.net:actor: ai
@@ -93,7 +89,7 @@ do:
         freesynergy.net:bot-seat: adresse-wechseln.aufrufer-umstellen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "(Spezifikation, Werkzeug folgt: `pin-refs`/`lift` raise the fs-release tag/SHA in the `uses:` lines; the owner part is the `ersetzen` run below) The callers move to the new owner TOGETHER with the new fs-release tag, never the owner alone with the old tag. This is done inside the per-repo step `ersetzen-ohne-cargo` (class c: owner by `ersetzen`, tag/SHA by `pin-refs`); this step only names the rule for the order."
+        freesynergy.net:summary: "(Spezifikation, Werkzeug folgt: `pin-refs`/`lift` raise the fs-release ref in the `uses:` lines; the owner part is the `ersetzen` run below) The callers move to the new owner TOGETHER with the full SHA L of fs-release main (`fs-release-ref`), never the owner alone with an old tag or `@main`. This is done inside the per-repo step `ersetzen-ohne-cargo` (class c: owner by `ersetzen`, ref by `pin-refs --dir . <L>`); the proof is the sub-step `aufrufer-pruefen` (`fs-release address aufrufer`, rc 0 BEFORE the push); this step names the rule for the order."
   - ersetzen-ohne-cargo:
       for:
         each: repo
@@ -114,6 +110,19 @@ do:
                 freesynergy.net:gate: none
                 freesynergy.net:kind: objective
                 freesynergy.net:summary: "Per repo, worker (Sonnet), one branch `unreviewed/<branch>`: `fs-release address ersetzen <dir>` (safe forms only; never Cargo sources, `Cargo.lock`, `scripts/lock-sources.toml`, catalog data; the repo Catalog is refused), then the HAND LIST of this repo from the approved plan, then the fresh check `fs-release address nachher --ref HEAD` on the branch. Local commit only, no push. A repo without hits is `0 Dateien`, not an error."
+          - aufrufer-pruefen:
+              call: address-callers:0.0.17@fs
+              with:
+                repo: ${ $repo }
+                neutral: ${ .input.fs_release_neutral }
+                fs_release: ${ .input.fs_release_dir }
+                ref: HEAD
+              metadata:
+                freesynergy.net:actor: machine
+                freesynergy.net:actor-type: Service
+                freesynergy.net:gate: none
+                freesynergy.net:kind: objective
+                freesynergy.net:summary: "`fs-release address aufrufer --neutral <fs_release_neutral> --fs-release <fresh clone, fetched> --ref HEAD <dir>` on the branch of this repo: every `uses:` of fs-release names exactly `FreeSynergy-Net`, a full SHA or an existing tag, the ref contains owner-neutral and lies on origin/main of fs-release, one ref per repo. rc 0 is required BEFORE the push (rc 1 red goes back to `tausch`, rc 2 is an error and never green). `address nachher --neutral .. --fs-release ..` runs the same rule."
           - head:
               call: resolve-head:0.0.17@fs
               with:
@@ -182,7 +191,7 @@ do:
         freesynergy.net:bot-seat: adresse-wechseln.ersetzen-ohne-cargo
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "PART 1, per repo (order of the repos free AFTER `fs-release-tag`, Catalog excluded): `tausch` (classes c, d, f, g, h; owner and the new fs-release tag/SHA together in the `uses:` lines), `head`, `gates`, `review`, `ff` - all bound to the head of that repo. Repos without main are an error of `bestand` and are not edited."
+        freesynergy.net:summary: "PART 1, per repo (order of the repos free AFTER `fs-release-ref`, Catalog excluded): `tausch` (classes c, d, f, g, h; owner and the fs-release ref L together in the `uses:` lines), `aufrufer-pruefen`, `head`, `gates`, `review`, `ff` - all bound to the head of that repo. Repos without main are an error of `bestand` and are not edited."
   - katalog:
       run:
         workflow:
@@ -207,6 +216,8 @@ do:
         repos: ${ .input.repos }
         allow: ${ .input.allow }
         ref: origin/main
+        neutral: ${ .input.fs_release_neutral }
+        fs_release: ${ .input.fs_release_dir }
       if: ${ .input.teil == 1 }
       export:
         as: '${ $context + { nachher: . } }'
@@ -215,7 +226,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "`fs-release address nachher --ref origin/main [--allow <file>] <dir>...` with the SAME BROAD finder as `bestand` (not the narrow replace forms): GREEN only if outside `allow` and outside the Cargo classes a and b there are 0 hits and no `allow` entry is stale (`ghcr.io` lines are reported, not counted). The tool prints every remaining hit (`TREFFER <repo> <path>:<line>: <text>`) and the verdict; exit code 0 green, 1 red, 2 error. Red goes back to `ersetzen-ohne-cargo` of the repos named in the hits."
+        freesynergy.net:summary: "`fs-release address nachher --ref origin/main [--allow <file>] [--neutral <L0> --fs-release <clone>] <dir>...` (with the pair it also runs the rule of `address aufrufer` on the same repos) with the SAME BROAD finder as `bestand` (not the narrow replace forms): GREEN only if outside `allow` and outside the Cargo classes a and b there are 0 hits and no `allow` entry is stale (`ghcr.io` lines are reported, not counted). The tool prints every remaining hit (`TREFFER <repo> <path>:<line>: <text>`) and the verdict; exit code 0 green, 1 red, 2 error. Red goes back to `ersetzen-ohne-cargo` of the repos named in the hits."
   - cargo-pins:
       run:
         workflow:

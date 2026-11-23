@@ -86,7 +86,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Version comparison BEFORE the review request (specification, no script yet): the version in Cargo.toml, in the entries of the own crates in Cargo.lock and the first heading of CHANGELOG.md are the SAME and the tag is v<version> (lesson fs-people v0.0.11: a lock with the old version was only seen at the tag); the `uses:` lines of fs-release in release.yml, ci.yml and check.yml are pinned to the NEWEST chain, today v0.0.10 (lesson fs-packages with v0.0.9: the old chain lacks later fixes); a pin is never lowered. Red goes back to the lift or the author before any review; the same check runs again on the fresh clone in `ff-und-tag`."
+        freesynergy.net:summary: "Version comparison BEFORE the review request (specification, no script yet): the version in Cargo.toml, in the entries of the own crates in Cargo.lock and the first heading of CHANGELOG.md are the SAME and the tag is v<version> (lesson fs-people v0.0.11: a lock with the old version was only seen at the tag); the `uses:` lines of fs-release in release.yml, ci.yml and check.yml are pinned to the NEWEST chain, today v0.0.10 (a tag, or a full SHA of fs-release main that contains owner-neutral; `fs-release address aufrufer` checks it; lesson fs-packages with v0.0.9: the old chain lacks later fixes); a pin is never lowered. Red goes back to the lift or the author before any review; the same check runs again on the fresh clone in `ff-und-tag`."
   - adresse-pruefen:
       call: identity-check:0.0.17@fs
       with:

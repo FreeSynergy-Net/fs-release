@@ -5,6 +5,7 @@
 # Order of the end: branch CI of ALL workflows (a hang of more than 30 minutes: cancel, ONE restart, then escalation), signing entries, the expected runs per repo (each one there and green for the head), fresh
 # clone, checklist, approval for exactly this head, push without force, annotated tag, ls-remote proof, watch the release, tidy up.
 # Agents never push or tag. FS profile: see README.md.
+# KNOWN GAP (ENTSCHEID-ref, 23.11.): the case repo = fs-release does not fit this flow yet: fs-release has no release run for a tag (`release.yml` and `_release-*.yml` are `workflow_call` only; a tag push starts only `lint.yml`), so `erwartete-laeufe`/`release-beobachten` would be red or unknown and nothing is signed. A step for the case fs-release (no release run expected, check `lint.yml` and the tag proof only) is to be added later by `workflow-pflege`, before the tag v0.0.18.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
