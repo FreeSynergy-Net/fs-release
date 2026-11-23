@@ -153,4 +153,17 @@ sed 's/^  range_base=""$/  range_base="HEAD.."/' "$tool" >"$tmp/mut9f1"; cmp -s 
 erun fc "$tmp/mut9f1"; chk "9f mutant 1 (first-check range empty): case (c) turns green (the test sees it)" test $rc -eq 0
 sed 's/"\$lrc" -ne 2/"$lrc" -eq 99/' "$tool" >"$tmp/mut9f2"; cmp -s "$tool" "$tmp/mut9f2" && chk "9f mutant 2 was applied" false
 erun fd "$tmp/mut9f2"; chk "9f mutant 2 (ls-remote error = no main): case (d) turns green (the test sees it)" test $rc -eq 0
+# --- S1 (identity-erstpruefung-r2): GH_TOKEN goes ONLY to origin https://github.com/ ; any other host gets NO Authorization header. A stub git in PATH logs the ls-remote call (and answers rc 2 = "no main") ---
+real_git="$(command -v git)"; mkdir "$tmp/stub"
+printf '#!/usr/bin/env bash\ncase " $* " in *" ls-remote "*) printf "%%s\\n" "$*" >>"$GIT_STUB_LOG"; exit 2;; esac\nexec %s "$@"\n' "$real_git" >"$tmp/stub/git"; chmod +x "$tmp/stub/git"
+trun() { : >"$tmp/stub.log"; env CI=true GITHUB_ACTIONS=true GH_TOKEN=sekret PATH="$tmp/stub:$PATH" GIT_STUB_LOG="$tmp/stub.log" bash "${2:-$tool}" "$tmp/$1" >"$tmp/o" 2>&1; rc=$?; }
+fx fg none; git -C "$tmp/fg" remote set-url origin https://github.com/FreeSynergy-Net/x.git
+trun fg; chk "S1 origin https://github.com/: first check runs (rc 0) and the header IS sent" test $rc -eq 0 -a -n "$(grep -F http.extraheader "$tmp/stub.log")"
+fx fh none; git -C "$tmp/fh" remote set-url origin https://codeberg.org/FreeSynergy/x.git
+trun fh; chk "S1 foreign host (codeberg): the call happens (rc 0) and NO Authorization header is sent" test $rc -eq 0 -a -s "$tmp/stub.log" -a -z "$(grep -Fi -e extraheader -e AUTHORIZATION "$tmp/stub.log")"
+chk "S1 the token itself is never in the call (foreign host)" test -z "$(grep -F -e sekret -e "$(printf 'x-access-token:sekret' | base64 -w0)" "$tmp/stub.log")"
+git -C "$tmp/fh" remote set-url origin http://github.com/x/y.git; trun fh; chk "S1 http:// (no TLS) github.com: no header either" test -s "$tmp/stub.log" -a -z "$(grep -F extraheader "$tmp/stub.log")"
+git -C "$tmp/fh" remote set-url origin https://github.com.evil.example/x.git; trun fh; chk "S1 look-alike host github.com.evil.example: no header" test -s "$tmp/stub.log" -a -z "$(grep -F extraheader "$tmp/stub.log")"
+sed 's#https://github.com/\*)#*)#' "$tool" >"$tmp/muts1"; cmp -s "$tool" "$tmp/muts1" && chk "S1 mutant was applied" false
+git -C "$tmp/fh" remote set-url origin https://codeberg.org/FreeSynergy/x.git; trun fh "$tmp/muts1"; chk "S1 mutant (always send): the foreign-host case turns red, the header is sent (the test sees it)" test -n "$(grep -F extraheader "$tmp/stub.log")"
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails FAILED"; exit 1; fi

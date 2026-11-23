@@ -35,7 +35,9 @@ range_base="$base.."
 if ! g rev-parse --verify -q "$base^{commit}" >/dev/null; then
   # Decision 9f: ONLY the case "main does not exist on the remote" is a first check. Every other missing base (another ref, a fetch or network error, a main that exists but was not fetched) is red as before, never skipped.
   if [ "$base" != origin/main ]; then echo "identity FAILED: base $base not found (fetch it, never skip)" >&2; exit 2; fi
-  auth=(); if [ -n "${GH_TOKEN:-}" ]; then auth=(-c "http.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"); fi
+  # the token goes ONLY to https://github.com/, never to another host (mirror, Codeberg): no header there
+  auth=(); origin="$(git remote get-url origin 2>/dev/null)"
+  case "$origin" in https://github.com/*) if [ -n "${GH_TOKEN:-}" ]; then auth=(-c "http.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"); fi ;; esac
   GIT_TERMINAL_PROMPT=0 timeout 120 git "${auth[@]}" ls-remote --exit-code origin main >/dev/null 2>&1; lrc=$?
   if [ "$lrc" -ne 2 ]; then echo "identity FAILED: base $base not found and the remote did not say that main does not exist (ls-remote rc $lrc; fetch it, never skip)" >&2; exit 2; fi
   [ "$(g rev-parse --is-shallow-repository)" = false ] || { echo "identity FAILED: no main and the clone is shallow, the root commit is not known (fetch-depth 0, never skip)" >&2; exit 2; }
