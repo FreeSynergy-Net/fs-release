@@ -34,6 +34,7 @@ gates_lint_shell() {
 gates_lint_actions() { cd "$1" && actionlint; }
 # gates_clippy_probe <root>: under a foreign toolchain the lints of the LIB errors (-D warnings) hide the test targets (AW18). Re-run clippy with exactly those lints allowed (-A), so the test targets are checked;
 # prints the result and every finding in a file CHANGED against origin/main. Never green by itself: the first clippy rc stays a finding.
+# shellcheck disable=SC2154 # finding_work is set by gates.sh (sourced)
 gates_clippy_probe() {
   local root="$1" out="$finding_work/clippy.out" po="$finding_work/probe.out" lints=() l rc=0 base changed
   [ -r "$out" ] && [ "$(gates_read_rc "$out.rc")" != 0 ] || return 0
