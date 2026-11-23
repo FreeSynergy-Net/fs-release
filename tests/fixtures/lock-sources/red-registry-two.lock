@@ -1,0 +1,24 @@
+version = 4
+
+[[package]]
+name = "demo-app"
+version = "0.1.0"
+dependencies = ["demo-people", "fs-types 0.0.7"]
+
+[[package]]
+name = "demo-people"
+version = "0.1.0"
+source = "git+https://github.com/FreeSynergy/demo-people?tag=v0.1.0#1111111111111111111111111111111111111111"
+dependencies = ["fs-types 0.0.6"]
+
+[[package]]
+name = "fs-types"
+version = "0.0.6"
+source = "registry+https://github.com/FreeSynergy-Net/fs-crates"
+checksum = "6666666666666666666666666666666666666666666666666666666666666666"
+
+[[package]]
+name = "fs-types"
+version = "0.0.7"
+source = "registry+https://github.com/FreeSynergy-Net/fs-crates"
+checksum = "7777777777777777777777777777777777777777777777777777777777777777"
