@@ -1,0 +1,236 @@
+//! Pattern: Builder (turns a checked blueprint folder, or the definition of `freesynergy-release`, into an `RpmSpec`; the file format is the adapter's job).
+//!
+//! ADR 0094 table (b): a program is a noarch package `fs-<name>` with its data below `/usr/share/freesynergy/programs/<name>/`, a `.desktop` entry
+//! (`Exec=fs-starter <name>`), and `Requires` taken from the blueprint (`fs-starter`, and `fs-module-<x> >= version` per `[[module]]`).
+
+use crate::emit::slot::pascal;
+use crate::model::Blueprint;
+use crate::rpm_spec::{Req, RpmSpec, SpecFile};
+use std::path::Path;
+
+/// Where the data of programs lives on the target system.
+pub const PROGRAMS_DIR: &str = "/usr/share/freesynergy/programs";
+/// The default licence of the project (`workspace.package.license`).
+pub const LICENSE: &str = "MIT OR Apache-2.0";
+/// The address of the data repo that serves the dnf source (decision 2026-11-23: FreeSynergy-Net/Repository).
+pub const REPOSITORY_URL: &str = "https://github.com/FreeSynergy-Net/Repository";
+/// The Pages address of that repo. NOT KNOWN YET (Pages is switched on in order 4): a placeholder, `release_spec` refuses to build with it.
+pub const PAGES_URL: &str = "PAGES-URL-NOT-SET";
+/// The place of the public key on the target system.
+pub const KEY_PATH: &str = "/etc/pki/rpm-gpg/RPM-GPG-KEY-freesynergy";
+/// The place of the dnf source on the target system.
+pub const REPO_FILE: &str = "/etc/yum.repos.d/freesynergy.repo";
+
+/// A program name that is safe as a file name and as a package name.
+fn valid_name(n: &str) -> bool {
+    n.split('-').all(|p| {
+        !p.is_empty()
+            && p.chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    })
+}
+
+fn tree(from: &Path, to: &str, out: &mut Vec<SpecFile>) -> Result<(), String> {
+    let mut list: Vec<_> = std::fs::read_dir(from)
+        .map_err(|e| format!("{}: {e}", from.display()))?
+        .flatten()
+        .collect();
+    list.sort_by_key(std::fs::DirEntry::file_name);
+    for e in list {
+        let meta = std::fs::symlink_metadata(e.path()).map_err(|x| x.to_string())?;
+        let name = e.file_name().to_string_lossy().into_owned();
+        let dest = format!("{to}/{name}");
+        if meta.file_type().is_symlink() {
+            return Err(format!("{}: a link is not packaged", e.path().display()));
+        } else if meta.is_dir() {
+            out.push(SpecFile {
+                dest: dest.clone(),
+                bytes: None,
+                mode: 0o755,
+                config: false,
+            });
+            tree(&e.path(), &dest, out)?;
+        } else {
+            let bytes = std::fs::read(e.path()).map_err(|x| x.to_string())?;
+            out.push(SpecFile {
+                dest,
+                bytes: Some(bytes),
+                mode: 0o644,
+                config: false,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The `.desktop` entry: `fs-starter <name>` starts the program (ADR 0094).
+fn desktop(bp: &Blueprint) -> String {
+    let p = &bp.program;
+    let line = |t: &Option<String>| {
+        t.as_deref()
+            .unwrap_or_default()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let mut s = format!(
+        "[Desktop Entry]\nType=Application\nName={}\n",
+        pascal(&p.name)
+    );
+    s += &format!(
+        "Comment={}\nComment[de]={}\n",
+        line(&p.summary.en),
+        line(&p.summary.de)
+    );
+    s += &format!(
+        "Exec=fs-starter {}\nCategories={};\n",
+        p.name,
+        p.categories.join(";")
+    );
+    if let Some(icon) = &p.icon {
+        s += &format!("Icon={icon}\n");
+    }
+    s
+}
+
+/// The package `fs-<name>` of a blueprint folder (`scaffold.toml` and `forms/`). `starter_min` is the version of `fs-starter` the program needs; unknown = none.
+///
+/// # Errors
+/// A text when the name is unsafe, a file cannot be read or a link is in the folder.
+pub fn program_spec(
+    bp: &Blueprint,
+    folder: &Path,
+    starter_min: Option<&str>,
+    release: &str,
+) -> Result<RpmSpec, String> {
+    let p = &bp.program;
+    if !valid_name(&p.name) {
+        return Err(format!(
+            "the program name {:?} is not usable as a package name",
+            p.name
+        ));
+    }
+    let base = format!("{PROGRAMS_DIR}/{}", p.name);
+    let file = |dest: String, bytes: Vec<u8>, mode| SpecFile {
+        dest,
+        bytes: Some(bytes),
+        mode,
+        config: false,
+    };
+    let scaffold = std::fs::read(folder.join("scaffold.toml")).map_err(|e| e.to_string())?;
+    let mut files = vec![
+        SpecFile {
+            dest: base.clone(),
+            bytes: None,
+            mode: 0o755,
+            config: false,
+        },
+        file(format!("{base}/scaffold.toml"), scaffold, 0o644),
+    ];
+    if folder.join("forms").is_dir() {
+        files.push(SpecFile {
+            dest: format!("{base}/forms"),
+            bytes: None,
+            mode: 0o755,
+            config: false,
+        });
+        tree(&folder.join("forms"), &format!("{base}/forms"), &mut files)?;
+    }
+    let app = format!(
+        "/usr/share/applications/net.freesynergy.{}.desktop",
+        pascal(&p.name)
+    );
+    files.push(file(app, desktop(bp).into_bytes(), 0o644));
+    let mut requires = vec![Req {
+        name: "fs-starter".into(),
+        at_least: starter_min.map(Into::into),
+    }];
+    requires.extend(bp.module.iter().map(|m| Req {
+        name: format!(
+            "fs-module-{}",
+            m.name.strip_prefix("fs-").unwrap_or(&m.name)
+        ),
+        at_least: Some(m.version.clone()),
+    }));
+    let text = |t: &Option<String>| {
+        t.as_deref()
+            .unwrap_or_default()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    Ok(RpmSpec {
+        name: format!("fs-{}", p.name),
+        version: p.version.clone(),
+        release: release.into(),
+        license: LICENSE.into(),
+        summary: text(&p.summary.en),
+        description: text(&p.description.en),
+        url: Some(REPOSITORY_URL.into()),
+        files,
+        requires,
+        source_date: None,
+    })
+}
+
+/// The dnf source: `stable` is on, `nightly` is there but off (decision 2026-11-23). Packages and the repo data are checked (`gpgcheck`, `repo_gpgcheck`).
+#[must_use]
+pub fn repo_file(pages: &str) -> String {
+    let section = |id: &str, name: &str, channel: &str, on: u8| {
+        format!(
+            "[{id}]\nname={name}\nbaseurl={pages}/rpm/{channel}\nenabled={on}\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file://{KEY_PATH}\n"
+        )
+    };
+    let stable = section("freesynergy", "FreeSynergy (stable)", "stable", 1);
+    let nightly = section(
+        "freesynergy-nightly",
+        "FreeSynergy (nightly, for testers)",
+        "nightly",
+        0,
+    );
+    format!("{stable}\n{nightly}")
+}
+
+/// The package `freesynergy-release`: the dnf source and the PUBLIC key.
+///
+/// # Errors
+/// A text when `pages` is still the placeholder, or `key` is not an armored public key (a secret key must never end up in a package).
+pub fn release_spec(
+    pages: &str,
+    key: &[u8],
+    version: &str,
+    release: &str,
+) -> Result<RpmSpec, String> {
+    if pages == PAGES_URL || pages.is_empty() {
+        return Err("the Pages address is not set: give --pages-url (it is not known yet)".into());
+    }
+    let armor = std::str::from_utf8(key).map_err(|_| "the key is not armored text".to_string())?;
+    if !armor
+        .trim_start()
+        .starts_with("-----BEGIN PGP PUBLIC KEY BLOCK-----")
+        || armor.contains("PRIVATE KEY")
+    {
+        return Err("the key file is not an armored PGP public key".into());
+    }
+    let cfg = |dest: &str, bytes: Vec<u8>| SpecFile {
+        dest: dest.into(),
+        bytes: Some(bytes),
+        mode: 0o644,
+        config: true,
+    };
+    Ok(RpmSpec {
+        name: "freesynergy-release".into(),
+        version: version.into(),
+        release: release.into(),
+        license: LICENSE.into(),
+        summary: "FreeSynergy package source and signing key".into(),
+        description: "The dnf source of FreeSynergy (stable on, nightly off) and the public key that signs the packages and the repo data.".into(),
+        url: Some(REPOSITORY_URL.into()),
+        files: vec![
+            cfg(REPO_FILE, repo_file(pages).into_bytes()),
+            SpecFile { dest: KEY_PATH.into(), bytes: Some(key.to_vec()), mode: 0o644, config: false },
+        ],
+        requires: Vec::new(),
+        source_date: None,
+    })
+}

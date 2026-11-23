@@ -12,3 +12,5 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.9"
 sha2 = "0.11"
 toml_edit = "=0.22.27"
+# Adapter only (pattern: pin + adapter): builds noarch RPMs of data packages. No signing here (signing is CI); no zstd/xz (no C libraries).
+rpm = { version = "=0.30.2", default-features = false, features = ["payload", "gzip-compression"] }
