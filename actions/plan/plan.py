@@ -172,6 +172,8 @@ def main():
     if kind == "module":
         windows = []  # TODO WIN-b: WiX template, MSI per machine into the anchor; until then no Windows job
         print("::warning::kind module: no Windows package yet (not built, WIN-b); windows-targets is ignored")
+        # Decided HERE, before the approval of the signing job: no SBOM for a module yet (cargo sbom lists all platforms and features, not the RPM), said out loud.
+        print("::notice::kind module: no SBOM for now (cargo sbom would name crates that are not in the RPM; an exact SBOM comes later). The release notes say so.")
     plan = {
         "tag": tag, "version": version, "version_core": core, "prerelease": "-" in version,
         "name": name, "binaries": binaries, "cargo_package": wanted, "workdir": workdir,

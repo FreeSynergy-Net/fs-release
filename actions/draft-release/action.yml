@@ -4,6 +4,7 @@ inputs:
   tag: { description: "Release tag", required: true }
   name: { description: "Release name prefix", required: true }
   prerelease: { description: "true for SemVer pre-releases", default: "false" }
+  kind: { description: "Release kind (cli, daemon, app, module, data, library); decides the SBOM line of the notes", required: true }
   directory: { description: "Artefact directory", default: dist }
   token: { description: "Token with contents write", required: true }
 runs:
@@ -13,6 +14,7 @@ runs:
       env:
         TAG: ${{ inputs.tag }}
         NAME: ${{ inputs.name }}
+        KIND: ${{ inputs.kind }}
         PRERELEASE: ${{ inputs.prerelease }}
         DIST: ${{ github.workspace }}/${{ inputs.directory }}
         REPO: ${{ github.repository }}

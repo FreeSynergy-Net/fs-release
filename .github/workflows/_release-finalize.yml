@@ -42,12 +42,12 @@ jobs:
           pattern: dist-*
           merge-multiple: true
           path: dist
-      # SBOM per kind (README "SBOM per kind"): decided by the plan (the plan job printed the notice before the approval). data = no SBOM, said in the log and in the release notes;
-      # every other kind: cargo sbom of the workdir (a module's service binary is built from exactly that crate).
-      - name: no SBOM for kind data
-        if: fromJSON(inputs.plan).kind == 'data'
-        run: echo "::notice::kind data - no SBOM, on purpose; the RPM holds data files only, no crates"
-      - if: fromJSON(inputs.plan).kind != 'data'
+      # SBOM per kind (README "SBOM per kind"): decided by the plan (the plan job printed the notice before the approval). data and module = no SBOM for now, said in the log and in the release notes;
+      # cli, daemon, app: cargo sbom of the workdir (a superset: all platforms and features, see the README).
+      - name: no SBOM for kind data or module
+        if: fromJSON(inputs.plan).kind == 'data' || fromJSON(inputs.plan).kind == 'module'
+        run: echo "::notice::kind ${{ fromJSON(inputs.plan).kind }} - no SBOM for now, on purpose (no exact package-level SBOM yet)"
+      - if: fromJSON(inputs.plan).kind != 'data' && fromJSON(inputs.plan).kind != 'module'
         uses: FreeSynergy-Net/fs-release/actions/sbom@b9e406cb228bcdfa06f796f5da570c56f6aeebb0
         with:
           name: ${{ fromJSON(inputs.plan).name }}
@@ -74,4 +74,5 @@ jobs:
           tag: ${{ fromJSON(inputs.plan).tag }}
           name: ${{ fromJSON(inputs.plan).name }}
           prerelease: ${{ fromJSON(inputs.plan).prerelease }}
+          kind: ${{ fromJSON(inputs.plan).kind }}
           token: ${{ github.token }}

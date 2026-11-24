@@ -22,7 +22,7 @@ S
 chmod +x "$tmp/bin/gh"
 mkdir -p "$tmp/real/actions/draft-release"; cp "$here/../actions/draft-release/draft.sh" "$here/../actions/draft-release/footer.md" "$tmp/real/actions/draft-release/"
 run() { # <draft.sh dir> -> rc; env: STUB_VIEW, STUB_RC
-  PATH="$tmp/bin:$PATH" TMPDIR="$tmp/t" TAG=v1 REPO=o/r DIST="$tmp/dist" GH_TOKEN=x bash "$1/actions/draft-release/draft.sh" > "$tmp/out" 2>&1
+  PATH="$tmp/bin:$PATH" TMPDIR="$tmp/t" TAG=v1 KIND=cli REPO=o/r DIST="$tmp/dist" GH_TOKEN=x bash "$1/actions/draft-release/draft.sh" > "$tmp/out" 2>&1
 }
 left() { find "$tmp/t" -mindepth 1 | wc -l; }
 STUB_VIEW=none STUB_RC=0 run "$tmp/real"; rc=$?

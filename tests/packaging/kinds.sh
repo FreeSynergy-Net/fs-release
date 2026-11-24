@@ -78,5 +78,32 @@ plan_out() { (cd "$1" && shift && env TAG=v0.1.1 LINUX_TARGETS=x86_64 WINDOWS_TA
 check_in "kinds: module says it has no Windows build yet (WIN-b)" "$(plan_out "$TK/mod" BINARIES=planning-service KIND=module NAME=planning)" "::warning::kind module: no Windows package yet"
 check_in "kinds: data says it has no SBOM, before the approval" "$(plan_out "$T/none" KIND=data NAME=fs-tasks)" "::notice::kind data: no SBOM"
 # the finalize job: the SBOM step is skipped for data, and a release without *.spdx.json says so in its notes
-check_in "kinds: finalize skips the SBOM action for data" "$(grep -B1 'actions/sbom@' "$ROOT/.github/workflows/_release-finalize.yml")" "fromJSON(inputs.plan).kind != 'data'"
-check_in "kinds: draft notes say 'SBOM: none' without an spdx file" "$(grep -c 'SBOM: none for this release' "$ROOT/actions/draft-release/draft.sh")" "1"
+# the exact condition (a text search for a part of it would survive `|| true`)
+check_has "kinds: finalize skips the SBOM action for data and module (exact line)" "$(grep -B1 'actions/sbom@' "$ROOT/.github/workflows/_release-finalize.yml" | head -1 | sed 's/^ *//')" "- if: fromJSON(inputs.plan).kind != 'data' && fromJSON(inputs.plan).kind != 'module'"
+check_has "kinds: finalize says the skip in the log (exact line)" "$(grep -B1 'no SBOM for now, on purpose' "$ROOT/.github/workflows/_release-finalize.yml" | head -1 | sed 's/^ *//')" "if: fromJSON(inputs.plan).kind == 'data' || fromJSON(inputs.plan).kind == 'module'"
+check_in "kinds: module says it has no SBOM, before the approval" "$(plan_out "$TK/mod" BINARIES=planning-service KIND=module NAME=planning)" "::notice::kind module: no SBOM"
+check_in "kinds: finalize hands the kind to draft-release" "$(grep -A8 'actions/draft-release@' "$ROOT/.github/workflows/_release-finalize.yml")" "kind: \${{ fromJSON(inputs.plan).kind }}"
+# K-T2: draft.sh really runs (stub gh keeps the notes file): empty DIST and one with an spdx file, per kind; the footer line must be replaced or kept
+draft_notes() { # <draft.sh dir> <kind> <with spdx 0|1> -> notes text; rc in $T/drc
+  local d="$T/draft"; rm -rf "$d"; mkdir -p "$d/dist" "$d/bin" "$d/tmp"; echo f > "$d/dist/a.txt"; [[ $3 -eq 1 ]] && : > "$d/dist/x.spdx.json"
+  cat > "$d/bin/gh" <<'GHSTUB'
+#!/usr/bin/env bash
+[[ "$2" == view ]] && exit 1
+if [[ "$2" == create ]]; then while [[ $# -gt 0 ]]; do [[ "$1" == --notes-file ]] && cp "$2" "$STUB_NOTES"; shift; done; fi
+exit 0
+GHSTUB
+  chmod +x "$d/bin/gh"; local rc=0
+  PATH="$d/bin:$PATH" TMPDIR="$d/tmp" STUB_NOTES="$d/notes" TAG=v1 REPO=o/r DIST="$d/dist" GH_TOKEN=x KIND=$2 bash "$1/actions/draft-release/draft.sh" >"$d/out" 2>&1 || rc=$?
+  echo "$rc" > "$T/drc"; cat "$d/notes" 2>/dev/null || true
+}
+for k in data module; do
+  n=$(draft_notes "$ROOT" $k 0); check_in "kinds: draft.sh notes for $k say SBOM none (empty DIST)" "$n" "- SBOM: none for this release (kind $k: no exact package-level SBOM yet)"
+  check_lacks "kinds: draft.sh notes for $k have no SBOM claim of *.spdx.json" "$n" "*.spdx.json"
+done
+n=$(draft_notes "$ROOT" cli 1); check_in "kinds: draft.sh notes keep the SBOM line for cli with an spdx file" "$n" "- SBOM: \`*.spdx.json\`"
+n=$(draft_notes "$ROOT" cli 0); check_in "kinds: draft.sh notes say none for cli without an spdx file" "$n" "- SBOM: none for this release (kind cli:"
+# the footer without the SBOM line: draft.sh must fail loudly, not publish notes that say nothing
+mkdir -p "$T/dmut/actions/draft-release"; cp "$ROOT"/actions/draft-release/{draft.sh,footer.md} "$T/dmut/actions/draft-release/"
+sed -i 's/^- SBOM: /- Bill of materials: /' "$T/dmut/actions/draft-release/footer.md"
+draft_notes "$T/dmut" module 0 >/dev/null
+[[ $(cat "$T/drc") -ne 0 ]] && pass "kinds: draft.sh fails when the footer has no SBOM line to replace" || fail "kinds: draft.sh must fail on a footer without the SBOM line"
