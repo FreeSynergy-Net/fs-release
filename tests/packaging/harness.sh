@@ -37,7 +37,10 @@ if [[ "\$1" == build ]]; then
     case "\$1" in --target) t=\$2; shift ;; --bin) bins+=("\$2"); shift ;; esac
     shift
   done
-  for b in "\${bins[@]}"; do td=\${CARGO_TARGET_DIR:-target}; mkdir -p "\$td/\$t/release"; : > "\$td/\$t/release/\$b"; : > "\$td/\$t/release/\$b.exe"; done
+  for b in "\${bins[@]}"; do td=\${CARGO_TARGET_DIR:-target}; mkdir -p "\$td/\$t/release"; : > "\$td/\$t/release/\$b"; : > "\$td/\$t/release/\$b.exe"
+    # STUB_ELF=3e|b7: the "built" binary gets an ELF header of that e_machine (kind module checks it)
+    if [[ -n "\${STUB_ELF:-}" ]]; then { printf '\\x7fELF'; head -c 14 /dev/zero; printf "\\x\$STUB_ELF\\0"; } > "\$td/\$t/release/\$b"; fi
+  done
 fi
 STUB
 printf '#!/usr/bin/env bash\nexit 0\n' > "$T/bin/strip"

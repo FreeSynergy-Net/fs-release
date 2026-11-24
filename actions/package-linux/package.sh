@@ -18,6 +18,12 @@ dist=$(dist_dir)
 in_workdir
 # Optional hook of the program repo: $workdir/packaging/prepare.sh fetches what the packages need from its one source (e.g. the icon from fs-icons).
 if [[ -x packaging/prepare.sh ]]; then group "prepare"; packaging/prepare.sh; endgroup; fi
+# kind module/data (INST-4b): one RPM from `fs-blueprint package module|rpm`, nothing of the binary formats below.
+case "$(plan_get kind)" in module|data)
+  # shellcheck source=package_blueprint.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/package_blueprint.sh"
+  blueprint_package; exit 0 ;;
+esac
 base="$name-$version-linux-$ARCH"
 read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
 groups=(); group_list   # one entry per cargo package: "<package>TAB<bin,bin>"

@@ -8,7 +8,7 @@ inputs:
   cargo-package: { description: "Cargo package (-p) for workspaces", default: "" }
   working-directory: { description: "Directory of the Cargo workspace", default: "." }
   features: { description: "Cargo features for release builds", default: "" }
-  kind: { description: "cli, daemon or app; library = pure library without packages (needs an empty binaries, tag/version/CHANGELOG checked)", default: "cli" }
+  kind: { description: "cli, daemon, app, module (Linux RPM fs-module-<name>, name = host module name) or data (noarch RPM of scaffold.toml); library = pure library without packages (needs an empty binaries, tag/version/CHANGELOG checked)", default: "cli" }
   app-id: { description: "Reverse-DNS application id", default: "" }
   app-name: { description: "Human readable name", default: "" }
   description: { description: "One-line description", default: "" }

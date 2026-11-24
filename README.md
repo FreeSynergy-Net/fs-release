@@ -13,6 +13,7 @@ Releases are tagged (see the tags of this repo). The workflows are used by the r
 - CI: formatting, lints, tests, our own code-rules checker and a licence policy check.
 - Windows gate: one reusable workflow (`_windows-check.yml`: fmt, clippy pedantic, tests on `windows-2022`) with a small caller file.
 - Packages: Linux (tar.gz, deb, rpm, AppImage, Arch, optional Flatpak), Windows (zip, msi, exe), macOS (tar.gz, dmg), optional container image.
+- Release kinds `module` (one Linux RPM `fs-module-<name>` from the built service, made by `fs-blueprint package module`) and `data` (one noarch RPM of `scaffold.toml`); Windows for these kinds is still a TODO (WIN-b). / Release-Arten `module` (ein Linux-RPM `fs-module-<name>` aus dem gebauten Dienst) und `data` (ein noarch-RPM aus `scaffold.toml`); Windows für diese Arten ist noch offen (WIN-b).
 - A software bill of materials (SPDX), build provenance, checksums and OpenPGP signatures.
 - A draft GitHub release, never published automatically.
 - First real run was green on FreeSynergy-Net/fs-capnpc as a draft release: tar.gz for Linux and macOS, deb, rpm, Arch, msi and zip, SBOM and checksums.

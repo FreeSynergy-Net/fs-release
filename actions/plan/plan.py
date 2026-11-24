@@ -25,10 +25,13 @@ WINDOWS = {
     "aarch64": ("windows-11-arm", "aarch64-pc-windows-msvc"),
 }
 DEFAULT_FORMATS = {
-    "linux": {"app": "tar.gz,deb,rpm,appimage,arch", "cli": "tar.gz,deb,rpm,arch", "daemon": "tar.gz,deb,rpm,arch"},
-    "windows": {"app": "zip,msi,exe", "cli": "zip,msi", "daemon": "zip,msi"},
-    "macos": {"app": "dmg", "cli": "tar.gz", "daemon": "tar.gz"},
+    "linux": {"app": "tar.gz,deb,rpm,appimage,arch", "cli": "tar.gz,deb,rpm,arch", "daemon": "tar.gz,deb,rpm,arch", "module": "rpm", "data": "rpm"},
+    # module/data: Linux RPM only. Windows (WiX template `modules\\<name>\\service.exe`, WIN-b) and macOS are not built yet: no job, never a silent half release.
+    "windows": {"app": "zip,msi,exe", "cli": "zip,msi", "daemon": "zip,msi", "module": "", "data": ""},
+    "macos": {"app": "dmg", "cli": "tar.gz", "daemon": "tar.gz", "module": "", "data": ""},
 }
+PACKAGE_KINDS = ("module", "data")  # built by `fs-blueprint package module|rpm`, not by the binary formats
+MODULE_NAME = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 
 
 def env(name, default=""):
@@ -71,8 +74,33 @@ def main():
 
     kind = env("KIND", "cli")
     if kind != "library" and kind not in DEFAULT_FORMATS["linux"]:
-        fail("kind must be cli, daemon, app or library")
+        fail("kind must be cli, daemon, app, module, data or library")
     binaries = csv(env("BINARIES"))
+    if kind == "data":
+        # Data package (noarch RPM of `fs-blueprint package rpm scaffold.toml`): no binary, no cargo build.
+        if binaries:
+            fail("kind 'data' with a non-empty 'binaries': a data package has no binary (use kind 'module' for a module with a service)")
+        name = env("NAME") or env("GITHUB_REPOSITORY").rsplit("/", 1)[-1]
+        if not name:
+            fail("kind 'data' needs the input 'name' (the program name)")
+        plan = {
+            "tag": tag, "version": version, "version_core": core, "prerelease": "-" in version, "kind": "data",
+            "name": name, "binaries": [], "workdir": env("WORKDIR", "."), "blueprint": "scaffold.toml",
+            "linux_formats": "rpm", "windows_formats": "", "macos_formats": "",
+            # the RPM is noarch: ONE Linux job (x86_64) builds it, no aarch64 twin
+            "linux_matrix": [{"arch": "x86_64", "runner": LINUX["x86_64"][0], "triple": LINUX["x86_64"][1]}], "windows_matrix": [],
+            "has_linux": True, "has_windows": False, "has_macos": False, "has_arch": False,
+        }
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write(f"plan={json.dumps(plan, separators=(',', ':'))}\nversion={version}\n")
+        print(json.dumps(plan, indent=2))
+        return
+    if kind == "module":
+        # `name` is the HOST module name (planning), never the repo name; the RPM is fs-module-<name>. Exactly one service binary.
+        if len(binaries) != 1:
+            fail("kind 'module' needs exactly one binary (the service) in 'binaries'")
+        if not MODULE_NAME.match(env("NAME")) or env("NAME").startswith("fs-"):
+            fail("kind 'module' needs 'name' = the host module name (lowercase, e.g. planning, no 'fs-' prefix)")
     if kind == "library" and binaries:
         fail("kind 'library' with a non-empty 'binaries': a library has no binaries to package (remove one of the two)")
     if kind != "library" and not binaries:
@@ -139,6 +167,8 @@ def main():
         os_: env(f"{os_.upper()}_FORMATS") or DEFAULT_FORMATS[os_][kind] for os_ in DEFAULT_FORMATS
     }
     linux, windows = matrix("linux", env("LINUX_TARGETS"), LINUX), matrix("windows", env("WINDOWS_TARGETS"), WINDOWS)
+    if kind == "module":
+        windows = []  # TODO WIN-b: WiX template, MSI per machine into the anchor; until then no Windows job
     plan = {
         "tag": tag, "version": version, "version_core": core, "prerelease": "-" in version,
         "name": name, "binaries": binaries, "cargo_package": wanted, "workdir": workdir,
@@ -151,7 +181,7 @@ def main():
         "macos_formats": formats["macos"],
         "linux_matrix": linux, "windows_matrix": windows,
         "has_linux": bool(linux), "has_windows": bool(windows),
-        "has_macos": env("MACOS") == "true",
+        "has_macos": env("MACOS") == "true" and kind not in PACKAGE_KINDS,
         "has_arch": bool(linux) and "arch" in formats["linux"] and any(m["arch"] == "x86_64" for m in linux),
     }
     if plan["has_arch"] and "tar.gz" not in formats["linux"]:

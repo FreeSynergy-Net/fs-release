@@ -41,10 +41,20 @@ jobs:
         uses: FreeSynergy-Net/fs-release/actions/install-tools@b9e406cb228bcdfa06f796f5da570c56f6aeebb0
         with:
           tools: cargo-deb@3.8.0
-      - if: contains(fromJSON(inputs.plan).linux_formats, 'rpm')
+      - if: contains(fromJSON(inputs.plan).linux_formats, 'rpm') && !contains(fromJSON('["module","data"]'), fromJSON(inputs.plan).kind)
         uses: FreeSynergy-Net/fs-release/actions/install-tools@b9e406cb228bcdfa06f796f5da570c56f6aeebb0
         with:
           tools: cargo-generate-rpm@0.21.1
+      # kind module/data (INST-4b): the RPM is made by `fs-blueprint package module|rpm`, built from the commit of THIS workflow file (as check.yml does; a full SHA, never a name)
+      - name: fs-blueprint (kind module, data)
+        if: contains(fromJSON('["module","data"]'), fromJSON(inputs.plan).kind)
+        env:
+          JOB: ${{ toJSON(job) }}
+        run: |
+          REV=$(printf '%s' "$JOB" | python3 -I -c 'import json, sys; j = json.load(sys.stdin); print(j.get("workflow_sha", "") if j.get("workflow_repository") in ("FreeSynergy/fs-release", "FreeSynergy-Net/fs-release") else "")')
+          if ! [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::cannot read the fs-release commit of this workflow file"; exit 2; fi
+          cargo install --git https://github.com/FreeSynergy-Net/fs-release --rev "$REV" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
+          echo "$RUNNER_TEMP/fsbp/bin" >> "$GITHUB_PATH"
       - uses: FreeSynergy-Net/fs-release/actions/package-linux@b9e406cb228bcdfa06f796f5da570c56f6aeebb0
         with:
           plan: ${{ inputs.plan }}

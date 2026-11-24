@@ -92,7 +92,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Only for `neu` and `heben` (a removal has no asset): (1) the asset name of the entry answers HTTP 200 (`curl -sIL`, read only); (2) the release of the tag is published AND is a pre-release or a release, NEVER a draft (a draft has no public asset); (3) the tarball holds the binary of the program (`tar -tzf`)."
+        freesynergy.net:summary: "Only for `neu` and `heben` (a removal has no asset): (1) the asset name of the entry answers HTTP 200 (`curl -sIL`, read only); (2) the release of the tag is published AND is a pre-release or a release, NEVER a draft (a draft has no public asset); (3) by the kind of the release (INST-4b): for `cli`, `daemon` and `app` the tarball holds the binary of the program (`tar -tzf`); for `data` and `module` there is NO tarball and no binary at the top: the asset is the RPM and it holds the module folder (`kind: module`: `/usr/libexec/freesynergy/modules/<name>/service` and `/usr/share/freesynergy/modules/<name>.metainfo.xml`, the RPM `fs-module-<name>`) or `programs/<name>/` (`kind: data`: `/usr/share/freesynergy/programs/<name>/`, the RPM `fs-<name>`), checked read only with `rpm -qpl`; an RPM without that folder is red, never green."
   - gen-catalog:
       call: gen-catalog-check:0.0.18@fs
       export:

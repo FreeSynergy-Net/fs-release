@@ -44,6 +44,15 @@ pub(super) fn catalog_flow(text: &str) -> bool {
     in_order(text, &KAT_ORDER)
         && step_body(text, "asset-pruefen").contains("if: ${ .input.modus != \"entfernen\" }")
         && step_body(text, "asset-pruefen").contains("NEVER a draft")
+        && [
+            "`data` and `module`",
+            "rpm -qpl",
+            "programs/<name>/",
+            "modules/<name>/service",
+            "tar -tzf",
+        ]
+        .iter()
+        .all(|p| step_body(text, "asset-pruefen").contains(p))
         && ["gen_catalog.py --check", "unittest", "py_compile"]
             .iter()
             .all(|p| step_body(text, "gen-catalog").contains(p))
@@ -115,6 +124,8 @@ fn counter_katalog_rule_breaks_are_caught() {
     for phrase in [
         "NEVER a draft",
         "py_compile",
+        "rpm -qpl",
+        "programs/<name>/",
         "does not match the given sha256",
         "5 minutes",
         "BOTH `## Unreleased",

@@ -8,11 +8,11 @@ name: release
 on:
   workflow_call:
     inputs:
-      binaries: { type: string, default: "", description: "Comma separated binary names; empty only together with kind library" }
+      binaries: { type: string, default: "", description: "Comma separated binary names; empty only together with kind library or data; exactly one (the service) with kind module" }
       app-id: { type: string, default: "", description: "Reverse-DNS id, e.g. net.freesynergy.CapnpCompiler (AppImage, Flatpak, macOS bundle)" }
       app-name: { type: string, default: "", description: "Human readable name (default - project name)" }
       description: { type: string, default: "", description: "One line (default - Cargo description)" }
-      kind: { type: string, default: cli, description: "cli, daemon or app - selects the default formats; library = pure library (library mode, binaries must be empty)" }
+      kind: { type: string, default: cli, description: "cli, daemon, app, module (Linux RPM fs-module-<name>; name = host module name; Windows is a TODO, WIN-b) or data (noarch RPM of scaffold.toml) - selects the default formats; library = pure library (library mode, binaries must be empty)" }
       name: { type: string, default: "", description: "Artefact base name (default - Cargo package)" }
       ignore-binaries: { type: string, default: "", description: "Binaries under crates/ that are deliberately not packaged (* = all)" }
       cargo-package: { type: string, default: "", description: "Cargo package (-p) in a workspace" }
