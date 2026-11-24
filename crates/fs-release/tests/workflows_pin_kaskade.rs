@@ -138,7 +138,9 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     assert!(bad(t.replace("  - rev-pins:", "  - rev-x:")));
     assert!(bad(t.replace("  - ein-stand:", "  - ein-x:")));
     assert!(bad(t.replace("  - ein-stand-weiter:", "  - ein-x:")));
-    assert!(bad(t.replace("DEV-DEPENDENCIES FIRST", "DEV-DEPENDENCIES LATER")));
+    assert!(bad(
+        t.replace("DEV-DEPENDENCIES FIRST", "DEV-DEPENDENCIES LATER")
+    ));
     assert!(bad(t.replace("cargo tree -d", "cargo tree")));
     // A2: every case of every switch, one by one (M4 gates-weiter red -> continue, M5 round case, M7 ff-weiter `sonst`)
     for (step, want) in SWITCHES {
@@ -203,4 +205,46 @@ fn the_cascade_calls_each_other_flow_only_by_run_and_passes_the_inputs() {
     for k in ["repo", "commit", "libs"] {
         assert!(lift.contains(&format!("          {k}: ")), "lift input {k}");
     }
+}
+
+/// The jq of a `when: '${ ... }'` line, evaluated on `ctx` (the `$context` of the run): the real answer, not the wording.
+fn when_is(t: &str, case: &str, ctx: &str) -> bool {
+    use std::io::Write;
+    let step = "ein-stand-weiter";
+    let expr = cases(t, step)
+        .into_iter()
+        .find(|c| c.0 == case)
+        .map(|c| c.1)
+        .expect("case exists");
+    let expr = expr
+        .trim()
+        .trim_start_matches('\'')
+        .trim_end_matches('\'')
+        .trim_start_matches("${")
+        .trim_end_matches('}')
+        .to_string();
+    let mut child = std::process::Command::new("jq")
+        .args(["-e", "--argjson", "context", ctx, &expr])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .expect("jq is installed (it is on the runner and in the dev tools)");
+    child.stdin.take().unwrap().write_all(b"null").unwrap();
+    child.wait().unwrap().success()
+}
+
+#[test]
+fn ein_stand_weiter_reaches_the_green_way_and_stops_on_red_or_no_result() {
+    let t = read("pin-kaskade");
+    let green = r#"{"einstand":{"red":false,"befunde":[]}}"#;
+    let red = r#"{"einstand":{"red":true,"befunde":[]}}"#;
+    let found = r#"{"einstand":{"red":false,"befunde":[{"crate":"fs-rpc"}]}}"#;
+    let none = r#"{}"#;
+    // green: only `gruen` fires
+    assert!(!when_is(&t, "rot", green) && when_is(&t, "gruen", green));
+    // red, or a finding: `rot`, never `gruen`
+    assert!(when_is(&t, "rot", red) && !when_is(&t, "gruen", red));
+    assert!(when_is(&t, "rot", found) && !when_is(&t, "gruen", found));
+    // no result: neither fires, so `ohne-ergebnis` (-> eskalation) decides
+    assert!(!when_is(&t, "rot", none) && !when_is(&t, "gruen", none));
 }
