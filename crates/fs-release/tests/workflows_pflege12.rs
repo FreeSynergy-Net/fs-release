@@ -1,6 +1,6 @@
 //! Pattern: none (test). Workflow maintenance run 8: rule [GATE-PIPEFAIL] (`scripts/gates.sh` has `pipefail`, prints an rc per gate, never cuts
 //! a gate output with `tail`/`head`; the review text and docs state the rule) and the branch CI of this repo (`branch-ci.yml` runs on `unreviewed/**`).
-//! Each rule has a counter-test on a changed copy. Nine steps, each with its rc line through `step`: fmt, clippy, test, rust-rules, lock, files, licence, identity, guard ([GATES-WAECHTER]); [GATES-SAMMELLISTE]: no gate stops the run at the first red.
+//! Each rule has a counter-test on a changed copy. Ten steps (since the nextest gate `doctest` is its own step), each with its rc line through `step`: fmt, clippy, test, doctest, rust-rules, lock, files, licence, identity, guard ([GATES-WAECHTER]); [GATES-SAMMELLISTE]: no gate stops the run at the first red.
 
 mod support;
 use support::workflows::{read, root};
@@ -23,7 +23,7 @@ fn gates_ok(text: &str) -> bool {
             .lines()
             .filter(|l| l.trim_start().starts_with("step ") && !l.contains("()"))
             .count()
-            >= 9
+            >= 10
         && !text.lines().filter(code).any(cut)
 }
 
