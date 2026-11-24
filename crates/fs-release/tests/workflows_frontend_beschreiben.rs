@@ -129,9 +129,17 @@ fn menue_mutants_are_all_red() {
         // Schritt fehlt: the check step is renamed away
         base.replacen("  - menue-vollstaendig:\n", "  - menue-pruefung-x:\n", 1),
         // Prüfung fehlt: the switch of the check is gone
-        base.replacen("  - menue-vollstaendig-again:\n", "  - menue-switch-x:\n", 1),
+        base.replacen(
+            "  - menue-vollstaendig-again:\n",
+            "  - menue-switch-x:\n",
+            1,
+        ),
         // Rücksprung > 2: the loop limit is raised
-        base.replacen("$context.menuepruef.runde // 0) >= 3", "$context.menuepruef.runde // 0) >= 9", 1),
+        base.replacen(
+            "$context.menuepruef.runde // 0) >= 3",
+            "$context.menuepruef.runde // 0) >= 9",
+            1,
+        ),
         // Eskalation fehlt: the third red round no longer goes to eskalation
         base.replacen(
             "($context.menuepruef.runde // 0) >= 3 }'\n            then: eskalation",
