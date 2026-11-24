@@ -273,6 +273,35 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The existing sub-workflow `lift`, called UNCHANGED (no second pin way): sets the pin in Cargo.toml to the new tag (`--repo NAME=vX.Y.Z`; fs-interfaces never touches fs-types; fs-types and fs-conformance come from the repo FreeSynergy-Net/fs-types, the lift moves a crate that still comes from the repo fs-interfaces), regenerates Cargo.lock by `cargo update --workspace` (cargo metadata, NEVER by hand) - this `cargo update` runs DIRECTLY with `timeout 120`, not through build-slot.sh ([CARGO-UPDATE-DIREKT]), runs fmt, clippy, rules, tests, `lock-sources` and commits with the identity FreeSynergy <support@freesynergy.net>."
+  - ein-stand:
+      call: kaskade-ein-stand:0.0.18@fs
+      with:
+        glied: ${ $context.glied }
+        dir: ${ .input.worktrees // "/srv/FreeSynergy/.scratch/api-runner/wt" }/pk-${ $context.glied.repo }
+      export:
+        as: '${ $context + { einstand: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (specification, no script yet; lesson 24.11.: `planning` and `person` as dev-dependencies of fs-starter pulled old fs-rpc states): DEV-DEPENDENCIES FIRST - in the Cargo.toml files of the Glied (also every member crate, `[dev-dependencies]` and `[build-dependencies]` as well as `[dependencies]`) every fs crate of `glied.libs` / `glied.tags` is on the new tag, the dev-dependency pins before the normal ones (a dev-dependency left behind pulls the old state of a lower crate into the graph); then, directly in the worktree and NOT through `build-slot.sh` (own target, `cargo tree -d --workspace --all-targets --edges normal,build,dev`, one run of `cargo` with the lock as the lift made it), the TARGET GRAPH has exactly ONE state (version and source/tag) per fs crate (`fs-types`, `fs-objects`, `fs-interfaces`, `fs-rpc`, `fs-conformance`, the modules, `fs-components`, `fs-forms`); a second state of an fs crate is RED with the crate, both states and the path that pulls the old one (`cargo tree -i <crate>@<old>`). Result `einstand` = { red, befunde: [{ crate, staende, zieht }] }; red is also a `cargo tree` that fails or prints nothing. No fix by hand and no `[patch]`: the pin of the Glied that pulls the old state is raised first (back to `glied-weiche`/`eskalation`, the strategy decides), Cargo.lock only by cargo."
+  - ein-stand-weiter:
+      switch:
+        - rot:
+            when: '${ ($context.einstand.red // true) != false or ($context.einstand.befunde // [] | length) > 0 }'
+            then: eskalation
+        - gruen:
+            when: '${ $context.einstand.red == false and ($context.einstand.befunde // [] | length) == 0 }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - ABORT on a red Glied: a second state of an fs crate in the target graph (or no result) stops the cascade at once and goes to `eskalation`; only `red == false` without findings goes on to the special work."
   - besonderes:
       call: kaskade-besonderes-ai:0.0.18@fs
       with:
