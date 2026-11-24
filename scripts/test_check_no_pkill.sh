@@ -51,7 +51,7 @@ EOF
 }
 cases="$(check_cases "$tool" real)"
 echo "$cases" | grep -v '^FAIL' | sed 's/^/ /;s/^ ok/ok/'
-if echo "$cases" | grep -q '^FAIL'; then echo "$cases" | grep '^FAIL'; fails=$((fails + 1)); fi
+if grep -q '^FAIL' <<<"$cases"; then grep '^FAIL' <<<"$cases"; fails=$((fails + 1)); fi
 
 # not red: prose naming the rule, a comment, kill of an own PID
 mkdir -p "$tmp/c/scripts"
@@ -93,6 +93,6 @@ cp "$tool" "$tmp/mutant"
 sed -i 's/^CMD = re.compile(.*/CMD = re.compile(r"(?!x)x")/; s/^PGREP_KILL = re.compile(.*/PGREP_KILL = re.compile(r"(?!x)x")/' "$tmp/mutant"
 if cmp -s "$tmp/mutant" "$tool"; then bad "mutation changed nothing"; fi
 mcases="$(check_cases "$tmp/mutant" mut)"
-if echo "$mcases" | grep -q '^FAIL'; then ok "mutation (patterns removed) turns the planted cases red"; else bad "mutation stayed green"; fi
+if grep -q '^FAIL' <<<"$mcases"; then ok "mutation (patterns removed) turns the planted cases red"; else bad "mutation stayed green"; fi
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi
