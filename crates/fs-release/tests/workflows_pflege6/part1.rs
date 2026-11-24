@@ -80,6 +80,7 @@ pub(super) fn decision_flow(text: &str) -> bool {
             "recherche",
             "cut",
             "entwurf",
+            "gegenprobe",
             "ask",
             "record",
         ]

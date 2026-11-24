@@ -14,7 +14,10 @@ fn ok(t: &str) -> bool {
         && has(t, "entwurf")
         && has(t, "ask")
         && has(t, "record")
-        && in_order(t, &["recherche", "cut", "entwurf", "gegenprobe", "ask", "record"])
+        && in_order(
+            t,
+            &["recherche", "cut", "entwurf", "gegenprobe", "ask", "record"],
+        )
         && step_body(t, "gegenprobe").contains("call: gegenprobe-ai:0.0.18@fs")
         && step_body(t, "gegenprobe").contains("if: ${ $context.entwurf != null }")
         && step_body(t, "gegenprobe").contains("actor: ai")
