@@ -89,7 +89,9 @@ pub(super) fn decision_flow(text: &str) -> bool {
         && ask.contains("actor: human")
         && ask.contains("gate: human")
         && ask.contains("name: user-decision")
-        && ask.contains("if: ${ $context.verdict.open or $context.cut.open or $context.entwurf.open }")
+        && ask.contains(
+            "if: ${ $context.verdict.open or $context.cut.open or $context.entwurf.open }",
+        )
         && step_body(text, "record").contains("actor: ai")
         && step_body(text, "entwurf").contains("actor: ai")
         && step_body(text, "entwurf").contains("gate: strategie-ok")

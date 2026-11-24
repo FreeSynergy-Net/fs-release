@@ -163,7 +163,10 @@ fn release_flow_compares_versions_before_the_review_and_review_reads_the_ci() {
             "review-request"
         ]
     ));
-    assert!(in_order(&flow, &["pins-und-release-commit", "gates", "lock-pruefung"]));
+    assert!(in_order(
+        &flow,
+        &["pins-und-release-commit", "gates", "lock-pruefung"]
+    ));
     let body = step_body(&flow, "version-abgleich");
     for p in [
         "Cargo.toml",
