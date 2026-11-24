@@ -181,6 +181,7 @@ jobs:
           working-directory: ${{ inputs.working-directory }}
           diff-base: ${{ (!inputs.full && startsWith(github.ref, 'refs/heads/unreviewed/')) && 'origin/main' || '' }}
           profile: ${{ inputs.profile != '' && inputs.profile || (startsWith(github.ref, 'refs/tags/') && 'release' || 'quick') }}
+          also-profile: ${{ github.ref == 'refs/heads/main' && 'security' || '' }}
       # Blueprint check (S5): only when asked (`blueprint` warn or block) and only when the repo has a scaffold.toml. The talk records of the exceptions are read from a
       # flat checkout of fs-documentation main (ADR 0099 addendum). `--drift` also finds a hand change in a generated file.
       - name: Documentation checkout for the talk records

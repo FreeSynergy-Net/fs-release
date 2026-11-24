@@ -40,4 +40,13 @@ if [ "$rc" -eq 2 ]; then ok "--profile without a name is refused"; else bad "--p
 # the doc test step ignores a profile (gates.sh never gives one to it)
 run "$t/with" --doc --workspace
 if [ "$rc" -eq 0 ] && grep -q 'STUB-CARGO test --doc' <<<"$out"; then ok "doc tests run plain cargo test --doc"; else bad "doc step (rc $rc): $out"; fi
+run "$t/with" --profile quick --workspace
+if grep 'STUB-CARGO nextest run' <<<"$out" | grep -q -- '--no-fail-fast'; then ok "--no-fail-fast always (beats fail-fast of a profile)"; else bad "no --no-fail-fast: $out"; fi
+printf '[profile.security]\nfail-fast = true\n' >> "$t/with/.config/nextest.toml"
+run "$t/with" --then-profile security --profile quick --workspace
+if [ "$rc" -eq 0 ] && grep -q 'second run with profile security' <<<"$out" && grep -q 'STUB-CARGO nextest run --profile security ' <<<"$out"; then ok "then-profile defined: second run"; else bad "then-profile (rc $rc): $out"; fi
+run "$t/without" --then-profile security --workspace
+if [ "$rc" -eq 0 ] && grep -q 'profile security not defined here, second run skipped' <<<"$out"; then ok "then-profile missing: skipped with a line, rc 0"; else bad "then-profile missing (rc $rc): $out"; fi
+run "$t/with" --then-profile 'x;id' --workspace
+if [ "$rc" -eq 2 ]; then ok "then-profile name refused"; else bad "then-profile evil (rc $rc)"; fi
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

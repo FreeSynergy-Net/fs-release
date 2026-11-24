@@ -19,6 +19,12 @@ fi
 # --profile <name> (first arguments; from the input `profile` of check.yml via FS_GATES_PROFILE): a named nextest profile of the CALLER repo (`.config/nextest.toml`, e.g. quick, release). The name is checked against a fixed alphabet
 # before it is used (anything else = rc 2, never put on a command line). A repo without that profile does not fail: the default profile runs and the log says so (so repos without profiles stay green).
 profile_args=()
+also=""
+if [ "${1:-}" = --then-profile ]; then
+  [ $# -ge 2 ] || { echo "test gate: --then-profile needs a name" >&2; exit 2; }
+  also="$2"; shift 2
+  [[ "$also" =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || { echo "test gate REFUSED: profile name must match [a-z][a-z0-9_-]{0,31} (got: ${also:0:40})" >&2; exit 2; }
+fi
 if [ "${1:-}" = --profile ]; then
   [ $# -ge 2 ] || { echo "test gate: --profile needs a name" >&2; exit 2; }
   profile="$2"; shift 2
@@ -41,4 +47,16 @@ if [ "$got" != "$version" ]; then
   echo "test gate: cargo-nextest $got is newer than the pin $version (accepted outside CI)"
 fi
 echo "test gate: cargo-nextest $got, configuration $config"
-cargo nextest run ${profile_args[@]+"${profile_args[@]}"} --tool-config-file "freesynergy:$config" --no-tests=pass --no-fail-fast "$@"
+# --no-fail-fast always: it beats `fail-fast = true` of a profile of the caller (every red test is reported)
+cargo nextest run ${profile_args[@]+"${profile_args[@]}"} --tool-config-file "freesynergy:$config" --no-tests=pass --no-fail-fast "$@"; rc=$?
+# --then-profile <name> (first argument; main only, set by check.yml): afterwards the same selection once more with that profile if the caller defines it, else skipped with a line in the log
+if [ -n "$also" ]; then
+  if grep -qE "^[[:space:]]*\[profile\.${also}(\.[A-Za-z0-9_-]+)?\][[:space:]]*(#.*)?\$" .config/nextest.toml 2>/dev/null; then
+    echo "test gate: second run with profile $also"
+    cargo nextest run --profile "$also" --tool-config-file "freesynergy:$config" --no-tests=pass --no-fail-fast "$@"; rc2=$?
+    [ "$rc" -eq 0 ] && rc=$rc2
+  else
+    echo "test gate: profile $also not defined here, second run skipped"
+  fi
+fi
+exit "$rc"

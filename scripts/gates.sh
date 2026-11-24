@@ -196,7 +196,9 @@ else
   # FS_GATES_PROFILE: the nextest profile of the caller (input `profile` of check.yml); the name is checked and a missing profile falls back to default INSIDE test-gate.sh (visible in the log). Doc tests ignore it.
   profsel=()
   if [ -n "${FS_GATES_PROFILE:-}" ]; then profsel=(--profile "$FS_GATES_PROFILE"); fi
-  step test error bash "$here/test-gate.sh" ${profsel[@]+"${profsel[@]}"} "${testsel[@]}" --all-features --locked "${skip[@]}"
+  thensel=()
+  if [ -n "${FS_GATES_ALSO_PROFILE:-}" ]; then thensel=(--then-profile "$FS_GATES_ALSO_PROFILE"); fi
+  step test error bash "$here/test-gate.sh" ${thensel[@]+"${thensel[@]}"} ${profsel[@]+"${profsel[@]}"} "${testsel[@]}" --all-features --locked "${skip[@]}"
   step doctest error bash "$here/test-gate.sh" --doc "${testsel[@]}" --all-features --locked --no-fail-fast
   step rust-rules rule python3 -I "$rules" "$root"
   # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
