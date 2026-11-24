@@ -28,6 +28,7 @@ fn flow_is_sound(text: &str) -> bool {
         "bild-waechter",
         "bild-again",
         "vergleich",
+        "fremdbilder-pruefen",
         "bericht",
         "abbruch",
         "eskalation",
@@ -77,6 +78,12 @@ fn flow_is_sound(text: &str) -> bool {
         && text.contains("NO own script, NO Python")
         && text.contains("ONLY LAYOUT")
         && text.contains("REALITY INSTEAD OF TESTS")
+        && text.contains("[FREMDBILDER-NIE-INS-REPO]")
+        && step_body(text, "bilder-holen").contains("Writes ONLY to `.scratch`")
+        && step_body(text, "bild-nebeneinander")
+            .contains("stays LOCAL under `.scratch/katalog-plan/bilder/layout/<programm>/`")
+        && step_body(text, "fremdbilder-pruefen").contains("git diff --name-only")
+        && step_body(text, "fremdbilder-pruefen").contains("a FINDING")
 }
 
 #[test]
@@ -90,4 +97,15 @@ fn the_flow_calls_no_script_and_no_python_and_names_the_commands_of_our_programs
     assert!(!t.contains("python") && !t.contains(".py\"") && !t.contains("run:\n        shell"));
     assert!(step_body(&t, "pruefbefehl").contains("--check"));
     assert!(t.contains("NO `set -e`, NO `set -u`, NO `set -o pipefail`"));
+}
+
+#[test]
+fn foreign_pictures_never_go_into_a_repo_in_both_flows() {
+    let d = read("dossier");
+    assert!(d.contains("[FREMDBILDER-NIE-INS-REPO]"));
+    assert!(step_body(&d, "fremdbilder-pruefen").contains("a FINDING"));
+    assert!(in_order(
+        &d,
+        &["baustein-zuordnung-again", "fremdbilder-pruefen", "publish"]
+    ));
 }
