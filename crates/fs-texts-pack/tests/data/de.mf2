@@ -1,4 +1,4 @@
-# Basissprache
+# base language (German)
 hello = Hallo, {$name}!
 files =
   .input {$n :integer}
