@@ -68,3 +68,15 @@ check_has "kinds: data uses package rpm" "$out" "fs-blueprint package rpm scaffo
 check_lacks "kinds: data never calls cargo" "$out" "cargo "
 check_has "kinds: data RPM in dist" "$out" "fs-tasks-0.1.1-1.noarch.rpm"
 out=$(STUB_BPVER=9.9.9 run_kind "$T/none" "$dplan"); KRC=$(cat "$T/krc"); [[ $KRC -ne 0 ]] && pass "kinds: data RPM of another version than the tag fails" || fail "kinds: version mismatch must fail"
+
+# K-T1: the ELF magic is checked on its own: a file that is NOT an ELF but has the e_machine bytes 3e 00 at byte 18 must be refused
+out=$(STUB_MAGIC=XYZ STUB_ELF=3e run_kind "$TK/mod" "$plan"); KRC=$(cat "$T/krc")
+[[ $KRC -ne 0 ]] && ! grep -q "^fs-blueprint" <<<"$out" && pass "kinds: non-ELF with the x86_64 e_machine bytes is refused (ELF magic)" || fail "kinds: non-ELF with 3e00 must fail (rc=$KRC)"
+
+# K-W1 / MUSS-1: what the plan says out loud (decided in the plan job, before the signing approval)
+plan_out() { (cd "$1" && shift && env TAG=v0.1.1 LINUX_TARGETS=x86_64 WINDOWS_TARGETS=x86_64 MACOS=true "$@" GITHUB_OUTPUT="$T/out" python3 -I "$ROOT/actions/plan/plan.py" 2>&1); }
+check_in "kinds: module says it has no Windows build yet (WIN-b)" "$(plan_out "$TK/mod" BINARIES=planning-service KIND=module NAME=planning)" "::warning::kind module: no Windows package yet"
+check_in "kinds: data says it has no SBOM, before the approval" "$(plan_out "$T/none" KIND=data NAME=fs-tasks)" "::notice::kind data: no SBOM"
+# the finalize job: the SBOM step is skipped for data, and a release without *.spdx.json says so in its notes
+check_in "kinds: finalize skips the SBOM action for data" "$(grep -B1 'actions/sbom@' "$ROOT/.github/workflows/_release-finalize.yml")" "fromJSON(inputs.plan).kind != 'data'"
+check_in "kinds: draft notes say 'SBOM: none' without an spdx file" "$(grep -c 'SBOM: none for this release' "$ROOT/actions/draft-release/draft.sh")" "1"

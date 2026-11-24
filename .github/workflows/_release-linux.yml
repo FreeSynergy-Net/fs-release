@@ -37,6 +37,7 @@ jobs:
           targets: ${{ matrix.triple }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
           cache-key: release-${{ matrix.arch }}
+          cache: ${{ fromJSON(inputs.plan).kind == 'data' && 'false' || 'true' }} # kind data has no Cargo.toml: nothing for rust-cache to read
       - if: contains(fromJSON(inputs.plan).linux_formats, 'deb')
         uses: FreeSynergy-Net/fs-release/actions/install-tools@b9e406cb228bcdfa06f796f5da570c56f6aeebb0
         with:
@@ -51,7 +52,7 @@ jobs:
         env:
           JOB: ${{ toJSON(job) }}
         run: |
-          REV=$(printf '%s' "$JOB" | python3 -I -c 'import json, sys; j = json.load(sys.stdin); print(j.get("workflow_sha", "") if j.get("workflow_repository") in ("FreeSynergy/fs-release", "FreeSynergy-Net/fs-release") else "")')
+          REV=$(printf '%s' "$JOB" | jq -r 'if (.workflow_repository | IN("FreeSynergy/fs-release", "FreeSynergy-Net/fs-release")) then (.workflow_sha // "") else "" end')
           if ! [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::cannot read the fs-release commit of this workflow file"; exit 2; fi
           cargo install --git https://github.com/FreeSynergy-Net/fs-release --rev "$REV" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
           echo "$RUNNER_TEMP/fsbp/bin" >> "$GITHUB_PATH"

@@ -39,7 +39,7 @@ if [[ "\$1" == build ]]; then
   done
   for b in "\${bins[@]}"; do td=\${CARGO_TARGET_DIR:-target}; mkdir -p "\$td/\$t/release"; : > "\$td/\$t/release/\$b"; : > "\$td/\$t/release/\$b.exe"
     # STUB_ELF=3e|b7: the "built" binary gets an ELF header of that e_machine (kind module checks it)
-    if [[ -n "\${STUB_ELF:-}" ]]; then { printf '\\x7fELF'; head -c 14 /dev/zero; printf "\\x\$STUB_ELF\\0"; } > "\$td/\$t/release/\$b"; fi
+    if [[ -n "\${STUB_ELF:-}" ]]; then { printf "\\x7f\${STUB_MAGIC:-ELF}"; head -c 14 /dev/zero; printf "\\x\$STUB_ELF\\0"; } > "\$td/\$t/release/\$b"; fi
   done
 fi
 STUB

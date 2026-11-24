@@ -91,6 +91,8 @@ def main():
             "linux_matrix": [{"arch": "x86_64", "runner": LINUX["x86_64"][0], "triple": LINUX["x86_64"][1]}], "windows_matrix": [],
             "has_linux": True, "has_windows": False, "has_macos": False, "has_arch": False,
         }
+        # Decided HERE, long before the approval of the signing job: no SBOM for a data package (see README "SBOM per kind"), said out loud, never silent.
+        print("::notice::kind data: no SBOM (a data package has no Rust code; cargo sbom would list crates that are not in the RPM, so none is made). The release notes say so.")
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
             out.write(f"plan={json.dumps(plan, separators=(',', ':'))}\nversion={version}\n")
         print(json.dumps(plan, indent=2))
@@ -169,6 +171,7 @@ def main():
     linux, windows = matrix("linux", env("LINUX_TARGETS"), LINUX), matrix("windows", env("WINDOWS_TARGETS"), WINDOWS)
     if kind == "module":
         windows = []  # TODO WIN-b: WiX template, MSI per machine into the anchor; until then no Windows job
+        print("::warning::kind module: no Windows package yet (not built, WIN-b); windows-targets is ignored")
     plan = {
         "tag": tag, "version": version, "version_core": core, "prerelease": "-" in version,
         "name": name, "binaries": binaries, "cargo_package": wanted, "workdir": workdir,

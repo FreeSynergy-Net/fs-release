@@ -8,6 +8,10 @@ footer=$(mktemp)
 trap 'rm -f "$footer"' EXIT
 # shellcheck disable=SC2016  # envsubst wants the literal ${REPO}
 REPO=$REPO envsubst '${REPO}' < "$(dirname "${BASH_SOURCE[0]}")/footer.md" > "$footer"
+# an SBOM line only when an SBOM is among the files; a release without one (kind data) says so, never silent
+if ! compgen -G "$DIST/*.spdx.json" > /dev/null; then
+  sed -i 's|^- SBOM: .*|- SBOM: none for this release (data package: the RPM holds data files only, no Rust crates; an SBOM from Cargo.lock would name crates that are not in it)|' "$footer"
+fi
 
 if state=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
   # A published release is never touched again: replacing signed files under a public tag would break everything that
