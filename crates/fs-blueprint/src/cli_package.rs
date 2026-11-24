@@ -4,7 +4,9 @@ use crate::cli::{print, read_catalog, Options};
 use crate::emit::generate::planned_paths;
 use crate::kit::KitCatalog;
 use crate::model::Blueprint;
-use crate::package_rpm::{program_spec, release_spec, PAGES_URL};
+use crate::package_rpm::{
+    filesystem_spec, module_spec, program_spec, release_spec, ModuleInput, PAGES_URL,
+};
 use crate::repo_fs::FsRepo;
 use crate::rpm_spec::RpmSpec;
 use crate::verified::verify;
@@ -20,6 +22,9 @@ struct Extra {
     fingerprint: Option<String>,
     version: Option<String>,
     source_date: Option<u32>,
+    binary: Option<PathBuf>,
+    name: Option<String>,
+    arch: Option<String>,
 }
 
 fn split(words: &[String]) -> Result<(Extra, Vec<String>), String> {
@@ -33,6 +38,9 @@ fn split(words: &[String]) -> Result<(Extra, Vec<String>), String> {
         source_date: std::env::var("SOURCE_DATE_EPOCH")
             .ok()
             .and_then(|v| v.parse().ok()),
+        binary: None,
+        name: None,
+        arch: None,
     };
     let (mut rest, mut it) = (Vec::new(), words.iter());
     while let Some(w) = it.next() {
@@ -48,6 +56,9 @@ fn split(words: &[String]) -> Result<(Extra, Vec<String>), String> {
             "--key" => x.key = Some(PathBuf::from(v()?)),
             "--fingerprint" => x.fingerprint = Some(v()?),
             "--pkg-version" => x.version = Some(v()?),
+            "--binary" => x.binary = Some(PathBuf::from(v()?)),
+            "--name" => x.name = Some(v()?),
+            "--arch" => x.arch = Some(v()?),
             "--source-date" => {
                 x.source_date = Some(
                     v()?.parse()
@@ -135,19 +146,55 @@ fn release(x: &Extra, o: &Options, out: &mut dyn Write) -> Result<i32, String> {
     )
 }
 
+fn filesystem(x: &Extra, o: &Options, out: &mut dyn Write) -> Result<i32, String> {
+    let version = x.version.as_deref().unwrap_or(env!("CARGO_PKG_VERSION"));
+    finish(filesystem_spec(version, &x.release), x, o, out)
+}
+
+fn module(x: &Extra, o: &Options, out: &mut dyn Write) -> Result<i32, String> {
+    let [folder] = o.positional.as_slice() else {
+        return Err("package module needs the module folder: fs-blueprint package module FOLDER --name N --pkg-version V --binary FILE [--arch CPU] [--out DIR]".into());
+    };
+    let name = x
+        .name
+        .as_deref()
+        .ok_or("package module needs --name (the host module name)")?;
+    let version = x
+        .version
+        .as_deref()
+        .ok_or("package module needs --pkg-version")?;
+    let binary = x
+        .binary
+        .as_deref()
+        .ok_or("package module needs --binary FILE (the built service)")?;
+    let arch = x.arch.as_deref().unwrap_or(std::env::consts::ARCH);
+    let input = ModuleInput {
+        name,
+        version,
+        release: &x.release,
+        binary,
+        arch,
+    };
+    finish(module_spec(Path::new(folder), &input)?, x, o, out)
+}
+
 /// `package` (the words AFTER `package`). Exit codes as the other commands: 0 made, 1 the blueprint has findings, 2 wrong words or an error.
 ///
 /// # Errors
 /// The words are wrong, a file cannot be read or the package cannot be made.
 pub fn run_package(words: &[String], out: &mut dyn Write) -> Result<i32, String> {
     let Some((kind, rest)) = words.split_first() else {
-        return Err("package needs a kind: rpm | release".into());
+        return Err("package needs a kind: rpm | release | filesystem | module".into());
     };
     let (x, rest) = split(rest)?;
     let o = crate::cli::parse(&rest)?;
     match kind.as_str() {
         "rpm" => rpm(&x, &o, out),
         "release" => release(&x, &o, out),
-        other => Err(format!("unknown package kind {other} (rpm | release)")),
+        "filesystem" => filesystem(&x, &o, out),
+        "module" => module(&x, &o, out),
+        other => Err(format!(
+            "unknown package kind {other} (rpm | release | filesystem | module)"
+        )),
     }
 }

@@ -1,4 +1,4 @@
-//! Pattern: Adapter (the crate `rpm` 0.30.2 behind one small value: `RpmSpec` in, a noarch RPM file out; nothing else in the tool knows the crate).
+//! Pattern: Adapter (the crate `rpm` 0.30.2 behind one small value: `RpmSpec` in, an RPM file out; nothing else in the tool knows the crate).
 //!
 //! Never signs: a local build is for tests; signing is the CI (`rpmsign`), a release is built by the CI from the tag only.
 
@@ -21,9 +21,11 @@ pub struct Req {
     pub at_least: Option<String>,
 }
 
-/// Everything a noarch package of data needs.
+/// Everything a package needs (data: `noarch`; a module with a binary: its CPU).
 pub struct RpmSpec {
     pub name: String,
+    /// `noarch` for data, `x86_64` or `aarch64` for a package with a binary.
+    pub arch: String,
     pub version: String,
     pub release: String,
     pub license: String,
@@ -37,10 +39,13 @@ pub struct RpmSpec {
 }
 
 impl RpmSpec {
-    /// The file name `<name>-<version>-<release>.noarch.rpm`.
+    /// The file name `<name>-<version>-<release>.<arch>.rpm`.
     #[must_use]
     pub fn file_name(&self) -> String {
-        format!("{}-{}-{}.noarch.rpm", self.name, self.version, self.release)
+        format!(
+            "{}-{}-{}.{}.rpm",
+            self.name, self.version, self.release, self.arch
+        )
     }
 
     /// Builds the package into `out_dir` (made when missing) and returns the path.
@@ -57,7 +62,7 @@ impl RpmSpec {
             &self.name,
             &self.version,
             &self.license,
-            "noarch",
+            &self.arch,
             &self.summary,
         );
         b.using_config(config)
