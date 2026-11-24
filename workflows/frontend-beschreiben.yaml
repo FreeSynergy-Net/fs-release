@@ -25,6 +25,7 @@
 #   (10) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (`set -e` closes the user's shell on the first error; `set -u` and `pipefail` do not close it, but they stay switched ON in the user's shell and change every later command and prompt script). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
 #   (11) REALITY INSTEAD OF TESTS (user 24.11.): the layout descriptions are the practical test of Forms, Components and the host; whatever stands out (a missing component, form or host command) becomes a card AT ONCE (lane C or F, or Scaffold: "Befehl fehlt in Modul X"), not at the end of the run; no mutant chains for this flow, a structure test is enough, one review per bundle.
 #   (12) [FREMDBILDER-NIE-INS-REPO] (user 24.11., HARD RULE, emphasised): pictures of OTHER programs (model pictures, dossier pictures, comparison sheets "model left, our layout right") NEVER go into a repo, the net, a release or a docs page - open source or not. Models are LOCAL reading material under `.scratch/` and stay there: model pictures under `.scratch/katalog-plan/bilder/<programm>/vorbild/`, sheets under `.scratch/katalog-plan/bilder/layout/<programm>/`. No step uploads, commits or pushes a foreign picture. Only OUR OWN pictures and descriptions in our own words may stand in branches, commits and PRs. The step `fremdbilder-pruefen` (data only: a git listing with a file-extension list, no new script) runs before every commit/push.
+#   (13) [MENUES-IMMER-MIT] (user 24.11., HARD RULE): at EVERY frontend the FULL menu tree of the model goes with it: main menu, context menus, tool bar (structure, names, order, shortcuts). Steps `menue-baum` (reads the menu tree into `menue`; `menus.md` is written from the model pictures when the dossier has none) and `menue-vollstaendig` (check: every entry of `menue` stands in the layout; red goes back to `layout-schreiben` at most twice, the third red round goes to `eskalation`) run after `anordnung-lesen` and after `layout-schreiben`. An unfinished entry STAYS in the menu (locked, reason in the tooltip, no extra line). Menu entries carry NO command and NO right (rule 2 and the binding comes later).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -163,12 +164,44 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Step 2. LOOK at every picture and write down the ARRANGEMENT of the components. Input: `vorbild.bilder`, the block table of `bausteine.md`. Output `anordnung` = { bilder: [ { name, baum: [ { component (block id of `bausteine.md`), wo (area: top, left, centre, ...), kinder (nesting), leisten (bars, columns, rows), abstaende (gaps in steps of the picture, not in pixels of a screen) } ], farben_schriften (what the picture shows about colour, font, space: goes to `theme-schreiben`, NOT into the tree) } ] }. A block id comes from the table (existing first); no id for a thing: write `unbekannt` with a crop name, the step `fehlende-components-melden` takes it. Reads only, writes nothing else."
+  - menue-baum:
+      call: menue-baum-ai:0.0.18@fs
+      with:
+        dossier: ${ .input.dossier }
+        bilder: ${ $context.vorbild.bilder }
+        anordnung: ${ $context.anordnung }
+      export:
+        as: '${ $context + { menue: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.menue-baum
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step 2b [MENUES-IMMER-MIT] (rule 13). The MENU TREE of the model as data, before the layout is written. Input: `dossier` (its `menus.md`, or the menu sections of the dossier), `bilder` (the pictures of opened menus), `anordnung`. When the dossier has NO `menus.md` (the case for tasks, people and groups today), the step reads the menu pictures and the dossier and writes `menus.md` into the dossier folder first, once, in our own words. Output `menue` = { eintraege: [ { ebene (haupt | kontext | werkzeug), menue (name of the menu, or the object kind of a context menu), name, reihenfolge (int), kuerzel (shortcut, empty when none), kinder (nesting by name) } ], quelle: [dossier paths and sections read], keine_quelle (bool: no menu section and no menu picture for this model) }. Every entry of the main menu, of each context menu and of the tool bar: structure, names, order, shortcuts. NO command, NO right, NO colour. Writes only the `menus.md` of the dossier (when missing) and the output. Menu pictures of other programs stay LOCAL under `.scratch` ([FREMDBILDER-NIE-INS-REPO])."
+  - menue-baum-weiche:
+      switch:
+        - ohne-menue:
+            when: '${ $context.menue.eintraege == null or ($context.menue.eintraege | length) == 0 }'
+            then: eskalation
+        - da:
+            when: '${ $context.menue.eintraege != null and ($context.menue.eintraege | length) > 0 }'
+            then: layout-schreiben
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow [MENUES-IMMER-MIT] - a menu tree with entries goes on to `layout-schreiben`; an empty or missing `menue.eintraege` (no menu of the model could be read) goes to `eskalation`, never on without a menu."
   - layout-schreiben:
       call: layout-schreiben-ai:0.0.18@fs
       with:
         anordnung: ${ $context.anordnung }
+        menue: ${ $context.menue }
         beschreibung: ${ .input.beschreibung }
-        auftrag: '${ [($context.pruef.stderr // ""), (.input.auftrag // "")] | map(select(. != "")) | (.[0] // "") }'
+        auftrag: '${ [($context.menuepruef.auftrag // ""), ($context.pruef.stderr // ""), (.input.auftrag // "")] | map(select(. != "")) | (.[0] // "") }'
       export:
         as: '${ $context + { layout: . } }'
       metadata:
@@ -177,7 +210,41 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.layout-schreiben
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 3. Write the LAYOUT part of the fs-forms description (data files `forms/<ansicht>.toml` of the program repo, the format the host reads; pattern `fs-tasks/forms/board.toml`, do not invent a format; a program repo without `scaffold.toml` first gets one like fs-people). Input: `anordnung.bilder[].baum`, `auftrag` (input, empty in the first round; in a repeat the flow hands the stderr of the red `pruefbefehl` in as `auftrag`; after a red `bild-nebeneinander` (no stderr) the order stays the input one and the red `bilder` result is in the context). Output `layout` = { dateien: [paths], head (full SHA of the local commit on `unreviewed/frontend-<programm>`), vorlaeufig: [components that stand in], offen: [areas left out] }. Contents: which component where, nesting, bars, columns, gaps; placeholder values only so that something can be seen. NOTHING else (rule 2): no data source, no command, no right, no example source, no logic, no colour or font value. The BINDING part is NOT written (no `[[source]]`, map or command section; never a fake source). Local commit, no push, no tag."
+        freesynergy.net:summary: "Step 3. Write the LAYOUT part of the fs-forms description (data files `forms/<ansicht>.toml` of the program repo, the format the host reads; pattern `fs-tasks/forms/board.toml`, do not invent a format; a program repo without `scaffold.toml` first gets one like fs-people). Input: `anordnung.bilder[].baum`, `menue` (the menu tree of the model, rule 13), `auftrag` (input, empty in the first round; in a repeat the order is the list of missing menu entries of a red `menuepruef` (`menuepruef.auftrag`), else the stderr of the red `pruefbefehl`; after a red `bild-nebeneinander` (no stderr) the order stays the input one and the red `bilder` result is in the context). Output `layout` = { dateien: [paths], head (full SHA of the local commit on `unreviewed/frontend-<programm>`), vorlaeufig: [components that stand in], offen: [areas left out] }. Contents: which component where, nesting, bars, columns, gaps; the menu entries of `menue` as structure (names, order, shortcuts, placeholder state; an unfinished entry STAYS in the menu, locked, the reason in the tooltip, never an extra line); placeholder values only so that something can be seen. NOTHING else (rule 2): no data source, no command, no right, no example source, no logic, no colour or font value. The BINDING part is NOT written (no `[[source]]`, map or command section; never a fake source). Local commit, no push, no tag."
+  - menue-vollstaendig:
+      call: menue-vollstaendig-ai:0.0.18@fs
+      with:
+        menue: ${ $context.menue }
+        layout: ${ $context.layout }
+        workdir: ${ .input.workdir }
+      export:
+        as: '${ $context + { menuepruef: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.menue-vollstaendig
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check [MENUES-IMMER-MIT] (rule 13). Pruefung `Menübaum des Vorbilds vollständig übernommen`: every entry of `menue.eintraege` stands in the layout files `layout.dateien` with structure, name, order and shortcut, LOCKED entries included (locked = marked in the tooltip, never a `*` or an extra line in the name). Input: `menue`, `layout`. Output `menuepruef` = { fehlt: [each missing entry as menu / name, with the file it should stand in], anzahl_dossier (int: entries of `menue`), anzahl_layout (int: entries found in the layout), auftrag (text: the list of `fehlt` as the order for `layout-schreiben`; empty when green), red (bool: `fehlt` not empty or `anzahl_layout < anzahl_dossier`), runde (int: the step counts itself in `<workdir>/.menue-vollstaendig-runde`, +1 per call, file removed on green) }. A missing result is never green: it goes to `eskalation` in `menue-vollstaendig-again`."
+  - menue-vollstaendig-again:
+      switch:
+        - runden:
+            when: '${ $context.menuepruef.red == true and ($context.menuepruef.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.menuepruef.red == true }'
+            then: layout-schreiben
+        - green:
+            when: '${ $context.menuepruef.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow [MENUES-IMMER-MIT] - red goes back to `layout-schreiben` with the list of missing entries as the order (at most two repeats), the third red round goes to `eskalation`; a missing result goes to `eskalation`, never to green."
   - theme-schreiben:
       call: theme-schreiben-ai:0.0.18@fs
       with:
