@@ -32,7 +32,7 @@ jobs:
         uses: FreeSynergy-Net/fs-release/actions/install-tools@1c65434bdce1a1790349fddcb314b1c57d71985c
         with:
           tools: cargo-wix@0.3.9
-      - uses: FreeSynergy-Net/fs-release/actions/package-windows@1c65434bdce1a1790349fddcb314b1c57d71985c
+      - uses: FreeSynergy-Net/fs-release/actions/package-windows@496e36a9f299de2bf7ffd933a8313e5c7e9767ad
         with:
           plan: ${{ inputs.plan }}
           arch: ${{ matrix.arch }}
