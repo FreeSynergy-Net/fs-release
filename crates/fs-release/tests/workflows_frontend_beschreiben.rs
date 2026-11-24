@@ -117,6 +117,11 @@ fn foreign_picture_check_looks_at_every_commit_and_never_uses_a_deleting_commit(
         assert!(body.contains("EVERY commit of the range"));
         assert!(body.contains("NEVER a deleting commit"));
         assert!(body.contains("not yet pushed commits"));
+        assert!(body.contains("case-insensitive"));
+        for ext in ["tif", "avif", "heic", "heif", "jxl", "pdf"] {
+            assert!(body.contains(ext), "missing extension {ext}");
+        }
+        assert!(body.contains("gepusht-red"));
     }
 }
 
