@@ -26,15 +26,20 @@ if [ -z "${CI:-}" ]; then
   export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
   # [GATES-TMP] The tests (tempfile) write to TMPDIR. A folder of its own per run, removed by the EXIT trap below, so what a test
   # leaves behind (killed run, process::exit, a panic in a Drop) goes with the run and not into the shared base. The base is not
-  # /tmp (RAM) and is not changed here. A run killed by SIGKILL leaves its folder; the next run sweeps folders of dead PIDs.
+  # /tmp (RAM) and is not changed here. A run killed by SIGKILL leaves its folder; the next run sweeps folders of dead PIDs
+  # (kill -0: a live run of ANOTHER user or PID namespace would look dead; not the case today, a flock per folder would be the robust form).
+  # A removal that fails (a folder a test made read-only, a foreign owner) is only a warning, never a red gate; the base must be absolute (the folder would land in the working tree).
+  gates_rm_tmp() { rm -rf "$1" 2>/dev/null || echo "gates: warning: could not remove $1" >&2; return 0; }
   gates_tmp_base="${TMPDIR_GATES:-/srv/FreeSynergy/.scratch}"
+  case "$gates_tmp_base" in /*) ;; *) echo "gates FAILED: TMPDIR_GATES must be an absolute path (got $gates_tmp_base)" >&2; exit 2 ;; esac
   for old in "$gates_tmp_base"/gates-run.*; do
     [ -d "$old" ] || continue
     old_pid="${old##*/gates-run.}"; old_pid="${old_pid%%.*}"
     case "$old_pid" in ''|*[!0-9]*) continue ;; esac
-    kill -0 "$old_pid" 2>/dev/null || rm -rf "$old"
+    kill -0 "$old_pid" 2>/dev/null || gates_rm_tmp "$old"
   done
   gates_run_tmp="$(mktemp -d "$gates_tmp_base/gates-run.$$.XXXXXX")"
+  trap 'if [ -n "$gates_run_tmp" ]; then gates_rm_tmp "$gates_run_tmp"; fi' EXIT # at once: the exits below (uncommitted changes, lock held) must not leave the folder
   export TMPDIR="$gates_run_tmp"
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     echo "gates FAILED: uncommitted changes in $root" >&2
@@ -49,7 +54,7 @@ fi
 gates_guard_lock "$root" || exit 1
 guard_snap=""
 finding_work="$(mktemp -d "${TMPDIR:-/tmp}/gates-list.XXXXXX")"
-trap 'gates_guard_unlock "$root"; if [ -n "$guard_snap" ]; then rm -f "$guard_snap" "$guard_snap.end"; fi; rm -rf "$finding_work"; if [ -n "$gates_run_tmp" ]; then rm -rf "$gates_run_tmp"; fi' EXIT
+trap 'gates_guard_unlock "$root"; if [ -n "$guard_snap" ]; then rm -f "$guard_snap" "$guard_snap.end"; fi; rm -rf "$finding_work"; if [ -n "$gates_run_tmp" ]; then gates_rm_tmp "$gates_run_tmp"; fi' EXIT
 # The snapshot lives in <git dir>/gates-guard/ (inside the worktree's own .git: not in /tmp = RAM, invisible to the tree hash).
 # A run killed by SIGKILL leaves its snapshot there; the next run sweeps snapshots of dead PIDs (own folder only).
 guard_dir="$(gates_guard_snapdir "$root")"
