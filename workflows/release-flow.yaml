@@ -61,6 +61,18 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review (`eskalation` ends it with `eskaliert: true` for the caller). Only green goes on."
+  - pins-und-release-commit:
+      call: repo-release-commit:0.0.18@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: release-flow.pins-und-release-commit
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Release commit of ONE repo (own step; gap reported by two agents: nobody set the own version and the CHANGELOG section, so a wrong version or heading was only seen at the tag). It stands BEFORE `gates`, so that gates, lock check and review see the very state that is released. The pins are NOT touched here: the neighbour tags, the `uses:` lines of fs-release and the lock come from `lift` (already run, never lifted a second time; this step only reads them and sends a pin that is not lifted back to `lift`). In an own worktree, in this order: (1) set the version in Cargo.toml and the entries of the own crates in Cargo.lock (by cargo, not by hand) to <version>; (2) CHANGELOG.md: the heading is exactly `## <version>` WITHOUT a date (the date, if wanted, goes into the text below it), because the CI probe `actions/library-release/notes.py` (called by `plan` and `library-release`) matches the heading with the regex `^## (?:\\S+ )?{re.escape(version)}$` (line 44) and a heading like `## 0.1.0 (2026-11-24)` is red only at the tag; the section is not empty and `## Unreleased` does not stand in for it; (3) ONE release commit on the branch; no tag, no push (the later steps `tag` and `push` do that). `version-abgleich` checks the result again before the review."
   - gates:
       call: gates:0.0.18@fs
       metadata:
@@ -87,7 +99,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Version comparison BEFORE the review request (specification, no script yet): the version in Cargo.toml, in the entries of the own crates in Cargo.lock and the first heading of CHANGELOG.md are the SAME and the tag is v<version> (lesson fs-people v0.0.11: a lock with the old version was only seen at the tag); the `uses:` lines of fs-release in release.yml, ci.yml and check.yml are pinned to the NEWEST chain, today v0.0.10 (a tag, or a full SHA of fs-release main that contains owner-neutral; `fs-release address aufrufer` checks it; lesson fs-packages with v0.0.9: the old chain lacks later fixes); a pin is never lowered. Red goes back to the lift or the author before any review; the same check runs again on the fresh clone in `ff-und-tag`."
+        freesynergy.net:summary: "Version comparison BEFORE the review request (specification, no script yet): the version in Cargo.toml, in the entries of the own crates in Cargo.lock and the first heading of CHANGELOG.md (exactly `## <version>`, no date in the heading, rule of `pins-und-release-commit`) are the SAME and the tag is v<version> (lesson fs-people v0.0.11: a lock with the old version was only seen at the tag); the `uses:` lines of fs-release in release.yml, ci.yml and check.yml are pinned to the NEWEST chain, today v0.0.10 (a tag, or a full SHA of fs-release main that contains owner-neutral; `fs-release address aufrufer` checks it; lesson fs-packages with v0.0.9: the old chain lacks later fixes); a pin is never lowered. Red goes back to the lift or the author before any review; the same check runs again on the fresh clone in `ff-und-tag`."
   - adresse-pruefen:
       call: identity-check:0.0.18@fs
       with:
