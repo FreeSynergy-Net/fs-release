@@ -1,5 +1,5 @@
 //! Pattern: none (test). The flow `frontend-beschreiben` (the LAYOUT of a Frontend as describing data, no function, no connection): existing first, the six steps in order, layout and theme apart, binding not written,
-//! the check command of the PUBLISHED host, missing components as cards with a crop, the gaps as cards (no script, no Python in the flow), the user's verdict, the copy block rule. Structure test only (user's depth of checking 24.11.: no mutant chains).
+//! the check command of the PUBLISHED host, missing components as cards with a crop, the gaps as cards (no script, no Python in the flow), the sheet per program with the honest comparison (no verdict per picture), gaps L1 to L7 with target lanes, the copy block rule. Structure test only (user's depth of checking 24.11.: no mutant chains).
 
 mod support;
 use support::workflows::{in_order, read, step_body};
@@ -26,8 +26,7 @@ fn flow_is_sound(text: &str) -> bool {
         "bild-nebeneinander",
         "bild-waechter",
         "bild-again",
-        "abnahme",
-        "abnahme-weiche",
+        "vergleich",
         "fehlende-components-melden",
         "bericht",
         "abbruch",
@@ -58,9 +57,14 @@ fn flow_is_sound(text: &str) -> bool {
         && step_body(text, "pruefbefehl-again").contains(">= 3")
         && step_body(text, "bild-nebeneinander").contains("--picture")
         && !step_body(text, "bild-nebeneinander").contains("--sample-data")
-        && step_body(text, "abnahme").contains("name: picture-acceptance")
-        && step_body(text, "abnahme").contains("freesynergy.net:gate: human")
-        && step_body(text, "abnahme-weiche").contains("$context.verdict.accepted == true")
+        && step_body(text, "vergleich").contains("NO verdict of the user per picture")
+        && step_body(text, "vergleich").contains("fehlt | anders | gleich")
+        && !text.contains("name: picture-acceptance")
+        && step_body(text, "bild-nebeneinander").contains("bilder/layout/<programm>/")
+        && step_body(text, "host-holen").contains("Gap L7")
+        && text.contains("L7 Host/component state fetch")
+        && text.contains("TO CLARIFY FIRST")
+        && text.contains("Target lane: C1")
         && step_body(text, "fehlende-components-melden").contains("picture crop to lane C")
         && step_body(text, "fehlende-components-melden").contains("never a new `[x]` line")
         && step_body(text, "fehlende-components-melden").contains("Befehl fehlt in Modul X")

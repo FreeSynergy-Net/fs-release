@@ -1,24 +1,25 @@
 # frontend-beschreiben: the LAYOUT of a Frontend as DESCRIBING DATA (an fs-forms description), NOT as a crate, WITHOUT function and WITHOUT connection. Run through `workflow-pflege`.
 # Order: `Workflow frontend-beschreiben, step <id>, parameters programm, frontend, vorbild, dossier, model, bestand, blinc, repo, branch, workdir, beschreibung, host_version` (docs/prompt-template.md). FS profile: see README.md.
 # State of the order (user, 24.11.2026, via 9f): ONLY LAYOUT. No data source, no commands, no rights, no example-source duty; only placeholder values so that something can be seen. The BINDING part (source, commands, rights) is written LATER, when Scaffold AND Forms stand; then it is only ADDED, nothing is rebuilt. Therefore the description has three folders that never mix: `beschreibung/layout/` (arrangement of the components), `beschreibung/theme/` (colours, fonts, spaces as a layer of its own; more themes without touching the layout), `beschreibung/bindung/` (NOT written by this flow).
-# Course (the six steps of the user): bilder-holen -> anordnung-lesen -> layout-schreiben -> theme-schreiben -> bild-nebeneinander -> fehlende-components-melden. Around them: vorhanden-pruefen first, the review `frontend-nur-komponenten`, the check command of the published host, the user's verdict (`picture-acceptance`).
+# Course (the six steps of the user): bilder-holen -> anordnung-lesen -> layout-schreiben -> theme-schreiben -> bild-nebeneinander -> fehlende-components-melden. Around them: vorhanden-pruefen first, the review `frontend-nur-komponenten`, the check command of the published host, the one SHEET per program (`bild-nebeneinander`) and the honest comparison by Haiku (`vergleich`). No verdict of the user per picture.
 # The flow is ITSELF only data: every step is a command of one of our programs (published host `fs-starter --check|--description|--picture|--list-commands`, recorder module `fs-capture`, `gh` for reading) or a reading/writing step of an agent on DATA files. NO own script, NO Python, NOTHING compiled in the flow, NO new crate. The `@fs` calls are SPECIFICATION (see README.md, status table). Several programs may run in parallel (Haiku, no build slot: nothing is built).
-# Input: programm (name of the program), frontend (name of the Frontend description), vorbild (the model program), dossier (folder of the dossier), model (pictures of the model), bestand, blinc (inventories for the dossier), repo, branch (`unreviewed/frontend-<programm>`), workdir, beschreibung (folder of the description INSIDE the data package, only data files), auftrag (optional: the user's words of the last verdict, empty in the first round), host_version (tag of the published host `fs-starter`, e.g. `v0.0.4`).
-# Existing first (user rule 23.11.): the flow does NOT replace `frontend-round` for the old Frontend crates. It CALLS `dossier`, `picture-acceptance` and the review template `frontend-nur-komponenten` as they are (no second copy). Decision "new flow instead of rebuilding frontend-round": `frontend-round` builds a crate (`build-ai`, gates, `menue-vergleich`, release-flow, style steps) and is needed for the old crates until they are descriptions; a rebuild would put crate and description into one file and make its tests (`workflows_frontend_komponenten`, `workflows_aufrufer`) carry both. When the last Frontend crate is gone, `frontend-round` is removed in one step (a card in FEATURES-OFFEN.md).
+# Input: programm (name of the program), frontend (name of the Frontend description), vorbild (the model program), dossier (folder of the dossier), model (pictures of the model), bestand, blinc (inventories for the dossier), repo, branch (`unreviewed/frontend-<programm>`), workdir, beschreibung (folder of the description INSIDE the data package, only data files), auftrag (optional: the order of the last round, empty in the first round), host_version (tag of the published host `fs-starter`, e.g. `v0.0.4`).
+# Existing first (user rule 23.11.): the flow does NOT replace `frontend-round` for the old Frontend crates. It CALLS `dossier` and the review template `frontend-nur-komponenten` as they are (no second copy). Decision "new flow instead of rebuilding frontend-round": `frontend-round` builds a crate (`build-ai`, gates, `menue-vergleich`, release-flow, style steps) and is needed for the old crates until they are descriptions; a rebuild would put crate and description into one file and make its tests (`workflows_frontend_komponenten`, `workflows_aufrufer`) carry both. When the last Frontend crate is gone, `frontend-round` is removed in one step (a card in FEATURES-OFFEN.md).
 # GAPS (rule: where a step would today only work by a script, it is NOT built in; it is a card "Befehl fehlt in Modul X" to Scaffold/the modules, listed in the report and in FEATURES-OFFEN.md). State 24.11.2026:
-#   L1 `fs-starter --check`: reports only "description there or not" (rc 0/1/3); a LIST of the forms and components used and of what is missing is missing -> the step `anordnung-lesen` is an agent reading until then.
-#   L2 fs-components: no command "list the blocks with what they can do and their `forms = [...]`" (only reading `contract/blocks/*.toml`); needed by `fehlende-components-melden`.
-#   L3 `fs-capture`: no command that sets a model picture and our picture side by side (`pair <vorbild.png> <unser.png> <out.png>`) and none that cuts a part out of a picture (`crop <png> <x> <y> <w> <h> <out.png>`); `picture-acceptance` step `menue-bilder` has no script either.
-#   L4 `fs-starter --picture`: one picture of the screen; a picture of an OPENED main menu or context menu is not named in the words (`--screen` to be checked in `fs-starter --help` by the step `bild-nebeneinander`); if it cannot be done: card to fs-forms-run.
-#   L5 `fs-starter` with a description that has ONLY layout and theme (no `bindung/`): whether the host draws it with placeholder values is to be shown by the step `pruefbefehl`; red there is a card to Scaffold/fs-forms ("layout without binding"), never a reason to write a binding into the layout.
-#   L6 Windows: the model pictures are mostly made on Windows (`fs-capture shot --title` there); our pictures are drawn on Linux and on `windows-latest` (WARP); one command that does both and names the host is missing.
+#   L1 `fs-starter --check`: reports only "description there or not" (rc 0/1/3); a LIST of the forms and components used and of what is missing is missing -> the step `anordnung-lesen` is an agent reading until then. Target lane: C1 (Scaffold/Host).
+#   L2 fs-components: no command "list the blocks with what they can do and their `forms = [...]`" (only reading `contract/blocks/*.toml`); needed by `fehlende-components-melden`. Target lane: C.
+#   L3 `fs-capture`: no command that sets a model picture and our picture side by side (`pair <vorbild.png> <unser.png> <out.png>`) and none that cuts a part out of a picture (`crop <png> <x> <y> <w> <h> <out.png>`); `picture-acceptance` step `menue-bilder` has no script either. Target lane: fs-capture.
+#   L4 `fs-starter --picture`: one picture of the screen; a picture of an OPENED main menu or context menu is not named in the words (`--screen` to be checked in `fs-starter --help` by the step `bild-nebeneinander`); if it cannot be done: card to fs-forms-run. Target lane: fs-capture (menu picture).
+#   L5 `fs-starter` with a description that has ONLY layout and theme (no `bindung/`): whether the host draws it with placeholder values is to be shown by the step `pruefbefehl`; red there is a card to Scaffold/fs-forms ("layout without binding"), never a reason to write a binding into the layout. TO CLARIFY FIRST (before any further Frontend run): does the host draw a description with only layout and theme? If NOT: the card goes AT ONCE to C1 with PRECEDENCE (without it no picture exists). Target lane: C1.
+#   L6 Windows: the model pictures are mostly made on Windows (`fs-capture shot --title` there); our pictures are drawn on Linux and on `windows-latest` (WARP); one command that does both and names the host is missing. Target lane: C1.
+#   L7 Host/component state fetch: `gh release download` is NOT a command of our programs. For now ALLOWED (CI-built binary, never locally built, rule 5); the command of the Packages module "fetch host/component state" is missing. Target lane: C1.
 # Rules. (1) Existing first: `vorhanden-pruefen` is the mandatory first step: description, dossier, forms, components, blocks, `FEATURES-OFFEN.md` are read before a line is written; what exists is extended.
 #   (2) LAYOUT ONLY: no data source, no command, no right, no logic in `layout/` and `theme/`; placeholder values only (said so in the picture name and in the report: `layout-nur`). Binding is added later in `bindung/`.
 #   (3) A missing component or one that cannot do what the model shows is NEVER bypassed in the Frontend: the part stays out (`offen`) or the nearest existing component stands in marked `vorlaeufig`; a card WITH a picture crop goes to lane C (the user wants the components COMPLETE; the list steers the order in lane C). A missing form: lane F (workflow `form-neu`).
 #   (4) THEMING is its own layer: colours, fonts and spaces of the model go to `theme/` as tokens (ADR 0074), never into `layout/`; a second theme must work without a change in `layout/`.
 #   (5) The host binary is the PUBLISHED one (release asset of FreeSynergy-Net/fs-starter at the tag `host_version`, checksum checked when the release has one), never a locally built or cached binary (CLAUDE.md section 4, hard limit 1).
 #   (6) The description holds only data: a file with code (`*.rs`, `Cargo.toml`, `*.py`, `*.sh`) in `beschreibung` is a FINDING (review template `frontend-nur-komponenten`).
-#   (7) Pictures first and the user's verdict: `picture-acceptance` is called with the pictures; only `accepted == true` ends the flow green; the user's words go back as the order. Pictures count only with a green theme guard (`waechter.red == false`).
+#   (7) Pictures first, NO verdict of the user per picture: the step `bild-nebeneinander` makes ONE SHEET per program (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`; the user looks at the sheets bundled whenever he wants. `picture-acceptance` stays for later (with the binding) and is NOT part of this flow. Until then Haiku compares itself (step `vergleich`) and lists the deviations honestly (`fehlt` / `anders` / `gleich`). Pictures count only with a green theme guard (`waechter.red == false`).
 #   (8) Size of the steps (for Haiku): ONE step does ONE thing and names `Input:` and `Output:` in its summary; a red check jumps back at most twice, the third red round goes to `eskalation`; a missing result goes to `eskalation`, never on.
 #   (9) Agents never push to main, tag or merge; output only on `unreviewed/frontend-<programm>`; no force push; identity `FreeSynergy <support@freesynergy.net>` only; tests only through `bash .scratch/build-slot.sh` (`--status` first).
 #   (10) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (`set -e` closes the user's shell on the first error; `set -u` and `pipefail` do not close it, but they stay switched ON in the user's shell and change every later command and prompt script). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
@@ -174,7 +175,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.layout-schreiben
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 3. Write the LAYOUT part of the fs-forms description (data files in `beschreibung/layout/`; take an existing description of the same host as the pattern, do not invent a format). Input: `anordnung.bilder[].baum`, `auftrag` (input, empty in the first round; in a repeat the run state hands the user's words `verdict.words` of the last verdict in as `auftrag`). Output `layout` = { dateien: [paths], head (full SHA of the local commit on `unreviewed/frontend-<programm>`), vorlaeufig: [components that stand in], offen: [areas left out] }. Contents: which component where, nesting, bars, columns, gaps; placeholder values only so that something can be seen. NOTHING else (rule 2): no data source, no command, no right, no example source, no logic, no colour or font value. The BINDING part is NOT written (`bindung/` stays empty). Local commit, no push, no tag."
+        freesynergy.net:summary: "Step 3. Write the LAYOUT part of the fs-forms description (data files in `beschreibung/layout/`; take an existing description of the same host as the pattern, do not invent a format). Input: `anordnung.bilder[].baum`, `auftrag` (input, empty in the first round; in a repeat the run state hands the stderr of the red check or the lines `fehlt`/`anders` of `vergleich` in as `auftrag`). Output `layout` = { dateien: [paths], head (full SHA of the local commit on `unreviewed/frontend-<programm>`), vorlaeufig: [components that stand in], offen: [areas left out] }. Contents: which component where, nesting, bars, columns, gaps; placeholder values only so that something can be seen. NOTHING else (rule 2): no data source, no command, no right, no example source, no logic, no colour or font value. The BINDING part is NOT written (`bindung/` stays empty). Local commit, no push, no tag."
   - theme-schreiben:
       call: theme-schreiben-ai:0.0.18@fs
       with:
@@ -245,7 +246,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Fetch the PUBLISHED host binary (rule 5). Input: `host_version`, `workdir`. Command: `gh release download <host_version> --repo FreeSynergy-Net/fs-starter --pattern 'fs-starter-*' --dir <workdir>/host` and, when the release carries a checksum file, `sha256sum --check` on it (rc kept, output not cut). Output `host` = { pfad, tag, sha256, geprueft (bool: false = the release has no checksum, said in the report), red }. No release at that tag = red (never a locally built binary). `fs-starter --version` must print the tag."
+        freesynergy.net:summary: "Fetch the PUBLISHED host binary (rule 5). Gap L7: `gh release download` is no command of our programs; allowed for now (CI-built binary, never locally built), the command of the Packages module is missing (card, target lane C1). Input: `host_version`, `workdir`. Command: `gh release download <host_version> --repo FreeSynergy-Net/fs-starter --pattern 'fs-starter-*' --dir <workdir>/host` and, when the release carries a checksum file, `sha256sum --check` on it (rc kept, output not cut). Output `host` = { pfad, tag, sha256, geprueft (bool: false = the release has no checksum, said in the report), red }. No release at that tag = red (never a locally built binary). `fs-starter --version` must print the tag."
   - host-weiche:
       switch:
         - red:
@@ -306,7 +307,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put it next to the model. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The pair model | ours is made by `picture-acceptance` (gap L3). Output `bilder` = { dateien: [paths], rc, red }. Red = rc != 0 or a file that is missing or empty."
+        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put ONE SHEET per program next to the model (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The sheet (pair model | ours, views below each other) is made by the step itself (gap L3: `fs-capture pair`); no verdict of the user per picture. Output `bilder` = { dateien: [paths], rc, red }. Red = rc != 0 or a file that is missing or empty."
   - bild-waechter:
       call: theme-waechter-check:0.0.18@fs
       with:
@@ -318,7 +319,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "SPECIFICATION, NOT RUNNABLE (no script yet; same step as in `frontend-round`). Theme guard of the pictures (rule [THEME-WAECHTER] in testlauf): the result `waechter` goes to the picture acceptance; pictures without a green guard (`red == false`) do not count as evidence there."
+        freesynergy.net:summary: "SPECIFICATION, NOT RUNNABLE (no script yet; same step as in `frontend-round`). Theme guard of the pictures (rule [THEME-WAECHTER] in testlauf): the result `waechter` goes to the comparison (`vergleich`); pictures without a green guard (`red == false`) do not count as evidence there."
   - bild-again:
       switch:
         - runden:
@@ -329,7 +330,7 @@ do:
             then: layout-schreiben
         - green:
             when: '${ $context.bilder.red == false }'
-            then: abnahme
+            then: vergleich
         - ohne-ergebnis:
             then: eskalation
       metadata:
@@ -337,45 +338,22 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - a picture that was not drawn goes back to `layout-schreiben` (at most two repeats), the third red round goes to `eskalation`; only drawn pictures go to the acceptance; a missing result goes to `eskalation`."
-  - abnahme:
-      run:
-        workflow:
-          namespace: freesynergy.net
-          name: picture-acceptance
-          version: 0.0.18
-        input:
-          dossier: ${ .input.dossier }
-          model: ${ .input.model }
-          ours: ${ $context.bilder }
-          waechter: ${ $context.waechter }
+        freesynergy.net:summary: "Control flow - a picture that was not drawn goes back to `layout-schreiben` (at most two repeats), the third red round goes to `eskalation`; only drawn pictures go to the comparison (`vergleich`); a missing result goes to `eskalation`."
+  - vergleich:
+      call: vergleich-ai:0.0.18@fs
+      with:
+        bilder: ${ $context.bilder }
+        model: ${ .input.model }
+        waechter: ${ $context.waechter }
       export:
-        as: '${ $context + { verdict: . } }'
+        as: '${ $context + { vergleich: . } }'
       metadata:
-        freesynergy.net:actor: human
-        freesynergy.net:actor-type: Person
-        freesynergy.net:gate: human
-        freesynergy.net:kind: subjective
-        freesynergy.net:summary: "The user's verdict on the pictures (`picture-acceptance.yaml`: model | ours, strategy opinion, then the user) is taken as it is; nobody argues it down. The pictures show LAYOUT with placeholder values (rule 2); nobody judges data or function here. Output `verdict` = { accepted, words }."
-  - abnahme-weiche:
-      switch:
-        - accepted:
-            when: '${ $context.verdict.accepted == true }'
-            then: fehlende-components-melden
-        - not-accepted:
-            when: '${ $context.verdict.accepted == false and (($context.verdict.runde // 0) < 3) }'
-            then: layout-schreiben
-        - runden:
-            when: '${ $context.verdict.accepted == false }'
-            then: eskalation
-        - no-verdict:
-            then: eskalation
-      metadata:
-        freesynergy.net:actor: machine
+        freesynergy.net:actor: ai
         freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.vergleich
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - only `accepted == true` goes on (to `fehlende-components-melden`); `accepted == false` goes back to `layout-schreiben` with the user's words as the order (`verdict.words`; at most two repeats); anything else (no verdict, e.g. picture-acceptance ended in `dossier-menue-fehlt` or `menue-bild-fehlt`) goes to `eskalation`."
+        freesynergy.net:summary: "Haiku compares itself - NO verdict of the user per picture (`picture-acceptance` is for later, with the binding, and is not called here). Input: the sheets `bilder` (one per program under `bilder/layout/<programm>/`), the model pictures `model`. Per view of the sheet one line `fehlt | anders | gleich` with what exactly (area, component), honest and not softened; a view without a model picture is `fehlt` (model), never `gleich`. Output `vergleich` = { blaetter: [paths], zeilen: [ { ansicht, urteil: fehlt | anders | gleich, was } ] }. The user looks at the sheets bundled whenever he wants. Every `fehlt` or `anders` that comes from a missing component is input of `fehlende-components-melden`."
   - fehlende-components-melden:
       call: components-melden-ai:0.0.18@fs
       with:
@@ -389,7 +367,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.fehlende-components-melden
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 6. Every component that the model shows and that is missing here, or that cannot do what the model shows, is a card WITH a picture crop to lane C (the user wants the components COMPLETE; this list steers the order in lane C). Input: `anordnung` (components with `unbekannt` or `vorlaeufig`), `layout.vorlaeufig`, `layout.offen`, the blocks of fs-components (gap L2). Output `fehlende` = { karten: [ { bahn: C | F, component, was_fehlt_oder_kann_nicht, bild (path of the model picture), ausschnitt (x y w h of the crop), wo_im_vorbild } ], zeilen: [the new `[ ]` lines] }. The crop is named (gap L3: `fs-capture crop`); until it exists the card names picture and area. In `FEATURES-OFFEN.md` ONLY new `[ ]` lines in the fitting section and only if the same card is not there yet (existing first), never a new `[x]` line; a missing FORM goes to lane F (workflow `form-neu`). Where a step of this run would only work by a script: the card \"Befehl fehlt in Modul X: <command> (<what for>)\" (gaps L1 to L6 of the header that were really met), each once. In the worktree the lines go to `_bericht/FEATURES.md` (quote the existing line), the coordinator ticks."
+        freesynergy.net:summary: "Step 6. Every component that the model shows and that is missing here, or that cannot do what the model shows, is a card WITH a picture crop to lane C (the user wants the components COMPLETE; this list steers the order in lane C). Input: `anordnung` (components with `unbekannt` or `vorlaeufig`), `layout.vorlaeufig`, `layout.offen`, the blocks of fs-components (gap L2). Output `fehlende` = { karten: [ { bahn: C | F, component, was_fehlt_oder_kann_nicht, bild (path of the model picture), ausschnitt (x y w h of the crop), wo_im_vorbild } ], zeilen: [the new `[ ]` lines] }. The crop is named (gap L3: `fs-capture crop`); until it exists the card names picture and area. In `FEATURES-OFFEN.md` ONLY new `[ ]` lines in the fitting section and only if the same card is not there yet (existing first), never a new `[x]` line; a missing FORM goes to lane F (workflow `form-neu`). Where a step of this run would only work by a script: the card \"Befehl fehlt in Modul X: <command> (<what for>)\" ((gaps L1 to L7 of the header that were really met, each with its target lane)), each once. In the worktree the lines go to `_bericht/FEATURES.md` (quote the existing line), the coordinator ticks."
   - bericht:
       call: report-write:0.0.18@fs
       with:
@@ -401,7 +379,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.bericht
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Report: full SHAs, the host tag and checksum state, the pictures (paths, `layout-nur`), the verdict, the cards (components with crops, `Befehl fehlt in Modul X`), CI run ids per repo (ALL workflows of the target repo at the exact head, incl. Windows; id, conclusion, headSha, read with `gh` at the exact head), the areas left out. The checklist `FEATURES-OFFEN.md`: the EXISTING lines are ticked (`[ ]` to `[x]` + date), a new line only for something really new. Copy blocks in the report follow rule 10."
+        freesynergy.net:summary: "Report: full SHAs, the host tag and checksum state, the sheets (paths, `layout-nur`), the comparison (`fehlt`/`anders`/`gleich`), the cards (components with crops, `Befehl fehlt in Modul X`), CI run ids per repo (ALL workflows of the target repo at the exact head, incl. Windows; id, conclusion, headSha, read with `gh` at the exact head), the areas left out. The checklist `FEATURES-OFFEN.md`: the EXISTING lines are ticked (`[ ]` to `[x]` + date), a new line only for something really new. Copy blocks in the report follow rule 10."
   - abbruch:
       set:
         todo: abbruch
@@ -421,4 +399,4 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "A check was red for the third time, a model picture is still missing, no published host exists, the user did not accept three times, or a result is missing: the loop stops and the person decides. The report names the step and the last red result."
+        freesynergy.net:summary: "A check was red for the third time, a model picture is still missing, no published host exists, or a result is missing: the loop stops and the person decides. The report names the step and the last red result."
