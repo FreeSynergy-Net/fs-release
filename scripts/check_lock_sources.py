@@ -22,7 +22,9 @@ CONFIG = Path(__file__).resolve().parent / "lock-sources.toml"
 DEP = re.compile(r"^(\S+)(?: (\S+))?(?: \((.*)\))?$")
 
 def norm(url: str) -> str:
-    return re.sub(r"(\.git)?/*$", "", url.strip().lower())
+    """lower case, no `.git`, no trailing slash; the old GitHub org name (github.com/FreeSynergy/, GitHub redirects it) counts as FreeSynergy-Net."""
+    u = re.sub(r"(\.git)?/*$", "", url.strip().lower())
+    return re.sub(r"^(https?://github\.com)/freesynergy/", r"\1/freesynergy-net/", u)
 
 def repo_of(source: str) -> str:
     """git+https://host/org/repo.git?tag=x#sha -> https://host/org/repo; registry+URL and sparse+URL -> the index URL (also normalised);

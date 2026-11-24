@@ -67,7 +67,9 @@ sed 's#registry+https://github.com/FreeSynergy-Net/fs-crates#sparse+https://gith
 expect "a sparse+ source of the same index URL is normalised too" 0 --only-from "$tmp/case.lock"
 sed 's#registry+https://github.com/FreeSynergy-Net/fs-crates#registry+https://github.com/FreeSynergy-Net/other-crates#' "$fx/green-registry.lock" > "$tmp/case.lock"
 expect "a registry of another index URL is red with the V1+ switch" 1 --only-from "$tmp/case.lock"
-expect "V1+: fs-types from the OLD org name FreeSynergy/ is red" 1 --only-from "$fx/red-old-org.lock"
+expect "V1+: fs-types from the OLD org name FreeSynergy/ (redirect) is the same source, green" 0 --only-from "$fx/red-old-org.lock"
+sed 's#github.com/FreeSynergy/#github.com/FreeSynergyX/#' "$fx/red-old-org.lock" > "$tmp/case.lock"
+expect "V1+: a look-alike org FreeSynergyX/ is red" 1 --only-from "$tmp/case.lock"
 expect "V1+: fs-types from a foreign org is red" 1 --only-from "$fx/red-foreign-org.lock"
 expect "V1+: fs-types from the registry of FreeSynergy-Net/ is green" 0 --only-from "$fx/green-registry.lock"
 expect "stdin" 1 - < "$fx/red-two-sources.lock"
@@ -83,6 +85,9 @@ mkdir -p "$tmp/empty"; expect "repo root without a lock is green" 0 "$tmp/empty"
 printf 'libraries = []\nonly_from_enabled = false\n' > "$tmp/mut.toml"
 r=$(rc_of --config "$tmp/mut.toml" "$fx/red-two-sources.lock")
 if [ "$r" = 0 ]; then ok "mutant (check switched off) passes the red lock, so the red test above is real"; else bad "mutant must pass the red lock, rc=$r"; fi
+# mutant: norm without the org alias -> the old org name is red again, so the alias test above is real
+sed 's#^    return re.sub(r"^(https.*#    return u#' "$tool" > "$tmp/mut_tool.py"
+python3 -I "$tmp/mut_tool.py" --config "$here/lock-sources.toml" --only-from "$fx/red-old-org.lock" >/dev/null 2>&1 && bad "mutant (no org alias) must be red on the old org name" || ok "mutant (no org alias) is red on the old org name, so the alias test is real"
 # mutant: repo_of without the registry normalisation (the old code) -> the normalisation test above would be red
 sed 's#for kind in ("git+", "registry+", "sparse+"):#for kind in ("git+",):#' "$tool" > "$tmp/mut_tool.py"
 sed 's#registry+https://github.com/FreeSynergy-Net/fs-crates#registry+HTTPS://GitHub.com/FreeSynergy-Net/FS-Crates.git/#' "$fx/green-registry.lock" > "$tmp/case.lock"
