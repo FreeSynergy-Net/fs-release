@@ -1,7 +1,7 @@
 //! The packer: sources in, a folder of files out.
 //!
 //! Pattern: Builder (the check, the manifest, then per language catalog and date blob; the result is a plain map of path -> bytes, written in one go).
-//! Layout of the output: `manifest.mf2m`, `<locale>.<hash>.mf2b` per language, `dates/<locale>/icu.blob` per language. The manifest is built from ALL
+//! Layout of the output: `manifest.mf2m`, `<locale>.<hash>.mf2b` per language, `dates/<locale>/icu.table` per language. The manifest is built from ALL
 //! sources, so it is the same whichever languages are asked for (a language package never changes the manifest of another).
 
 use std::collections::BTreeMap;
@@ -45,7 +45,7 @@ pub fn pack(sources: &[Source], wanted: &[String]) -> Result<Packed, PackError> 
     {
         let bytes = catalog::write(l, &manifest)?;
         files.insert(catalog::file_name(&l.tag, &bytes), bytes);
-        files.insert(dates::path(&l.tag), dates::blob(&l.tag)?);
+        files.insert(dates::path(&l.tag), dates::table(&l.tag)?);
     }
     Ok(Packed { files })
 }

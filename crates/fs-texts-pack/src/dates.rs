@@ -9,18 +9,20 @@ use mf2_locale_data::icu_blob::{icu_blob, DateNeeds, IcuBlobSpec};
 
 use crate::error::PackError;
 
-/// The `icu.blob` of `tag`.
-pub(crate) fn blob(tag: &str) -> Result<Vec<u8>, PackError> {
+/// The server-data table of `tag` (`Catalog::with_server_data` takes it as it is): the LOCALE layout of `mf2-catalog` with the one `icu.blob` entry (key 48).
+/// Written instead of the raw blob so that the loader needs no `writer` feature.
+pub(crate) fn table(tag: &str) -> Result<Vec<u8>, PackError> {
     let spec = IcuBlobSpec::new(false, false, DateNeeds::all());
     let bytes =
         icu_blob(tag, &spec).map_err(|e| PackError::Library(format!("{tag}: date data: {e:?}")))?;
     if bytes.is_empty() {
         return Err(PackError::Library(format!("{tag}: date data: empty blob")));
     }
-    Ok(bytes)
+    mf2_catalog::writer::server_table(&[(mf2_catalog::format::locale_key::ICU_BLOB, bytes)])
+        .map_err(|e| PackError::Library(format!("{tag}: date table: {e:?}")))
 }
 
-/// Where the blob of `tag` lies below the output folder.
+/// Where the table of `tag` lies below the output folder.
 pub(crate) fn path(tag: &str) -> String {
-    format!("dates/{tag}/icu.blob")
+    format!("dates/{tag}/icu.table")
 }

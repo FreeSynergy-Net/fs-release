@@ -112,28 +112,46 @@ fn the_catalog_loads_and_a_message_resolves() {
     }
 }
 
+fn leaked(bytes: Vec<u8>) -> &'static [u8] {
+    // `with_server_data` takes `'static` data: leaked once per loaded language, as the loader of fs-components-mf2 does.
+    Box::leak(bytes.into_boxed_slice())
+}
+
 #[test]
-fn the_date_blob_loads_and_de_formats_a_date() {
+fn the_date_table_loads_and_de_formats_a_date() {
     let files = fs_texts_pack::pack(&support::data(), &[]).unwrap().files;
-    let manifest = Manifest::read(&bytes(&files, "manifest.mf2m")).unwrap();
-    let blob = bytes(&files, "dates/de/");
     assert!(
-        (1000..4000).contains(&blob.len()),
-        "about 1.4 KB, was {}",
-        blob.len()
+        !files.keys().any(|n| n.ends_with("icu.blob")),
+        "no raw blob beside the table"
     );
-    icu_provider_blob::BlobDataProvider::try_new_from_blob(Box::from(&blob[..]))
-        .expect("BlobDataProvider");
+    let manifest = Manifest::read(&bytes(&files, "manifest.mf2m")).unwrap();
+    let table = bytes(&files, "dates/de/icu.table");
+    assert!(
+        (1000..4000).contains(&table.len()),
+        "about 1.4 KB, was {}",
+        table.len()
+    );
     let de = Catalog::new(bytes(&files, "de."), manifest.hash()).unwrap();
-    // `with_server_data` takes `'static` data: the blob is leaked once, as the loader of fs-components-mf2 will do per loaded language.
-    let de = de
-        .with_server_data(Box::leak(blob_as_locale_table(&blob).into_boxed_slice()))
-        .expect("server data");
+    let de = de.with_server_data(leaked(table)).expect("server data");
+    // The blob inside the table loads with the ICU4X provider.
+    let blob = de
+        .locale_entry(mf2_catalog::format::locale_key::ICU_BLOB)
+        .expect("icu.blob entry");
+    icu_provider_blob::BlobDataProvider::try_new_from_blob(Box::from(blob))
+        .expect("BlobDataProvider");
     assert_eq!(say(&de, &manifest, "when", &[]), "26.11.2026, 12:05");
 }
 
-/// The server-data table of `mf2-catalog` (LOCALE section layout) with the one `icu.blob` entry (key 48).
-fn blob_as_locale_table(blob: &[u8]) -> Vec<u8> {
-    mf2_catalog::writer::server_table(&[(mf2_catalog::format::locale_key::ICU_BLOB, blob.to_vec())])
-        .expect("table")
+#[test]
+fn a_broken_table_is_an_error_not_a_panic() {
+    let files = fs_texts_pack::pack(&support::data(), &[]).unwrap().files;
+    let manifest = Manifest::read(&bytes(&files, "manifest.mf2m")).unwrap();
+    let de = Catalog::new(bytes(&files, "de."), manifest.hash()).unwrap();
+    assert!(de
+        .with_server_data(leaked(b"this is not a table".to_vec()))
+        .is_err());
+    let mut cut = bytes(&files, "dates/de/icu.table");
+    cut.truncate(cut.len() / 2);
+    let de = Catalog::new(bytes(&files, "de."), manifest.hash()).unwrap();
+    assert!(de.with_server_data(leaked(cut)).is_err());
 }

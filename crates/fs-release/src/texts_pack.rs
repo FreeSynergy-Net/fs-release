@@ -14,7 +14,7 @@ pub struct TextsPackArgs {
     /// Folder with the sources `<language>.mf2` of one program (stay in the repo, they are the source of truth).
     #[arg(long)]
     quellen: PathBuf,
-    /// Output folder: `manifest.mf2m`, `<locale>.<hash>.mf2b` and `dates/<locale>/icu.blob`.
+    /// Output folder: `manifest.mf2m`, `<locale>.<hash>.mf2b` and `dates/<locale>/icu.table`.
     #[arg(long)]
     ausgabe: PathBuf,
     /// Only these languages are written (`de,en`); the check always covers all sources. Default: all.
