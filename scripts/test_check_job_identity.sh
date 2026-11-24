@@ -72,7 +72,7 @@ if [ -z "${TEST_ACTION:-}" ]; then
   }
   mut "identity missing in needs of check" check '/^    needs: identity$/d'
   mut "setup-rust step in the identity job" check "s|^      - name: Identity.*|      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@x\n&|"
-  mut "a caller input (apt-packages) in the identity job" check '0,/^    runs-on: \${{ inputs.runs-on }}$/{n;s/^    steps:$/    env: { X: "${{ inputs.apt-packages }}" }\n    steps:/}'
+  mut "a caller input (apt-packages) in the identity job" check '/^  identity:$/,/^    steps:$/s/^    steps:$/    env: { X: "${{ inputs.apt-packages }}" }\n    steps:/'
   mut "PR head commit not taken" check 's/ref: \${{ github.event.pull_request.head.sha || github.sha }}/ref: ${{ github.sha }}/'
   mut "identity block weakened" check 's/\$2 != ok || \$3 != ok/$2 != ok/'
   mut "RUSTUP_TOOLCHAIN removed from setup-rust" act 's/RUSTUP_TOOLCHAIN=/XX_TOOLCHAIN=/'
