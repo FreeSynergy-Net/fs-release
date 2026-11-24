@@ -14,7 +14,11 @@ fn flow_is_sound(text: &str) -> bool {
         "bilder-weiche",
         "dossier",
         "anordnung-lesen",
+        "menue-baum",
+        "menue-baum-weiche",
         "layout-schreiben",
+        "menue-vollstaendig",
+        "menue-vollstaendig-again",
         "theme-schreiben",
         "frontend-nur-komponenten",
         "frontend-nur-komponenten-weiche",
@@ -49,6 +53,25 @@ fn flow_is_sound(text: &str) -> bool {
         && step_body(text, "layout-schreiben").contains("forms/<ansicht>.toml")
         && step_body(text, "layout-schreiben").contains("no data source, no command, no right")
         && step_body(text, "layout-schreiben").contains("never a fake source")
+        && step_body(text, "menue-baum").contains("[MENUES-IMMER-MIT]")
+        && step_body(text, "menue-baum").contains("menus.md")
+        && step_body(text, "menue-baum").contains("NO command, NO right, NO colour")
+        && step_body(text, "menue-baum-weiche").contains("then: eskalation")
+        && step_body(text, "menue-baum-weiche").contains("then: layout-schreiben")
+        && step_body(text, "layout-schreiben").contains("$context.menuepruef.auftrag")
+        && step_body(text, "layout-schreiben").contains("menue: ${ $context.menue }")
+        && step_body(text, "menue-vollstaendig").contains("Menübaum des Vorbilds vollständig übernommen")
+        && step_body(text, "menue-vollstaendig").contains("LOCKED entries included")
+        && step_body(text, "menue-vollstaendig").contains("fehlt")
+        && step_body(text, "menue-vollstaendig").contains(".menue-vollstaendig-runde")
+        && step_body(text, "menue-vollstaendig-again").contains(
+            "runden:\n            when: '${ $context.menuepruef.red == true and ($context.menuepruef.runde // 0) >= 3 }'\n            then: eskalation",
+        )
+        && step_body(text, "menue-vollstaendig-again").contains(
+            "red:\n            when: '${ $context.menuepruef.red == true }'\n            then: layout-schreiben",
+        )
+        && step_body(text, "menue-vollstaendig-again").contains("ohne-ergebnis:\n            then: eskalation")
+        && text.contains("(13) [MENUES-IMMER-MIT]")
         && step_body(text, "theme-schreiben").contains("style layer of ADR 0074")
         && step_body(text, "theme-schreiben").contains("WITHOUT touching `forms/*.toml`")
         && step_body(text, "frontend-nur-komponenten").contains("gate: opus-ja")
@@ -94,6 +117,32 @@ fn flow_is_sound(text: &str) -> bool {
         && step_body(text, "pruefbefehl-again").contains("then: fremdbilder-pruefen")
         && !step_body(text, "host-weiche").contains("then: bericht")
         && !step_body(text, "pruefbefehl-again").contains("then: bericht")
+}
+
+/// [MENUES-IMMER-MIT] mutants: each one must make `flow_is_sound` red (a panic counts as red too).
+#[test]
+fn menue_mutants_are_all_red() {
+    let base = read("frontend-beschreiben");
+    assert!(flow_is_sound(&base));
+    let red = |t: &str| !std::panic::catch_unwind(|| flow_is_sound(t)).unwrap_or(false);
+    let mutants = [
+        // Schritt fehlt: the check step is renamed away
+        base.replacen("  - menue-vollstaendig:\n", "  - menue-pruefung-x:\n", 1),
+        // Prüfung fehlt: the switch of the check is gone
+        base.replacen("  - menue-vollstaendig-again:\n", "  - menue-switch-x:\n", 1),
+        // Rücksprung > 2: the loop limit is raised
+        base.replacen("$context.menuepruef.runde // 0) >= 3", "$context.menuepruef.runde // 0) >= 9", 1),
+        // Eskalation fehlt: the third red round no longer goes to eskalation
+        base.replacen(
+            "($context.menuepruef.runde // 0) >= 3 }'\n            then: eskalation",
+            "($context.menuepruef.runde // 0) >= 3 }'\n            then: layout-schreiben",
+            1,
+        ),
+    ];
+    for (i, m) in mutants.iter().enumerate() {
+        assert_ne!(m, &base, "mutant {i} changed nothing");
+        assert!(red(m.as_str()), "mutant {i} is not red");
+    }
 }
 
 #[test]
