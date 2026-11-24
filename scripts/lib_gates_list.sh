@@ -114,3 +114,32 @@ gates_beleg() {
   case "$diff" in *toolchain:*) gates_clippy_probe "$root" ;; esac
   echo "gates-beleg: green here is NOT proof of a green CI; the report names what did not run here and the CI run id of the branch CI at the head"
 }
+
+# gates_land_steps: the extra test runs of the LANDING head (push on main, set by check.yml): after quick and security, the profiles of FS_GATES_LAND_PROFILES (picture platform)
+# once each, as steps of their own (`test-<profile>`: own rc, own `gate ...: rc=` line, red = gate red, --no-fail-fast, no retries), only for the crates changed since FS_GATES_LAND_BASE (the head of main BEFORE
+# the push = github.event.before) and their dependants (scripts/affected_crates.py, the same selection as on branches). A profile the caller does not define is skipped with a line (test-gate.sh --only-profile).
+# No usable base (empty, all zeros = new branch, not 40 hex digits, git error, global file, every crate affected) = the whole workspace, said in the log; no changed file at all = skipped with a line.
+# `time` stays out on purpose (minutes): tag / nightly `release` only.
+gates_land_steps() {
+  local d profiles="${FS_GATES_LAND_PROFILES:-}" base="${FS_GATES_LAND_BASE:-}" p out rc=0 sel=(--workspace) n
+  [ -n "$profiles" ] || return 0
+  d="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  for p in $profiles; do
+    [[ "$p" =~ ^[a-z][a-z0-9_-]{0,31}$ ]] || { echo "gates FAILED: FS_GATES_LAND_PROFILES: bad profile name '${p:0:40}'" >&2; exit 2; }
+  done
+  if [[ "$base" =~ ^[0-9a-f]{40}$ ]] && ! [[ "$base" =~ ^0+$ ]]; then
+    out="$(python3 -I "$d/affected_crates.py" "$root" "$base" --empty-none)" || rc=$?
+    if [ "$rc" = 0 ] && [[ "$out" == "PACKAGES "* ]]; then
+      read -ra n <<<"${out#PACKAGES }"; sel=()
+      for p in "${n[@]}"; do sel+=(-p "$p"); done
+      echo "gates: landing-head test runs ($profiles) NARROWED to the crates changed since $base and their dependants: ${n[*]}"
+    elif [ "$rc" = 0 ] && [[ "$out" == "NONE "* ]]; then
+      echo "gates: landing-head test runs ($profiles) SKIPPED: ${out#NONE }"; return 0
+    else
+      echo "gates: landing-head test runs ($profiles) on the WHOLE workspace (${out:-affected_crates.py rc=$rc})"
+    fi
+  else
+    echo "gates: landing-head test runs ($profiles) on the WHOLE workspace (no usable base commit: '${base:0:12}')"
+  fi
+  for p in $profiles; do step "test-$p" error bash "$d/test-gate.sh" --only-profile "$p" "${sel[@]}" --all-features --locked; done
+}

@@ -4,6 +4,8 @@
     python3 -I scripts/affected_crates.py <cargo workspace dir> <base rev>       files = `git diff --name-only --no-renames <base>...HEAD`
     python3 -I scripts/affected_crates.py <cargo workspace dir> --files <file>   files = the lines of <file> (paths relative to the git top level; for tests)
 
+    ... --empty-none     (last argument) no changed file at all prints `NONE <reason>` instead of `FULL` (the landing-head runs of scripts/lib_gates_land.sh skip then)
+
 Prints ONE line on stdout: `PACKAGES a b c` (the crates that own a changed file plus every workspace crate that depends on one of them, dev-dependencies
 included, transitively), or `FULL <reason>` (test the whole workspace). Exit 0 for both. Any error (no such rev, cargo metadata fails, odd name) is
 `FULL`-worthy: it exits 2 and the caller (scripts/gates.sh) then tests the whole workspace. The rule is conservative: a changed file that no crate owns
@@ -42,10 +44,17 @@ def main():
     if len(sys.argv) < 3:
         print(__doc__)
         return 2
+    args = sys.argv[2:]
+    empty_none = args[-1] == "--empty-none"
+    if empty_none:
+        args = args[:-1]
     root = os.path.realpath(sys.argv[1])
-    files = changed_files(root, sys.argv[2:])
+    files = changed_files(root, args)
     if files is None:
         print("FULL a changed file lies outside the workspace directory")
+        return 0
+    if not files and empty_none:
+        print("NONE no changed file against the base")
         return 0
     if not files:
         print("FULL no changed file against the base (nothing to narrow)")

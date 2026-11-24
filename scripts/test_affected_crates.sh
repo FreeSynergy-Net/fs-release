@@ -111,6 +111,42 @@ gate_cases() { # <script>; counts failures in cases_fail when QUIET
 }
 gate_cases "$GK/scripts/gates.sh"
 
+# the landing head (push on main): FS_GATES_LAND_PROFILES / FS_GATES_LAND_BASE run picture and platform as steps of their own, only for the crates changed since the base (and their dependants)
+land_run() { # <base> [profiles]: output in $GK/out, cargo words in $GK/cargo.log; the rc is returned
+  : >"$GK/cargo.log"
+  PATH="$GK/bin:$PATH" CI=true TMPDIR="$tmp" FS_GATES_FEHLERLISTE_DIR="$tmp" FS_GATES_LAND_BASE="$1" FS_GATES_LAND_PROFILES="${2-picture platform}" bash "$GK/scripts/gates.sh" "$W" >"$GK/out" 2>&1
+}
+land_cases() {
+  local rc=0 why="" head3 headnow
+  head3="$(git -C "$W" rev-parse HEAD~3)"; headnow="$(git -C "$W" rev-parse HEAD)"
+  mkdir -p "$W/.config"; printf '[profile.picture]\nfail-fast = true\n\n[profile.platform]\nfail-fast = true\n' >"$W/.config/nextest.toml"
+  land_run "$head3" || rc=$?
+  [ "$rc" = 0 ] || why="$why; rc $rc"
+  for p in picture platform; do
+    grep -qE "^cargo nextest run --color never --profile $p .*--no-fail-fast -p app -p mid --all-features --locked$" "$GK/cargo.log" || why="$why; $p: narrowed run missing"
+    grep -q "^gate test-$p: rc=0" "$GK/out" || why="$why; $p: no own rc line"
+  done
+  grep -q 'landing-head test runs (picture platform) NARROWED' "$GK/out" || why="$why; narrowing not said"
+  land_run "$headnow" || true
+  ! grep -q -- '--profile picture' "$GK/cargo.log" || why="$why; no change: still ran"
+  grep -q 'SKIPPED: no changed file' "$GK/out" || why="$why; no change: skip not said"
+  land_run "" || true
+  grep -qE '^cargo nextest run --color never --profile picture .*--no-fail-fast --workspace --all-features --locked$' "$GK/cargo.log" || why="$why; no base: whole workspace missing"
+  land_run "0000000000000000000000000000000000000000" || true
+  grep -q 'WHOLE workspace (no usable base' "$GK/out" || why="$why; zero base not said"
+  land_run "1111111111111111111111111111111111111111" || true
+  grep -q 'landing-head test runs (picture platform) on the WHOLE workspace' "$GK/out" || why="$why; unknown commit: fallback not said"
+  land_run "$head3" "platform;id" || rc=$?
+  [ "$rc" = 2 ] || why="$why; bad profile name not refused (rc $rc)"
+  rm -f "$W/.config/nextest.toml"
+  land_run "$head3" || true
+  grep -q 'profile picture not defined here.*run skipped' "$GK/out" && ! grep -q -- '--profile picture' "$GK/cargo.log" || why="$why; undefined profile not skipped"
+  rmdir "$W/.config"
+  if [ -n "$why" ]; then if [ -n "${QUIET:-}" ]; then cases_fail=$((cases_fail + 1)); else bad "landing head runs: ${why#; }"; sed 's/^/     /' "$GK/out"; fi
+  elif [ -z "${QUIET:-}" ]; then ok "gates.sh landing head: picture and platform narrowed to the changed crates since the base, own rc lines; no change = skipped; no usable base = whole workspace; undefined profile skipped"; fi
+}
+land_cases
+
 # the wiring: only unreviewed/* branches get a diff base (never main, never a tag), `full: true` switches it off, the gates action hands it to gates.sh
 python3 -I - "$repo/.github/workflows/check.yml" "$repo/actions/gates/action.yml" <<'PY' && ok "check.yml: diff-base only on unreviewed/* and without full; the gates action sets FS_GATES_DIFF_BASE" || bad "check.yml / actions/gates wiring"
 import sys, yaml
@@ -123,12 +159,18 @@ expr = g["with"]["diff-base"]
 for need in ("!inputs.full", "startsWith(github.ref, 'refs/heads/unreviewed/')", "'origin/main'"):
     assert need in expr, need
 assert expr.rstrip().endswith("|| '' }}"), expr   # everything else: empty = the whole workspace
+lp, lb = g["with"]["land-profiles"], g["with"]["land-base"]   # landing head: only a push on main, base = the head of main before the push, `full` switches it to the whole workspace
+assert "refs/heads/main" in lp and "picture platform" in lp and "time" not in lp, lp
+for need in ("!inputs.full", "github.event_name == 'push'", "github.ref == 'refs/heads/main'", "github.event.before"):
+    assert need in lb, need
 f = [s for s in steps if s.get("name", "").startswith("Fetch main")][0]
 assert "!inputs.full" in f["if"] and "refs/heads/unreviewed/" in f["if"]
 assert steps.index(f) < steps.index(g)
 act = yaml.safe_load(open(sys.argv[2], encoding="utf-8"))
 assert act["inputs"]["diff-base"]["default"] == ""
-assert [s for s in act["runs"]["steps"] if "env" in s][0]["env"]["FS_GATES_DIFF_BASE"] == "${{ inputs.diff-base }}"
+e = [s for s in act["runs"]["steps"] if "env" in s][0]["env"]
+assert e["FS_GATES_DIFF_BASE"] == "${{ inputs.diff-base }}"
+assert e["FS_GATES_LAND_PROFILES"] == "${{ inputs.land-profiles }}" and e["FS_GATES_LAND_BASE"] == "${{ inputs.land-base }}"
 PY
 
 # mutants: each must fail a case

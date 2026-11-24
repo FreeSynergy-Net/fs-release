@@ -200,6 +200,8 @@ else
   if [ -n "${FS_GATES_ALSO_PROFILE:-}" ]; then thensel=(--then-profile "$FS_GATES_ALSO_PROFILE"); fi
   step test error bash "$here/test-gate.sh" ${thensel[@]+"${thensel[@]}"} ${profsel[@]+"${profsel[@]}"} "${testsel[@]}" --all-features --locked "${skip[@]}"
   step doctest error bash "$here/test-gate.sh" --doc "${testsel[@]}" --all-features --locked --no-fail-fast
+  # landing head (push on main; FS_GATES_LAND_PROFILES / FS_GATES_LAND_BASE from check.yml): picture and platform once more, for the changed crates and their dependants (own steps `test-<profile>`)
+  gates_land_steps
   step rust-rules rule python3 -I "$rules" "$root"
   # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
   step lock error bash "$here/gates-lock.sh" "$root"

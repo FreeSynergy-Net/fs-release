@@ -63,7 +63,7 @@ gates "$app/scripts/gates.sh" "$tmp/l1p" FS_GATES_PROFILE=quick; rc=$?
 chk "profile quick, not defined in the repo: green, visible line, no --profile flag" bash -c "[ $rc -eq 0 ] && grep -q 'profile quick not defined here' '$tmp/o.txt' && ! grep 'cargo nextest run' '$STUBLOG' | grep -q -- --profile"
 mkdir -p "$app/.config"; printf '[profile.quick]\nfail-fast = true\n' >"$app/.config/nextest.toml"
 gates "$app/scripts/gates.sh" "$tmp/l1q" FS_GATES_PROFILE=quick; rc=$?
-chk "profile quick, defined in the repo: nextest gets --profile quick, doc tests do not" bash -c "[ $rc -eq 0 ] && grep -q 'cargo nextest run --profile quick ' '$STUBLOG' && ! grep 'cargo test --doc' '$STUBLOG' | grep -q -- --profile"
+chk "profile quick, defined in the repo: nextest gets --profile quick, doc tests do not" bash -c "[ $rc -eq 0 ] && grep -q 'cargo nextest run --color never --profile quick ' '$STUBLOG' && ! grep 'cargo test --doc' '$STUBLOG' | grep -q -- --profile"
 gates "$app/scripts/gates.sh" "$tmp/l1r" "FS_GATES_PROFILE=quick;id"; rc=$?
 chk "profile with a shell character: refused, red, nothing run with it" bash -c "[ $rc -eq 1 ] && ! grep -q 'cargo nextest run' '$STUBLOG'"
 rm -rf "$app/.config"

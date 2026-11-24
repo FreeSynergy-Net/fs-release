@@ -4,6 +4,8 @@ inputs:
   working-directory: { description: "Cargo workspace root", default: "." }
   diff-base: { description: "Git revision to diff against (e.g. origin/main): the TEST gate then runs only the crates changed since it and their dependants (fmt, clippy, rules, lock, files stay full); empty = the whole workspace", default: "" }
   also-profile: { description: "second nextest profile run after the first when the caller defines it (check.yml sets security on main); skipped with a log line otherwise", default: "" }
+  land-profiles: { description: "space separated nextest profiles run once more AFTER the first (and also-profile) for the landing head, only for the crates changed since land-base and their dependants (check.yml sets `picture platform` on a push to main); a profile the caller does not define is skipped with a log line", default: "" }
+  land-base: { description: "commit before the push (github.event.before) the landing-head runs diff against; empty or all zeros = the whole workspace", default: "" }
   profile: { description: "nextest profile for the TEST gate (name from .config/nextest.toml of the caller, e.g. quick or release); empty = default profile. A profile the caller does not define is said in the log and the default profile runs", default: "" }
 runs:
   using: composite
@@ -18,4 +20,6 @@ runs:
         FS_GATES_DIFF_BASE: ${{ inputs.diff-base }}
         FS_GATES_PROFILE: ${{ inputs.profile }}
         FS_GATES_ALSO_PROFILE: ${{ inputs.also-profile }}
+        FS_GATES_LAND_PROFILES: ${{ inputs.land-profiles }}
+        FS_GATES_LAND_BASE: ${{ inputs.land-base }}
       run: '"$GITHUB_ACTION_PATH/../../scripts/gates.sh" "$PWD"'
