@@ -16,6 +16,8 @@ declare -A APPIMAGETOOL_SHA256=(
 name=$(plan_get name) version=$(plan_get version) formats=$(plan_get linux_formats)
 dist=$(dist_dir)
 in_workdir
+# Optional hook of the program repo: $workdir/packaging/prepare.sh fetches what the packages need from its one source (e.g. the icon from fs-icons).
+if [[ -x packaging/prepare.sh ]]; then group "prepare"; packaging/prepare.sh; endgroup; fi
 base="$name-$version-linux-$ARCH"
 read -ra bins <<<"$(plan_get binaries | tr ',' ' ')"
 groups=(); group_list   # one entry per cargo package: "<package>TAB<bin,bin>"
