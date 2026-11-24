@@ -77,6 +77,18 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Lock check (ADR 0092 rule 2, ADR 0093 rule 3), script `scripts/check_lock_sources.py` (also run by scripts/gates.sh through `scripts/gates-lock.sh`): in every Cargo.lock of the repo each of fs-types, fs-objects, fs-interfaces, fs-rpc, fs-jscalendar (list: scripts/lock-sources.toml) appears in exactly ONE source; two sources are an error that names both sources and the packages that pull them. Introduction: warning first, error later - switch `strict` (default false: a WARNING, the gate stays green; true in the repo's own `.fs-lock-sources.toml` once the repo is lifted to V1+, or env FS_LOCK_STRICT=1). V1+ addition, switch `only_from_enabled` (default OFF, env FS_LOCK_ONLY_FROM=1): fs-types only from the repo FreeSynergy-Net/fs-types."
+  - pins-und-release-commit:
+      call: repo-release-commit:0.0.18@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: release-flow.pins-und-release-commit
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Pins and release commit of ONE repo (own step; gap reported by two agents: for a single repo without a cascade, `pin-kaskade` is too big and `lift` only moves the version). In an own worktree of the repo, in this order: (1) pins in Cargo.toml and Cargo.lock lifted by cargo (never by hand) to the tags of the neighbour libraries, `uses:` lines of fs-release to the NEWEST chain (a pin is never lowered); (2) version in Cargo.toml and the entries of the own crates in Cargo.lock set to <version>; (3) CHANGELOG.md: the heading is exactly `## <version>` WITHOUT a date (the date, if wanted, goes into the text below it), because the CI probe (`actions/library-release/notes.py`, called by `plan` and `library-release`) matches the heading with the regex `^## (?:<name> )?<version>$` and a heading like `## 0.1.0 (2026-11-24)` is RED only at the tag; the section is not empty and an `## Unreleased` section does not stand in for it; (4) ONE release commit with these changes on the branch; no tag, no push (the later steps `tag` and `push` do that). Then `version-abgleich` checks the result."
   - version-abgleich:
       call: version-check:0.0.18@fs
       with:
@@ -87,7 +99,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Version comparison BEFORE the review request (specification, no script yet): the version in Cargo.toml, in the entries of the own crates in Cargo.lock and the first heading of CHANGELOG.md are the SAME and the tag is v<version> (lesson fs-people v0.0.11: a lock with the old version was only seen at the tag); the `uses:` lines of fs-release in release.yml, ci.yml and check.yml are pinned to the NEWEST chain, today v0.0.10 (a tag, or a full SHA of fs-release main that contains owner-neutral; `fs-release address aufrufer` checks it; lesson fs-packages with v0.0.9: the old chain lacks later fixes); a pin is never lowered. Red goes back to the lift or the author before any review; the same check runs again on the fresh clone in `ff-und-tag`."
+        freesynergy.net:summary: "Version comparison BEFORE the review request (specification, no script yet): the version in Cargo.toml, in the entries of the own crates in Cargo.lock and the first heading of CHANGELOG.md (exactly `## <version>`, no date in the heading, rule of `pins-und-release-commit`) are the SAME and the tag is v<version> (lesson fs-people v0.0.11: a lock with the old version was only seen at the tag); the `uses:` lines of fs-release in release.yml, ci.yml and check.yml are pinned to the NEWEST chain, today v0.0.10 (a tag, or a full SHA of fs-release main that contains owner-neutral; `fs-release address aufrufer` checks it; lesson fs-packages with v0.0.9: the old chain lacks later fixes); a pin is never lowered. Red goes back to the lift or the author before any review; the same check runs again on the fresh clone in `ff-und-tag`."
   - adresse-pruefen:
       call: identity-check:0.0.18@fs
       with:

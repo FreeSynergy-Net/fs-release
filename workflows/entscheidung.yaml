@@ -63,6 +63,22 @@ do:
         freesynergy.net:gate: strategie-ok
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Opus cuts and decides after the inventory (step `recherche`, or the ADR hits of `evaluate` when no research was needed): what is in, what is out, what waits, each cut with its reason and its source or ADR. The result is the file ENTSCHEID-schnitt.md under `out`. It is a proposal until the strategy has read it and accepted it (or sent it back with the reason); an accepted cut that departs from an ADR sets `open` in the result `cut` (`$context.cut.open`), and then the steps `ask` and `record` run exactly as for `verdict.open`."
+  - entwurf:
+      call: contract-draft-ai:0.0.18@fs
+      with:
+        topic: ${ .input.topic }
+        inventory: ${ $context.recherche }
+        cut: ${ $context.cut }
+        out: ${ .input.out }
+      export:
+        as: '${ $context + { entwurf: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: entscheidung.entwurf
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Optional, only when the decision needs contracts or signatures (traits, types, interfaces) before work orders can be cut; it stands after `recherche` (and `cut`) and before `ask`. Opus drafts the contracts as PAPER only (no code, no build slot) and writes the result to .scratch/<week>/decisions/ENTWURF-<name>.md under `out` (example: ENTWURF-stufe-6.md), at most 200 lines. Rules: (1) signatures and the exact files and places are checked against the REAL code (fresh clone, file:line), not recalled; what was not read is `[nicht belegt]`. (2) Every new trait carries as the first doc line `/// Pattern: <Name> - <one sentence>` and, where it departs from the pattern, `/// Abweichung: ...`. (3) Split into Sonnet work orders of at most 60 min each (one module, one set of files, own finish criterion; order and dependencies named). (4) Finish criterion WITH pictures (what the person sees; picture tests where the work shows something). (5) At most 2 questions to the user, numbered, each with a default; the technology is decided in the draft, not asked. (6) Existing first (CLAUDE.md section 8): crate, module or standard is named before anything new. The draft is a proposal; the questions go on through `ask` only when `open` is set, the work orders start only after the strategy accepted the draft."
   - ask:
       run:
         workflow:

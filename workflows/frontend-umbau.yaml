@@ -6,6 +6,7 @@
 # Inputs docs, docs_base, old, new, allow, delta are passed on to release-flow (step `doku`, rule doku-mitziehen).
 # Further inputs: `block` (host-block), `dossier` (same-pictures), `alt_crate` (alt-entfernen). Host line (decision /srv/FreeSynergy/.scratch/entscheid-simple-2026-11-21.md): host-block before convert, same-pictures = picture comparison with verdict, alt-entfernen after the picture OK.
 # Review template frontend: step `frontend-nur-komponenten` (input `frontend_crate`) before the picture acceptance: only component calls; logic or a widget is a finding (conversation `frontend-befund-talk`).
+# RULE [STANDARD-UMSETZEN]: an order "implement a standard for components / implement a cut" is not run here as a whole: design = `entscheidung` step `entwurf`, new modules = `modul-neu`, forms = `form-neu`; this flow converts only the block groups the draft names (one run per group).
 # Mandatory first step `vorhanden-pruefen` (rule of the user): look whether it exists or is only extended; the result `befund` (with proof) is read by the following steps.
 document:
   dsl: 1.0.3
