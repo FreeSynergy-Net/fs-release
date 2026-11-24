@@ -44,17 +44,17 @@ printf 'cargo clippy --workspace --locked\ncargo test --workspace\n' > "$T/gates
 if unlocked "$T/gates-one.sh"; then pass "gates: one line without --locked among locked ones is red"; else fail "gates: one unlocked line must be red"; fi
 # FS_GATES_SKIP_TEST (named exception of scripts/gates-komplett): only the ONE entry may be skipped, visibly; any other value is refused; unset = no skip.
 GK="$T/gk"; mkdir -p "$GK/scripts" "$GK/root" "$GK/bin"
-cp "$G" "$GK/scripts/gates.sh"; cp "$ROOT/scripts/lib_gates_guard.sh" "$ROOT/scripts/lib_gates_list.sh" "$GK/scripts/"; git init -q "$GK/root"; git -C "$GK/root" -c user.name=t -c user.email=t@t commit -q --allow-empty -m x; git -C "$GK/root" config --local freesynergy.identity-test-base HEAD; echo 1.0.0 > "$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' > "$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/licence-gate.sh"; cp "$ROOT/scripts/identity-check" "$GK/scripts/"; : > "$GK/scripts/check_rust_rules.py"
-printf '#!/usr/bin/env bash\necho "cargo $*" >> "%s/cargo.log"\n' "$GK" > "$GK/bin/cargo"; printf '#!/usr/bin/env bash\necho rustc-stub\n' > "$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
+cp "$G" "$GK/scripts/gates.sh"; cp "$ROOT/scripts/lib_gates_guard.sh" "$ROOT/scripts/lib_gates_list.sh" "$GK/scripts/"; git init -q "$GK/root"; git -C "$GK/root" -c user.name=t -c user.email=t@t commit -q --allow-empty -m x; git -C "$GK/root" config --local freesynergy.identity-test-base HEAD; echo 1.0.0 > "$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' > "$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/licence-gate.sh"; cp "$ROOT/scripts/identity-check" "$GK/scripts/"; cp "$ROOT/scripts/test-gate.sh" "$ROOT/scripts/nextest.pin" "$GK/scripts/"; mkdir -p "$GK/configs"; cp "$ROOT/configs/nextest.toml" "$GK/configs/"; : > "$GK/scripts/check_rust_rules.py"
+printf '#!/usr/bin/env bash\n[ "$1" = nextest ] && [ "$2" = --version ] && { echo "cargo-nextest 0.9.151 (stub)"; exit 0; }\necho "cargo $*" >> "%s/cargo.log"\n' "$GK" > "$GK/bin/cargo"; printf '#!/usr/bin/env bash\necho rustc-stub\n' > "$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
 skiprun() { : > "$GK/cargo.log"  # <script> <value or empty>: runs a copy of gates.sh with stub cargo; output in $GK/out
   PATH="$GK/bin:$PATH" CI=true FS_GATES_SKIP_TEST="$2" bash "$1" "$GK/root" > "$GK/out" 2>&1; }
 OK=released_changelog_sections_equal_their_tags
 rc=0; skiprun "$GK/scripts/gates.sh" "" || rc=$?
-if [ "$rc" -eq 0 ] && grep -q 'cargo test' "$GK/cargo.log" && ! grep -q -- '--skip' "$GK/cargo.log" && ! grep -q SKIPPED "$GK/out"; then pass "gates: FS_GATES_SKIP_TEST unset skips nothing"; else fail "gates: unset variable must skip nothing (rc $rc)"; fi
+if [ "$rc" -eq 0 ] && grep -q 'cargo nextest run' "$GK/cargo.log" && ! grep -q -- '--skip' "$GK/cargo.log" && ! grep -q SKIPPED "$GK/out"; then pass "gates: FS_GATES_SKIP_TEST unset skips nothing"; else fail "gates: unset variable must skip nothing (rc $rc)"; fi
 rc=0; skiprun "$GK/scripts/gates.sh" "$OK" || rc=$?
-if [ "$rc" -eq 0 ] && grep -q -- "-- --skip $OK" "$GK/cargo.log" && grep -q "SKIPPED" "$GK/out"; then pass "gates: the named exception test is skipped and says so"; else fail "gates: the named exception must be skipped visibly (rc $rc)"; fi
+if [ "$rc" -eq 0 ] && grep -q -- "not test(=$OK)" "$GK/cargo.log" && grep -q "SKIPPED" "$GK/out"; then pass "gates: the named exception test is skipped and says so"; else fail "gates: the named exception must be skipped visibly (rc $rc)"; fi
 rc=0; skiprun "$GK/scripts/gates.sh" "some_other_test" || rc=$?
-if [ "$rc" -ne 0 ] && ! grep -q 'cargo test' "$GK/cargo.log" && grep -q 'no exception entry' "$GK/out"; then pass "gates: a value without an exception entry is refused, nothing skipped"; else fail "gates: any other test name must be refused (rc $rc)"; fi
+if [ "$rc" -ne 0 ] && ! grep -q 'cargo nextest run' "$GK/cargo.log" && grep -q 'no exception entry' "$GK/out"; then pass "gates: a value without an exception entry is refused, nothing skipped"; else fail "gates: any other test name must be refused (rc $rc)"; fi
 # mutant: the variable takes effect without an exception entry (the allow check removed) must turn the refusal case red
 python3 -I - "$G" "$GK/scripts/gates-mut.sh" <<'PY'
 import sys
@@ -64,4 +64,4 @@ assert old in t
 open(sys.argv[2], "w", encoding="utf-8").write(t.replace(old, "false", 1))
 PY
 rc=0; skiprun "$GK/scripts/gates-mut.sh" "some_other_test" || rc=$?
-if [ "$rc" -ne 0 ] && ! grep -q 'cargo test' "$GK/cargo.log" && grep -q 'no exception entry' "$GK/out"; then fail "gates: MUTANT (skip without an exception entry) SURVIVED the refusal case"; else pass "gates: mutant (skip without an exception entry) is caught by the refusal case"; fi
+if [ "$rc" -ne 0 ] && ! grep -q 'cargo nextest run' "$GK/cargo.log" && grep -q 'no exception entry' "$GK/out"; then fail "gates: MUTANT (skip without an exception entry) SURVIVED the refusal case"; else pass "gates: mutant (skip without an exception entry) is caught by the refusal case"; fi

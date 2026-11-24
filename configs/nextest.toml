@@ -1,0 +1,21 @@
+# The ONE nextest configuration of the FreeSynergy gate `test` (scripts/test-gate.sh passes it as `--tool-config-file freesynergy:<this file>`), so it holds for EVERY caller repo without a file in
+# that repo. A repo may add its own `.config/nextest.toml`: nextest reads it ON TOP of this file (the repo wins); it never has to repeat anything from here.
+# nextest runs every test in its own process and all test binaries in parallel (the old `cargo test` ran the binaries one after the other).
+[profile.default]
+# a red test never stops the others (the gate collects ALL findings; same meaning as the old --no-fail-fast)
+fail-fast = false
+
+[test-groups]
+# Software GPU (lavapipe): its rasterizer is multi-threaded itself, so tests that draw pictures are held to few at a time (memory and cores), not one per CPU. Matched by NAME, see the override below.
+"@tool:freesynergy:gpu" = { max-threads = 2 }
+# Tests that must not overlap with ANY other test of their group (a port, a fixed file, a global): name them in the repo config or follow the name convention below.
+"@tool:freesynergy:serial" = { max-threads = 1 }
+
+# Name convention (the only generic hook there is): a test BINARY whose name contains `lavapipe` or ends in `_gpu` draws on the software GPU; a test binary whose name ends in `_serial` is run alone.
+[[profile.default.overrides]]
+filter = 'binary(/lavapipe|_gpu$/)'
+test-group = '@tool:freesynergy:gpu'
+
+[[profile.default.overrides]]
+filter = 'binary(/_serial$/)'
+test-group = '@tool:freesynergy:serial'

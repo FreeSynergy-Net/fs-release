@@ -92,14 +92,23 @@ nachpruefung_of() {
       crates="$(grep -oE -- '--> crates/[A-Za-z0-9_-]+' "$out" 2>/dev/null | sed 's|--> crates/||' | sort -u | awk '{ printf " -p %s", $0 }' || true)"
       echo "cargo clippy$crates --all-targets --all-features --locked -- -D warnings -W clippy::pedantic"
       ;;
-    test)
+    test|doctest)
       spec="$(awk '
+        # nextest: `FAIL [ 1.2s] <package>[::<test binary>] <test name>`, one per failed test (printed twice: as it fails and in the summary); lib = no `::`
+        /^ +FAIL +\[ *[0-9.]+s\] +[A-Za-z0-9_-]+(::[A-Za-z0-9_]+)? +[A-Za-z0-9_:]+$/ {
+          line = $0; sub(/^ +FAIL +\[ *[0-9.]+s\] +/, "", line); split(line, f, " "); nm = f[2]
+          if (index(f[1], "::")) { split(f[1], id, "::"); tgt = "-p " id[1] " --test " id[2] } else { tgt = "-p " f[1] " --lib" }
+          if (!((tgt SUBSEP nm) in seen)) { seen[tgt SUBSEP nm] = 1; order[++n] = tgt; list[tgt] = list[tgt] " " nm; if (!(tgt in first)) first[tgt] = 1 }
+        }
         /^test [A-Za-z0-9_:]+ \.\.\. FAILED$/ { names = names " " $2 }
         /^error: test failed, to rerun pass `-p [A-Za-z0-9_-]+ (--lib|--bin [A-Za-z0-9_-]+|--test [A-Za-z0-9_-]+|--doc)`$/ {
           s = $0; sub(/^[^`]*`/, "", s); sub(/`$/, "", s)
           print "cargo test " s " --all-features --locked" (names == "" ? "" : " -- " substr(names, 2)); names = ""; found = 1
         }
-        END { if (!found) print "cargo test --workspace --all-features --locked --no-fail-fast" }' "$out" 2>/dev/null || true)"
+        END {
+          for (i = 1; i <= n; i++) { t = order[i]; if (t in done) continue; done[t] = 1; print "cargo test " t " --all-features --locked -- " substr(list[t], 2); found = 1 }
+          if (!found) print "cargo test --workspace --all-features --locked --no-fail-fast"
+        }' "$out" 2>/dev/null || true)"
       echo "$spec"
       ;;
     rust-rules) echo "python3 -I {SCRIPTS}/check_rust_rules.py {ROOT}" ;;
@@ -163,7 +172,7 @@ else
       echo "gates FAILED: FS_GATES_SKIP_TEST=$FS_GATES_SKIP_TEST has no exception entry" >&2
       exit 2
     fi
-    skip=(-- --skip "$FS_GATES_SKIP_TEST")
+    skip=(-E "not test(=$FS_GATES_SKIP_TEST)")
     echo "gates: test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST, named exception of gates-komplett; not green for this test)"
   fi
   step fmt style cargo fmt --check
@@ -183,7 +192,9 @@ else
       echo "gates: test runs the WHOLE workspace (${sel_out:-affected_crates.py rc=$sel_rc})"
     fi
   fi
-  step test error cargo test "${testsel[@]}" --all-features --locked --no-fail-fast "${skip[@]}"
+  # test: cargo nextest (scripts/test-gate.sh: all test binaries in parallel, configs/nextest.toml, pin scripts/nextest.pin); nextest does not run doc tests, they are the step `doctest`. Both keep --no-fail-fast, --locked, the same selection.
+  step test error bash "$here/test-gate.sh" "${testsel[@]}" --all-features --locked "${skip[@]}"
+  step doctest error bash "$here/test-gate.sh" --doc "${testsel[@]}" --all-features --locked --no-fail-fast
   step rust-rules rule python3 -I "$rules" "$root"
   # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
   step lock error bash "$here/gates-lock.sh" "$root"

@@ -1,0 +1,4 @@
+# The ONE pin of cargo-nextest for the gate `test` (scripts/test-gate.sh). Read as KEY=VALUE lines, never executed.
+# CI installs exactly this version through actions/gates (taiki-e/install-action, pinned by SHA; its manifest holds the sha256 of the release asset and checks it).
+# Raising the version = change this line AND the `tool:` line of actions/gates/action.yml in one commit (the version must exist in the manifest of the pinned taiki-e/install-action).
+NEXTEST_VERSION=0.9.151

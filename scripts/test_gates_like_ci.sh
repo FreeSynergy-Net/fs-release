@@ -20,6 +20,7 @@ mkdir -p "$tmp/bin" "$tmp/alt"
 # BADASSERT: assert-is-empty in tests/forms.rs, only reported when `--all-targets` is on the command line (as clippy only lints test targets then); a call with --target (windows) fails with "unused self" when BADWIN
 cat >"$tmp/bin/cargo" <<'S'
 #!/usr/bin/env bash
+[ "$1" = nextest ] && [ "$2" = --version ] && echo "cargo-nextest 0.9.151 (stub)"
 [ "$1" = clippy ] || exit 0
 rc=0
 case "$*" in *"-A clippy::map_unwrap_or"*) ;; *) echo "error: map"; echo " --> crates/x/src/lib.rs:1:1"; echo " = help: https://x/index.html#map_unwrap_or"; rc=101 ;; esac
@@ -37,7 +38,7 @@ chmod +x "$tmp"/bin/* "$tmp"/alt/*
 mkdir -p "$tmp/sysroot/lib/rustlib/x86_64-pc-windows-msvc" "$tmp/alt-win" "$tmp/alt-sc"
 cp "$tmp"/alt/* "$tmp/alt-win/"; printf '#!/usr/bin/env bash\n[ "$1" = --print ] && { echo "%s"; exit 0; }\necho "rustc 1.0.0 (stub)"\n' "$tmp/sysroot" >"$tmp/alt-win/rustc"
 cp "$tmp"/alt/* "$tmp/alt-sc/"; rm -f "$tmp/alt-sc/shellcheck"
-mkrepo() { rm -rf "$1"; mkdir -p "$1/crates/x/tests" "$1/crates/x/src" "$1/.github/workflows"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; printf '#!/usr/bin/env bash\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"
+mkrepo() { rm -rf "$1"; mkdir -p "$1/crates/x/tests" "$1/crates/x/src" "$1/.github/workflows"; cp -r "$here" "$1/scripts"; mkdir -p "$1/configs"; cp "$here/../configs/nextest.toml" "$1/configs/"; rm -rf "$1/scripts/__pycache__"; printf '#!/usr/bin/env bash\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"
   printf '__pycache__/\n.test-tmp/\n' >"$1/.gitignore"; git init -q -b main "$1"; git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" update-ref refs/remotes/origin/main HEAD; git -C "$1" config --local freesynergy.identity-test-base HEAD; }
 app="$tmp/app"; mkrepo "$app"
 run() { # <script> <path dir> <args...>: output in $tmp/o.txt, the rc is returned

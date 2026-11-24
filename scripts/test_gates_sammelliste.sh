@@ -24,9 +24,10 @@ cat >"$tmp/bin/cargo" <<'S'
 #!/usr/bin/env bash
 echo "cargo $*" >>"$STUBLOG"
 case "$1" in
+  nextest) [ "$2" = --version ] && { echo "cargo-nextest 0.9.151 (stub)"; exit 0; }; [ -n "${RED_TEST:-}" ] && { echo "        FAIL [   0.010s] fs-demo::gold it_breaks"; echo "        FAIL [   0.010s] fs-demo::gold it_breaks"; echo "        FAIL [   0.010s] fs-demo evil;touch_pwned"; exit 100; } ;;
   fmt) [ -n "${RED_FMT:-}" ] && { echo "Diff in src/lib.rs:1:"; exit 1; } ;;
   clippy) [ -n "${RED_CLIPPY:-}" ] && { echo "error: a lint | with a pipe"; echo " --> crates/fs-demo/src/lib.rs:3:1"; exit 101; } ;;
-  test) [ -n "${RED_TEST:-}" ] && { echo "test it_breaks ... FAILED"; echo "test evil;touch_pwned ... FAILED"; echo 'error: test failed, to rerun pass `-p fs-demo --test gold`'; exit 101; } ;;
+  test) [ -n "${RED_TEST:-}" ] && [[ "$*" != *--doc* ]] && { echo "test it_breaks ... FAILED"; echo "test evil;touch_pwned ... FAILED"; echo 'error: test failed, to rerun pass `-p fs-demo --test gold`'; exit 101; } ;;
 esac
 exit 0
 S
@@ -36,7 +37,7 @@ export STUBLOG="$tmp/cargo.log"
 # fixture repos have no origin/main: every fixture repo names HEAD as identity base in its LOCAL config (freesynergy.identity-test-base); no environment variable can do that in CI
 
 # a mechanism folder (scripts + RUST_VERSION) and a repo with its own copy of it (no fs-release tag is pinned: the repo's own scripts count)
-mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; rm -rf "$1/scripts/__pycache__"; printf '#!/usr/bin/env bash\n[ -n "${RED_LICENCE:-}" ] && { echo "licence gate NOT RUN: stub" >&2; exit 64; }\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"; }
+mkmech() { rm -rf "$1"; mkdir -p "$1"; cp -r "$here" "$1/scripts"; mkdir -p "$1/configs"; cp "$here/../configs/nextest.toml" "$1/configs/"; rm -rf "$1/scripts/__pycache__"; printf '#!/usr/bin/env bash\n[ -n "${RED_LICENCE:-}" ] && { echo "licence gate NOT RUN: stub" >&2; exit 64; }\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"; }
 mkrepo() { mkmech "$1"; git init -q -b main "$1"; echo x >"$1/a.txt"; echo "__pycache__/" >"$1/.gitignore"; git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" config --local freesynergy.identity-test-base HEAD; }
 app="$tmp/app"; mkrepo "$app"
 gates() { # <gates.sh> <list dir> [env...]: stdout+stderr in $tmp/o.txt; the rc is returned
@@ -48,13 +49,13 @@ list() { cat "$1"/fehlerliste-*.md 2>/dev/null; }
 # 1. two intentional errors in different steps: both are on the list, the run goes to the end, the exit code is red
 gates "$app/scripts/gates.sh" "$tmp/l1" RED_FMT=1 RED_TEST=1; rc=$?
 chk "two errors: exit code 1" [ "$rc" -eq 1 ]
-chk "two errors: every step ran (an rc line for each of the 9 gates)" [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/o.txt")" -eq 9 ]
+chk "two errors: every step ran (an rc line for each of the 10 gates)" [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/o.txt")" -eq 10 ]
 chk "two errors: both findings are on the list" bash -c "grep -q '\*\*fmt\*\*' '$tmp/l1'/fehlerliste-*.md && grep -q '\*\*test\*\*' '$tmp/l1'/fehlerliste-*.md"
 chk "two errors: the list says 2 findings" grep -q '^2 findings' "$tmp/l1"/fehlerliste-main.md
-chk "two errors: the red rc is printed (fmt rc=1, test rc=101)" bash -c "grep -q '^gate fmt: rc=1' '$tmp/o.txt' && grep -q '^gate test: rc=101' '$tmp/o.txt'"
+chk "two errors: the red rc is printed (fmt rc=1, test rc=100 as nextest says)" bash -c "grep -q '^gate fmt: rc=1' '$tmp/o.txt' && grep -q '^gate test: rc=100' '$tmp/o.txt'"
 chk "two errors: every item has its exact nachpruefung command" bash -c "grep -q 'nachpruefung: cargo fmt --check' '$tmp/l1'/*.md && grep -q 'nachpruefung: cargo test -p fs-demo --test gold --all-features --locked -- it_breaks' '$tmp/l1'/*.md"
 chk "two errors: a test name with a shell character never reaches the list" bash -c "! grep -q 'touch_pwned' '$tmp/l1'/*.md | grep nachpruefung; ! grep 'nachpruefung' '$tmp/l1'/*.md | grep -q 'touch'"
-chk "two errors: cargo test runs with --no-fail-fast and clippy with --keep-going" bash -c "grep -q 'cargo test .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo clippy .*--keep-going' '$STUBLOG'"
+chk "two errors: cargo test runs with --no-fail-fast and clippy with --keep-going" bash -c "grep -q 'cargo nextest run .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo test --doc .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo clippy .*--keep-going' '$STUBLOG'"
 chk "two errors: the list is not in the repo tree" bash -c "[ -z \"\$(git -C '$app' status --porcelain)\" ] && [ ! -e '$app'/fehlerliste-main.md ]"
 # 1b. the licence gate red (cargo-deny finding or NOT RUN, rc 64): it is a finding of its own with its exact nachpruefung, the exit code is red
 gates "$app/scripts/gates.sh" "$tmp/l1b" RED_LICENCE=1; rc=$?
@@ -188,7 +189,7 @@ PY
     gates) # two errors: a list with both, exit 1, 9 rc lines, nachpruefung
       local dd="$tmp/mm-$RANDOM"; mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m
       : >"$STUBLOG"; env RED_FMT=1 RED_TEST=1 PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$dd" bash "$tmp/app-m/scripts/gates.sh" "$tmp/app-m" >"$tmp/mo.txt" 2>&1; local rc=$?
-      [ "$rc" -eq 1 ] && [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/mo.txt")" -eq 9 ] && grep -q '\*\*fmt\*\*' "$dd"/*.md 2>/dev/null && grep -q '\*\*test\*\*' "$dd"/*.md && grep -q 'nachpruefung: cargo fmt --check' "$dd"/*.md && grep -q 'cargo test .*--no-fail-fast' "$STUBLOG" && [ -z "$(git -C "$tmp/app-m" status --porcelain)" ] && [ ! -e "$tmp/app-m"/fehlerliste-main.md ] || r=1
+      [ "$rc" -eq 1 ] && [ "$(grep -c '^gate [a-z-]*: rc=' "$tmp/mo.txt")" -eq 10 ] && grep -q '\*\*fmt\*\*' "$dd"/*.md 2>/dev/null && grep -q '\*\*test\*\*' "$dd"/*.md && grep -q 'nachpruefung: cargo fmt --check' "$dd"/*.md && grep -q 'cargo nextest run .*--no-fail-fast' "$STUBLOG" && grep -q 'cargo test --doc .*--no-fail-fast' "$STUBLOG" && [ -z "$(git -C "$tmp/app-m" status --porcelain)" ] && [ ! -e "$tmp/app-m"/fehlerliste-main.md ] || r=1
       ;;
     teil) # the partial check: tick, injection, no gate result, no abort at the first green
       mkrepo "$tmp/app-m"; cp -r "$m/scripts" "$tmp/app-m/"; git -C "$tmp/app-m" add -A; git -C "$tmp/app-m" commit -qm m; rm -f "$tmp/PWNED"
@@ -232,7 +233,8 @@ echo "gates ok' '    exit 0
 fi
 echo "gates ok' gates
 mut "list without nachpruefung"       gates.sh 'nachpruefung_of "$name" "$finding_work/$name.out" | awk' 'true | awk' gates
-mut "test without --no-fail-fast"     gates.sh ' --no-fail-fast "${skip[@]}"' ' "${skip[@]}"' gates
+mut "doctest without --no-fail-fast"  gates.sh '--doc "${testsel[@]}" --all-features --locked --no-fail-fast' '--doc "${testsel[@]}" --all-features --locked' gates
+mut "nextest without --no-fail-fast"  test-gate.sh '--no-tests=pass --no-fail-fast "$@"' '--no-tests=pass "$@"' gates
 mut "list inside the repo tree"       gates.sh '  case "$(cd "$dir" && pwd)/" in "$root"/*) dir="${TMPDIR:-/tmp}" ;; esac' '  dir="$root"' gates
 mut "guard step removed"             gates.sh '  step guard error gates_guard_compare "$guard_snap" "$guard_snap.end"' '  true' gates
 mut "list file not written"           gates.sh '  } > "$findings_file"' '  } > /dev/null' gates

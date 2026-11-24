@@ -82,8 +82,8 @@ got=$(python3 -I "$AC" "$S/sub" HEAD~2 2>/dev/null); [ "$got" = "PACKAGES lone" 
 # gates.sh: copy with stub cargo (metadata goes to the real one), CI=true; the cargo log shows the narrowed test and the full clippy
 GK="$tmp/gk"; mkdir -p "$GK/scripts" "$GK/bin"
 cp "$repo/scripts/gates.sh" "$repo/scripts/lib_gates_guard.sh" "$repo/scripts/lib_gates_list.sh" "$AC" "$repo/scripts/identity-check" "$GK/scripts/"
-echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/licence-gate.sh"; : >"$GK/scripts/check_rust_rules.py"
-printf '#!/usr/bin/env bash\nif [ "$1" = metadata ]; then unset RUSTUP_TOOLCHAIN; exec "%s" "$@"; fi\necho "cargo $*" >> "%s/cargo.log"\n' "$real_cargo" "$GK" >"$GK/bin/cargo"
+echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/licence-gate.sh"; cp "$repo/scripts/test-gate.sh" "$repo/scripts/nextest.pin" "$GK/scripts/"; mkdir -p "$GK/configs"; cp "$repo/configs/nextest.toml" "$GK/configs/"; : >"$GK/scripts/check_rust_rules.py"
+printf '#!/usr/bin/env bash\nif [ "$1" = metadata ]; then unset RUSTUP_TOOLCHAIN; exec "%s" "$@"; fi\n[ "$1" = nextest ] && [ "$2" = --version ] && { echo "cargo-nextest 0.9.151 (stub)"; exit 0; }\necho "cargo $*" >> "%s/cargo.log"\n' "$real_cargo" "$GK" >"$GK/bin/cargo"
 printf '#!/usr/bin/env bash\nunset RUSTUP_TOOLCHAIN\nexec "%s" "$@"\n' "$(command -v rustc)" >"$GK/bin/rustc"; chmod +x "$GK/bin/cargo" "$GK/bin/rustc"
 gates_run() { # <script> <diff base or empty>; the repo under test is $W (HEAD = the stray commit); output in $GK/out, cargo words in $GK/cargo.log
   : >"$GK/cargo.log"; rm -f "$W/stray.txt"; "${G[@]}" commit -q -am unstray >/dev/null 2>&1
@@ -94,17 +94,17 @@ gate_cases() { # <script>; counts failures in cases_fail when QUIET
   gates_run "$s" "HEAD~3" || rc=$?
   cp "$GK/out" "$GK/out1"
   # HEAD~3 is the base commit's child (mid change, stray, unstray): the diff is crates/mid + stray.txt (net: stray gone) -> mid
-  grep -qx 'cargo test -p app -p mid --all-features --locked --no-fail-fast' "$GK/cargo.log" || why="$why; narrowed test line missing"
-  ! grep -q -- 'cargo test --workspace' "$GK/cargo.log" || why="$why; whole-workspace test ran"
+  grep -qE '^cargo nextest run .*--no-fail-fast -p app -p mid --all-features --locked$' "$GK/cargo.log" || why="$why; narrowed test line missing"
+  ! grep -q -- 'cargo nextest run .*--workspace' "$GK/cargo.log" || why="$why; whole-workspace test ran"
   grep -q 'cargo clippy --workspace --all-targets --all-features --locked --keep-going' "$GK/cargo.log" || why="$why; clippy not on the workspace"
   grep -qx 'cargo fmt --check' "$GK/cargo.log" || why="$why; fmt missing"
   grep -q 'test NARROWED' "$GK/out" || why="$why; no NARROWED line"
   [ "$rc" = 0 ] || why="$why; rc $rc"
   gates_run "$s" "" || rc=$?
-  grep -qx 'cargo test --workspace --all-features --locked --no-fail-fast' "$GK/cargo.log" || why="$why; unset: whole workspace test missing"
+  grep -qE '^cargo nextest run .*--no-fail-fast --workspace --all-features --locked$' "$GK/cargo.log" || why="$why; unset: whole workspace test missing"
   ! grep -q 'NARROWED' "$GK/out" || why="$why; unset: narrowed"
   gates_run "$s" "no-such-rev" || true
-  grep -qx 'cargo test --workspace --all-features --locked --no-fail-fast' "$GK/cargo.log" || why="$why; bad rev: no fallback to the whole workspace"
+  grep -qE '^cargo nextest run .*--no-fail-fast --workspace --all-features --locked$' "$GK/cargo.log" || why="$why; bad rev: no fallback to the whole workspace"
   grep -q 'test runs the WHOLE workspace' "$GK/out" || why="$why; bad rev: fallback not said"
   if [ -n "$why" ]; then if [ -n "${QUIET:-}" ]; then cases_fail=$((cases_fail + 1)); else bad "gates.sh narrowed test: ${why#; }"; sed 's/^/     /' "$GK/out1"; fi
   elif [ -z "${QUIET:-}" ]; then ok "gates.sh: FS_GATES_DIFF_BASE narrows ONLY the test gate (clippy, fmt stay full); unset or a bad rev = whole workspace, said"; fi
@@ -128,7 +128,7 @@ assert "!inputs.full" in f["if"] and "refs/heads/unreviewed/" in f["if"]
 assert steps.index(f) < steps.index(g)
 act = yaml.safe_load(open(sys.argv[2], encoding="utf-8"))
 assert act["inputs"]["diff-base"]["default"] == ""
-assert act["runs"]["steps"][0]["env"]["FS_GATES_DIFF_BASE"] == "${{ inputs.diff-base }}"
+assert [s for s in act["runs"]["steps"] if "env" in s][0]["env"]["FS_GATES_DIFF_BASE"] == "${{ inputs.diff-base }}"
 PY
 
 # mutants: each must fail a case

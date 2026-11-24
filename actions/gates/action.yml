@@ -6,6 +6,10 @@ inputs:
 runs:
   using: composite
   steps:
+    # cargo-nextest for the gate `test` (scripts/test-gate.sh): the version of scripts/nextest.pin, installed prebuilt and checked against the sha256 of the manifest of this pinned action (no compile, seconds)
+    - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+      with:
+        tool: cargo-nextest@0.9.151
     - shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
