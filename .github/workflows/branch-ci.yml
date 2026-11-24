@@ -31,6 +31,10 @@ jobs:
           toolchain: pinned
           components: rustfmt,clippy
           cache-key: branch-ci
+      # cargo-nextest for the gate `test` (scripts/test-gate.sh), the same version and install action as actions/gates (scripts/nextest.pin)
+      - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        with:
+          tool: cargo-nextest@0.9.151
       - name: tools of the package tests (rpm and cpio, the rpm tests must run and a missing tool is red)
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends rpm cpio
       - name: gates of this branch (scripts/gates.sh, one rc per gate)
