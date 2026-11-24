@@ -61,6 +61,18 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - the sub-workflow doku-mitziehen ended with `eskaliert` or without `status == green` (red three times, a check skipped): the person decides, this flow does NOT go on to its review (`eskalation` ends it with `eskaliert: true` for the caller). Only green goes on."
+  - pins-und-release-commit:
+      call: repo-release-commit:0.0.18@fs
+      with:
+        repo: ${ .input.repo }
+        tag: ${ .input.tag }
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: release-flow.pins-und-release-commit
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Release commit of ONE repo (own step; gap reported by two agents: nobody set the own version and the CHANGELOG section, so a wrong version or heading was only seen at the tag). It stands BEFORE `gates`, so that gates, lock check and review see the very state that is released. The pins are NOT touched here: the neighbour tags, the `uses:` lines of fs-release and the lock come from `lift` (already run, never lifted a second time; this step only reads them and sends a pin that is not lifted back to `lift`). In an own worktree, in this order: (1) set the version in Cargo.toml and the entries of the own crates in Cargo.lock (by cargo, not by hand) to <version>; (2) CHANGELOG.md: the heading is exactly `## <version>` WITHOUT a date (the date, if wanted, goes into the text below it), because the CI probe `actions/library-release/notes.py` (called by `plan` and `library-release`) matches the heading with the regex `^## (?:\\S+ )?{re.escape(version)}$` (line 44) and a heading like `## 0.1.0 (2026-11-24)` is red only at the tag; the section is not empty and `## Unreleased` does not stand in for it; (3) ONE release commit on the branch; no tag, no push (the later steps `tag` and `push` do that). `version-abgleich` checks the result again before the review."
   - gates:
       call: gates:0.0.18@fs
       metadata:
@@ -77,18 +89,6 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Lock check (ADR 0092 rule 2, ADR 0093 rule 3), script `scripts/check_lock_sources.py` (also run by scripts/gates.sh through `scripts/gates-lock.sh`): in every Cargo.lock of the repo each of fs-types, fs-objects, fs-interfaces, fs-rpc, fs-jscalendar (list: scripts/lock-sources.toml) appears in exactly ONE source; two sources are an error that names both sources and the packages that pull them. Introduction: warning first, error later - switch `strict` (default false: a WARNING, the gate stays green; true in the repo's own `.fs-lock-sources.toml` once the repo is lifted to V1+, or env FS_LOCK_STRICT=1). V1+ addition, switch `only_from_enabled` (default OFF, env FS_LOCK_ONLY_FROM=1): fs-types only from the repo FreeSynergy-Net/fs-types."
-  - pins-und-release-commit:
-      call: repo-release-commit:0.0.18@fs
-      with:
-        repo: ${ .input.repo }
-        tag: ${ .input.tag }
-      metadata:
-        freesynergy.net:actor: ai
-        freesynergy.net:actor-type: Service
-        freesynergy.net:bot-seat: release-flow.pins-und-release-commit
-        freesynergy.net:gate: none
-        freesynergy.net:kind: objective
-        freesynergy.net:summary: "Pins and release commit of ONE repo (own step; gap reported by two agents: for a single repo without a cascade, `pin-kaskade` is too big and `lift` only moves the version). In an own worktree of the repo, in this order: (1) pins in Cargo.toml and Cargo.lock lifted by cargo (never by hand) to the tags of the neighbour libraries, `uses:` lines of fs-release to the NEWEST chain (a pin is never lowered); (2) version in Cargo.toml and the entries of the own crates in Cargo.lock set to <version>; (3) CHANGELOG.md: the heading is exactly `## <version>` WITHOUT a date (the date, if wanted, goes into the text below it), because the CI probe (`actions/library-release/notes.py`, called by `plan` and `library-release`) matches the heading with the regex `^## (?:<name> )?<version>$` and a heading like `## 0.1.0 (2026-11-24)` is RED only at the tag; the section is not empty and an `## Unreleased` section does not stand in for it; (4) ONE release commit with these changes on the branch; no tag, no push (the later steps `tag` and `push` do that). Then `version-abgleich` checks the result."
   - version-abgleich:
       call: version-check:0.0.18@fs
       with:

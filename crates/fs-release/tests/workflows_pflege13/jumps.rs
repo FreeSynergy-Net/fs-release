@@ -101,12 +101,12 @@ pub fn exact_ok(d: &Value) -> R {
     Ok(())
 }
 
-/// `ask` and `record` run exactly for `verdict.open or cut.open`.
+/// `ask` and `record` run exactly for `verdict.open or cut.open or entwurf.open`.
 pub fn exact_cut_ok(d: &Value) -> R {
     for n in ["ask", "record"] {
-        if field(d, n, "if") != "${ $context.verdict.open or $context.cut.open }" {
+        if field(d, n, "if") != "${ $context.verdict.open or $context.cut.open or $context.entwurf.open }" {
             return Err(format!(
-                "{n}: the condition is not verdict.open or cut.open"
+                "{n}: the condition is not verdict.open or cut.open or entwurf.open"
             ));
         }
     }

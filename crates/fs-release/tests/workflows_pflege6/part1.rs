@@ -89,8 +89,12 @@ pub(super) fn decision_flow(text: &str) -> bool {
         && ask.contains("actor: human")
         && ask.contains("gate: human")
         && ask.contains("name: user-decision")
-        && ask.contains("if: ${ $context.verdict.open or $context.cut.open }")
+        && ask.contains("if: ${ $context.verdict.open or $context.cut.open or $context.entwurf.open }")
         && step_body(text, "record").contains("actor: ai")
+        && step_body(text, "entwurf").contains("actor: ai")
+        && step_body(text, "entwurf").contains("gate: strategie-ok")
+        && step_body(text, "entwurf").contains("ENTWURF-<name>.md")
+        && ask.contains("$context.entwurf.open")
 }
 
 #[test]
@@ -111,7 +115,7 @@ fn counter_asking_first_or_a_search_by_the_agent_is_caught() {
         1
     )));
     assert!(!decision_flow(&text.replace(
-        "if: ${ $context.verdict.open or $context.cut.open }",
+        "if: ${ $context.verdict.open or $context.cut.open or $context.entwurf.open }",
         ""
     )));
     let decision = read("user-decision");
