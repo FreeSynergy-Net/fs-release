@@ -79,6 +79,22 @@ do:
         freesynergy.net:gate: strategie-ok
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "Optional, only when the decision needs contracts or signatures (traits, types, interfaces) before work orders can be cut; it stands after `recherche` (and `cut`) and before `ask`. Opus drafts the contracts as PAPER only (no code, no build slot) and writes the result to .scratch/<week>/decisions/ENTWURF-<name>.md under `out` (example: ENTWURF-stufe-6.md), at most 200 lines. Rules: (1) signatures and the exact files and places are checked against the REAL code (fresh clone, file:line), not recalled; what was not read is `[nicht belegt]`. (2) Every new trait carries as the first doc line `/// Pattern: <Name> - <one sentence>` and, where it departs from the pattern, `/// Abweichung: ...`. (3) Split into Sonnet work orders of at most 60 min each (one module, one set of files, own finish criterion; order and dependencies named). (4) Finish criterion WITH pictures (what the person sees; picture tests where the work shows something). (5) At most 2 questions to the user, numbered, each with a default; the technology is decided in the draft, not asked. (6) Existing first (CLAUDE.md section 8): crate, module or standard is named before anything new. The draft is a proposal (gate strategie-ok, like `cut`); its questions to the user are carried in the result field `entwurf.open` and go on through `ask` (which reads `entwurf.open`); the work orders start only after the strategy accepted the draft."
+  - gegenprobe:
+      call: gegenprobe-ai:0.0.18@fs
+      if: ${ $context.entwurf != null }
+      with:
+        topic: ${ .input.topic }
+        entwurf: ${ $context.entwurf }
+        out: ${ .input.out }
+      export:
+        as: '${ $context + { gegenprobe: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: entscheidung.gegenprobe
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Only after `entwurf`: a reader who did not write the draft checks it against the REAL code (fresh clone, file:line). Input: the file ENTWURF-<name>.md under `out`. Output `gegenprobe`: one line per signature, path and Pattern line with `belegt | falsch | [nicht belegt]`, and the list of new traits without `/// Pattern:` first line. Model hint: Opus (a review). It changes no draft and starts no build slot; a red finding goes to the strategy, which decides what happens to the draft. `ask` does not read this result."
   - ask:
       run:
         workflow:
