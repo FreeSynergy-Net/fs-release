@@ -175,7 +175,7 @@ jobs:
       - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
         id: gates-fmt-clippy
         continue-on-error: true
-        uses: FreeSynergy-Net/fs-release/actions/gates@0b47c48751881810c2b2b9afe0fb0d2871b59be1
+        uses: FreeSynergy-Net/fs-release/actions/gates@99de8e65f671883d74e6cd49546e80a5915ddd03
         with:
           working-directory: ${{ inputs.working-directory }}
           diff-base: ${{ (!inputs.full && startsWith(github.ref, 'refs/heads/unreviewed/')) && 'origin/main' || '' }}
