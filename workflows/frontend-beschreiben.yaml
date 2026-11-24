@@ -1,6 +1,6 @@
 # frontend-beschreiben: the LAYOUT of a Frontend as DESCRIBING DATA (an fs-forms description), NOT as a crate, WITHOUT function and WITHOUT connection. Run through `workflow-pflege`.
 # Order: `Workflow frontend-beschreiben, step <id>, parameters programm, frontend, vorbild, dossier, model, bestand, blinc, repo, branch, workdir, beschreibung, host_version` (docs/prompt-template.md). FS profile: see README.md.
-# State of the order (user, 24.11.2026, via 9f): ONLY LAYOUT. No data source, no commands, no rights, no example-source duty; only placeholder values so that something can be seen. The BINDING part (source, commands, rights) is written LATER, when Scaffold AND Forms stand; then it is only ADDED, nothing is rebuilt. FORMAT (decision 9f 24.11.): what the host reads counts - the program repo with `scaffold.toml` and `forms/*.toml` (pattern: `fs-tasks/forms/board.toml`, `kind = "frontend"`, `schema = 1`). NO parallel tree `beschreibung/…`, NO new `frontends/` folder. The separation is expressed INSIDE this format: LAYOUT = `forms/<ansicht>.toml`; THEME = its own layer where ADR 0074 puts it (style choice `style = "<name>"` in the form file, tokens in the style layer, NEVER colours or sizes in the form file); BINDING = the `[[source]]`, map and command sections, which may be missing for now (the step `pruefbefehl` must PROVE that the host accepts a form without a source, otherwise it is a further gap L5 at C1; never fill it with a fake source). A program repo without `scaffold.toml` (e.g. fs-groups) gets one like fs-people (`schema = 2`) in the same branch. STEPS 1-3 and 8 (`vorhanden-pruefen`, `bilder-holen`, `anordnung-lesen`, `fehlende-components-melden`) NEED NO HOST and run before and without steps 6/7 (`bild-nebeneinander` waits for L5/SB-29).
+# State of the order (user, 24.11.2026, via 9f): ONLY LAYOUT. No data source, no commands, no rights, no example-source duty; only placeholder values so that something can be seen. The BINDING part (source, commands, rights) is written LATER, when Scaffold AND Forms stand; then it is only ADDED, nothing is rebuilt. FORMAT (decision 9f 24.11.): what the host reads counts - the program repo with `scaffold.toml` and `forms/*.toml` (pattern: `fs-tasks/forms/board.toml`, `kind = "frontend"`, `schema = 1`). NO parallel tree `beschreibung/…`, NO new `frontends/` folder. The separation is expressed INSIDE this format: LAYOUT = `forms/<ansicht>.toml`; THEME = its own layer where ADR 0074 puts it (style choice `style = "<name>"` in the form file, tokens in the style layer, NEVER colours or sizes in the form file); BINDING = the `[[source]]`, map and command sections, which may be missing for now (the step `pruefbefehl` must PROVE that the host accepts a form without a source, otherwise it is a further gap L5 at C1; never fill it with a fake source). A program repo without `scaffold.toml` (e.g. fs-groups) gets one like fs-people (`schema = 2`) in the same branch. The steps `vorhanden-pruefen`, `bilder-holen`, `anordnung-lesen`, `layout-schreiben`, `theme-schreiben` and `fehlende-components-melden` NEED NO HOST and run before `host-holen`; `bild-nebeneinander` (step 5) waits for L5/SB-29.
 # Course (the six steps of the user): bilder-holen -> anordnung-lesen -> layout-schreiben -> theme-schreiben -> bild-nebeneinander -> fehlende-components-melden. Around them: vorhanden-pruefen first, the review `frontend-nur-komponenten`, the check command of the published host, the one SHEET per program (`bild-nebeneinander`) and the honest comparison by Haiku (`vergleich`). No verdict of the user per picture.
 # The flow is ITSELF only data: every step is a command of one of our programs (published host `fs-starter --check|--description|--picture|--list-commands`, recorder module `fs-capture`, `gh` for reading) or a reading/writing step of an agent on DATA files. NO own script, NO Python, NOTHING compiled in the flow, NO new crate. The `@fs` calls are SPECIFICATION (see README.md, status table). Several programs may run in parallel (Haiku, no build slot: nothing is built).
 # Input: programm (name of the program), frontend (name of the Frontend description), vorbild (the model program), dossier (folder of the dossier; where the dossiers lie today: `.scratch/katalog-plan/bilder/<programm>/vorbild/` for the model pictures, `.../<programm>/unser/` for ours, text `.scratch/katalog-plan/DOSSIER-*.md`, checked with ls/grep 24.11. for people and groups), model (pictures of the model), bestand, blinc (inventories for the dossier), repo, branch (`unreviewed/frontend-<programm>`), workdir, beschreibung (the `forms/` folder of the program repo, only data files `forms/<ansicht>.toml`), auftrag (optional: the order of the last round, empty in the first round), host_version (tag of the published host `fs-starter`, e.g. `v0.0.4`).
@@ -108,7 +108,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.bilder-holen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 1. Take the model pictures of the program that are already in the dossier. Input: `dossier` (`bausteine.md`, `menus.md`, `dialogs.md`, pictures), `model`. Output `vorbild` = { bilder: [ { name, pfad, bereich } ], bilder_fehlen (bool: a main view, dialog or menu of the dossier without a picture), fehlt: [names] }. Where a person has the model program open (mostly Windows), the picture is taken with the recorder module: `fs-capture shot --title <window title>`, handed over with `fs-capture list` and `fs-capture zip <file.zip>`. Reads only the dossier; writes the picture list. [FREMDBILDER-NIE-INS-REPO] Writes ONLY to `.scratch` (model pictures `.scratch/katalog-plan/bilder/<programm>/vorbild/`, sheets `.scratch/katalog-plan/bilder/layout/<programm>/`); the step uploads no foreign picture to a repo, the net, a release or a docs page."
+        freesynergy.net:summary: "Step 1. Take the model pictures of the program that are already in the dossier. Input: `dossier` (`bausteine.md`, `menus.md`, `dialogs.md`, pictures), `model`. Output `vorbild` = { bilder: [ { name, pfad, bereich } ], bilder_fehlen (bool: a main view, dialog or menu of the dossier without a picture), fehlt: [names], runde (int: the step counts itself in `<workdir>/.bilder-holen-runde`, +1 per call, file removed on green) }. Where a person has the model program open (mostly Windows), the picture is taken with the recorder module: `fs-capture shot --title <window title>`, handed over with `fs-capture list` and `fs-capture zip <file.zip>`. Reads only the dossier; writes the picture list. [FREMDBILDER-NIE-INS-REPO] Writes ONLY to `.scratch` (model pictures `.scratch/katalog-plan/bilder/<programm>/vorbild/`, sheets `.scratch/katalog-plan/bilder/layout/<programm>/`); the step uploads no foreign picture to a repo, the net, a release or a docs page."
   - bilder-weiche:
       switch:
         - runden:
@@ -167,7 +167,7 @@ do:
       with:
         anordnung: ${ $context.anordnung }
         beschreibung: ${ .input.beschreibung }
-        auftrag: ${ .input.auftrag // "" }
+        auftrag: '${ if ($context.pruef.stderr // "") != "" then $context.pruef.stderr else (.input.auftrag // "") end }'
       export:
         as: '${ $context + { layout: . } }'
       metadata:
@@ -176,7 +176,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.layout-schreiben
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 3. Write the LAYOUT part of the fs-forms description (data files `forms/<ansicht>.toml` of the program repo, the format the host reads; pattern `fs-tasks/forms/board.toml`, do not invent a format; a program repo without `scaffold.toml` first gets one like fs-people). Input: `anordnung.bilder[].baum`, `auftrag` (input, empty in the first round; in a repeat the run state hands the stderr of the red check or the lines `fehlt`/`anders` of `vergleich` in as `auftrag`). Output `layout` = { dateien: [paths], head (full SHA of the local commit on `unreviewed/frontend-<programm>`), vorlaeufig: [components that stand in], offen: [areas left out] }. Contents: which component where, nesting, bars, columns, gaps; placeholder values only so that something can be seen. NOTHING else (rule 2): no data source, no command, no right, no example source, no logic, no colour or font value. The BINDING part is NOT written (no `[[source]]`, map or command section; never a fake source). Local commit, no push, no tag."
+        freesynergy.net:summary: "Step 3. Write the LAYOUT part of the fs-forms description (data files `forms/<ansicht>.toml` of the program repo, the format the host reads; pattern `fs-tasks/forms/board.toml`, do not invent a format; a program repo without `scaffold.toml` first gets one like fs-people). Input: `anordnung.bilder[].baum`, `auftrag` (input, empty in the first round; in a repeat the flow hands the stderr of the red `pruefbefehl` in as `auftrag`; after a red `bild-nebeneinander` (no stderr) the order stays the input one and the red `bilder` result is in the context). Output `layout` = { dateien: [paths], head (full SHA of the local commit on `unreviewed/frontend-<programm>`), vorlaeufig: [components that stand in], offen: [areas left out] }. Contents: which component where, nesting, bars, columns, gaps; placeholder values only so that something can be seen. NOTHING else (rule 2): no data source, no command, no right, no example source, no logic, no colour or font value. The BINDING part is NOT written (no `[[source]]`, map or command section; never a fake source). Local commit, no push, no tag."
   - theme-schreiben:
       call: theme-schreiben-ai:0.0.18@fs
       with:
@@ -203,7 +203,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.frontend-nur-komponenten
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Review template frontend (rule of the user, lane 3) as it is, the folder of the description stands in place of the crate (input `frontend_crate` = `beschreibung`): ONLY the plugging together of components plus theme, style, menu tree and texts; a file with code, logic, an own widget, a data source or a command inside `forms/*.toml` or the style layer, or a colour or size value inside `forms/*.toml` is a FINDING (result `befunde`, each with file and line). Opus reads only and writes the findings."
+        freesynergy.net:summary: "Review template frontend (rule of the user, lane 3) as it is, the folder of the description stands in place of the crate (input `frontend_crate` = `beschreibung`): ONLY the plugging together of components plus theme, style, menu tree and texts; a file with code, logic, an own widget, a data source or a command inside `forms/*.toml` or the style layer, or a colour or size value inside `forms/*.toml` is a FINDING (result `komponenten` = { befunde: [each with file and line], runde (int: the step counts itself in `<workdir>/.komponenten-runde`, +1 per call, file removed when `befunde` is empty) }). Opus reads only and writes the findings."
   - frontend-nur-komponenten-weiche:
       switch:
         - runden:
@@ -266,7 +266,7 @@ do:
       switch:
         - red:
             when: '${ $context.host.red != false }'
-            then: bericht
+            then: fremdbilder-pruefen
         - green:
             when: '${ $context.host.red == false }'
             then: continue
@@ -275,7 +275,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Control flow - no published host (or no result) ends only the PICTURE part: steps 1-3 and 8 (cards) are already done and go into the report, the pictures wait (L5/SB-29, L7); the layout is never shown with a built or cached binary."
+        freesynergy.net:summary: "Control flow - no published host (or no result) ends only the PICTURE part: the steps without a host (`vorhanden-pruefen` to `fehlende-components-melden`, cards) are already done and go into the report, the pictures wait (L5/SB-29, L7); the layout is never shown with a built or cached binary."
   - pruefbefehl:
       call: fs-starter-check:0.0.18@fs
       with:
@@ -288,12 +288,12 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The check command of the published host. Input: `host.pfad`, `beschreibung`. Command: `<host.pfad> --check --description <beschreibung>`. Output `pruef` = { rc, red, stderr (whole, not cut) }. rc 0 = description there; rc 1 = failed; rc 3 = contract missing (fatal); anything else is red. A description with layout and theme only (gap L5): red because of a missing binding is NOT repaired by writing a binding into the layout, it is a card to Scaffold/fs-forms. Gap L1: the command does not list the components used. `pruef.l5 == true` = the host does not accept a form without a source: NOT repaired with a fake source; card to C1 with PRECEDENCE (gap L5), the run goes to the report."
+        freesynergy.net:summary: "The check command of the published host. Input: `host.pfad`, `beschreibung`. Command: `<host.pfad> --check --description <beschreibung>`. Output `pruef` = { rc, red, stderr (whole, not cut), l5 (bool: `true` exactly when rc is 1 and stderr names a missing `source`, i.e. the host does not accept a form without a source; else `false`), runde (int: the step counts itself in `<workdir>/.pruefbefehl-runde`, +1 per call, file removed on green) }. rc 0 = description there; rc 1 = failed; rc 3 = contract missing (fatal); anything else is red. A description with layout and theme only (gap L5): red because of a missing binding is NOT repaired by writing a binding into the layout, it is a card to Scaffold/fs-forms. Gap L1: the command does not list the components used. `pruef.l5 == true` = the host does not accept a form without a source: NOT repaired with a fake source; card to C1 with PRECEDENCE (gap L5), the run goes through `fremdbilder-pruefen` to the report."
   - pruefbefehl-again:
       switch:
         - l5-form-ohne-quelle:
             when: '${ $context.pruef.l5 == true }'
-            then: bericht
+            then: fremdbilder-pruefen
         - runden:
             when: '${ $context.pruef.red == true and ($context.pruef.runde // 0) >= 3 }'
             then: eskalation
@@ -325,7 +325,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put ONE SHEET per program next to the model (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The sheet (pair model | ours, views below each other) is made by the step itself (gap L3: `fs-capture pair`); no verdict of the user per picture. Output `bilder` = { dateien: [paths], rc, red }. Red = rc != 0 or a file that is missing or empty. [FREMDBILDER-NIE-INS-REPO] The sheet (model beside ours) stays LOCAL under `.scratch/katalog-plan/bilder/layout/<programm>/` and is never committed, pushed or uploaded; only our own pictures may leave the machine."
+        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put ONE SHEET per program next to the model (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The sheet (pair model | ours, views below each other) is made by the step itself (gap L3: `fs-capture pair`); no verdict of the user per picture. Output `bilder` = { dateien: [paths], rc, red, runde (int: the step counts itself in `<workdir>/.bild-nebeneinander-runde`, +1 per call, file removed on green) }. Red = rc != 0 or a file that is missing or empty. [FREMDBILDER-NIE-INS-REPO] The sheet (model beside ours) stays LOCAL under `.scratch/katalog-plan/bilder/layout/<programm>/` and is never committed, pushed or uploaded; only our own pictures may leave the machine."
   - bild-waechter:
       call: theme-waechter-check:0.0.18@fs
       with:
@@ -371,18 +371,39 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.vergleich
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Haiku compares itself - NO verdict of the user per picture (`picture-acceptance` is for later, with the binding, and is not called here). Input: the sheets `bilder` (one per program under `bilder/layout/<programm>/`), the model pictures `model`. Per view of the sheet one line `fehlt | anders | gleich` with what exactly (area, component), honest and not softened; a view without a model picture is `fehlt` (model), never `gleich`. Every `fehlt`/`anders` caused by a missing component is added as a card in the same format as in `fehlende-components-melden` (once, existing first). Output `vergleich` = { blaetter: [paths], zeilen: [ { ansicht, urteil: fehlt | anders | gleich, was } ] }. The user looks at the sheets bundled whenever he wants. Every `fehlt` or `anders` that comes from a missing component is input of `fehlende-components-melden`."
+        freesynergy.net:summary: "Haiku compares itself - NO verdict of the user per picture (`picture-acceptance` is for later, with the binding, and is not called here). Input: the sheets `bilder` (one per program under `bilder/layout/<programm>/`), the model pictures `model`. Per view of the sheet one line `fehlt | anders | gleich` with what exactly (area, component), honest and not softened; a view without a model picture is `fehlt` (model), never `gleich`. Every `fehlt`/`anders` caused by a missing component is added as a card in the same format as in `fehlende-components-melden` (once, existing first). Output `vergleich` = { blaetter: [paths], zeilen: [ { ansicht, urteil: fehlt | anders | gleich, was } ] }. The user looks at the sheets bundled whenever he wants."
   - fremdbilder-pruefen:
       call: fremdbilder-pruefen:0.0.18@fs
       with:
         beschreibung: ${ .input.beschreibung }
         branch: ${ .input.branch }
+      export:
+        as: '${ $context + { fremdbilder: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "[FREMDBILDER-NIE-INS-REPO] Before EVERY commit and push. Input: `beschreibung`, `branch`. Command (data, no new script): `git diff --name-only --diff-filter=AM <base>..HEAD` plus `git ls-files` of the description, filtered by the picture extension list (png, jpg, jpeg, gif, webp, svg, bmp, tiff, ico). Rule of paths: picture files may stand ONLY under our own picture folders of the description (e.g. `bilder/unser/`, `bilder/layout-nur-unser/`); a picture in a model folder (`vorbild/`), a comparison sheet or anything from `.scratch/` is a FINDING. Output { bilder_im_diff: [paths], fremd: [paths], red }. Red = a picture of a foreign program in the diff; then NO commit and NO push, the file is removed from the diff and the step runs again; a second red round goes to `eskalation`."
+        freesynergy.net:summary: "[FREMDBILDER-NIE-INS-REPO] Before EVERY commit and push. Input: `beschreibung`, `branch`. Command (data, no new script): `git diff --name-only --diff-filter=AM $(git merge-base origin/main HEAD)..HEAD` plus `git ls-files` of the description, filtered by the picture extension list (png, jpg, jpeg, gif, webp, svg, bmp, tiff, ico). Rule of paths: picture files may stand ONLY under ONE own picture folder of the description: `bilder/unser/`; a picture in a model folder (`vorbild/`), a comparison sheet or anything from `.scratch/` is a FINDING. Output `fremdbilder` = { bilder_im_diff: [paths], fremd: [paths], red, runde (int: the step counts itself in `<workdir>/.fremdbilder-runde`, +1 per call, file removed on green) }. Red = a picture of a foreign program in the diff; then NO commit and NO push, the step takes the file out of the diff and the control flow `fremdbilder-weiche` runs it again; the second red round goes to `eskalation`. EVERY way to `bericht` runs through this step (also `host-weiche` red and `pruefbefehl-again` l5)."
+  - fremdbilder-weiche:
+      switch:
+        - runden:
+            when: '${ $context.fremdbilder.red == true and ($context.fremdbilder.runde // 0) >= 2 }'
+            then: eskalation
+        - red:
+            when: '${ $context.fremdbilder.red == true }'
+            then: fremdbilder-pruefen
+        - green:
+            when: '${ $context.fremdbilder.red == false }'
+            then: bericht
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - reads `fremdbilder.red` and `fremdbilder.runde` (both set by `fremdbilder-pruefen`): red runs the check again, the second red round goes to `eskalation`; green goes to `bericht`; a missing result goes to `eskalation`, never to the report."
   - bericht:
       call: report-write:0.0.18@fs
       with:

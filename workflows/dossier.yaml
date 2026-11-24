@@ -77,18 +77,39 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: Control flow - bad input (`fehler`, rc 2) and a third red round (`runde` >= 3, counted by `scripts/baustein-zuordnung` in its state file, rc 3) go to the person (`eingabe-fehler`), they never jump back; a red assignment goes back to research (the agent fixes bausteine.md), green goes on to publish.
+        freesynergy.net:summary: Control flow - bad input (`fehler`, rc 2) and a third red round (`runde` >= 3, counted by `scripts/baustein-zuordnung` in its state file, rc 3) go to the person (`eingabe-fehler`), they never jump back; a red assignment goes back to research (the agent fixes bausteine.md), green goes on to `fremdbilder-pruefen` and then to publish.
   - fremdbilder-pruefen:
       call: fremdbilder-pruefen:0.0.18@fs
       with:
         dossier: ${ .input.dossier }
         branch: ${ .input.branch }
+      export:
+        as: '${ $context + { fremdbilder: . } }'
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "[FREMDBILDER-NIE-INS-REPO] Before the publish (and before every commit/push). Input: `dossier`, `branch`. Command (data, no new script): `git diff --name-only --diff-filter=AM <base>..HEAD` filtered by the picture extension list (png, jpg, jpeg, gif, webp, svg, bmp, tiff, ico). Picture files may stand only under our own picture folders; a picture of a foreign program (model folder `vorbild/`, comparison sheet, anything from `.scratch/`) is a FINDING. Output { fremd: [paths], red }. Red = the picture is taken out of the diff, the step runs again; a second red round goes to `eingabe-fehler`."
+        freesynergy.net:summary: "[FREMDBILDER-NIE-INS-REPO] Before the publish (and before every commit/push). Input: `dossier`, `branch`. Command (data, no new script): `git diff --name-only --diff-filter=AM $(git merge-base origin/main HEAD)..HEAD` filtered by the picture extension list (png, jpg, jpeg, gif, webp, svg, bmp, tiff, ico). Picture files may stand ONLY under ONE own picture folder of the dossier repo: `bilder/unser/`; a picture of a foreign program (model folder `vorbild/`, comparison sheet, anything from `.scratch/`) is a FINDING. Output `fremdbilder` = { fremd: [paths], red, runde (int: the step counts itself in `<dossier>/.fremdbilder-runde`, +1 per call, file removed on green) }. Red = the step takes the picture out of the diff and `fremdbilder-weiche` runs it again; the second red round goes to `eingabe-fehler`."
+  - fremdbilder-weiche:
+      switch:
+        - runden:
+            when: '${ $context.fremdbilder.red == true and ($context.fremdbilder.runde // 0) >= 2 }'
+            then: eingabe-fehler
+        - red:
+            when: '${ $context.fremdbilder.red == true }'
+            then: fremdbilder-pruefen
+        - green:
+            when: '${ $context.fremdbilder.red == false }'
+            then: publish
+        - ohne-ergebnis:
+            then: eingabe-fehler
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - reads `fremdbilder.red` and `fremdbilder.runde` (set by `fremdbilder-pruefen`): red runs the check again, the second red round goes to `eingabe-fehler`; green goes on to publish; a missing result goes to `eingabe-fehler`, never to publish."
   - publish:
       call: docs-main:0.0.18@fs
       then: end
@@ -109,4 +130,4 @@ do:
         freesynergy.net:actor-type: Person
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: The block check got bad input (the table or the inventory is missing or unreadable, rc 2) or was red three times; sending the agent back to research cannot fix that, so the person looks at it. This flow ends.
+        freesynergy.net:summary: The block check got bad input (the table or the inventory is missing or unreadable, rc 2) or was red three times, or the picture check was red twice or gave no result; sending the agent back to research cannot fix that, so the person looks at it. This flow ends.
