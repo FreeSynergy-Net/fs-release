@@ -30,6 +30,7 @@
 # copy blocks in .scratch; code pins are only counted, they change in the pin wave) - every hit in the text is replaced by the `FreeSynergy-Net` URL; (5) the sender is named in the order (`absender`): at a target that refuses AI or a bot (Kanidm) and in every foreign issue/thread
 # only the human sends, a bot corrects only its OWN text in a repo of ours. Occasions: fs-crates PR #1 (AI sentence, `reviewed by humans`, CODEOWNERS text) and the draft for the capnproto-rust issue (AI note, numbers, old org URLs).
 
+# Rule [KOPIERBLOCK-OFFENE-SHELL] (user, 24.11.2026): a copy block for the open shell of the user (not a text for GitHub: a block with commands) has NO `set -e`, NO `set -u`, NO `set -o pipefail` (they close the user's shell on the first error); error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file called as `bash <path>`. Applies to the steps `kopierblock`, `korrektur-kopierblock`, `pr-kopierblock` where the block holds commands.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net

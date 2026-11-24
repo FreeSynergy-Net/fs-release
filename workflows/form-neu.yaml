@@ -1,0 +1,234 @@
+# form-neu: a NEW or EXTENDED form in the form catalog `schema/forms.txt` of FreeSynergy-Net/fs-interfaces (a form = a named, versioned list of channels that a module fills and a component shows; "one module, one standard, many views").
+# Order: `Workflow form-neu, step <id>, parameters form (name), version (x.y.z), quellen (draft + decision files), kanaele (name | art | required | count), standard (per channel: URI + section), nutzer (modules), komponenten (components that say `forms = ...`), repo (fs-interfaces), branch (unreviewed/form-<name>), workdir` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege`.
+# SPECIFICATION: the `@fs` calls of this flow have no script yet (see README.md, status table); the real reader/test of the catalog is the Rust crate `fs-interfaces` (`fs_interfaces::forms`, tests `forms.rs`, `forms_count.rs`, `write_forms.rs`). Agents never push to main, tag or merge; output only on `unreviewed/form-<name>`; no force push; no Python; identity `FreeSynergy <support@freesynergy.net>` only.
+# Loops: a red check jumps back at most twice; the third red round goes to `eskalation`. Only `red == false` goes on; a missing result goes to `eskalation`, never on.
+# Rules. (1) Existing first (user rule 23.11.): `forms.txt` on main AND the `unreviewed/` branches AND the drafts (`.scratch/woche-*/form/formkatalog/`) are read before a line is written; a form that exists is EXTENDED (new minor version with an optional channel), never doubled.
+#   (2) Notation (state 24.11.2026, reader `fs_interfaces::forms` since 0.0.32/V-2): the catalog writes a form as THREE-part `name@x.y.z` (e.g. `tiles@1.0.0`), a need of a component or frontend as `name@<req>` (e.g. `tiles@^1.0.0`); `name@1` and `name@1.0` are refused by the reader (`parse_version`). Older drafts with `@1.0` / `@1` are outdated.
+#   (3) Versions: Minor = an optional channel comes; Major = a channel goes or changes meaning; Patch = text only, never raised. Only append, never rename or remove a form line. A required channel added to a form that somebody already pins is a MAJOR (new line `@2.0.0`); on a form that is still `planned` and pinned by nobody the entry may be set finally (say so in the comment).
+#   (4) Every form names the standard of its channels in the comment lines under it (URI and section: for example times RFC 3339, relations RFC 9253); no invented standard; where there is none, write "own, open" and say so.
+#   (5) The version of the fs-interfaces tag and the CHANGELOG are NOT decided here: the flow names the line that is needed (`version-und-changelog`); the tag is never set by the agent (`ff-und-tag`, strategy).
+#   (6) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (they close the user's shell on the first error). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: form-neu
+  version: 0.0.18
+  title: New or extended form in forms.txt - existing first, draft, catalog lines, version and changelog, counterpart component, Opus review
+do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.18@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: form-neu.vorhanden-pruefen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP: is the form or the standard already there? Read `schema/forms.txt` on origin/main of fs-interfaces (`gh api`, NOT a stale clone), the branches `unreviewed/*` of fs-interfaces (`git ls-remote`), the drafts under `.scratch/woche-*/form/formkatalog/`, the catalog of components (`contract/blocks/*.toml` in fs-components: `forms = [...]`) and `FEATURES-OFFEN.md`. Result `befund` = { art: vorhanden | neu, verweis (\"extend <name>@<version>\"), beleg (what was searched, paths, heads) }. `vorhanden` = the form is extended by a minor line or nothing is done; `neu` needs a reason and proof."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.18@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): `befund` without proof is RED; `neu` needs a reason and what was searched, `vorhanden` needs the reference \"extend X\"; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), the third red round goes to `eskalation`; a missing result goes to `eskalation`, never to green."
+  - vorhanden-weiche:
+      switch:
+        - vorhanden-ohne-aenderung:
+            when: '${ $context.befund.art == "vorhanden" and ($context.befund.erweitern // false) != true }'
+            then: abbruch
+        - vorhanden-erweitern:
+            when: '${ $context.befund.art == "vorhanden" }'
+            then: continue
+        - neu:
+            when: '${ $context.befund.art == "neu" }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - `vorhanden` without a needed extension ends the run with the reference (no doubled form); `vorhanden` with `erweitern` (a minor line) and `neu` go on; a missing result goes to `eskalation`."
+  - entwurf-lesen:
+      call: form-entwurf-lesen-ai:0.0.18@fs
+      with:
+        form: ${ .input.form }
+        quellen: ${ .input.quellen }
+      export:
+        as: '${ $context + { entwurf: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: form-neu.entwurf-lesen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Read the draft: the form catalog draft (`.scratch/woche-11-23/form/formkatalog/{forms.txt,README.md}`), the decision of the user of the form (for example `kalender/ENTSCHEID-schnitt.md` section d) and the sources of the channels (fields of the modules). Result `entwurf` = { kanaele: [name, art, required, count, quelle (file:line)], offen: [...] }. A channel without a source is listed under `offen`, not guessed. Reads only, writes nothing."
+  - forms-txt-aendern:
+      call: forms-txt-schreiben-ai:0.0.18@fs
+      with:
+        entwurf: ${ $context.entwurf }
+        version: ${ .input.version }
+        standard: ${ .input.standard }
+      export:
+        as: '${ $context + { aenderung: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: form-neu.forms-txt-aendern
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Edit `schema/forms.txt` (fs-interfaces, branch `unreviewed/form-<name>`, local commit, no push): form line `name@x.y.z | Display name | planned | description` (THREE-part, rule (2)), then one channel line per channel `> name | art | ! or - | count` (art one of the seven `records text number flag time reference command` or a set `text|number|time|flag`; count `1`, `0..1`, `0..4`, `0..n`, `1..n`, never `?`). Name the CHANNELS in a comment and give each its standard reference (rule (4)); an extension is appended as a new form line, the old line stays. Needed command channels carry `writes` (5th field) only on the channels of the same form with room for one field."
+  - forms-txt-check:
+      call: forms-reader-check:0.0.18@fs
+      with:
+        form: ${ .input.form }
+        version: ${ .input.version }
+      export:
+        as: '${ $context + { leser: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): while working only `cargo check -p fs-interfaces`; at the end ONE run of the repo tests through `bash .scratch/build-slot.sh` (`--status` first), `-p fs-interfaces` (tests `forms`, `forms_count`, `write_forms`). Red = the reader refuses the file, or the test that pins the form (required channels, art, count) is missing or fails. MUTANT that must turn red: the notation `@1` or `@1.0` instead of `@1.0.0`, or a required channel removed from the form. A pin test for the new form is part of the change; a form without a test that names its required channels is red. The `rc` of the run is kept (no cut output)."
+  - forms-txt-again:
+      switch:
+        - runden:
+            when: '${ $context.leser.red == true and ($context.leser.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.leser.red == true }'
+            then: forms-txt-aendern
+        - green:
+            when: '${ $context.leser.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `forms-txt-aendern` (at most two repeats), the third red round goes to `eskalation`; a missing result goes to `eskalation`, never to green."
+  - version-und-changelog:
+      call: form-version-ai:0.0.18@fs
+      with:
+        repo: ${ .input.repo }
+        aenderung: ${ $context.aenderung }
+      export:
+        as: '${ $context + { version: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: form-neu.version-und-changelog
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Read `CHANGELOG.md`, `DESIGN.md` and the docs of fs-interfaces (state AND the last tag: `gh api repos/FreeSynergy-Net/fs-interfaces/tags`) and NAME which version line is needed: all crates of the workspace carry ONE version (= the tag); `forms.txt` changes are appended only; the barrier of `settings.capnp` (a change of the schema that is only allowed together with the version named by the strategy) is respected. The agent does NOT decide the version number and does NOT raise it and does NOT tag; the result `version` = { zeile (the CHANGELOG line needed, German and English as in the file), grund, schranke (what blocks), angehoben: false }. A catalog comment or an appended form line is no version change by itself (`SW-1` style: \"NOT a version bump, no tag\")."
+  - gegenstueck:
+      call: form-gegenstueck-ai:0.0.18@fs
+      with:
+        form: ${ .input.form }
+        komponenten: ${ .input.komponenten }
+      export:
+        as: '${ $context + { gegenstueck: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: form-neu.gegenstueck
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The counterpart: which component says `forms = [\"<name>@^x.y.z\"]` (fs-components `contract/blocks/*.toml`, key `forms`, next to `accepts`) and which module delivers the map field to channel (`[[form]] name=... map={...}`)? Result `gegenstueck` = { komponenten: [block, datei:zeile, forms-heute], module: [...], luecke: [...] }. Only NAMED and proposed as a diff in the report; fs-components and the modules are NOT changed by this flow (no picture, no component in this order). A form without any component is listed (conformance `form-no-component`: yellow, fallback ADR 0098 E5)."
+  - opus-buendel-review:
+      call: opus-buendel-review:0.0.18@fs
+      with:
+        head: ${ $context.aenderung.head }
+        scope: buendel
+      export:
+        as: '${ $context + { urteil: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: form-neu.opus-buendel-review
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "ONE Opus review per BUNDLE of forms (not per branch), at the full SHA of the head: channels against the sources, standards named and read (not recalled), notation three-part, version/CHANGELOG line only NAMED, tests pin the required channels, mutant red. Report line 1 JA or NEIN with findings by file and line. Reads only."
+  - opus-buendel-review-again:
+      switch:
+        - runden:
+            when: '${ $context.urteil.verdict == "NEIN" and ($context.urteil.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.urteil.verdict == "NEIN" }'
+            then: forms-txt-aendern
+        - ja:
+            when: '${ $context.urteil.verdict == "JA" }'
+            then: continue
+        - ohne-urteil:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a NO goes back to `forms-txt-aendern` (at most two repeats), the third NO goes to `eskalation`; only a JA goes on; a missing verdict goes to `eskalation`."
+  - bericht:
+      call: report-write:0.0.18@fs
+      with:
+        lauf: ${ $context }
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: form-neu.bericht
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report: full SHAs, CI run ids per repo (branch-ci, lint, blueprint-e2e: id, conclusion, headSha, read with `gh` at the exact head), the named version line (not decided), the counterpart gaps, the open points. The checklist `FEATURES-OFFEN.md`: the EXISTING lines are ticked (`[ ]` to `[x]` + date), a new line only for something really new. Copy blocks in the report follow rule (6)."
+  - abbruch:
+      set:
+        todo: abbruch
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Abort with a reference: the form is already in the catalog and needs no extension; the report names the reference."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a NO came for the third time, or a result is missing: the loop stops and the person decides. The report names the step and the last red result."
