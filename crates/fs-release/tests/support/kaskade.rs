@@ -172,6 +172,14 @@ pub const SWITCHES: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     (
+        "ein-stand-weiter",
+        &[
+            ("rot", "eskalation"),
+            ("gruen", "continue"),
+            ("ohne-ergebnis", "eskalation"),
+        ],
+    ),
+    (
         "windows-weiter",
         &[
             ("rot", "eskalation"),
