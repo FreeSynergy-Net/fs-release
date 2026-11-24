@@ -61,6 +61,13 @@ fn data_flow_resolvable(text: &str) -> bool {
         {
             return true;
         }
+        // loop-carried read, same reason: the order (`auftrag`) of the red `menue-vollstaendig` is read by `layout-schreiben` for the repeat; the export `{ menuepruef: . }` stands later in the file
+        if text[at..].starts_with("$context.menuepruef.auftrag // ")
+            && text[..at].ends_with('(')
+            && text.contains("{ menuepruef: . }")
+        {
+            return true;
+        }
         text[..at].contains(&format!("{{ {key}: . }}"))
     })
 }
