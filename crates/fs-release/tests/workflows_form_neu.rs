@@ -25,6 +25,10 @@ fn form_flow_is_sound(text: &str) -> bool {
     in_order(text, &order)
         && step_body(text, "vorhanden-pruefen").contains("origin/main")
         && step_body(text, "vorhanden-pruefen-again").contains("then: eskalation")
+        && step_body(text, "vorhanden-pruefen").contains("erweitern (bool")
+        && step_body(text, "vorhanden-weiche").contains("$context.befund.erweitern")
+        && step_body(text, "vorhanden-weiche")
+            .contains("ohne-ergebnis:\n            then: eskalation")
         && step_body(text, "forms-txt-aendern").contains("THREE-part")
         && step_body(text, "forms-txt-check").contains("`@1.0`")
         && step_body(text, "forms-txt-check").contains("MUTANT")
@@ -60,6 +64,19 @@ fn form_neu_is_red_without_each_rule() {
             "gate: opus-ja",
             "no Opus review",
             ("gate: opus-ja", "gate: none"),
+        ),
+        (
+            "erweitern",
+            "the result of vorhanden-pruefen lacks the field the switch reads",
+            ("erweitern (bool", "erweitert (bool"),
+        ),
+        (
+            "ohne-ergebnis",
+            "a missing result of the switch may go on",
+            (
+                "ohne-ergebnis:\n            then: eskalation\n      metadata:\n        freesynergy.net:actor: machine\n        freesynergy.net:actor-type: Service\n        freesynergy.net:gate: none\n        freesynergy.net:kind: objective\n        freesynergy.net:summary: \"Control flow - `vorhanden` without",
+                "ohne-ergebnis:\n            then: continue\n      metadata:\n        freesynergy.net:actor: machine\n        freesynergy.net:actor-type: Service\n        freesynergy.net:gate: none\n        freesynergy.net:kind: objective\n        freesynergy.net:summary: \"Control flow - `vorhanden` without",
+            ),
         ),
         (
             "[KOPIERBLOCK-OFFENE-SHELL]",

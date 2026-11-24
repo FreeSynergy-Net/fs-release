@@ -7,7 +7,7 @@
 #   (3) Versions: Minor = an optional channel comes; Major = a channel goes or changes meaning; Patch = text only, never raised. Only append, never rename or remove a form line. A required channel added to a form that somebody already pins is a MAJOR (new line `@2.0.0`); on a form that is still `planned` and pinned by nobody the entry may be set finally (say so in the comment).
 #   (4) Every form names the standard of its channels in the comment lines under it (URI and section: for example times RFC 3339, relations RFC 9253); no invented standard; where there is none, write "own, open" and say so.
 #   (5) The version of the fs-interfaces tag and the CHANGELOG are NOT decided here: the flow names the line that is needed (`version-und-changelog`); the tag is never set by the agent (`ff-und-tag`, strategy).
-#   (6) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (they close the user's shell on the first error). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
+#   (6) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (`set -e` closes the user's shell on the first error; `set -u` and `pipefail` do not close it, but they stay switched ON in the user's shell and change every later command and prompt script). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -27,7 +27,7 @@ do:
         freesynergy.net:bot-seat: form-neu.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "MANDATORY FIRST STEP: is the form or the standard already there? Read `schema/forms.txt` on origin/main of fs-interfaces (`gh api`, NOT a stale clone), the branches `unreviewed/*` of fs-interfaces (`git ls-remote`), the drafts under `.scratch/woche-*/form/formkatalog/`, the catalog of components (`contract/blocks/*.toml` in fs-components: `forms = [...]`) and `FEATURES-OFFEN.md`. Result `befund` = { art: vorhanden | neu, verweis (\"extend <name>@<version>\"), beleg (what was searched, paths, heads) }. `vorhanden` = the form is extended by a minor line or nothing is done; `neu` needs a reason and proof."
+        freesynergy.net:summary: "MANDATORY FIRST STEP: is the form or the standard already there? Read `schema/forms.txt` on origin/main of fs-interfaces (`gh api`, NOT a stale clone), the branches `unreviewed/*` of fs-interfaces (`git ls-remote`), the drafts under `.scratch/woche-*/form/formkatalog/`, the catalog of components (`contract/blocks/*.toml` in fs-components: `forms = [...]`) and `FEATURES-OFFEN.md`. Result `befund` = { art: vorhanden | neu, verweis (\"extend <name>@<version>\"), erweitern (bool: `true` = a minor line is needed, `false` = nothing to change; only read for `vorhanden`, `neu` sets `false`), beleg (what was searched, paths, heads) }. `vorhanden` = the form is extended by a minor line (`erweitern: true`) or nothing is done (`erweitern: false`); `neu` needs a reason and proof."
   - vorhanden-pruefen-check:
       call: befund-beleg:0.0.18@fs
       with:
@@ -211,7 +211,7 @@ do:
         freesynergy.net:bot-seat: form-neu.bericht
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Report: full SHAs, CI run ids per repo (branch-ci, lint, blueprint-e2e: id, conclusion, headSha, read with `gh` at the exact head), the named version line (not decided), the counterpart gaps, the open points. The checklist `FEATURES-OFFEN.md`: the EXISTING lines are ticked (`[ ]` to `[x]` + date), a new line only for something really new. Copy blocks in the report follow rule (6)."
+        freesynergy.net:summary: "Report: full SHAs, CI run ids per repo (ALL workflows of the target repo at the exact head, incl. Windows, as named by the caller; id, conclusion, headSha, read with `gh` at the exact head), the named version line (not decided), the counterpart gaps, the open points. The checklist `FEATURES-OFFEN.md`: the EXISTING lines are ticked (`[ ]` to `[x]` + date), a new line only for something really new. Copy blocks in the report follow rule (6)."
   - abbruch:
       set:
         todo: abbruch
