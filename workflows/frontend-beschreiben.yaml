@@ -22,6 +22,7 @@
 #   (8) Size of the steps (for Haiku): ONE step does ONE thing and names `Input:` and `Output:` in its summary; a red check jumps back at most twice, the third red round goes to `eskalation`; a missing result goes to `eskalation`, never on.
 #   (9) Agents never push to main, tag or merge; output only on `unreviewed/frontend-<programm>`; no force push; identity `FreeSynergy <support@freesynergy.net>` only; tests only through `bash .scratch/build-slot.sh` (`--status` first).
 #   (10) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (`set -e` closes the user's shell on the first error; `set -u` and `pipefail` do not close it, but they stay switched ON in the user's shell and change every later command and prompt script). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
+#   (11) REALITY INSTEAD OF TESTS (user 24.11.): the layout descriptions are the practical test of Forms, Components and the host; whatever stands out (a missing component, form or host command) becomes a card AT ONCE (lane C or F, or Scaffold: "Befehl fehlt in Modul X"), not at the end of the run; no mutant chains for this flow, a structure test is enough, one review per bundle.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net

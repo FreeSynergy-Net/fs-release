@@ -1,5 +1,5 @@
 //! Pattern: none (test). The flow `frontend-beschreiben` (the LAYOUT of a Frontend as describing data, no function, no connection): existing first, the six steps in order, layout and theme apart, binding not written,
-//! the check command of the PUBLISHED host, missing components as cards with a crop, the gaps as cards (no script, no Python in the flow), the user's verdict, the copy block rule. Counter-tests on changed copies.
+//! the check command of the PUBLISHED host, missing components as cards with a crop, the gaps as cards (no script, no Python in the flow), the user's verdict, the copy block rule. Structure test only (user's depth of checking 24.11.: no mutant chains).
 
 mod support;
 use support::workflows::{in_order, read, step_body};
@@ -67,127 +67,12 @@ fn flow_is_sound(text: &str) -> bool {
         && text.contains("[KOPIERBLOCK-OFFENE-SHELL]")
         && text.contains("NO own script, NO Python")
         && text.contains("ONLY LAYOUT")
+        && text.contains("REALITY INSTEAD OF TESTS")
 }
 
 #[test]
 fn frontend_beschreiben_is_layout_only_data_with_the_published_host_and_cards_for_the_gaps() {
     assert!(flow_is_sound(&read("frontend-beschreiben")));
-}
-
-#[test]
-fn frontend_beschreiben_is_red_without_each_rule() {
-    let weiche = "bilder-weiche:\n      switch:\n        - runden:\n            when: '${ $context.vorbild.bilder_fehlen == true and ($context.vorbild.runde // 0) >= 2 }'\n            then: eskalation\n        - fehlen:\n            when: '${ $context.vorbild.bilder_fehlen == true }'\n            then: dossier";
-    for (needle, what, edit) in [
-        (
-            "MANDATORY FIRST STEP",
-            "no existing-first step",
-            ("MANDATORY FIRST STEP", "FIRST"),
-        ),
-        (
-            "then: dossier",
-            "missing pictures are not fetched first",
-            (
-                weiche,
-                &weiche.replace("then: dossier", "then: anordnung-lesen"),
-            ),
-        ),
-        (
-            "ARRANGEMENT",
-            "no arrangement step",
-            ("ARRANGEMENT", "list"),
-        ),
-        (
-            "no data source, no command, no right",
-            "the layout may carry a binding",
-            (
-                "no data source, no command, no right",
-                "a source may be named",
-            ),
-        ),
-        (
-            "`bindung/` stays empty",
-            "the flow may write the binding",
-            ("`bindung/` stays empty", "`bindung/` is written"),
-        ),
-        (
-            "WITHOUT touching `layout/`",
-            "theme not a layer of its own",
-            ("WITHOUT touching `layout/`", "together with `layout/`"),
-        ),
-        (
-            "gate: opus-ja",
-            "no Opus review of the description",
-            (
-                "freesynergy.net:gate: opus-ja",
-                "freesynergy.net:gate: none",
-            ),
-        ),
-        (
-            "gh release download",
-            "no published host",
-            ("gh release download", "cargo build"),
-        ),
-        (
-            "never a locally built binary",
-            "a local binary may be used",
-            ("never a locally built binary", "a local binary"),
-        ),
-        (
-            "--check --description",
-            "no check command",
-            ("--check --description", "--version"),
-        ),
-        (
-            "--picture",
-            "no picture of the layout",
-            ("--picture <workdir>", "--no-picture <workdir>"),
-        ),
-        (
-            "name: picture-acceptance",
-            "no user verdict flow",
-            ("name: picture-acceptance", "name: other"),
-        ),
-        (
-            "picture crop to lane C",
-            "missing components are not carded with a crop",
-            ("picture crop to lane C", "note"),
-        ),
-        (
-            "never a new `[x]` line",
-            "a card may be a ticked line",
-            ("never a new `[x]` line", "also a ticked line"),
-        ),
-        (
-            "Befehl fehlt in Modul X",
-            "gaps not carried as cards",
-            ("Befehl fehlt in Modul X", "gap"),
-        ),
-        (
-            "NO own script, NO Python",
-            "scripts allowed in the flow",
-            ("NO own script, NO Python", "scripts are fine"),
-        ),
-        (
-            "ONLY LAYOUT",
-            "function allowed",
-            ("ONLY LAYOUT", "LAYOUT and data"),
-        ),
-        (
-            "[KOPIERBLOCK-OFFENE-SHELL]",
-            "no copy block rule",
-            ("[KOPIERBLOCK-OFFENE-SHELL]", "[X]"),
-        ),
-    ] {
-        let t = read("frontend-beschreiben").replace(edit.0, edit.1);
-        assert!(!flow_is_sound(&t), "{needle}: {what}");
-    }
-    // example data are no duty any more: a sample-data word in the picture step is red
-    let t = read("frontend-beschreiben")
-        .replace("--picture <workdir>", "--sample-data --picture <workdir>");
-    assert!(
-        !flow_is_sound(&t),
-        "--sample-data: example source is no duty"
-    );
 }
 
 #[test]
