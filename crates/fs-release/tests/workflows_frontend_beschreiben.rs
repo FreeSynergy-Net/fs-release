@@ -19,6 +19,7 @@ fn flow_is_sound(text: &str) -> bool {
         "frontend-nur-komponenten",
         "frontend-nur-komponenten-weiche",
         "frontend-befund-talk",
+        "fehlende-components-melden",
         "host-holen",
         "host-weiche",
         "pruefbefehl",
@@ -27,7 +28,6 @@ fn flow_is_sound(text: &str) -> bool {
         "bild-waechter",
         "bild-again",
         "vergleich",
-        "fehlende-components-melden",
         "bericht",
         "abbruch",
         "eskalation",
@@ -44,11 +44,11 @@ fn flow_is_sound(text: &str) -> bool {
         && step_body(text, "dossier").contains("name: dossier")
         && step_body(text, "dossier").contains("then: bilder-holen")
         && step_body(text, "anordnung-lesen").contains("ARRANGEMENT")
-        && step_body(text, "layout-schreiben").contains("beschreibung/layout/")
+        && step_body(text, "layout-schreiben").contains("forms/<ansicht>.toml")
         && step_body(text, "layout-schreiben").contains("no data source, no command, no right")
-        && step_body(text, "layout-schreiben").contains("`bindung/` stays empty")
-        && step_body(text, "theme-schreiben").contains("beschreibung/theme/")
-        && step_body(text, "theme-schreiben").contains("WITHOUT touching `layout/`")
+        && step_body(text, "layout-schreiben").contains("never a fake source")
+        && step_body(text, "theme-schreiben").contains("style layer of ADR 0074")
+        && step_body(text, "theme-schreiben").contains("WITHOUT touching `forms/*.toml`")
         && step_body(text, "frontend-nur-komponenten").contains("gate: opus-ja")
         && step_body(text, "frontend-nur-komponenten-weiche").contains(">= 3 }")
         && step_body(text, "host-holen").contains("gh release download")
@@ -64,6 +64,11 @@ fn flow_is_sound(text: &str) -> bool {
         && step_body(text, "host-holen").contains("Gap L7")
         && text.contains("L7 Host/component state fetch")
         && text.contains("TO CLARIFY FIRST")
+        && text.contains("NO parallel tree")
+        && text.contains("NEED NO HOST")
+        && text.contains(".scratch/katalog-plan/bilder/<programm>/vorbild/")
+        && step_body(text, "pruefbefehl-again").contains("l5-form-ohne-quelle")
+        && step_body(text, "host-weiche").contains("then: bericht")
         && text.contains("Target lane: C1")
         && step_body(text, "fehlende-components-melden").contains("picture crop to lane C")
         && step_body(text, "fehlende-components-melden").contains("never a new `[x]` line")
