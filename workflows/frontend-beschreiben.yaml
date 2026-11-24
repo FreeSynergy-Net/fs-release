@@ -1,0 +1,423 @@
+# frontend-beschreiben: the LAYOUT of a Frontend as DESCRIBING DATA (an fs-forms description), NOT as a crate, WITHOUT function and WITHOUT connection. Run through `workflow-pflege`.
+# Order: `Workflow frontend-beschreiben, step <id>, parameters programm, frontend, vorbild, dossier, model, bestand, blinc, repo, branch, workdir, beschreibung, host_version` (docs/prompt-template.md). FS profile: see README.md.
+# State of the order (user, 24.11.2026, via 9f): ONLY LAYOUT. No data source, no commands, no rights, no example-source duty; only placeholder values so that something can be seen. The BINDING part (source, commands, rights) is written LATER, when Scaffold AND Forms stand; then it is only ADDED, nothing is rebuilt. Therefore the description has three folders that never mix: `beschreibung/layout/` (arrangement of the components), `beschreibung/theme/` (colours, fonts, spaces as a layer of its own; more themes without touching the layout), `beschreibung/bindung/` (NOT written by this flow).
+# Course (the six steps of the user): bilder-holen -> anordnung-lesen -> layout-schreiben -> theme-schreiben -> bild-nebeneinander -> fehlende-components-melden. Around them: vorhanden-pruefen first, the review `frontend-nur-komponenten`, the check command of the published host, the user's verdict (`picture-acceptance`).
+# The flow is ITSELF only data: every step is a command of one of our programs (published host `fs-starter --check|--description|--picture|--list-commands`, recorder module `fs-capture`, `gh` for reading) or a reading/writing step of an agent on DATA files. NO own script, NO Python, NOTHING compiled in the flow, NO new crate. The `@fs` calls are SPECIFICATION (see README.md, status table). Several programs may run in parallel (Haiku, no build slot: nothing is built).
+# Input: programm (name of the program), frontend (name of the Frontend description), vorbild (the model program), dossier (folder of the dossier), model (pictures of the model), bestand, blinc (inventories for the dossier), repo, branch (`unreviewed/frontend-<programm>`), workdir, beschreibung (folder of the description INSIDE the data package, only data files), auftrag (optional: the user's words of the last verdict, empty in the first round), host_version (tag of the published host `fs-starter`, e.g. `v0.0.4`).
+# Existing first (user rule 23.11.): the flow does NOT replace `frontend-round` for the old Frontend crates. It CALLS `dossier`, `picture-acceptance` and the review template `frontend-nur-komponenten` as they are (no second copy). Decision "new flow instead of rebuilding frontend-round": `frontend-round` builds a crate (`build-ai`, gates, `menue-vergleich`, release-flow, style steps) and is needed for the old crates until they are descriptions; a rebuild would put crate and description into one file and make its tests (`workflows_frontend_komponenten`, `workflows_aufrufer`) carry both. When the last Frontend crate is gone, `frontend-round` is removed in one step (a card in FEATURES-OFFEN.md).
+# GAPS (rule: where a step would today only work by a script, it is NOT built in; it is a card "Befehl fehlt in Modul X" to Scaffold/the modules, listed in the report and in FEATURES-OFFEN.md). State 24.11.2026:
+#   L1 `fs-starter --check`: reports only "description there or not" (rc 0/1/3); a LIST of the forms and components used and of what is missing is missing -> the step `anordnung-lesen` is an agent reading until then.
+#   L2 fs-components: no command "list the blocks with what they can do and their `forms = [...]`" (only reading `contract/blocks/*.toml`); needed by `fehlende-components-melden`.
+#   L3 `fs-capture`: no command that sets a model picture and our picture side by side (`pair <vorbild.png> <unser.png> <out.png>`) and none that cuts a part out of a picture (`crop <png> <x> <y> <w> <h> <out.png>`); `picture-acceptance` step `menue-bilder` has no script either.
+#   L4 `fs-starter --picture`: one picture of the screen; a picture of an OPENED main menu or context menu is not named in the words (`--screen` to be checked in `fs-starter --help` by the step `bild-nebeneinander`); if it cannot be done: card to fs-forms-run.
+#   L5 `fs-starter` with a description that has ONLY layout and theme (no `bindung/`): whether the host draws it with placeholder values is to be shown by the step `pruefbefehl`; red there is a card to Scaffold/fs-forms ("layout without binding"), never a reason to write a binding into the layout.
+#   L6 Windows: the model pictures are mostly made on Windows (`fs-capture shot --title` there); our pictures are drawn on Linux and on `windows-latest` (WARP); one command that does both and names the host is missing.
+# Rules. (1) Existing first: `vorhanden-pruefen` is the mandatory first step: description, dossier, forms, components, blocks, `FEATURES-OFFEN.md` are read before a line is written; what exists is extended.
+#   (2) LAYOUT ONLY: no data source, no command, no right, no logic in `layout/` and `theme/`; placeholder values only (said so in the picture name and in the report: `layout-nur`). Binding is added later in `bindung/`.
+#   (3) A missing component or one that cannot do what the model shows is NEVER bypassed in the Frontend: the part stays out (`offen`) or the nearest existing component stands in marked `vorlaeufig`; a card WITH a picture crop goes to lane C (the user wants the components COMPLETE; the list steers the order in lane C). A missing form: lane F (workflow `form-neu`).
+#   (4) THEMING is its own layer: colours, fonts and spaces of the model go to `theme/` as tokens (ADR 0074), never into `layout/`; a second theme must work without a change in `layout/`.
+#   (5) The host binary is the PUBLISHED one (release asset of FreeSynergy-Net/fs-starter at the tag `host_version`, checksum checked when the release has one), never a locally built or cached binary (CLAUDE.md section 4, hard limit 1).
+#   (6) The description holds only data: a file with code (`*.rs`, `Cargo.toml`, `*.py`, `*.sh`) in `beschreibung` is a FINDING (review template `frontend-nur-komponenten`).
+#   (7) Pictures first and the user's verdict: `picture-acceptance` is called with the pictures; only `accepted == true` ends the flow green; the user's words go back as the order. Pictures count only with a green theme guard (`waechter.red == false`).
+#   (8) Size of the steps (for Haiku): ONE step does ONE thing and names `Input:` and `Output:` in its summary; a red check jumps back at most twice, the third red round goes to `eskalation`; a missing result goes to `eskalation`, never on.
+#   (9) Agents never push to main, tag or merge; output only on `unreviewed/frontend-<programm>`; no force push; identity `FreeSynergy <support@freesynergy.net>` only; tests only through `bash .scratch/build-slot.sh` (`--status` first).
+#   (10) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (`set -e` closes the user's shell on the first error; `set -u` and `pipefail` do not close it, but they stay switched ON in the user's shell and change every later command and prompt script). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: frontend-beschreiben
+  version: 0.0.18
+  title: Describe the layout of a Frontend as data - model pictures, arrangement, layout, theme, picture next to the model, missing components
+do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.18@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.vorhanden-pruefen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP. Input: `.input` (programm, frontend, vorbild, dossier). Read: the description of this Frontend in the data package (`beschreibung`: `layout/`, `theme/`), the dossier folder (`bausteine.md`, pictures), the components (fs-components `contract/blocks/*.toml`), the branches `unreviewed/*` of the program repo, `FEATURES-OFFEN.md`. Output `befund` = { art: vorhanden | neu, verweis (\"extend <frontend>\" or the reason for neu), erweitern (bool; only read for `vorhanden`), beleg (what was searched, paths, heads) }. `neu` needs a reason and proof."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.18@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate). Input: `befund`. Output: `belegcheck` = { red, runde }. A `befund` without proof is RED: `neu` needs a reason and what was searched, `vorhanden` needs the reference \"extend X\"; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), the third red round goes to `eskalation`; a missing result goes to `eskalation`, never to green."
+  - vorhanden-weiche:
+      switch:
+        - vorhanden-ohne-aenderung:
+            when: '${ $context.befund.art == "vorhanden" and ($context.befund.erweitern // false) != true }'
+            then: abbruch
+        - vorhanden-erweitern:
+            when: '${ $context.befund.art == "vorhanden" }'
+            then: bilder-holen
+        - neu:
+            when: '${ $context.befund.art == "neu" }'
+            then: bilder-holen
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - `vorhanden` without a needed extension ends the run with the reference (no doubled Frontend); `vorhanden` with `erweitern` and `neu` go on; a missing result goes to `eskalation`."
+  - bilder-holen:
+      call: bilder-holen-ai:0.0.18@fs
+      with:
+        dossier: ${ .input.dossier }
+        model: ${ .input.model }
+      export:
+        as: '${ $context + { vorbild: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.bilder-holen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step 1. Take the model pictures of the program that are already in the dossier. Input: `dossier` (`bausteine.md`, `menus.md`, `dialogs.md`, pictures), `model`. Output `vorbild` = { bilder: [ { name, pfad, bereich } ], bilder_fehlen (bool: a main view, dialog or menu of the dossier without a picture), fehlt: [names] }. Where a person has the model program open (mostly Windows), the picture is taken with the recorder module: `fs-capture shot --title <window title>`, handed over with `fs-capture list` and `fs-capture zip <file.zip>`. Reads only the dossier; writes the picture list."
+  - bilder-weiche:
+      switch:
+        - runden:
+            when: '${ $context.vorbild.bilder_fehlen == true and ($context.vorbild.runde // 0) >= 2 }'
+            then: eskalation
+        - fehlen:
+            when: '${ $context.vorbild.bilder_fehlen == true }'
+            then: dossier
+        - da:
+            when: '${ $context.vorbild.bilder_fehlen == false }'
+            then: anordnung-lesen
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - missing pictures go FIRST to the sub-workflow `dossier` (get them), then back to `bilder-holen` (once); still missing the second time: `eskalation` (the person takes the picture or declares the area `ohne Vorbild`); a missing result goes to `eskalation`. Pictures first: no layout without them."
+  - dossier:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: dossier
+          version: 0.0.18
+        input:
+          vorbild: ${ .input.vorbild }
+          bestand: ${ .input.bestand }
+          blinc: ${ .input.blinc }
+          dossier: ${ .input.dossier }
+          repo: ${ .input.repo }
+          branch: ${ .input.branch }
+      then: bilder-holen
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Sub-workflow `dossier.yaml` as it is (research by the agent, check-docs by the machine, block analysis `bausteine.md`, human publish). Input: vorbild, bestand, blinc, dossier, repo, branch. Output: the dossier folder with the pictures. Then `bilder-holen` runs again."
+  - anordnung-lesen:
+      call: anordnung-lesen-ai:0.0.18@fs
+      with:
+        bilder: ${ $context.vorbild.bilder }
+        dossier: ${ .input.dossier }
+      export:
+        as: '${ $context + { anordnung: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.anordnung-lesen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step 2. LOOK at every picture and write down the ARRANGEMENT of the components. Input: `vorbild.bilder`, the block table of `bausteine.md`. Output `anordnung` = { bilder: [ { name, baum: [ { component (block id of `bausteine.md`), wo (area: top, left, centre, ...), kinder (nesting), leisten (bars, columns, rows), abstaende (gaps in steps of the picture, not in pixels of a screen) } ], farben_schriften (what the picture shows about colour, font, space: goes to `theme-schreiben`, NOT into the tree) } ] }. A block id comes from the table (existing first); no id for a thing: write `unbekannt` with a crop name, the step `fehlende-components-melden` takes it. Reads only, writes nothing else."
+  - layout-schreiben:
+      call: layout-schreiben-ai:0.0.18@fs
+      with:
+        anordnung: ${ $context.anordnung }
+        beschreibung: ${ .input.beschreibung }
+        auftrag: ${ .input.auftrag // "" }
+      export:
+        as: '${ $context + { layout: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.layout-schreiben
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step 3. Write the LAYOUT part of the fs-forms description (data files in `beschreibung/layout/`; take an existing description of the same host as the pattern, do not invent a format). Input: `anordnung.bilder[].baum`, `auftrag` (input, empty in the first round; in a repeat the run state hands the user's words `verdict.words` of the last verdict in as `auftrag`). Output `layout` = { dateien: [paths], head (full SHA of the local commit on `unreviewed/frontend-<programm>`), vorlaeufig: [components that stand in], offen: [areas left out] }. Contents: which component where, nesting, bars, columns, gaps; placeholder values only so that something can be seen. NOTHING else (rule 2): no data source, no command, no right, no example source, no logic, no colour or font value. The BINDING part is NOT written (`bindung/` stays empty). Local commit, no push, no tag."
+  - theme-schreiben:
+      call: theme-schreiben-ai:0.0.18@fs
+      with:
+        anordnung: ${ $context.anordnung }
+        beschreibung: ${ .input.beschreibung }
+      export:
+        as: '${ $context + { theme: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.theme-schreiben
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step 4. THEMING as a layer of its own. Input: `anordnung.bilder[].farben_schriften`. Output `theme` = { dateien: [paths in `beschreibung/theme/`], head, namen: [theme names] }. Colours, fonts and spaces of the model as tokens (ADR 0074, DTCG), English theme name, fair reference to the model named (source and licence of the reference, nothing copied, ADR 0013). The layout does not name a colour or size; another theme is added later WITHOUT touching `layout/` (a second file in `theme/`). Local commit, no push, no tag."
+  - frontend-nur-komponenten:
+      call: frontend-nur-komponenten:0.0.18@fs
+      with:
+        frontend_crate: ${ .input.beschreibung }
+      export:
+        as: '${ $context + { komponenten: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.frontend-nur-komponenten
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Review template frontend (rule of the user, lane 3) as it is, the folder of the description stands in place of the crate (input `frontend_crate` = `beschreibung`): ONLY the plugging together of components plus theme, style, menu tree and texts; a file with code, logic, an own widget, a data source or a command inside `layout/` or `theme/`, or a colour or size value inside `layout/` is a FINDING (result `befunde`, each with file and line). Opus reads only and writes the findings."
+  - frontend-nur-komponenten-weiche:
+      switch:
+        - runden:
+            when: '${ $context.komponenten.befunde != null and ($context.komponenten.befunde | length) > 0 and ($context.komponenten.runde // 0) >= 3 }'
+            then: eskalation
+        - befund:
+            when: '${ $context.komponenten.befunde != null and ($context.komponenten.befunde | length) > 0 }'
+            then: frontend-befund-talk
+        - sauber:
+            when: '${ $context.komponenten.befunde != null and ($context.komponenten.befunde | length) == 0 }'
+            then: host-holen
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a finding goes to the conversation `frontend-befund-talk` (at most two repeats, then `eskalation`); only an empty list (not a missing result) goes on; a missing result goes to `eskalation`, never on."
+  - frontend-befund-talk:
+      call: talk:0.0.18@fs
+      with:
+        frontend_crate: ${ .input.beschreibung }
+        befunde: ${ $context.komponenten.befunde }
+      then: frontend-nur-komponenten
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "Conversation of the user and Opus about every finding; the protocol `talk-<programm>-frontend-<datum>.md` holds the decision. No agent decides it alone. Then the check runs again."
+  - host-holen:
+      call: host-holen:0.0.18@fs
+      with:
+        host_version: ${ .input.host_version }
+        workdir: ${ .input.workdir }
+      export:
+        as: '${ $context + { host: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Fetch the PUBLISHED host binary (rule 5). Input: `host_version`, `workdir`. Command: `gh release download <host_version> --repo FreeSynergy-Net/fs-starter --pattern 'fs-starter-*' --dir <workdir>/host` and, when the release carries a checksum file, `sha256sum --check` on it (rc kept, output not cut). Output `host` = { pfad, tag, sha256, geprueft (bool: false = the release has no checksum, said in the report), red }. No release at that tag = red (never a locally built binary). `fs-starter --version` must print the tag."
+  - host-weiche:
+      switch:
+        - red:
+            when: '${ $context.host.red != false }'
+            then: eskalation
+        - green:
+            when: '${ $context.host.red == false }'
+            then: continue
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - no published host (or no result) is the end of the run for the person: the layout is not shown with a built or cached binary."
+  - pruefbefehl:
+      call: fs-starter-check:0.0.18@fs
+      with:
+        host: ${ $context.host }
+        beschreibung: ${ .input.beschreibung }
+      export:
+        as: '${ $context + { pruef: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The check command of the published host. Input: `host.pfad`, `beschreibung`. Command: `<host.pfad> --check --description <beschreibung>`. Output `pruef` = { rc, red, stderr (whole, not cut) }. rc 0 = description there; rc 1 = failed; rc 3 = contract missing (fatal); anything else is red. A description with layout and theme only (gap L5): red because of a missing binding is NOT repaired by writing a binding into the layout, it is a card to Scaffold/fs-forms. Gap L1: the command does not list the components used."
+  - pruefbefehl-again:
+      switch:
+        - runden:
+            when: '${ $context.pruef.red == true and ($context.pruef.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.pruef.red == true }'
+            then: layout-schreiben
+        - green:
+            when: '${ $context.pruef.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `layout-schreiben` with the stderr as the order (at most two repeats), the third red round goes to `eskalation`; a missing result goes to `eskalation`, never to green."
+  - bild-nebeneinander:
+      call: fs-starter-picture:0.0.18@fs
+      with:
+        host: ${ $context.host }
+        beschreibung: ${ .input.beschreibung }
+        programm: ${ .input.programm }
+        workdir: ${ .input.workdir }
+      export:
+        as: '${ $context + { bilder: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put it next to the model. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The pair model | ours is made by `picture-acceptance` (gap L3). Output `bilder` = { dateien: [paths], rc, red }. Red = rc != 0 or a file that is missing or empty."
+  - bild-waechter:
+      call: theme-waechter-check:0.0.18@fs
+      with:
+        images: ${ $context.bilder }
+      export:
+        as: '${ $context + { waechter: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "SPECIFICATION, NOT RUNNABLE (no script yet; same step as in `frontend-round`). Theme guard of the pictures (rule [THEME-WAECHTER] in testlauf): the result `waechter` goes to the picture acceptance; pictures without a green guard (`red == false`) do not count as evidence there."
+  - bild-again:
+      switch:
+        - runden:
+            when: '${ $context.bilder.red == true and ($context.bilder.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.bilder.red == true }'
+            then: layout-schreiben
+        - green:
+            when: '${ $context.bilder.red == false }'
+            then: abnahme
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a picture that was not drawn goes back to `layout-schreiben` (at most two repeats), the third red round goes to `eskalation`; only drawn pictures go to the acceptance; a missing result goes to `eskalation`."
+  - abnahme:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: picture-acceptance
+          version: 0.0.18
+        input:
+          dossier: ${ .input.dossier }
+          model: ${ .input.model }
+          ours: ${ $context.bilder }
+          waechter: ${ $context.waechter }
+      export:
+        as: '${ $context + { verdict: . } }'
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "The user's verdict on the pictures (`picture-acceptance.yaml`: model | ours, strategy opinion, then the user) is taken as it is; nobody argues it down. The pictures show LAYOUT with placeholder values (rule 2); nobody judges data or function here. Output `verdict` = { accepted, words }."
+  - abnahme-weiche:
+      switch:
+        - accepted:
+            when: '${ $context.verdict.accepted == true }'
+            then: fehlende-components-melden
+        - not-accepted:
+            when: '${ $context.verdict.accepted == false and (($context.verdict.runde // 0) < 3) }'
+            then: layout-schreiben
+        - runden:
+            when: '${ $context.verdict.accepted == false }'
+            then: eskalation
+        - no-verdict:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - only `accepted == true` goes on (to `fehlende-components-melden`); `accepted == false` goes back to `layout-schreiben` with the user's words as the order (`verdict.words`; at most two repeats); anything else (no verdict, e.g. picture-acceptance ended in `dossier-menue-fehlt` or `menue-bild-fehlt`) goes to `eskalation`."
+  - fehlende-components-melden:
+      call: components-melden-ai:0.0.18@fs
+      with:
+        anordnung: ${ $context.anordnung }
+        layout: ${ $context.layout }
+      export:
+        as: '${ $context + { fehlende: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.fehlende-components-melden
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Step 6. Every component that the model shows and that is missing here, or that cannot do what the model shows, is a card WITH a picture crop to lane C (the user wants the components COMPLETE; this list steers the order in lane C). Input: `anordnung` (components with `unbekannt` or `vorlaeufig`), `layout.vorlaeufig`, `layout.offen`, the blocks of fs-components (gap L2). Output `fehlende` = { karten: [ { bahn: C | F, component, was_fehlt_oder_kann_nicht, bild (path of the model picture), ausschnitt (x y w h of the crop), wo_im_vorbild } ], zeilen: [the new `[ ]` lines] }. The crop is named (gap L3: `fs-capture crop`); until it exists the card names picture and area. In `FEATURES-OFFEN.md` ONLY new `[ ]` lines in the fitting section and only if the same card is not there yet (existing first), never a new `[x]` line; a missing FORM goes to lane F (workflow `form-neu`). Where a step of this run would only work by a script: the card \"Befehl fehlt in Modul X: <command> (<what for>)\" (gaps L1 to L6 of the header that were really met), each once. In the worktree the lines go to `_bericht/FEATURES.md` (quote the existing line), the coordinator ticks."
+  - bericht:
+      call: report-write:0.0.18@fs
+      with:
+        lauf: ${ $context }
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: frontend-beschreiben.bericht
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report: full SHAs, the host tag and checksum state, the pictures (paths, `layout-nur`), the verdict, the cards (components with crops, `Befehl fehlt in Modul X`), CI run ids per repo (ALL workflows of the target repo at the exact head, incl. Windows; id, conclusion, headSha, read with `gh` at the exact head), the areas left out. The checklist `FEATURES-OFFEN.md`: the EXISTING lines are ticked (`[ ]` to `[x]` + date), a new line only for something really new. Copy blocks in the report follow rule 10."
+  - abbruch:
+      set:
+        todo: abbruch
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Abort with a reference: the layout is already described and needs no extension; the report names the reference."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a model picture is still missing, no published host exists, the user did not accept three times, or a result is missing: the loop stops and the person decides. The report names the step and the last red result."
