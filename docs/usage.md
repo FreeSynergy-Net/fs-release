@@ -164,6 +164,8 @@ Packaging metadata stays in the app repo: `[package.metadata.deb]` and `[package
 (without them sensible defaults are generated), optional `wix/main.wxs`, `packaging/<app-id>.desktop`,
 `packaging/<app-id>.png|svg` (AppImage), `packaging/icon.icns` (macOS app).
 
+Optional hook `packaging/prepare.sh`: when it exists and is executable (`-x`), `package-linux` and `package-windows` run it in the working folder of the program repo BEFORE the packages are built (log group `prepare`), so the repo can fetch what the packages need from its one source (fs-starter: the host icon from fs-icons). Make it executable in git (`git update-index --chmod=+x`): on Windows the check `-x` is also made by Git Bash, and a file without the executable bit is skipped silently. The hook runs in the job `build` (`contents: read`, no secrets, no signing key; those exist only in `finalize`), i.e. with the rights of `cargo build`.
+
 ### Library mode (`kind: library`, no binaries)
 
 A pure library has nothing to build, package or sign. Set `kind: library` and leave `binaries` **empty**; the same `release.yml` then runs in library mode
