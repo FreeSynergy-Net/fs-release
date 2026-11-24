@@ -44,7 +44,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.vorhanden-pruefen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "MANDATORY FIRST STEP. Input: `.input` (programm, frontend, vorbild, dossier). Read: the description of this Frontend in the data package (`beschreibung` = `forms/*.toml`, `scaffold.toml`), the dossier folder (`bausteine.md`, pictures), the components (fs-components `contract/blocks/*.toml`), the branches `unreviewed/*` of the program repo, `FEATURES-OFFEN.md`. Output `befund` = { art: vorhanden | neu, verweis (\"extend <frontend>\" or the reason for neu), erweitern (bool; only read for `vorhanden`), beleg (what was searched, paths, heads) }. `neu` needs a reason and proof."
+        freesynergy.net:summary: "MANDATORY FIRST STEP. Input: `.input` (programm, frontend, vorbild, dossier). Read: the description of this Frontend in the data package (`beschreibung` = `forms/*.toml`, `scaffold.toml`), the dossier folder (`bausteine.md`, pictures), the components (fs-components `contract/blocks/*.toml`), the branches `unreviewed/*` of the program repo, `FEATURES-OFFEN.md`. Output `befund` = { art: vorhanden | neu, verweis (\"extend <frontend>\" or the reason for neu), erweitern (bool; only read for `vorhanden`), beleg (what was searched, paths, heads) }. `neu` needs a reason and proof. At the start of a run the step removes every `<workdir>/.*-runde` counter file (also the ones an `eskalation` or `l5` left standing), so a new run starts at round 0."
   - vorhanden-pruefen-check:
       call: befund-beleg:0.0.18@fs
       with:
@@ -98,6 +98,7 @@ do:
   - bilder-holen:
       call: bilder-holen-ai:0.0.18@fs
       with:
+        workdir: ${ .input.workdir }
         dossier: ${ .input.dossier }
         model: ${ .input.model }
       export:
@@ -167,7 +168,7 @@ do:
       with:
         anordnung: ${ $context.anordnung }
         beschreibung: ${ .input.beschreibung }
-        auftrag: '${ if ($context.pruef.stderr // "") != "" then $context.pruef.stderr else (.input.auftrag // "") end }'
+        auftrag: '${ [($context.pruef.stderr // ""), (.input.auftrag // "")] | map(select(. != "")) | (.[0] // "") }'
       export:
         as: '${ $context + { layout: . } }'
       metadata:
@@ -194,6 +195,7 @@ do:
   - frontend-nur-komponenten:
       call: frontend-nur-komponenten:0.0.18@fs
       with:
+        workdir: ${ .input.workdir }
         frontend_crate: ${ .input.beschreibung }
       export:
         as: '${ $context + { komponenten: . } }'
@@ -203,7 +205,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.frontend-nur-komponenten
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: subjective
-        freesynergy.net:summary: "Review template frontend (rule of the user, lane 3) as it is, the folder of the description stands in place of the crate (input `frontend_crate` = `beschreibung`): ONLY the plugging together of components plus theme, style, menu tree and texts; a file with code, logic, an own widget, a data source or a command inside `forms/*.toml` or the style layer, or a colour or size value inside `forms/*.toml` is a FINDING (result `komponenten` = { befunde: [each with file and line], runde (int: the step counts itself in `<workdir>/.komponenten-runde`, +1 per call, file removed when `befunde` is empty) }). Opus reads only and writes the findings."
+        freesynergy.net:summary: "Review template frontend (rule of the user, lane 3) as it is, the folder of the description stands in place of the crate (input `frontend_crate` = `beschreibung`): ONLY the plugging together of components plus theme, style, menu tree and texts; a file with code, logic, an own widget, a data source or a command inside `forms/*.toml` or the style layer, or a colour or size value inside `forms/*.toml` is a FINDING (result `komponenten` = { befunde: [each with file and line], runde (int: the step counts itself in `<workdir>/.komponenten-runde`, +1 per call, file removed when `befunde` is empty) }). Opus reads only and writes the findings; the counter file is kept by the flow (the caller of the step, input `workdir`), not by the reviewer."
   - frontend-nur-komponenten-weiche:
       switch:
         - runden:
@@ -279,6 +281,7 @@ do:
   - pruefbefehl:
       call: fs-starter-check:0.0.18@fs
       with:
+        workdir: ${ .input.workdir }
         host: ${ $context.host }
         beschreibung: ${ .input.beschreibung }
       export:
@@ -288,7 +291,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "The check command of the published host. Input: `host.pfad`, `beschreibung`. Command: `<host.pfad> --check --description <beschreibung>`. Output `pruef` = { rc, red, stderr (whole, not cut), l5 (bool: `true` exactly when rc is 1 and stderr names a missing `source`, i.e. the host does not accept a form without a source; else `false`), runde (int: the step counts itself in `<workdir>/.pruefbefehl-runde`, +1 per call, file removed on green) }. rc 0 = description there; rc 1 = failed; rc 3 = contract missing (fatal); anything else is red. A description with layout and theme only (gap L5): red because of a missing binding is NOT repaired by writing a binding into the layout, it is a card to Scaffold/fs-forms. Gap L1: the command does not list the components used. `pruef.l5 == true` = the host does not accept a form without a source: NOT repaired with a fake source; card to C1 with PRECEDENCE (gap L5), the run goes through `fremdbilder-pruefen` to the report."
+        freesynergy.net:summary: "The check command of the published host. Input: `host.pfad`, `beschreibung`. Command: `<host.pfad> --check --description <beschreibung>`. Output `pruef` = { rc, red, stderr (whole, not cut), l5 (bool: for `--check` of host v0.0.8 always `false`: a form without `[[source]]` passes with rc 0; whether `--picture` accepts such a form is still open; rc 1 with `layout-error-source-unknown` in stderr is NOT L5 but an error of `layout-schreiben` (a block points to a source that does not exist): red, back to `layout-schreiben` with the stderr as the order), runde (int: the step counts itself in `<workdir>/.pruefbefehl-runde`, +1 per call, file removed on green) }. rc 0 = description there; rc 1 = failed; rc 3 = contract missing (fatal); anything else is red. A description with layout and theme only (gap L5): red because of a missing binding is NOT repaired by writing a binding into the layout, it is a card to Scaffold/fs-forms. Gap L1: the command does not list the components used. `pruef.l5 == true` = the host does not accept a form without a source: NOT repaired with a fake source; card to C1 with PRECEDENCE (gap L5), the run goes through `fremdbilder-pruefen` to the report."
   - pruefbefehl-again:
       switch:
         - l5-form-ohne-quelle:
@@ -325,7 +328,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put ONE SHEET per program next to the model (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The sheet (pair model | ours, views below each other) is made by the step itself (gap L3: `fs-capture pair`); no verdict of the user per picture. Output `bilder` = { dateien: [paths], rc, red, runde (int: the step counts itself in `<workdir>/.bild-nebeneinander-runde`, +1 per call, file removed on green) }. Red = rc != 0 or a file that is missing or empty. [FREMDBILDER-NIE-INS-REPO] The sheet (model beside ours) stays LOCAL under `.scratch/katalog-plan/bilder/layout/<programm>/` and is never committed, pushed or uploaded; only our own pictures may leave the machine."
+        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put ONE SHEET per program next to the model (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/unser/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The sheet (pair model | ours, views below each other) is made by the step itself (gap L3: `fs-capture pair`); no verdict of the user per picture. Output `bilder` = { dateien: [paths], rc, red, runde (int: the step counts itself in `<workdir>/.bild-nebeneinander-runde`, +1 per call, file removed on green) }. Red = rc != 0 or a file that is missing or empty. [FREMDBILDER-NIE-INS-REPO] The sheet (model beside ours) stays LOCAL under `.scratch/katalog-plan/bilder/layout/<programm>/` and is never committed, pushed or uploaded; only our own pictures may leave the machine."
   - bild-waechter:
       call: theme-waechter-check:0.0.18@fs
       with:
@@ -375,6 +378,7 @@ do:
   - fremdbilder-pruefen:
       call: fremdbilder-pruefen:0.0.18@fs
       with:
+        workdir: ${ .input.workdir }
         beschreibung: ${ .input.beschreibung }
         branch: ${ .input.branch }
       export:
@@ -384,7 +388,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "[FREMDBILDER-NIE-INS-REPO] Before EVERY commit and push. Input: `beschreibung`, `branch`. Command (data, no new script): `git diff --name-only --diff-filter=AM $(git merge-base origin/main HEAD)..HEAD` plus `git ls-files` of the description, filtered by the picture extension list (png, jpg, jpeg, gif, webp, svg, bmp, tiff, ico). Rule of paths: picture files may stand ONLY under ONE own picture folder of the description: `bilder/unser/`; a picture in a model folder (`vorbild/`), a comparison sheet or anything from `.scratch/` is a FINDING. Output `fremdbilder` = { bilder_im_diff: [paths], fremd: [paths], red, runde (int: the step counts itself in `<workdir>/.fremdbilder-runde`, +1 per call, file removed on green) }. Red = a picture of a foreign program in the diff; then NO commit and NO push, the step takes the file out of the diff and the control flow `fremdbilder-weiche` runs it again; the third red round (at most two repeats) goes to `eskalation`. EVERY way to `bericht` runs through this step (also `host-weiche` red and `pruefbefehl-again` l5)."
+        freesynergy.net:summary: "[FREMDBILDER-NIE-INS-REPO] Before EVERY commit and push. Input: `beschreibung`, `branch`. Command (data, no new script): EVERY commit of the range is checked, not only the net diff (a deleting commit would make the net diff clean while the picture still lies in the history on GitHub): `git log --diff-filter=A --name-only --format= $(git merge-base origin/main HEAD)..HEAD` (every file ever added in the range), plus `git diff --name-only --diff-filter=AM $(git merge-base origin/main HEAD)..HEAD` plus `git ls-files` of the description, filtered by the picture extension list (png, jpg, jpeg, gif, webp, svg, bmp, tiff, ico). Rule of paths: picture files may stand ONLY under ONE own picture folder of the description: `bilder/unser/`; a picture in a model folder (`vorbild/`), a comparison sheet or anything from `.scratch/` is a FINDING. Output `fremdbilder` = { bilder_im_diff: [paths], fremd: [paths], red, runde (int: the step counts itself in `<workdir>/.fremdbilder-runde`, +1 per call, file removed on green) }. Red = a picture of a foreign program in the diff; then NO push. Taking the picture out means: REWRITE the local, not yet pushed commits so that the picture never was in any of them (for example `git rebase` with drop or edit; no force push, because nothing is pushed yet). NEVER a deleting commit (`git rm` plus a new commit): it keeps the picture in the history. If the branch is already pushed, no repeat: the flow goes to `eskalation`; otherwise the control flow `fremdbilder-weiche` runs the check again; the third red round (at most two repeats) goes to `eskalation`. EVERY way to `bericht` runs through this step (also `host-weiche` red and `pruefbefehl-again` l5)."
   - fremdbilder-weiche:
       switch:
         - runden:

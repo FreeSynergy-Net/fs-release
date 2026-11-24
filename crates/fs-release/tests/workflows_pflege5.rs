@@ -55,7 +55,10 @@ fn data_flow_resolvable(text: &str) -> bool {
             .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
             .collect();
         // loop-carried read: the stderr of the red `pruefbefehl` is the order of the repeat of `layout-schreiben` (its export stands later in the file)
-        if text[at..].starts_with("$context.pruef.stderr") && text.contains("{ pruef: . }") {
+        if text[at..].starts_with("$context.pruef.stderr // ")
+            && text[..at].ends_with('(')
+            && text.contains("{ pruef: . }")
+        {
             return true;
         }
         text[..at].contains(&format!("{{ {key}: . }}"))

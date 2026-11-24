@@ -110,6 +110,17 @@ fn the_flow_calls_no_script_and_no_python_and_names_the_commands_of_our_programs
 }
 
 #[test]
+fn foreign_picture_check_looks_at_every_commit_and_never_uses_a_deleting_commit() {
+    for file in ["frontend-beschreiben", "dossier"] {
+        let body = step_body(&read(file), "fremdbilder-pruefen");
+        assert!(body.contains("git log --diff-filter=A --name-only --format= $(git merge-base origin/main HEAD)..HEAD"));
+        assert!(body.contains("EVERY commit of the range"));
+        assert!(body.contains("NEVER a deleting commit"));
+        assert!(body.contains("not yet pushed commits"));
+    }
+}
+
+#[test]
 fn foreign_pictures_never_go_into_a_repo_in_both_flows() {
     let d = read("dossier");
     assert!(d.contains("[FREMDBILDER-NIE-INS-REPO]"));
