@@ -24,6 +24,7 @@
 #   (9) Agents never push to main, tag or merge; output only on `unreviewed/frontend-<programm>`; no force push; identity `FreeSynergy <support@freesynergy.net>` only; tests only through `bash .scratch/build-slot.sh` (`--status` first).
 #   (10) COPY BLOCKS FOR THE USER [KOPIERBLOCK-OFFENE-SHELL]: a copy block for the open shell of the user has NO `set -e`, NO `set -u`, NO `set -o pipefail` (`set -e` closes the user's shell on the first error; `set -u` and `pipefail` do not close it, but they stay switched ON in the user's shell and change every later command and prompt script). Error handling stands inside the block (`cmd || { echo "..."; }`) or the block is a file that is called as `bash <path>` (the options then live in the file, not in the user's shell).
 #   (11) REALITY INSTEAD OF TESTS (user 24.11.): the layout descriptions are the practical test of Forms, Components and the host; whatever stands out (a missing component, form or host command) becomes a card AT ONCE (lane C or F, or Scaffold: "Befehl fehlt in Modul X"), not at the end of the run; no mutant chains for this flow, a structure test is enough, one review per bundle.
+#   (12) [FREMDBILDER-NIE-INS-REPO] (user 24.11., HARD RULE, emphasised): pictures of OTHER programs (model pictures, dossier pictures, comparison sheets "model left, our layout right") NEVER go into a repo, the net, a release or a docs page - open source or not. Models are LOCAL reading material under `.scratch/` and stay there: model pictures under `.scratch/katalog-plan/bilder/<programm>/vorbild/`, sheets under `.scratch/katalog-plan/bilder/layout/<programm>/`. No step uploads, commits or pushes a foreign picture. Only OUR OWN pictures and descriptions in our own words may stand in branches, commits and PRs. The step `fremdbilder-pruefen` (data only: a git listing with a file-extension list, no new script) runs before every commit/push.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -107,7 +108,7 @@ do:
         freesynergy.net:bot-seat: frontend-beschreiben.bilder-holen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 1. Take the model pictures of the program that are already in the dossier. Input: `dossier` (`bausteine.md`, `menus.md`, `dialogs.md`, pictures), `model`. Output `vorbild` = { bilder: [ { name, pfad, bereich } ], bilder_fehlen (bool: a main view, dialog or menu of the dossier without a picture), fehlt: [names] }. Where a person has the model program open (mostly Windows), the picture is taken with the recorder module: `fs-capture shot --title <window title>`, handed over with `fs-capture list` and `fs-capture zip <file.zip>`. Reads only the dossier; writes the picture list."
+        freesynergy.net:summary: "Step 1. Take the model pictures of the program that are already in the dossier. Input: `dossier` (`bausteine.md`, `menus.md`, `dialogs.md`, pictures), `model`. Output `vorbild` = { bilder: [ { name, pfad, bereich } ], bilder_fehlen (bool: a main view, dialog or menu of the dossier without a picture), fehlt: [names] }. Where a person has the model program open (mostly Windows), the picture is taken with the recorder module: `fs-capture shot --title <window title>`, handed over with `fs-capture list` and `fs-capture zip <file.zip>`. Reads only the dossier; writes the picture list. [FREMDBILDER-NIE-INS-REPO] Writes ONLY to `.scratch` (model pictures `.scratch/katalog-plan/bilder/<programm>/vorbild/`, sheets `.scratch/katalog-plan/bilder/layout/<programm>/`); the step uploads no foreign picture to a repo, the net, a release or a docs page."
   - bilder-weiche:
       switch:
         - runden:
@@ -324,7 +325,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put ONE SHEET per program next to the model (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The sheet (pair model | ours, views below each other) is made by the step itself (gap L3: `fs-capture pair`); no verdict of the user per picture. Output `bilder` = { dateien: [paths], rc, red }. Red = rc != 0 or a file that is missing or empty."
+        freesynergy.net:summary: "Step 5. Draw OUR picture of the layout with the published host and put ONE SHEET per program next to the model (model left, our layout right, all views one below the other) under `bilder/layout/<programm>/`. Input: `host.pfad`, `beschreibung`, `programm`, `workdir`. First `<host.pfad> --help` (take the words from there). Command per picture: `<host.pfad> --description <beschreibung> --picture <workdir>/bilder/<programm>-<bereich>-layout-nur-unser.png` (placeholder values, so `layout-nur` stands in the name); names as in `picture-acceptance` where the host can draw an opened menu (gap L4). The sheet (pair model | ours, views below each other) is made by the step itself (gap L3: `fs-capture pair`); no verdict of the user per picture. Output `bilder` = { dateien: [paths], rc, red }. Red = rc != 0 or a file that is missing or empty. [FREMDBILDER-NIE-INS-REPO] The sheet (model beside ours) stays LOCAL under `.scratch/katalog-plan/bilder/layout/<programm>/` and is never committed, pushed or uploaded; only our own pictures may leave the machine."
   - bild-waechter:
       call: theme-waechter-check:0.0.18@fs
       with:
@@ -371,6 +372,17 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Haiku compares itself - NO verdict of the user per picture (`picture-acceptance` is for later, with the binding, and is not called here). Input: the sheets `bilder` (one per program under `bilder/layout/<programm>/`), the model pictures `model`. Per view of the sheet one line `fehlt | anders | gleich` with what exactly (area, component), honest and not softened; a view without a model picture is `fehlt` (model), never `gleich`. Every `fehlt`/`anders` caused by a missing component is added as a card in the same format as in `fehlende-components-melden` (once, existing first). Output `vergleich` = { blaetter: [paths], zeilen: [ { ansicht, urteil: fehlt | anders | gleich, was } ] }. The user looks at the sheets bundled whenever he wants. Every `fehlt` or `anders` that comes from a missing component is input of `fehlende-components-melden`."
+  - fremdbilder-pruefen:
+      call: fremdbilder-pruefen:0.0.18@fs
+      with:
+        beschreibung: ${ .input.beschreibung }
+        branch: ${ .input.branch }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "[FREMDBILDER-NIE-INS-REPO] Before EVERY commit and push. Input: `beschreibung`, `branch`. Command (data, no new script): `git diff --name-only --diff-filter=AM <base>..HEAD` plus `git ls-files` of the description, filtered by the picture extension list (png, jpg, jpeg, gif, webp, svg, bmp, tiff, ico). Rule of paths: picture files may stand ONLY under our own picture folders of the description (e.g. `bilder/unser/`, `bilder/layout-nur-unser/`); a picture in a model folder (`vorbild/`), a comparison sheet or anything from `.scratch/` is a FINDING. Output { bilder_im_diff: [paths], fremd: [paths], red }. Red = a picture of a foreign program in the diff; then NO commit and NO push, the file is removed from the diff and the step runs again; a second red round goes to `eskalation`."
   - bericht:
       call: report-write:0.0.18@fs
       with:
