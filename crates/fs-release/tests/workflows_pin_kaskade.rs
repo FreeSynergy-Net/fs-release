@@ -24,6 +24,8 @@ fn ok(t: &str) -> bool {
             "rev-pins",
             "rev-pins-weiter",
             "pin-lift",
+            "ein-stand",
+            "ein-stand-weiter",
             "besonderes",
             "windows-aufrufer",
             "windows-weiter",
@@ -66,6 +68,11 @@ fn ok(t: &str) -> bool {
         && step_body(t, "rev-pins").contains("fs-conformance")
         && step_body(t, "rev-pins-weiter").contains("then: eskalation")
         && !step_body(t, "rev-pins-weiter").contains("then: pin-lift")
+        && step_body(t, "ein-stand").contains("DEV-DEPENDENCIES FIRST")
+        && step_body(t, "ein-stand").contains("cargo tree -d")
+        && step_body(t, "ein-stand").contains("exactly ONE state")
+        && step_body(t, "ein-stand-weiter").contains("then: eskalation")
+        && !step_body(t, "ein-stand-weiter").contains("then: besonderes")
         && step_body(t, "plan").contains("REAL dependencies")
         && graph_ok(t)
         && switches_ok(t)
@@ -129,6 +136,10 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     )));
     assert!(bad(t.replace("  - rev-pins-weiter:", "  - rev-x:")));
     assert!(bad(t.replace("  - rev-pins:", "  - rev-x:")));
+    assert!(bad(t.replace("  - ein-stand:", "  - ein-x:")));
+    assert!(bad(t.replace("  - ein-stand-weiter:", "  - ein-x:")));
+    assert!(bad(t.replace("DEV-DEPENDENCIES FIRST", "DEV-DEPENDENCIES LATER")));
+    assert!(bad(t.replace("cargo tree -d", "cargo tree")));
     // A2: every case of every switch, one by one (M4 gates-weiter red -> continue, M5 round case, M7 ff-weiter `sonst`)
     for (step, want) in SWITCHES {
         for (case, then) in *want {
