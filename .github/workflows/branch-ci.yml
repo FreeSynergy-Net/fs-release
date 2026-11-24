@@ -41,11 +41,16 @@ jobs:
         id: gates-of-this
         continue-on-error: true
         run: scripts/gates.sh "$PWD"
+      - name: configs/nextest.toml is accepted by the real cargo-nextest (scripts/test_nextest_config.sh; needs nextest, so here and not in lint)
+        id: nextest-config
+        continue-on-error: true
+        run: bash scripts/test_nextest_config.sh
       - name: Collect the results (every step above ran; the job is red when one was)
         if: always()
         env:
           RESULTS: |
             gates-of-this ${{ steps.gates-of-this.outcome }}
+            nextest-config ${{ steps.nextest-config.outcome }}
         run: |
           red=0
           list="$(mktemp)"

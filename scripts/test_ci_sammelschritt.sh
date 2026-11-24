@@ -88,7 +88,14 @@ mut "no always() on the collecting step" check.yml '        if: always()
           RESULTS' '        env:
           RESULTS'
 mut "step without continue-on-error"    branch-ci.yml '        id: gates-of-this
-        continue-on-error: true' '        id: gates-of-this'
+        continue-on-error: true
+        run: scripts/gates.sh "$PWD"
+      - name: configs/nextest.toml is accepted by the real cargo-nextest (scripts/test_nextest_config.sh; needs nextest, so here and not in lint)
+        id: nextest-config
+        continue-on-error: true' '        id: gates-of-this
+        run: scripts/gates.sh "$PWD"
+      - name: configs/nextest.toml is accepted by the real cargo-nextest (scripts/test_nextest_config.sh; needs nextest, so here and not in lint)
+        id: nextest-config'
 mut "gates step not collected"          check.yml '            gates-fmt-clippy ${{ steps.gates-fmt-clippy.outcome }}
 ' ''
 mut "lint packaging job without collector" lint.yml '          RESULTS: |
