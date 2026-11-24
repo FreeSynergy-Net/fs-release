@@ -56,7 +56,17 @@ chk "two errors: the red rc is printed (fmt rc=1, test rc=100 as nextest says)" 
 chk "two errors: every item has its exact nachpruefung command" bash -c "grep -q 'nachpruefung: cargo fmt --check' '$tmp/l1'/*.md && grep -q 'nachpruefung: cargo test -p fs-demo --test gold --all-features --locked -- it_breaks' '$tmp/l1'/*.md"
 chk "two errors: a test name with a shell character never reaches the list" bash -c "! grep -q 'touch_pwned' '$tmp/l1'/*.md | grep nachpruefung; ! grep 'nachpruefung' '$tmp/l1'/*.md | grep -q 'touch'"
 chk "two errors: cargo test runs with --no-fail-fast and clippy with --keep-going" bash -c "grep -q 'cargo nextest run .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo test --doc .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo clippy .*--keep-going' '$STUBLOG'"
+chk "profile: no FS_GATES_PROFILE = no --profile flag on nextest" bash -c "! grep 'cargo nextest run' '$STUBLOG' | grep -q -- --profile"
 chk "two errors: the list is not in the repo tree" bash -c "[ -z \"\$(git -C '$app' status --porcelain)\" ] && [ ! -e '$app'/fehlerliste-main.md ]"
+# 1a. FS_GATES_PROFILE reaches nextest (repo without .config/nextest.toml: default + visible line, no flag; with the profile defined: the flag)
+gates "$app/scripts/gates.sh" "$tmp/l1p" FS_GATES_PROFILE=quick; rc=$?
+chk "profile quick, not defined in the repo: green, visible line, no --profile flag" bash -c "[ $rc -eq 0 ] && grep -q 'profile quick not defined here' '$tmp/o.txt' && ! grep 'cargo nextest run' '$STUBLOG' | grep -q -- --profile"
+mkdir -p "$app/.config"; printf '[profile.quick]\nfail-fast = true\n' >"$app/.config/nextest.toml"
+gates "$app/scripts/gates.sh" "$tmp/l1q" FS_GATES_PROFILE=quick; rc=$?
+chk "profile quick, defined in the repo: nextest gets --profile quick, doc tests do not" bash -c "[ $rc -eq 0 ] && grep -q 'cargo nextest run --profile quick ' '$STUBLOG' && ! grep 'cargo test --doc' '$STUBLOG' | grep -q -- --profile"
+gates "$app/scripts/gates.sh" "$tmp/l1r" "FS_GATES_PROFILE=quick;id"; rc=$?
+chk "profile with a shell character: refused, red, nothing run with it" bash -c "[ $rc -eq 1 ] && ! grep -q 'cargo nextest run' '$STUBLOG'"
+rm -rf "$app/.config"
 # 1b. the licence gate red (cargo-deny finding or NOT RUN, rc 64): it is a finding of its own with its exact nachpruefung, the exit code is red
 gates "$app/scripts/gates.sh" "$tmp/l1b" RED_LICENCE=1; rc=$?
 chk "licence red: exit code 1, rc 64 printed, finding on the list with its nachpruefung" bash -c "[ $rc -eq 1 ] && grep -q '^gate licence: rc=64' '$tmp/o.txt' && grep -q '\*\*licence\*\*' '$tmp/l1b'/fehlerliste-*.md && grep -q 'nachpruefung: bash {SCRIPTS}/licence-gate.sh {ROOT}' '$tmp/l1b'/fehlerliste-*.md"

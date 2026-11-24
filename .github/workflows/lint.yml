@@ -194,6 +194,10 @@ jobs:
         id: packaging-tests-plan
         continue-on-error: true
         run: scripts/test-packaging.sh
+      - name: nextest profile input (test-gate.sh --profile; defined, missing = default plus line, refused names; stub cargo)
+        id: nextest-profile
+        continue-on-error: true
+        run: bash scripts/test_nextest_profile.sh
       - name: typing test, caret and field detection on synthetic pictures
         id: typing-test-caret
         continue-on-error: true
@@ -232,6 +236,7 @@ jobs:
             ci-collecting-step ${{ steps.ci-collecting-step.outcome }}
             pin-kaskade-scripts ${{ steps.pin-kaskade-scripts.outcome }}
             packaging-tests-plan ${{ steps.packaging-tests-plan.outcome }}
+            nextest-profile ${{ steps.nextest-profile.outcome }}
             typing-test-caret ${{ steps.typing-test-caret.outcome }}
         run: |
           red=0

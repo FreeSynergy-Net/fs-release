@@ -3,6 +3,7 @@ description: Run scripts/gates.sh (fmt, clippy pedantic, test, coding rules ADR 
 inputs:
   working-directory: { description: "Cargo workspace root", default: "." }
   diff-base: { description: "Git revision to diff against (e.g. origin/main): the TEST gate then runs only the crates changed since it and their dependants (fmt, clippy, rules, lock, files stay full); empty = the whole workspace", default: "" }
+  profile: { description: "nextest profile for the TEST gate (name from .config/nextest.toml of the caller, e.g. quick or release); empty = default profile. A profile the caller does not define is said in the log and the default profile runs", default: "" }
 runs:
   using: composite
   steps:
@@ -14,4 +15,5 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       env:
         FS_GATES_DIFF_BASE: ${{ inputs.diff-base }}
+        FS_GATES_PROFILE: ${{ inputs.profile }}
       run: '"$GITHUB_ACTION_PATH/../../scripts/gates.sh" "$PWD"'

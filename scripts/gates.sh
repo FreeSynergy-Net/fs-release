@@ -193,7 +193,10 @@ else
     fi
   fi
   # test: cargo nextest (scripts/test-gate.sh: all test binaries in parallel, configs/nextest.toml, pin scripts/nextest.pin); nextest does not run doc tests, they are the step `doctest`. Both keep --no-fail-fast, --locked, the same selection.
-  step test error bash "$here/test-gate.sh" "${testsel[@]}" --all-features --locked "${skip[@]}"
+  # FS_GATES_PROFILE: the nextest profile of the caller (input `profile` of check.yml); the name is checked and a missing profile falls back to default INSIDE test-gate.sh (visible in the log). Doc tests ignore it.
+  profsel=()
+  if [ -n "${FS_GATES_PROFILE:-}" ]; then profsel=(--profile "$FS_GATES_PROFILE"); fi
+  step test error bash "$here/test-gate.sh" ${profsel[@]+"${profsel[@]}"} "${testsel[@]}" --all-features --locked "${skip[@]}"
   step doctest error bash "$here/test-gate.sh" --doc "${testsel[@]}" --all-features --locked --no-fail-fast
   step rust-rules rule python3 -I "$rules" "$root"
   # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.

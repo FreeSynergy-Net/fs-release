@@ -15,6 +15,7 @@ on:
       # (the tag commit cannot name itself). A full commit SHA given here wins. Never a branch or a tag name.
       blueprint-rev: { type: string, default: "", description: "Commit of fs-release the command `fs-blueprint` is built from: a full SHA, or empty = the commit of this workflow file (for a caller pinned to a tag: the tag commit)" }
       full: { type: boolean, default: false, description: "On branches unreviewed/* the test gate runs only the crates changed against main and their dependants; true forces the whole workspace (main and tags always test everything)" }
+      profile: { type: string, default: "", description: "nextest profile of the TEST gate, a name from .config/nextest.toml of the caller. Empty = by ref: tag -> release, every other ref (unreviewed/*, main, workflow_dispatch) -> quick. A profile the caller does not define is said in the log and the default profile (everything) runs, so repos without profiles stay green" }
       test-env: { type: string, default: "", description: "Environment for the test step, one KEY=VALUE per line (for tests that need a tool the runner lacks and say so)" }
 
 permissions:
@@ -179,6 +180,7 @@ jobs:
         with:
           working-directory: ${{ inputs.working-directory }}
           diff-base: ${{ (!inputs.full && startsWith(github.ref, 'refs/heads/unreviewed/')) && 'origin/main' || '' }}
+          profile: ${{ inputs.profile != '' && inputs.profile || (startsWith(github.ref, 'refs/tags/') && 'release' || 'quick') }}
       # Blueprint check (S5): only when asked (`blueprint` warn or block) and only when the repo has a scaffold.toml. The talk records of the exceptions are read from a
       # flat checkout of fs-documentation main (ADR 0099 addendum). `--drift` also finds a hand change in a generated file.
       - name: Documentation checkout for the talk records

@@ -56,7 +56,7 @@ of a repo; it runs on every push. It needs no secrets and only `contents: read`.
    `ordner: crates/fs-group-directory/src/groups_v1` / `sha256: 91c0f8b0849d85b1038b8b09f511e27134c1ddfeb0ef2eae42dc8579b3d2faf3`.
    Valid only while the folder exists and its hash matches: any change to the folder, a missing lock file, a wrong name or a path outside the folder turns the rule back on.
 
-Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env` (KEY=VALUE lines; the keys CI, GITHUB_*, RUNNER_*, FS_*, GATES_*, GIT_*, LD_*, PATH, BASH_ENV and ENV are refused: red), `software-gpu` (boolean, default false), `full` (boolean, default false). Unlike
+Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env` (KEY=VALUE lines; the keys CI, GITHUB_*, RUNNER_*, FS_*, GATES_*, GIT_*, LD_*, PATH, BASH_ENV and ENV are refused: red), `software-gpu` (boolean, default false), `full` (boolean, default false), `profile` (text, default empty, see below). Unlike
 `ci.yml` there is no MSRV or cargo-deny step and no feature selection: everything is checked with all features. Repos can run both.
 
 **Scope of the test gate (CI cost).** On a branch `unreviewed/*` step 3 runs only the crates that own a file changed against main (merge base with
@@ -65,6 +65,18 @@ Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env`
 check and the file checks always run on the whole workspace. `main`, tags, every other ref and `full: true` test the whole workspace, and so does
 every unclear case (Cargo.lock, a workspace manifest, toolchain or cargo config, a file that no crate owns, an error): the gate output says which
 (`gates: test NARROWED ...` / `gates: test runs the WHOLE workspace (...)`). Locally `scripts/gates.sh` is unchanged.
+
+**Test profiles (input `profile`).** The test gate runs `cargo nextest run --profile <name>` with a profile out of the CALLER's `.config/nextest.toml` (names: `quick`, `time`, `security`, `platform`, `picture`, `release`; see `workflows/testlauf.yaml` [NEXTEST-PROFILES]). Empty `profile` = by ref: a tag runs `release`, every other ref (`unreviewed/*`, `main`, `workflow_dispatch`) runs `quick`; the narrowing to changed crates on `unreviewed/*` and the input `full` work as before and combine with the profile. A caller that does not define the profile is not red: the log says `test gate: profile quick not defined here (...), running default` and everything runs as before, so repos without profiles stay green. The name is checked (`[a-z][a-z0-9_-]{0,31}`), anything else is refused (rc 2). Doc tests do not use a profile. Switch on in a caller: nothing to do for the default; to force a profile: `with: { profile: release }`. A nightly full run belongs in the caller, not here, for example (NOT built in):
+
+```yaml
+# .github/workflows/nightly.yml in the caller repo
+# on:
+#   schedule: [{ cron: "17 2 * * *" }]
+# jobs:
+#   nightly:
+#     uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@<pin>
+#     with: { profile: release, full: true }
+```
 
 **Release plan probe.** A repo with its own `.github/workflows/release.yml` that calls the fs-release release workflow gets the real `actions/plan`
 run on the inputs of that call (`binaries`, `ignore-binaries`, `cargo-package`, `working-directory`, `kind`, ...; plain values only, the tag is the Cargo

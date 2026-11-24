@@ -40,6 +40,12 @@
 #   release  = everything, no filter, no retries, no fail-fast: the release gate, CI only (hard limit 1).
 #   cargo profile `fast` = `dev` without debug info (`debug = 0`): smaller, faster to link, for quick test builds.
 #  A new test follows the file-name convention in the header of that nextest.toml, so it lands in the right profile.
+#  [NEXTEST-PROFILES] WHICH STAGE RUNS WHICH PROFILE (PLAN-basis-vertraege 10c; wired in the shared check: `check.yml` input `profile` -> `actions/gates` -> `scripts/gates.sh` -> `scripts/test-gate.sh --profile <name>`):
+#   while working: only `cargo check -p <crate>`; finished module (stage `ende`): `quick` for that crate only; push on `unreviewed/*`: `quick` for the changed crates and their dependants (picture/platform/security only when the change fits);
+#   the head that is landed: ONE `quick` over everything + `picture`/`platform` for what changed; main and `workflow_dispatch`: `quick` over the whole workspace; tag: `release` (everything, CI only, hard limit 1);
+#   nightly: `release` on main when main changed (a `schedule` workflow of the CALLER, never in the reusable check.yml); `security` completely before V1. Nobody starts a full run on their own.
+#   Fallback: a repo that does not define the profile is not red: the gate says `profile <name> not defined here ... running default` and runs everything (so repos without profiles stay green). A profile name outside [a-z][a-z0-9_-]{0,31} is refused (rc 2).
+#   Doc tests run on the same selection without a profile. Self tests: scripts/test_nextest_profile.sh, scripts/test_gates_sammelliste.sh.
 # RULES ADDED BY workflow-pflege-1 (23.11.2026, cards of the strategy; each rule names its occasion):
 # [NICHT-GELAUFEN-NIE-GRUEN] (card 2) For ALL gates (gates.sh and every single gate in it, semver, check scripts, the tests of this flow): a gate that did not run, was skipped or cancelled, has no result, no `rc`
 #   or says `NotRun` is NEVER green; the report lists it as `lokal NICHT gelaufen: <what>` and the head is not green. Occasion: K-2-r2 M2 (a semver check with `NotRun` was counted GREEN).
