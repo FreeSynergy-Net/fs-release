@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@07aede614fff0ee20a1ed5e9d6d80e2b8ece734c
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@eeb026b7d88666c3bad639933ae31fd5f950d99a
         with:
           toolchain: pinned
           cache-key: blueprint-e2e-${{ matrix.os }}
@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@07aede614fff0ee20a1ed5e9d6d80e2b8ece734c
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@eeb026b7d88666c3bad639933ae31fd5f950d99a
         with:
           toolchain: pinned
           cache-key: blueprint-readme-${{ matrix.os }}
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@07aede614fff0ee20a1ed5e9d6d80e2b8ece734c
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@eeb026b7d88666c3bad639933ae31fd5f950d99a
         with:
           toolchain: pinned
           cache-key: blueprint-install
