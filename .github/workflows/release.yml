@@ -56,7 +56,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0 # the plan checks that the tag commit is on main (actions/tag-on-main)
       - id: plan
-        uses: FreeSynergy-Net/fs-release/actions/plan@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+        uses: FreeSynergy-Net/fs-release/actions/plan@da557ba317f87252f53f808d06b76a0db5dfaecd
         with:
           tag: ${{ inputs.tag }}
           name: ${{ inputs.name }}
@@ -79,7 +79,7 @@ jobs:
   linux:
     needs: plan
     if: fromJSON(needs.plan.outputs.plan).has_linux
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-linux.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-linux.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     with:
       plan: ${{ needs.plan.outputs.plan }}
       apt-packages: ${{ inputs.apt-packages }}
@@ -89,7 +89,7 @@ jobs:
   windows:
     needs: plan
     if: fromJSON(needs.plan.outputs.plan).has_windows
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-windows.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-windows.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     with:
       plan: ${{ needs.plan.outputs.plan }}
       smoke: ${{ inputs.smoke }}
@@ -98,14 +98,14 @@ jobs:
   macos:
     needs: plan
     if: fromJSON(needs.plan.outputs.plan).has_macos
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-macos.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-macos.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     with:
       plan: ${{ needs.plan.outputs.plan }}
 
   flatpak:
     needs: plan
     if: inputs.flatpak && !fromJSON(needs.plan.outputs.plan).library
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-flatpak.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-flatpak.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     with:
       plan: ${{ needs.plan.outputs.plan }}
       manifest: ${{ inputs.flatpak-manifest }}
@@ -113,7 +113,7 @@ jobs:
   container:
     needs: [plan, linux]
     if: inputs.container && !fromJSON(needs.plan.outputs.plan).library
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-container.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-container.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     permissions:
       contents: read
       packages: write
@@ -126,7 +126,7 @@ jobs:
   mobile:
     needs: plan
     if: (inputs.android || inputs.ios) && !fromJSON(needs.plan.outputs.plan).library
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-mobile.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-mobile.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     with:
       plan: ${{ needs.plan.outputs.plan }}
       android: ${{ inputs.android }}
@@ -135,7 +135,7 @@ jobs:
   finalize:
     needs: [plan, linux, windows, macos, flatpak, container, mobile]
     if: ${{ !cancelled() && needs.plan.result == 'success' && !fromJSON(needs.plan.outputs.plan).library && !contains(needs.*.result, 'failure') }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-finalize.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-finalize.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     permissions:
       contents: write
       id-token: write
@@ -160,7 +160,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # the tag commit must be an ancestor of origin/main (release.sh)
-      - uses: FreeSynergy-Net/fs-release/actions/library-release@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+      - uses: FreeSynergy-Net/fs-release/actions/library-release@da557ba317f87252f53f808d06b76a0db5dfaecd
         with:
           tag: ${{ fromJSON(needs.plan.outputs.plan).tag }}
           name: ${{ inputs.name }}
@@ -172,7 +172,7 @@ jobs:
   publish:
     needs: [plan, finalize]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.finalize.result == 'success' }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-publish.yml@a04fe4cbb448a2e1bf3db044d7929fa029b4d2f8
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-publish.yml@da557ba317f87252f53f808d06b76a0db5dfaecd
     permissions:
       contents: write
       attestations: read
