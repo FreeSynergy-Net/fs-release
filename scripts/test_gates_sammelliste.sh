@@ -24,7 +24,7 @@ cat >"$tmp/bin/cargo" <<'S'
 #!/usr/bin/env bash
 echo "cargo $*" >>"$STUBLOG"
 case "$1" in
-  nextest) [ "$2" = --version ] && { echo "cargo-nextest 0.9.151 (stub)"; exit 0; }; [ -n "${RED_TEST:-}" ] && { echo "        FAIL [   0.010s] fs-demo::gold it_breaks"; echo "        FAIL [   0.010s] fs-demo::gold it_breaks"; echo "        FAIL [   0.010s] fs-demo evil;touch_pwned"; exit 100; } ;;
+  nextest) [ "$2" = --version ] && { echo "cargo-nextest 0.9.151 (stub)"; exit 0; }; [ -n "${RED_TEST:-}" ] && { echo "        FAIL [   0.010s] fs-demo::gold it_breaks"; echo "        FAIL [   0.010s] fs-demo::gold it_breaks"; echo "        FAIL [   0.010s] (  2/818) fs-demo::gold it_breaks_too"; echo "        FAIL [   0.010s] fs-demo evil;touch_pwned"; exit 100; } ;;
   fmt) [ -n "${RED_FMT:-}" ] && { echo "Diff in src/lib.rs:1:"; exit 1; } ;;
   clippy) [ -n "${RED_CLIPPY:-}" ] && { echo "error: a lint | with a pipe"; echo " --> crates/fs-demo/src/lib.rs:3:1"; exit 101; } ;;
   test) [ -n "${RED_TEST:-}" ] && [[ "$*" != *--doc* ]] && { echo "test it_breaks ... FAILED"; echo "test evil;touch_pwned ... FAILED"; echo 'error: test failed, to rerun pass `-p fs-demo --test gold`'; exit 101; } ;;
@@ -54,6 +54,7 @@ chk "two errors: both findings are on the list" bash -c "grep -q '\*\*fmt\*\*' '
 chk "two errors: the list says 2 findings" grep -q '^2 findings' "$tmp/l1"/fehlerliste-main.md
 chk "two errors: the red rc is printed (fmt rc=1, test rc=100 as nextest says)" bash -c "grep -q '^gate fmt: rc=1' '$tmp/o.txt' && grep -q '^gate test: rc=100' '$tmp/o.txt'"
 chk "two errors: every item has its exact nachpruefung command" bash -c "grep -q 'nachpruefung: cargo fmt --check' '$tmp/l1'/*.md && grep -q 'nachpruefung: cargo test -p fs-demo --test gold --all-features --locked -- it_breaks' '$tmp/l1'/*.md"
+chk "two errors: a FAIL line with the nextest counter (  2/818) is read too (real format of nextest 0.9.151)" bash -c "grep -q 'nachpruefung: cargo test -p fs-demo --test gold --all-features --locked -- it_breaks it_breaks_too' '$tmp/l1'/*.md"
 chk "two errors: a test name with a shell character never reaches the list" bash -c "! grep -q 'touch_pwned' '$tmp/l1'/*.md | grep nachpruefung; ! grep 'nachpruefung' '$tmp/l1'/*.md | grep -q 'touch'"
 chk "two errors: cargo test runs with --no-fail-fast and clippy with --keep-going" bash -c "grep -q 'cargo nextest run .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo test --doc .*--no-fail-fast' '$STUBLOG' && grep -q 'cargo clippy .*--keep-going' '$STUBLOG'"
 chk "profile: no FS_GATES_PROFILE = no --profile flag on nextest" bash -c "! grep 'cargo nextest run' '$STUBLOG' | grep -q -- --profile"
@@ -61,6 +62,8 @@ chk "two errors: the list is not in the repo tree" bash -c "[ -z \"\$(git -C '$a
 # 1a. FS_GATES_PROFILE reaches nextest (repo without .config/nextest.toml: default + visible line, no flag; with the profile defined: the flag)
 gates "$app/scripts/gates.sh" "$tmp/l1p" FS_GATES_PROFILE=quick; rc=$?
 chk "profile quick, not defined in the repo: green, visible line, no --profile flag" bash -c "[ $rc -eq 0 ] && grep -q 'profile quick not defined here' '$tmp/o.txt' && ! grep 'cargo nextest run' '$STUBLOG' | grep -q -- --profile"
+gates "$app/scripts/gates.sh" "$tmp/l1s" FS_GATES_PROFILE=quick FS_GATES_ALSO_PROFILE=security; rc=$?
+chk "second profile (security on main) not defined: green, but the Beleg says NICHT gelaufen" bash -c "[ $rc -eq 0 ] && grep -q 'gates-beleg: lokal NICHT gelaufen: test second run with profile security' '$tmp/o.txt'"
 mkdir -p "$app/.config"; printf '[profile.quick]\nfail-fast = true\n' >"$app/.config/nextest.toml"
 gates "$app/scripts/gates.sh" "$tmp/l1q" FS_GATES_PROFILE=quick; rc=$?
 chk "profile quick, defined in the repo: nextest gets --profile quick, doc tests do not" bash -c "[ $rc -eq 0 ] && grep -q 'cargo nextest run --color never --profile quick ' '$STUBLOG' && ! grep 'cargo test --doc' '$STUBLOG' | grep -q -- --profile"

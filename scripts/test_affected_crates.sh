@@ -112,12 +112,17 @@ gate_cases() { # <script>; counts failures in cases_fail when QUIET
 gate_cases "$GK/scripts/gates.sh"
 
 # the landing head (push on main): FS_GATES_LAND_PROFILES / FS_GATES_LAND_BASE run picture and platform as steps of their own, only for the crates changed since the base (and their dependants)
+head3=""
 land_run() { # <base> [profiles]: output in $GK/out, cargo words in $GK/cargo.log; the rc is returned
   : >"$GK/cargo.log"
   PATH="$GK/bin:$PATH" CI=true TMPDIR="$tmp" FS_GATES_FEHLERLISTE_DIR="$tmp" FS_GATES_LAND_BASE="$1" FS_GATES_LAND_PROFILES="${2-picture platform}" bash "$GK/scripts/gates.sh" "$W" >"$GK/out" 2>&1
 }
+undef_ok() { # the caller has no profile picture/platform: green, no `gate test-picture: rc=` line, the Beleg lists both as not run
+  local rc=0; land_run "$head3" || rc=$?
+  [ "$rc" = 0 ] && ! grep -q '^gate test-picture: rc=' "$GK/out" && grep -q '^gate test-picture: SKIPPED' "$GK/out" && grep -q 'gates-beleg: lokal NICHT gelaufen: test-picture (profile picture not defined' "$GK/out" && grep -q 'gates-beleg: lokal NICHT gelaufen: test-platform' "$GK/out" && ! grep -q -- '--profile picture' "$GK/cargo.log"
+}
 land_cases() {
-  local rc=0 why="" head3 headnow
+  local rc=0 why="" headnow
   head3="$(git -C "$W" rev-parse HEAD~3)"; headnow="$(git -C "$W" rev-parse HEAD)"
   mkdir -p "$W/.config"; printf '[profile.picture]\nfail-fast = true\n\n[profile.platform]\nfail-fast = true\n' >"$W/.config/nextest.toml"
   land_run "$head3" || rc=$?
@@ -138,9 +143,22 @@ land_cases() {
   grep -q 'landing-head test runs (picture platform) on the WHOLE workspace' "$GK/out" || why="$why; unknown commit: fallback not said"
   land_run "$head3" "platform;id" || rc=$?
   [ "$rc" = 2 ] || why="$why; bad profile name not refused (rc $rc)"
+  # [NICHT-GELAUFEN-NIE-GRUEN] no change since the base: no rc line, the Beleg says NICHT gelaufen
+  land_run "$headnow" || true
+  { ! grep -q '^gate test-picture: rc=' "$GK/out" && grep -q 'gates-beleg: lokal NICHT gelaufen: test-picture (no changed crate' "$GK/out" && grep -q 'gates-beleg: lokal NICHT gelaufen: test-platform' "$GK/out"; } || why="$why; no change: shown as run (or not as not run)"
   rm -f "$W/.config/nextest.toml"
-  land_run "$head3" || true
-  grep -q 'profile picture not defined here.*run skipped' "$GK/out" && ! grep -q -- '--profile picture' "$GK/cargo.log" || why="$why; undefined profile not skipped"
+  undef_ok "$GK/scripts" || why="$why; undefined profile shown as run, or not as not run"
+  # mutant: the check before `step` removed -> the profile is run as a step (rc=0 line, no NICHT gelaufen) -> undef_ok must turn red
+  cp "$GK/scripts/lib_gates_list.sh" "$tmp/lib.keep"
+  python3 -I - "$GK/scripts/lib_gates_list.sh" <<'PY'
+import sys
+p = sys.argv[1]; t = open(p, encoding="utf-8").read()
+a = 'if ! grep -qE "^[[:space:]]*'
+assert a in t
+open(p, "w", encoding="utf-8").write(t.replace(a, 'if false && ! grep -qE "^[[:space:]]*', 1))
+PY
+  if undef_ok "$GK/scripts"; then why="$why; mutant (skip check removed) survived"; fi
+  cp "$tmp/lib.keep" "$GK/scripts/lib_gates_list.sh"
   rmdir "$W/.config"
   if [ -n "$why" ]; then if [ -n "${QUIET:-}" ]; then cases_fail=$((cases_fail + 1)); else bad "landing head runs: ${why#; }"; sed 's/^/     /' "$GK/out"; fi
   elif [ -z "${QUIET:-}" ]; then ok "gates.sh landing head: picture and platform narrowed to the changed crates since the base, own rc lines; no change = skipped; no usable base = whole workspace; undefined profile skipped"; fi

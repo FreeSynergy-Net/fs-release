@@ -35,6 +35,10 @@ for fname, jobs in FILES.items():
             bad.append(f"{fname}:{jname}: the last step is no collecting step with if: always()")
             continue
         results = last["env"]["RESULTS"]
+        for ref in re.findall(r"steps\.([A-Za-z0-9_-]+)\.outcome", results):   # every collected id must itself run with continue-on-error (else a red step stops the later ones)
+            st = [x for x in steps if x.get("id") == ref]
+            if not st or st[0].get("continue-on-error") is not True:
+                bad.append(f"{fname}:{jname}: collected step {ref} has no continue-on-error")
         for i in ids:
             if f"steps.{i}.outcome" not in results:
                 bad.append(f"{fname}:{jname}: step {i} is not collected")
@@ -88,14 +92,7 @@ mut "no always() on the collecting step" check.yml '        if: always()
           RESULTS' '        env:
           RESULTS'
 mut "step without continue-on-error"    branch-ci.yml '        id: gates-of-this
-        continue-on-error: true
-        run: scripts/gates.sh "$PWD"
-      - name: configs/nextest.toml is accepted by the real cargo-nextest (scripts/test_nextest_config.sh; needs nextest, so here and not in lint)
-        id: nextest-config
-        continue-on-error: true' '        id: gates-of-this
-        run: scripts/gates.sh "$PWD"
-      - name: configs/nextest.toml is accepted by the real cargo-nextest (scripts/test_nextest_config.sh; needs nextest, so here and not in lint)
-        id: nextest-config'
+        continue-on-error: true' '        id: gates-of-this'
 mut "gates step not collected"          check.yml '            gates-fmt-clippy ${{ steps.gates-fmt-clippy.outcome }}
 ' ''
 mut "lint packaging job without collector" lint.yml '          RESULTS: |

@@ -92,11 +92,11 @@ nachpruefung_of() {
       crates="$(grep -oE -- '--> crates/[A-Za-z0-9_-]+' "$out" 2>/dev/null | sed 's|--> crates/||' | sort -u | awk '{ printf " -p %s", $0 }' || true)"
       echo "cargo clippy$crates --all-targets --all-features --locked -- -D warnings -W clippy::pedantic"
       ;;
-    test|doctest)
+    test|doctest|test-*)
       spec="$(awk '
-        # nextest: `FAIL [ 1.2s] <package>[::<test binary>] <test name>`, one per failed test (printed twice: as it fails and in the summary); lib = no `::`
-        /^ +FAIL +\[ *[0-9.]+s\] +[A-Za-z0-9_-]+(::[A-Za-z0-9_]+)? +[A-Za-z0-9_:]+$/ {
-          line = $0; sub(/^ +FAIL +\[ *[0-9.]+s\] +/, "", line); split(line, f, " "); nm = f[2]
+        # nextest: `FAIL [ 1.2s] [( 1/818)] <package>[::<test binary>] <test name>`, one per failed test (printed twice: as it fails and in the summary); lib = no `::`
+        /^ +FAIL +\[ *[0-9.]+s\] +(\( *[0-9]+\/[0-9]+\) +)?[A-Za-z0-9_-]+(::[A-Za-z0-9_]+)? +[A-Za-z0-9_:]+$/ {
+          line = $0; sub(/^ +FAIL +\[ *[0-9.]+s\] +(\( *[0-9]+\/[0-9]+\) +)?/, "", line); split(line, f, " "); nm = f[2]
           if (index(f[1], "::")) { split(f[1], id, "::"); tgt = "-p " id[1] " --test " id[2] } else { tgt = "-p " f[1] " --lib" }
           if (!((tgt SUBSEP nm) in seen)) { seen[tgt SUBSEP nm] = 1; order[++n] = tgt; list[tgt] = list[tgt] " " nm; if (!(tgt in first)) first[tgt] = 1 }
         }

@@ -63,6 +63,7 @@ if [ -n "$also" ]; then
     [ "$rc" -eq 0 ] && rc=$rc2
   else
     echo "test gate: profile $also not defined here, second run skipped"
+    echo "gates-skipped: test second run with profile $also (not defined in .config/nextest.toml)"
   fi
 fi
 exit "$rc"

@@ -108,6 +108,8 @@ gates_beleg() {
   echo "gates-beleg: CI-gleich: NEIN - Zweig-CI am genauen Kopf (inkl. windows) ist der Beleg"
   echo "gates-beleg: lokal gelaufen: $*"
   while read -r l; do [ -z "$l" ] || echo "gates-beleg: lokal NICHT gelaufen: $l"; done <<<"$diff"
+  # [NICHT-GELAUFEN-NIE-GRUEN] a run that was SKIPPED (profile not defined by the caller, nothing changed) says `gates-skipped: <what>` in its step output or in land.out: never "ran, rc=0" in the Beleg
+  while IFS= read -r l; do echo "gates-beleg: lokal NICHT gelaufen: ${l#gates-skipped: }"; done < <(grep -h '^gates-skipped: ' "${finding_work:-/nonexistent}"/*.out 2>/dev/null || true)
   if [ -r "${finding_work:-/nonexistent}/selftests.out" ]; then
     while read -r l; do echo "gates-beleg: lokal NICHT gelaufen: ${l#selftest-skipped: }"; done < <(grep '^selftest-skipped: ' "$finding_work/selftests.out")
   fi
@@ -134,12 +136,21 @@ gates_land_steps() {
       for p in "${n[@]}"; do sel+=(-p "$p"); done
       echo "gates: landing-head test runs ($profiles) NARROWED to the crates changed since $base and their dependants: ${n[*]}"
     elif [ "$rc" = 0 ] && [[ "$out" == "NONE "* ]]; then
-      echo "gates: landing-head test runs ($profiles) SKIPPED: ${out#NONE }"; return 0
+      echo "gates: landing-head test runs ($profiles) SKIPPED: ${out#NONE }"
+      for p in $profiles; do echo "gates-skipped: test-$p (no changed crate since $base)" | tee -a "$finding_work/land.out"; done; return 0
     else
       echo "gates: landing-head test runs ($profiles) on the WHOLE workspace (${out:-affected_crates.py rc=$rc})"
     fi
   else
     echo "gates: landing-head test runs ($profiles) on the WHOLE workspace (no usable base commit: '${base:0:12}')"
   fi
-  for p in $profiles; do step "test-$p" error bash "$d/test-gate.sh" --only-profile "$p" "${sel[@]}" --all-features --locked; done
+  for p in $profiles; do
+    # a profile the caller does not define: NO step (a step would print `rc=0` and the Beleg would say "ran"); the gate stays green, the Beleg says `lokal NICHT gelaufen`
+    if ! grep -qE "^[[:space:]]*\[profile\.${p}(\.[A-Za-z0-9_-]+)?\][[:space:]]*(#.*)?\$" .config/nextest.toml 2>/dev/null; then
+      echo "gate test-$p: SKIPPED (profile $p not defined in .config/nextest.toml)"
+      echo "gates-skipped: test-$p (profile $p not defined in .config/nextest.toml)" | tee -a "$finding_work/land.out"
+    else
+      step "test-$p" error bash "$d/test-gate.sh" --only-profile "$p" "${sel[@]}" --all-features --locked
+    fi
+  done
 }

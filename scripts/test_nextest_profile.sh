@@ -47,7 +47,8 @@ printf '[profile.security]\nfail-fast = true\n' >> "$t/with/.config/nextest.toml
 run "$t/with" --then-profile security --profile quick --workspace
 if [ "$rc" -eq 0 ] && grep -q 'second run with profile security' <<<"$out" && grep -q 'STUB-CARGO nextest run --color never --profile security ' <<<"$out"; then ok "then-profile defined: second run"; else bad "then-profile (rc $rc): $out"; fi
 run "$t/without" --then-profile security --workspace
-if [ "$rc" -eq 0 ] && grep -q 'profile security not defined here, second run skipped' <<<"$out"; then ok "then-profile missing: skipped with a line, rc 0"; else bad "then-profile missing (rc $rc): $out"; fi
+if [ "$rc" -eq 0 ] && grep -q 'profile security not defined here, second run skipped' <<<"$out"; then ok "then-profile missing: skipped with a line, rc 0"
+if grep -q '^gates-skipped: test second run with profile security' <<<"$out"; then ok "then-profile missing: says gates-skipped (the Beleg lists it as not run)"; else bad "no gates-skipped line: $out"; fi; else bad "then-profile missing (rc $rc): $out"; fi
 run "$t/with" --then-profile 'x;id' --workspace
 if [ "$rc" -eq 2 ]; then ok "then-profile name refused"; else bad "then-profile evil (rc $rc)"; fi
 # --only-profile (the landing-head runs): a profile the caller does not define is SKIPPED (nothing runs, rc 0), a defined one runs

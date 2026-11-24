@@ -4,7 +4,7 @@
     python3 -I scripts/affected_crates.py <cargo workspace dir> <base rev>       files = `git diff --name-only --no-renames <base>...HEAD`
     python3 -I scripts/affected_crates.py <cargo workspace dir> --files <file>   files = the lines of <file> (paths relative to the git top level; for tests)
 
-    ... --empty-none     (last argument) no changed file at all prints `NONE <reason>` instead of `FULL` (the landing-head runs of scripts/lib_gates_land.sh skip then)
+    ... --empty-none     (last argument) no changed file at all prints `NONE <reason>` instead of `FULL` (the landing-head runs of scripts/lib_gates_list.sh skip then)
 
 Prints ONE line on stdout: `PACKAGES a b c` (the crates that own a changed file plus every workspace crate that depends on one of them, dev-dependencies
 included, transitively), or `FULL <reason>` (test the whole workspace). Exit 0 for both. Any error (no such rev, cargo metadata fails, odd name) is
