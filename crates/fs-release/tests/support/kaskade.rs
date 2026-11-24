@@ -227,6 +227,7 @@ pub fn switches_ok(t: &str) -> bool {
                         && got[1].1.contains("bau.red == false")
                 }
                 "windows-weiter" => got[1].1.contains("windows.red == false"),
+                "ein-stand-weiter" => got[0].1.contains("red // false) == true"),
                 "ci-weiter" => got[0].1.contains("== \"green\""),
                 "review-weiter" => got[0].1.contains("== \"JA\""),
                 "ff-weiter" => got[0].1.contains("== \"done\""),
