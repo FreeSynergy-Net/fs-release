@@ -5,6 +5,7 @@
 # Loops: a red check jumps back at most twice; the third red round goes to `eskalation` (the person). Only `red == false` goes on; a missing result goes to `eskalation`, never on.
 # Source: .scratch/katalog-plan/PFLEGE9-AUFTRAG-workflows.md and PLAN-baukasten-architektur.md section c2 (program = manifest), conversation 2 ("not compile yet"; every exception is a conversation).
 # Inputs: `name`, `kategorie` (plan section b2.7), `art` (konfiguration | agent | fachmodul), `nutzer` (list of programs), `standard`, `programmseite` (program page in fs-documentation en + de, for the help part), `hilfe_marker` (optional).
+# Place `ort` (step `anlegen`): an existing repo, or `lokal-neu` = new repo, local only (git init under `.scratch/<name>/`, birth commit, no push, remote later by the person; decision woche-11-23 G-0, ENTWURF-stufe3-4.md "Workflow-Lücke").
 # Rules. (1) Existing first (N10): catalog, module repos, `unreviewed/` branches and `.scratch` are searched before anything new. (2) A shared module needs at least 2 users, a specialist module at least 1 (plan section b2.3 e). (3) Data of others only through a contract; own data with export, import, share, delete, media type, version. (4) No `[[exception]]` without `talk` (use `ausnahme-gespraech`).
 # RULES ADDED BY workflow-pflege-1 (23.11.2026, card 8): [LAYERS-PFLEGEN] a new module (crate) in fs-components gets its entry in `contract/layers.toml` in the SAME change (layer and allowed dependencies;
 #   a crate without an entry is red, see the gates of `testlauf` [ENDE-GATES]); the module is part of the test run `-p fs-components-catalog` (the catalog reads the layers); the stage `ende` of `testlauf` runs for the module with the
@@ -273,7 +274,7 @@ do:
         freesynergy.net:bot-seat: modul-neu.anlegen
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Create the crate in the target repo and the manifest (AppStream `addon`, `extends`, `fs:requires`) on a branch `unreviewed/modul-<name>`; local commit, no push. [LAYERS-PFLEGEN] In fs-components the same commit adds the entry in `contract/layers.toml`."
+        freesynergy.net:summary: "Create the crate in the target repo and the manifest (AppStream `addon`, `extends`, `fs:requires`) on a branch `unreviewed/modul-<name>`; local commit, no push. Parameter `ort`: an existing repo path (as before), or `lokal-neu` = NEW repo, local only: `git init` under `/srv/FreeSynergy/.scratch/<name>/`, birth commit (README with the AI note, licences, workspace, CHANGELOG), NO push, NO remote (the person adds it later; no `gh repo create`). [LAYERS-PFLEGEN] In fs-components the same commit adds the entry in `contract/layers.toml`."
   - anlegen-check:
       call: manifest-pruefen:0.0.18@fs
       with:
