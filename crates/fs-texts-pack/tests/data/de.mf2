@@ -1,0 +1,8 @@
+# Basissprache
+hello = Hallo, {$name}!
+files =
+  .input {$n :integer}
+  .match $n
+  one {{{$n} Datei}}
+  * {{{$n} Dateien}}
+when = {|2026-11-26T12:05:00| :datetime}

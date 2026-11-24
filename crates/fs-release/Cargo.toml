@@ -12,6 +12,7 @@ name = "fs-release"
 path = "src/main.rs"
 
 [dependencies]
+fs-texts-pack = { path = "../fs-texts-pack" }
 fs-release-chain = { path = "../fs-release-chain" }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }

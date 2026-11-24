@@ -1,0 +1,22 @@
+[package]
+name = "fs-texts-pack"
+version = "0.0.18"
+description = "fs-texts-pack: packs the .mf2 text sources of a program (pair check de/en) into MessageFormat 2 catalogs, one manifest and the date data blob of each language (ADR 0057)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+# Existing first (CLAUDE.md section 8): parser, writer, reader format and ICU4X blob generator are the ones of the `mf2` library (pinned exactly like fs-components).
+# This crate is only the adapter: our source format, the pair check and the layout of the output. The Cargo features are the ones `mf2::compile` switches on.
+mf2-syntax = "=3.0.0"
+mf2-model = "=3.0.0"
+mf2-catalog = { version = "=3.0.0", features = ["writer", "content-hash"] }
+mf2-locale-data = { version = "=3.0.0", features = ["icu-blob"] }
+
+[dev-dependencies]
+tempfile = "3"
+mf2 = { version = "=3.0.0", default-features = false, features = ["host-std", "number", "host-std-datetime-icu"] }
+mf2-catalog = { version = "=3.0.0", features = ["server-data", "writer"] }
+icu_provider_blob = "=2.4.0"
