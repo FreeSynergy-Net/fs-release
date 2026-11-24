@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: FreeSynergy-Net/fs-release/actions/publish-release@da557ba317f87252f53f808d06b76a0db5dfaecd
+      - uses: FreeSynergy-Net/fs-release/actions/publish-release@9150d628905bff10fc94b573eef9100f0acc8f55
         with:
           tag: ${{ inputs.tag }}
           repo: ${{ github.repository }}
