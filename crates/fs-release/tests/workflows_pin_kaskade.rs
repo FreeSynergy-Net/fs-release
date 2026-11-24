@@ -239,7 +239,7 @@ fn ein_stand_weiter_reaches_the_green_way_and_stops_on_red_or_no_result() {
     let green = r#"{"einstand":{"red":false,"befunde":[]}}"#;
     let red = r#"{"einstand":{"red":true,"befunde":[]}}"#;
     let found = r#"{"einstand":{"red":false,"befunde":[{"crate":"fs-rpc"}]}}"#;
-    let none = r#"{}"#;
+    let none = r"{}";
     // green: only `gruen` fires
     assert!(!when_is(&t, "rot", green) && when_is(&t, "gruen", green));
     // red, or a finding: `rot`, never `gruen`
