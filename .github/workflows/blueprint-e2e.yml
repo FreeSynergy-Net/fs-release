@@ -35,7 +35,7 @@ jobs:
         with:
           toolchain: pinned
           cache-key: blueprint-e2e-${{ matrix.os }}
-      - name: fs-blueprint tests on this platform (nextest profile: tag release, else quick; doc tests too)
+      - name: fs-blueprint tests on this platform (nextest profile, doc tests too)
         uses: ./actions/test-profile
         with:
           args: -p fs-blueprint --locked
