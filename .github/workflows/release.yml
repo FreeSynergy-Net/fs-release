@@ -121,7 +121,7 @@ jobs:
 
   container:
     needs: [plan, linux]
-    if: inputs.container && !fromJSON(needs.plan.outputs.plan).library
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.linux.result == 'success' && inputs.container && !fromJSON(needs.plan.outputs.plan).library }}
     uses: FreeSynergy-Net/fs-release/.github/workflows/_release-container.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
     permissions:
       contents: read
