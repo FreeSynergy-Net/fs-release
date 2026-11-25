@@ -1,0 +1,30 @@
+name: test-profile
+description: The tests of a caller through the nextest profiles, like the gate `test` of check.yml (scripts/test-gate.sh, cargo-nextest pinned in scripts/nextest.pin). Profile empty = by ref - tag release, every other ref quick; a profile the caller does not define is said in the log and the default profile (everything) runs, never a silent skip. Doc tests (nextest does not run them) run as their own step.
+inputs:
+  working-directory: { description: "Cargo workspace root", default: "." }
+  profile: { description: "nextest profile (name from .config/nextest.toml of the caller); empty = tag -> release, else quick", default: "" }
+  args: { description: "Arguments of `cargo nextest run`, e.g. `-p crate --all-features --locked` (word split, no quoting)", default: "" }
+  doc: { description: "Also run the doc tests (`cargo test --doc` with the same package and feature arguments)", default: "true" }
+runs:
+  using: composite
+  steps:
+    # the same install as actions/gates: prebuilt, sha256 checked by the pinned install action (Windows too)
+    - uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+      with:
+        tool: cargo-nextest@0.9.151
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        PROFILE: ${{ inputs.profile }}
+        ARGS: ${{ inputs.args }}
+        DOC: ${{ inputs.doc }}
+      run: |
+        if [ -z "$PROFILE" ]; then
+          case "$GITHUB_REF" in refs/tags/*) PROFILE=release ;; *) PROFILE=quick ;; esac
+        fi
+        # shellcheck disable=SC2086
+        bash "$GITHUB_ACTION_PATH/../../scripts/test-gate.sh" --profile "$PROFILE" $ARGS
+        if [ "$DOC" = true ]; then
+          # shellcheck disable=SC2086
+          bash "$GITHUB_ACTION_PATH/../../scripts/test-gate.sh" --doc $ARGS
+        fi
