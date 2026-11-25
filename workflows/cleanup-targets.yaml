@@ -40,7 +40,7 @@ do:
       call: cleanup-targets:0.0.18@fs
       with:
         mode: worktree
-        target: ${ $context.zweig.repo + "/" + $context.zweig.worktree }
+        target: ${ .input.target }
       metadata:
         freesynergy.net:actor: machine
         freesynergy.net:actor-type: Service
