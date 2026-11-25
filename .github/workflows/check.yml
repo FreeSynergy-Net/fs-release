@@ -169,7 +169,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends -o "Dir::Cache::archives=$ARCHIVES" $PACKAGES
           # the cache step (a post step as the runner user) must be able to read what apt wrote
           sudo chmod -R a+rX "$ARCHIVES"
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@7533919b7f532dccc7ea35bf0150d6082de62f65
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@b701f78d6ad676ad9992c7e71c69dadbcc7be105
         with:
           toolchain: pinned
           components: rustfmt,clippy
@@ -203,7 +203,7 @@ jobs:
       - name: Gates (fmt, clippy pedantic, test, FreeSynergy coding rules - ADR 0043)
         id: gates-fmt-clippy
         continue-on-error: true
-        uses: FreeSynergy-Net/fs-release/actions/gates@7533919b7f532dccc7ea35bf0150d6082de62f65
+        uses: FreeSynergy-Net/fs-release/actions/gates@b701f78d6ad676ad9992c7e71c69dadbcc7be105
         with:
           working-directory: ${{ inputs.working-directory }}
           diff-base: ${{ (!inputs.full && startsWith(github.ref, 'refs/heads/unreviewed/')) && 'origin/main' || '' }}
@@ -308,7 +308,7 @@ jobs:
         id: release-plan-probe
         continue-on-error: true
         if: steps.release-inputs.outputs.probe == 'true'
-        uses: FreeSynergy-Net/fs-release/actions/plan@7533919b7f532dccc7ea35bf0150d6082de62f65
+        uses: FreeSynergy-Net/fs-release/actions/plan@b701f78d6ad676ad9992c7e71c69dadbcc7be105
         with:
           tag: ${{ steps.release-inputs.outputs.tag }}
           name: ${{ steps.release-inputs.outputs.name }}
