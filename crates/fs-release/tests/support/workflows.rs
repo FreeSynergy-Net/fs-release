@@ -19,6 +19,7 @@ pub const FILES: [&str; 64] = [
     "bugfix",
     "catalog-bump",
     "cleanup-targets",
+    "components-bau",
     "coordination-round",
     "cost-reconcile",
     "doku-aufraeumen",

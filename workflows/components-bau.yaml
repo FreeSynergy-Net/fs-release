@@ -10,11 +10,11 @@ document:
   dsl: 1.0.3
   namespace: freesynergy.net
   name: components-bau
-  version: 0.0.17
+  version: 0.0.18
   title: Build in fs-components - existing first, pattern, branch with identity, builder, gates, one testlauf, Opus review, CI, ff landing, pin, checklist
 do:
   - vorhanden-pruefen:
-      call: vorhanden-pruefen-ai:0.0.17@fs
+      call: vorhanden-pruefen-ai:0.0.18@fs
       with:
         suche: ${ .input }
       export:
@@ -27,7 +27,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "MANDATORY FIRST STEP: look whether it already exists - Blinc, own crates and modules, crates.io (a crate found is used first: pin plus own adapter), `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch`, inventories. Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof."
   - vorhanden-pruefen-check:
-      call: befund-beleg:0.0.17@fs
+      call: befund-beleg:0.0.18@fs
       with:
         befund: ${ $context.befund }
       export:
@@ -74,7 +74,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - an existing crate that only has to be used ends the run with the reference; `vorhanden` with an extension or `neu` goes on; a missing result goes to `eskalation`."
   - entwurf:
-      call: build-ai:0.0.17@fs
+      call: build-ai:0.0.18@fs
       with:
         repo: fs-components
         task: "write the interface first - head line `Pattern: <Name> - <one sentence>` (closest pattern, deviation in one sentence), first doc line of every trait names its pattern (conventions/coding.md section 2), then the plan; the program runs against the interface"
@@ -89,7 +89,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Draft (CLAUDE.md sections 7a, 8): pattern first, then the interface (trait), standard per method, as little own code as possible; the draft names pattern, standard and the crates reused."
   - entwurf-check:
-      call: pattern-beleg:0.0.17@fs
+      call: pattern-beleg:0.0.18@fs
       with:
         entwurf: ${ $context.entwurf }
       export:
@@ -120,7 +120,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `entwurf` (at most two repeats), then `eskalation`; a missing result goes to `eskalation`."
   - slot-pruefen:
-      call: build-slot-status:0.0.17@fs
+      call: build-slot-status:0.0.18@fs
       export:
         as: '${ $context + { slot: . } }'
       metadata:
@@ -130,7 +130,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "`bash .scratch/build-slot.sh --status` first; at most ONE build agent per controller (4 slots, 4 controllers); no free slot means: work without a build (reading, drafts, docs) and ask again later, never `/tmp` for builds."
   - zweig:
-      call: branch-identity:0.0.17@fs
+      call: branch-identity:0.0.18@fs
       with:
         repo: fs-components
         branch: unreviewed/${ .input.ziel }
@@ -146,7 +146,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Worktree with branch `unreviewed/<ziel>` from `origin/main`; BEFORE the first commit `git config user.name FreeSynergy` and `git config user.email support@freesynergy.net` in this worktree (lesson 25.11.)."
   - bauen:
-      call: build-ai:0.0.17@fs
+      call: build-ai:0.0.18@fs
       with:
         repo: fs-components
         branch: ${ $context.zweig.branch }
@@ -162,7 +162,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "The builder (Sonnet) works in the worktree and commits locally ([COMMIT]); no push to main, no tag; report [BERICHT] with SHA, and in `_bericht/FEATURES.md` which existing checklist lines are done."
   - identitaet-pruefen:
-      call: commit-identity:0.0.17@fs
+      call: commit-identity:0.0.18@fs
       with:
         repo: ${ $context.zweig.worktree }
         expect: FreeSynergy <support@freesynergy.net> | FreeSynergy <support@freesynergy.net>
@@ -175,7 +175,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Check: `git log -1 --format='%an <%ae> | %cn <%ce>'` must read exactly `FreeSynergy <support@freesynergy.net> | FreeSynergy <support@freesynergy.net>` (script `scripts/identity-check`); red BEFORE the first push: amend or rebase locally; once pushed, a force-push is refused - then a new branch `-r2`, never force."
   - render-pruefen:
-      call: contract-render-check:0.0.17@fs
+      call: contract-render-check:0.0.18@fs
       with:
         repo: ${ $context.zweig.worktree }
       export:
@@ -187,7 +187,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Generated files (`contract/BLOCKS*.md`) are produced only by `contract/render`; the check runs it and compares: a hand-written or stale file is red."
   - gates:
-      call: gates:0.0.17@fs
+      call: gates:0.0.18@fs
       with:
         repo: ${ $context.zweig.worktree }
         rustflags: -D warnings -W clippy::pedantic
@@ -223,9 +223,13 @@ do:
         workflow:
           namespace: freesynergy.net
           name: testlauf
-          version: 0.0.17
+          version: 0.0.18
         input:
-          stufe: ende
+          repo: fs-components
+          branch: unreviewed/${ .input.ziel }
+          head: ${ $context.bau.sha // "HEAD" }
+          delta: origin/main..HEAD
+          scope: end
           crate: ${ .input.crate }
           profil: quick
       export:
@@ -256,7 +260,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a red test goes back to `bauen` (at most two repeats; the gates run again), the third red round to `eskalation`."
   - push:
-      call: push-unreviewed:0.0.17@fs
+      call: push-unreviewed:0.0.18@fs
       with:
         branch: ${ $context.zweig.branch }
       export:
@@ -269,7 +273,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "`git push origin unreviewed/<ziel>` - only `unreviewed/*`, never main, never a tag, never force; refused means a new branch `-r2`."
   - kopf:
-      call: resolve-head:0.0.17@fs
+      call: resolve-head:0.0.18@fs
       with:
         branch: ${ $context.zweig.branch }
       export:
@@ -285,9 +289,12 @@ do:
         workflow:
           namespace: freesynergy.net
           name: review
-          version: 0.0.17
+          version: 0.0.18
         input:
+          repo: fs-components
+          branch: unreviewed/${ .input.ziel }
           head: ${ $context.kopf.sha }
+          delta: origin/main..${ $context.kopf.sha }
           scope: normal
       export:
         as: '${ $context + { urteil: . } }'
@@ -318,7 +325,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a YES counts only for the SHA it names (equal to `kopf.sha`); a NO goes back to `bauen` (at most two repeats), then `eskalation`; a missing result or a YES for another SHA goes to `eskalation`."
   - ci:
-      call: ci-status:0.0.17@fs
+      call: ci-status:0.0.18@fs
       with:
         repo: fs-components
         sha: ${ $context.kopf.sha }
@@ -347,7 +354,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red CI goes back to `bauen` (a new SHA needs a new review); only green at exactly `kopf.sha` goes on."
   - landen:
-      call: merge-ff:0.0.17@fs
+      call: merge-ff:0.0.18@fs
       with:
         into: main
         branch: ${ $context.zweig.branch }
@@ -362,7 +369,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Landing by the controller: ff onto main ONLY after Opus YES for exactly this SHA and green CI at exactly this SHA; never force, never a tag; proof `git merge-base --is-ancestor <branch> origin/main`."
   - pin:
-      call: pin-eintragen:0.0.17@fs
+      call: pin-eintragen:0.0.18@fs
       with:
         sha: ${ $context.kopf.sha }
         datei: .scratch/sonnet/PINS.md
@@ -374,7 +381,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "A pin line in `.scratch/sonnet/PINS.md` (crate, SHA, what changed) and a message to everybody affected (other controllers directly, the pins also stay in PINS.md)."
   - checkliste:
-      call: checkliste-abhaken:0.0.17@fs
+      call: checkliste-abhaken:0.0.18@fs
       with:
         karte: ${ .input.karte }
         datei: .scratch/FEATURES-OFFEN.md
@@ -386,7 +393,7 @@ do:
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Tick the EXISTING line in `.scratch/FEATURES-OFFEN.md` (`[ ]` to `[x]` plus date), never a new `[x]` line; new things as `[ ]` in the right section; read before writing (lesson 24.11.). No report is final before this."
   - bericht:
-      call: report-to-strategy:0.0.17@fs
+      call: report-to-strategy:0.0.18@fs
       with:
         lauf: ${ $context }
       then: end
