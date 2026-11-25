@@ -56,7 +56,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0 # the plan checks that the tag commit is on main (actions/tag-on-main)
       - id: plan
-        uses: FreeSynergy-Net/fs-release/actions/plan@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+        uses: FreeSynergy-Net/fs-release/actions/plan@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           tag: ${{ inputs.tag }}
           name: ${{ inputs.name }}
@@ -80,7 +80,7 @@ jobs:
   signing-check:
     needs: plan
     if: ${{ github.ref_type == 'tag' && !fromJSON(needs.plan.outputs.plan).library }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-signing-check.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-signing-check.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     secrets:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -88,7 +88,7 @@ jobs:
   linux:
     needs: [plan, signing-check]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && fromJSON(needs.plan.outputs.plan).has_linux }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-linux.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-linux.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     with:
       plan: ${{ needs.plan.outputs.plan }}
       apt-packages: ${{ inputs.apt-packages }}
@@ -98,7 +98,7 @@ jobs:
   windows:
     needs: [plan, signing-check]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && fromJSON(needs.plan.outputs.plan).has_windows }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-windows.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-windows.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     with:
       plan: ${{ needs.plan.outputs.plan }}
       smoke: ${{ inputs.smoke }}
@@ -107,14 +107,14 @@ jobs:
   macos:
     needs: [plan, signing-check]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && fromJSON(needs.plan.outputs.plan).has_macos }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-macos.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-macos.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     with:
       plan: ${{ needs.plan.outputs.plan }}
 
   flatpak:
     needs: [plan, signing-check]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && inputs.flatpak && !fromJSON(needs.plan.outputs.plan).library }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-flatpak.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-flatpak.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     with:
       plan: ${{ needs.plan.outputs.plan }}
       manifest: ${{ inputs.flatpak-manifest }}
@@ -122,7 +122,7 @@ jobs:
   container:
     needs: [plan, linux]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.linux.result == 'success' && inputs.container && !fromJSON(needs.plan.outputs.plan).library }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-container.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-container.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     permissions:
       contents: read
       packages: write
@@ -135,7 +135,7 @@ jobs:
   mobile:
     needs: [plan, signing-check]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && (inputs.android || inputs.ios) && !fromJSON(needs.plan.outputs.plan).library }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-mobile.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-mobile.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     with:
       plan: ${{ needs.plan.outputs.plan }}
       android: ${{ inputs.android }}
@@ -144,7 +144,7 @@ jobs:
   finalize:
     needs: [plan, signing-check, linux, windows, macos, flatpak, container, mobile]
     if: ${{ !cancelled() && needs.plan.result == 'success' && !fromJSON(needs.plan.outputs.plan).library && !contains(needs.*.result, 'failure') }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-finalize.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-finalize.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     permissions:
       contents: write
       id-token: write
@@ -169,7 +169,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # the tag commit must be an ancestor of origin/main (release.sh)
-      - uses: FreeSynergy-Net/fs-release/actions/library-release@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+      - uses: FreeSynergy-Net/fs-release/actions/library-release@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           tag: ${{ fromJSON(needs.plan.outputs.plan).tag }}
           name: ${{ inputs.name }}
@@ -181,7 +181,7 @@ jobs:
   publish:
     needs: [plan, finalize]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.finalize.result == 'success' }}
-    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-publish.yml@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-publish.yml@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
     permissions:
       contents: write
       attestations: read

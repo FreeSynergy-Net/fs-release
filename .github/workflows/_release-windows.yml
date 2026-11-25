@@ -22,17 +22,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           toolchain: pinned
           targets: ${{ matrix.triple }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
           cache-key: release-${{ matrix.arch }}
       - if: contains(fromJSON(inputs.plan).windows_formats, 'msi') && matrix.arch == 'x86_64'
-        uses: FreeSynergy-Net/fs-release/actions/install-tools@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+        uses: FreeSynergy-Net/fs-release/actions/install-tools@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           tools: cargo-wix@0.3.9
-      - uses: FreeSynergy-Net/fs-release/actions/package-windows@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+      - uses: FreeSynergy-Net/fs-release/actions/package-windows@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           plan: ${{ inputs.plan }}
           arch: ${{ matrix.arch }}
@@ -63,19 +63,19 @@ jobs:
           name: dist-windows-${{ matrix.arch }}
           path: dist
       - if: contains(fromJSON(inputs.plan).windows_formats, 'zip')
-        uses: FreeSynergy-Net/fs-release/actions/smoke@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+        uses: FreeSynergy-Net/fs-release/actions/smoke@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           plan: ${{ inputs.plan }}
           format: zip
           args: ${{ inputs.smoke-args }}
       - if: contains(fromJSON(inputs.plan).windows_formats, 'msi') && matrix.arch == 'x86_64'
-        uses: FreeSynergy-Net/fs-release/actions/smoke@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+        uses: FreeSynergy-Net/fs-release/actions/smoke@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           plan: ${{ inputs.plan }}
           format: msi
           args: ${{ inputs.smoke-args }}
       - if: contains(fromJSON(inputs.plan).windows_formats, 'exe') && matrix.arch == 'x86_64'
-        uses: FreeSynergy-Net/fs-release/actions/smoke@e1b5b210c8f77dd8107213c0f9c7d62314b48c3e
+        uses: FreeSynergy-Net/fs-release/actions/smoke@baef9f152ec5c8027168cdf52261eb2d8b59a1f8
         with:
           plan: ${{ inputs.plan }}
           format: exe
