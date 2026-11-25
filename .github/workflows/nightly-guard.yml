@@ -1,0 +1,37 @@
+# Guard for a nightly run (CI-Tempo): says `run=true` only when main changed since the last SUCCESSFUL scheduled run of the CALLER workflow.
+# A `schedule` trigger can only live in the caller, so the caller has two jobs: this guard, then `check.yml` with `profile: release` under `needs: guard` + `if: needs.guard.outputs.run == 'true'`
+# (example: examples/callers/nightly.yml). Every other event (workflow_dispatch) always runs. No schedule run yet or a failed lookup = run (never skip by mistake).
+name: nightly-guard
+on:
+  workflow_call:
+    outputs:
+      run: { description: "true = run the nightly, false = main is unchanged since the last green nightly", value: "${{ jobs.guard.outputs.run }}" }
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.sha }}
+          WORKFLOW: ${{ github.workflow }}
+          REPO: ${{ github.repository }}
+        shell: bash {0}
+        run: |
+          run=true
+          if [ "$EVENT" = schedule ]; then
+            last=$(gh run list -R "$REPO" --workflow "$WORKFLOW" --event schedule --status success --branch main -L1 --json headSha --jq '.[0].headSha // ""') || last=""
+            if [ -n "$last" ] && [ "$last" = "$HEAD_SHA" ]; then run=false; fi
+            echo "nightly guard: head $HEAD_SHA, last green nightly ${last:-none} -> run=$run"
+          else
+            echo "nightly guard: event $EVENT always runs"
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"

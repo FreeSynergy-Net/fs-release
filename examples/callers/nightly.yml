@@ -1,0 +1,22 @@
+# Copy to <repo>/.github/workflows/nightly.yml - nightly full run (profile release) that runs ONLY when main changed since the last green nightly.
+# The workflow name must stay unique per repo: the guard looks up the last successful scheduled run by it.
+name: nightly
+on:
+  schedule: [{ cron: "17 2 * * *" }]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  guard:
+    uses: FreeSynergy-Net/fs-release/.github/workflows/nightly-guard.yml@main
+  nightly:
+    needs: guard
+    if: needs.guard.outputs.run == 'true'
+    uses: FreeSynergy-Net/fs-release/.github/workflows/check.yml@main
+    with:
+      profile: release
+      full: true
+      # software-gpu: true   # as in the repo's check.yml

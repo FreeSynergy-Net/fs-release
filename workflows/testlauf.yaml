@@ -46,7 +46,7 @@
 #     since the previous main (base = github.event.before, not origin/main) and their dependants; nothing changed = skipped with a line; no usable base or `full: true` = whole workspace; a profile the caller does not define = skipped with a line;
 #   tag: `release` (everything, CI only, hard limit 1). A caller without that profile is not red: `profile <name> not defined here ... running default` runs everything.
 #   NOT WIRED (only a plan): `picture`/`platform`/`security` on `unreviewed/*` branches "when the change fits" (there only `quick` runs); `time` (minutes) runs in no check at all except through `release` on a tag;
-#   nightly `release` on main when main changed (would be a `schedule` workflow of the CALLER, never in the reusable check.yml; docs/usage.md has an example); `security` completely before V1 (by hand); locally `cargo check -p <crate>` and
+#   nightly `release` on main when main changed (would be a `schedule` workflow of the CALLER, never in the reusable check.yml; docs/usage.md has an example); guard: nightly-guard.yml; `security` completely before V1 (by hand); locally `cargo check -p <crate>` and
 #   `quick` for one finished module (stage `ende`). Nobody starts a full run on their own. A profile name outside [a-z][a-z0-9_-]{0,31} is refused (rc 2). nextest runs with `--color never` (the FAIL lines of the re-check list stay readable in CI).
 #   Doc tests run on the same selection without a profile. Self tests: scripts/test_nextest_profile.sh, scripts/test_gates_sammelliste.sh.  Real nextest accepts configs/nextest.toml: scripts/test_nextest_config.sh (branch-ci.yml).
 # RULES ADDED BY workflow-pflege-1 (23.11.2026, cards of the strategy; each rule names its occasion):
