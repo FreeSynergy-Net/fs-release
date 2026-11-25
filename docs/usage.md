@@ -35,7 +35,7 @@ Inputs: `working-directory` (default `.`), `features` (`all` = `--all-features`,
 `rules-url`, `licences` (default true).
 
 What runs, in order: `cargo fmt --check` (no `--all`, coding.md section 7), `cargo clippy --all-targets
---all-features -- -D warnings`, `cargo test --all-features`, `scripts/check_rust_rules.py` fetched from
+--all-features -- -D warnings`, the tests through `actions/test-profile` (cargo nextest, profile `release` on a tag, else `quick`; a repo without that profile in `.config/nextest.toml` runs the default profile = everything, said in the log; doc tests as their own step; `blueprint-e2e.yml` does the same), `scripts/check_rust_rules.py` fetched from
 `FreeSynergy-Net/fs-documentation` (`main`), then `cargo deny check licenses bans sources` with
 [`configs/deny.toml`](../configs/deny.toml) (allow-list MIT, Apache-2.0, BSD, ISC, Zlib, Unicode, MPL-2.0 ...;
 GPL/AGPL/LGPL/unknown are rejected) unless the repo has its own `deny.toml`. Advisories are reported as a warning only.
