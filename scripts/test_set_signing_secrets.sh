@@ -209,20 +209,37 @@ suite() {
   EXTRA="REVIEWER=alice"
   run x "" "" --env --env-only --repos texts
   ck "--env with --env-only: rc 2" '[ "$rc" = 2 ]'
-  # ask mode (typed passphrase): needs a terminal. run_tty feeds the lines through a pseudo-terminal (socat) so the real prompt path runs.
+  # ask mode (typed passphrase): needs a terminal. run_tty feeds the lines through a pseudo-terminal (python3 pty) so the real prompt path runs.
   ASKPW="ask-PASSPHRASE-91c4e7"
   run x "" "" --env --repos texts --yes --ask-passphrase
   ck "ask mode without a terminal: clear error, rc != 0, nothing written" '[ "$rc" != 0 ] && grep -q "no terminal" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
   run x "" "" --env --repos texts --yes --ask-passphrase --dry-run
   ck "ask mode dry run: rc 0, no prompt, no passphrase printed, redacted note" '[ "$rc" = 0 ] && ! grep -q "$ASKPW" "$tmp/out" && grep -q "typed passphrase" "$tmp/out"'
-  if [ "${PTY:-1}" = 1 ] && command -v socat >/dev/null; then
+  if [ "${PTY:-1}" = 1 ]; then
     run_tty() { # <input lines separated by \n> <args...>
       local in=$1; shift
       : >"$tmp/args"; : >"$tmp/stdin"; : >"$tmp/gpg"; rm -rf "$tmp/keys" "$tmp/state/"{env,policy,env.GPG_PRIVATE_KEY,env.GPG_PASSPHRASE}
       touch "$tmp/state/repo.GPG_PRIVATE_KEY" "$tmp/state/repo.GPG_PASSPHRASE"
-      (sleep 0.5; printf "$in"; sleep 1.5) | env PATH="$tmp/bin:$PATH" MOCK_ARGS="$tmp/args" MOCK_STDIN="$tmp/stdin" MOCK_STATE="$tmp/state" MOCK_GPG="$tmp/gpg" SECRETVAL="$SECRETVAL" ASKPW="$ASKPW" \
+      PTY_IN="$(printf "$in")" python3 -I -c '
+import os, pty, sys, time, termios, signal
+signal.alarm(20)
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp(sys.argv[1], sys.argv[1:])
+a = termios.tcgetattr(fd); a[3] &= ~termios.ECHO; termios.tcsetattr(fd, termios.TCSANOW, a)  # like socat echo=0: typed lines are not echoed
+time.sleep(0.5); os.write(fd, (os.environ["PTY_IN"] + "\n").encode())
+while True:
+    try:
+        d = os.read(fd, 4096)
+    except OSError:
+        break
+    if not d:
+        break
+    sys.stdout.buffer.write(d); sys.stdout.flush()
+sys.exit(os.waitstatus_to_exitcode(os.waitpid(pid, 0)[1]))
+' env PATH="$tmp/bin:$PATH" MOCK_ARGS="$tmp/args" MOCK_STDIN="$tmp/stdin" MOCK_STATE="$tmp/state" MOCK_GPG="$tmp/gpg" SECRETVAL="$SECRETVAL" ASKPW="$ASKPW" \
         OUT_DIR="$tmp/keys" OUT_OWNER="$(id -un):$(id -gn)" NO_UPLOAD=1 FS_SIGN_TMP="$tmp" REVIEWER=alice HOME="$tmp/nohome" \
-        socat - "EXEC:bash $SCRIPT_DIR/set-signing-secrets.sh $*,pty,setsid,ctty,echo=0" >"$tmp/out" 2>&1
+        bash "$SCRIPT_DIR/set-signing-secrets.sh" "$@" >"$tmp/out" 2>&1
       rc=$?
     }
     run_tty "y\n$ASKPW\n$ASKPW\ny\n" --env --repos texts
@@ -232,8 +249,6 @@ suite() {
     ck "ask mode does not use a passphrase file" '! grep -q -- "--passphrase-file" "$tmp/gpg"'
     run_tty "y\n$ASKPW\nOTHER-typo\n" --env --repos texts
     ck "ask mode: two different entries abort, nothing written" '[ "$rc" != 0 ] && grep -q "differ" "$tmp/out" && ! grep -q "environments" "$tmp/args" && ! grep -q "$ASKPW" "$tmp/out"'
-  else
-    echo "note: socat not installed, pseudo-terminal tests skipped"
   fi
   EXTRA="REVIEWER=alice"
   run x "" "" --repo-secrets --repos texts --yes
