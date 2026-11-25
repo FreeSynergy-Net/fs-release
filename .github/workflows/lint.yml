@@ -268,7 +268,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # the pins name commits of the history
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@7e3b98b5807af07572982e588f2b94caed2197fc
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@c3b021017a419f0495eff4da661136b7e74c1c12
         with:
           toolchain: pinned
           cache-key: lint-pin-chain
