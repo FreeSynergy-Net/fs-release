@@ -31,14 +31,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@f44c348c9dec89e6f3a3026d98d3db66f99ab9df
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@1273bab3e500eaa14b915d94e07652e0f6897769
         with:
           toolchain: pinned
           cache-key: blueprint-e2e-${{ matrix.os }}
-      - name: fs-blueprint tests on this platform
-        run: cargo test -p fs-blueprint --locked --no-fail-fast
+      - name: fs-blueprint tests on this platform (nextest profile, doc tests too)
+        uses: ./actions/test-profile
+        with:
+          args: -p fs-blueprint --locked
       - name: one blueprint becomes a data package that checks without drift
-        run: cargo test -p fs-blueprint --locked --test e2e -- --ignored --nocapture
+        uses: ./actions/test-profile
+        with:
+          profile: default
+          doc: "false"
+          args: -p fs-blueprint --locked --test e2e --run-ignored only --no-capture
       - name: the command `fs-blueprint check` on the fixtures (a good repo is ok, a bad one gives exit code 1 and its codes)
         shell: bash
         run: |
@@ -131,7 +137,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@f44c348c9dec89e6f3a3026d98d3db66f99ab9df
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@1273bab3e500eaa14b915d94e07652e0f6897769
         with:
           toolchain: pinned
           cache-key: blueprint-readme-${{ matrix.os }}
@@ -148,7 +154,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@f44c348c9dec89e6f3a3026d98d3db66f99ab9df
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@1273bab3e500eaa14b915d94e07652e0f6897769
         with:
           toolchain: pinned
           cache-key: blueprint-install

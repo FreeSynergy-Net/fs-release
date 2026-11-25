@@ -39,7 +39,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@f44c348c9dec89e6f3a3026d98d3db66f99ab9df
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@1273bab3e500eaa14b915d94e07652e0f6897769
         with:
           toolchain: pinned
           components: rustfmt,clippy
@@ -51,10 +51,12 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           cargo clippy --all-targets $FEATURE_FLAGS -- -D warnings
-      - name: cargo test
-        run: |
-          # shellcheck disable=SC2086
-          cargo test $FEATURE_FLAGS
+      # tests through the nextest profiles like check.yml (tag -> release, else quick; a repo without that profile runs the default profile = everything, said in the log); doc tests as their own step
+      - name: cargo test (nextest profile)
+        uses: FreeSynergy-Net/fs-release/actions/test-profile@78cc989d267fb11fc2df0137174ea8b4559b21a5
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          args: ${{ env.FEATURE_FLAGS }}
       - name: FreeSynergy coding rules (ADR 0043)
         if: inputs.rules
         env:
@@ -64,7 +66,7 @@ jobs:
           python3 -I "$RUNNER_TEMP/check_rust_rules.py" "$PWD"
       - name: Licences (cargo-deny)
         if: inputs.licences
-        uses: FreeSynergy-Net/fs-release/actions/licence-check@f44c348c9dec89e6f3a3026d98d3db66f99ab9df
+        uses: FreeSynergy-Net/fs-release/actions/licence-check@1273bab3e500eaa14b915d94e07652e0f6897769
         with:
           working-directory: ${{ inputs.working-directory }}
 
@@ -78,7 +80,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@f44c348c9dec89e6f3a3026d98d3db66f99ab9df
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@1273bab3e500eaa14b915d94e07652e0f6897769
         with:
           toolchain: ${{ inputs.msrv }}
           working-directory: ${{ inputs.working-directory }}
