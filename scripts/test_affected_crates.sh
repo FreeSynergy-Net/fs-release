@@ -2,7 +2,7 @@
 # Pattern: none (test). Self test of scripts/affected_crates.py and of the narrowed TEST gate of scripts/gates.sh (CI cost on unreviewed/* branches).
 # A fixture workspace  app -> mid -> base (+ an independent `lone`, and `devonly` that uses base only as a dev-dependency): the files of one crate give that crate plus every
 # crate that depends on it (dev-dependencies and transitively), a global file or a file no crate owns gives FULL, errors give rc 2 (the gate then tests the whole workspace).
-# gates.sh with FS_GATES_DIFF_BASE runs `cargo test -p ...` for the narrowed set and keeps clippy/fmt on --workspace; unset, nothing changes. Mutants must each fail a case.
+# gates.sh with FS_GATES_DIFF_BASE runs `cargo test -p ...` for the narrowed set and runs `cargo clippy -p ...` for the same set and keeps fmt on --workspace; unset, nothing changes. Mutants must each fail a case.
 #   bash scripts/test_affected_crates.sh      (needs bash, python3, git, cargo for `metadata`; no network)
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,7 +79,7 @@ got=$(python3 -I "$AC" "$S/sub" HEAD~1 2>/dev/null); [ "$got" = "FULL a changed 
 git -C "$S" rm -q --cached other.txt; git -C "$S" -c user.name=t -c user.email=t@t commit -q -m c
 got=$(python3 -I "$AC" "$S/sub" HEAD~2 2>/dev/null); [ "$got" = "PACKAGES lone" ] && ok "sub directory workspace: paths are made relative to it" || bad "mono: got '$got'"
 
-# gates.sh: copy with stub cargo (metadata goes to the real one), CI=true; the cargo log shows the narrowed test and the full clippy
+# gates.sh: copy with stub cargo (metadata goes to the real one), CI=true; the cargo log shows the narrowed test and the narrowed clippy
 GK="$tmp/gk"; mkdir -p "$GK/scripts" "$GK/bin"
 cp "$repo/scripts/gates.sh" "$repo/scripts/lib_gates_guard.sh" "$repo/scripts/lib_gates_list.sh" "$AC" "$repo/scripts/identity-check" "$GK/scripts/"
 echo 1.0.0 >"$GK/RUST_VERSION"; printf '#!/usr/bin/env bash\nexit 0\n' >"$GK/scripts/gates-lock.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/gates-files.sh"; cp "$GK/scripts/gates-lock.sh" "$GK/scripts/licence-gate.sh"; cp "$repo/scripts/test-gate.sh" "$repo/scripts/nextest.pin" "$GK/scripts/"; mkdir -p "$GK/configs"; cp "$repo/configs/nextest.toml" "$GK/configs/"; : >"$GK/scripts/check_rust_rules.py"
@@ -96,18 +96,21 @@ gate_cases() { # <script>; counts failures in cases_fail when QUIET
   # HEAD~3 is the base commit's child (mid change, stray, unstray): the diff is crates/mid + stray.txt (net: stray gone) -> mid
   grep -qE '^cargo nextest run .*--no-fail-fast -p app -p mid --all-features --locked$' "$GK/cargo.log" || why="$why; narrowed test line missing"
   ! grep -q -- 'cargo nextest run .*--workspace' "$GK/cargo.log" || why="$why; whole-workspace test ran"
-  grep -q 'cargo clippy --workspace --all-targets --all-features --locked --keep-going' "$GK/cargo.log" || why="$why; clippy not on the workspace"
+  grep -qE '^cargo clippy -p app -p mid --all-targets --all-features --locked --keep-going' "$GK/cargo.log" || why="$why; clippy not narrowed like the test"
+  ! grep -q -- 'cargo clippy --workspace' "$GK/cargo.log" || why="$why; narrowed: clippy ran on the whole workspace"
   grep -qx 'cargo fmt --check' "$GK/cargo.log" || why="$why; fmt missing"
   grep -q 'test NARROWED' "$GK/out" || why="$why; no NARROWED line"
   [ "$rc" = 0 ] || why="$why; rc $rc"
   gates_run "$s" "" || rc=$?
   grep -qE '^cargo nextest run .*--no-fail-fast --workspace --all-features --locked$' "$GK/cargo.log" || why="$why; unset: whole workspace test missing"
   ! grep -q 'NARROWED' "$GK/out" || why="$why; unset: narrowed"
+  grep -q 'cargo clippy --workspace --all-targets --all-features --locked --keep-going' "$GK/cargo.log" || why="$why; unset: clippy not on the whole workspace"
   gates_run "$s" "no-such-rev" || true
   grep -qE '^cargo nextest run .*--no-fail-fast --workspace --all-features --locked$' "$GK/cargo.log" || why="$why; bad rev: no fallback to the whole workspace"
   grep -q 'test runs the WHOLE workspace' "$GK/out" || why="$why; bad rev: fallback not said"
+  grep -q 'cargo clippy --workspace --all-targets --all-features --locked --keep-going' "$GK/cargo.log" || why="$why; bad rev: clippy not on the whole workspace"
   if [ -n "$why" ]; then if [ -n "${QUIET:-}" ]; then cases_fail=$((cases_fail + 1)); else bad "gates.sh narrowed test: ${why#; }"; sed 's/^/     /' "$GK/out1"; fi
-  elif [ -z "${QUIET:-}" ]; then ok "gates.sh: FS_GATES_DIFF_BASE narrows ONLY the test gate (clippy, fmt stay full); unset or a bad rev = whole workspace, said"; fi
+  elif [ -z "${QUIET:-}" ]; then ok "gates.sh: FS_GATES_DIFF_BASE narrows the test AND clippy gates (fmt, rules stay full); unset or a bad rev = whole workspace, said"; fi
 }
 gate_cases "$GK/scripts/gates.sh"
 
@@ -206,7 +209,7 @@ mutant "Cargo.lock not global" affected_crates.py 's/"Cargo.lock", //' crates
 mutant "no-owner file ignored" affected_crates.py 's/if not owners:/if False:/' crates
 mutant "prefix match without the slash" affected_crates.py 's/d \+ "\/"/d/' crates
 mutant "every crate affected still narrows" affected_crates.py 's/if len\(seen\) == len\(pkgs\):/if False:/' crates
-mutant "gates: narrowing also for clippy" gates.sh 's/clippy --workspace --all-targets/clippy -p mid --all-targets/' gates
+mutant "gates: clippy always on the whole workspace" gates.sh 's/clippy "\$\{testsel\[@\]\}" --all-targets/clippy --workspace --all-targets/' gates
 mutant "gates: narrowing ignored" gates.sh 's/^( *)testsel=\(\)$/\1testsel=(--workspace)/' gates
 mutant "gates: fallback not said" gates.sh 's/test runs the WHOLE workspace/test runs it/' gates
 mutant "gates: -p dropped from the list" gates.sh 's/testsel\+=\(-p "\$sel_name"\)/testsel+=("$sel_name")/' gates

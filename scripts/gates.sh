@@ -189,9 +189,8 @@ else
     echo "gates: test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST, named exception of gates-komplett; not green for this test)"
   fi
   step fmt style cargo fmt --check
-  step clippy lint cargo clippy --workspace --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic
-  # FS_GATES_DIFF_BASE: set ONLY by CI on `unreviewed/*` branches (actions/gates input diff-base, never locally, never on main or a tag): the TEST gate then runs the crates that own a changed
-  # file plus their dependants (scripts/affected_crates.py); fmt, clippy, rust-rules, lock and files stay on the whole workspace. Anything unclear (error, global file, every crate) = whole workspace, said below.
+  # FS_GATES_DIFF_BASE: set ONLY by CI on `unreviewed/*` branches (actions/gates input diff-base, never locally, never on main or a tag): the TEST and CLIPPY gates then run the crates that own a changed
+  # file plus their dependants (scripts/affected_crates.py); fmt, rust-rules, lock and files stay on the whole workspace. Anything unclear (error, global file, every crate) = whole workspace, said below.
   testsel=(--workspace)
   if [ -n "${FS_GATES_DIFF_BASE:-}" ]; then
     sel_rc=0
@@ -200,11 +199,13 @@ else
       read -ra sel_names <<<"${sel_out#PACKAGES }"
       testsel=()
       for sel_name in "${sel_names[@]}"; do testsel+=(-p "$sel_name"); done
-      echo "gates: test NARROWED to the crates changed against $FS_GATES_DIFF_BASE and their dependants: ${sel_names[*]} (fmt, clippy, rules, lock, files stay full)"
+      echo "gates: test NARROWED to the crates changed against $FS_GATES_DIFF_BASE and their dependants: ${sel_names[*]} (clippy uses the same selection; fmt, rules, lock, files stay full)"
     else
       echo "gates: test runs the WHOLE workspace (${sel_out:-affected_crates.py rc=$sel_rc})"
     fi
   fi
+  # clippy: the SAME selection as the test gate ([CI-TEMPO]: measured 49 s of the whole run; on `unreviewed/*` only the changed crates and their dependants, `main`/tags/unclear = --workspace).
+  step clippy lint cargo clippy "${testsel[@]}" --all-targets --all-features --locked --keep-going -- -D warnings -W clippy::pedantic
   # test: cargo nextest (scripts/test-gate.sh: all test binaries in parallel, configs/nextest.toml, pin scripts/nextest.pin); nextest does not run doc tests, they are the step `doctest`. Both keep --no-fail-fast, --locked, the same selection.
   # FS_GATES_PROFILE: the nextest profile of the caller (input `profile` of check.yml); the name is checked and a missing profile falls back to default INSIDE test-gate.sh (visible in the log). Doc tests ignore it.
   profsel=()

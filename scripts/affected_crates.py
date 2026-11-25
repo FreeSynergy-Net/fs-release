@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Which workspace crates must be TESTED for the files a branch changed (CI cost on `unreviewed/*` branches; fmt, clippy, lock and rules always stay full).
+"""Which workspace crates must be TESTED for the files a branch changed (CI cost on `unreviewed/*` branches; CLIPPY uses the same set; fmt, lock and rules always stay full).
 
     python3 -I scripts/affected_crates.py <cargo workspace dir> <base rev>       files = `git diff --name-only --no-renames <base>...HEAD`
     python3 -I scripts/affected_crates.py <cargo workspace dir> --files <file>   files = the lines of <file> (paths relative to the git top level; for tests)

@@ -59,9 +59,9 @@ of a repo; it runs on every push. It needs no secrets and only `contents: read`.
 Inputs: `working-directory` (default `.`), `apt-packages`, `runs-on`, `test-env` (KEY=VALUE lines; the keys CI, GITHUB_*, RUNNER_*, FS_*, GATES_*, GIT_*, LD_*, PATH, BASH_ENV and ENV are refused: red), `software-gpu` (boolean, default false), `full` (boolean, default false), `profile` (text, default empty, see below). Unlike
 `ci.yml` there is no MSRV or cargo-deny step and no feature selection: everything is checked with all features. Repos can run both.
 
-**Scope of the test gate (CI cost).** On a branch `unreviewed/*` step 3 runs only the crates that own a file changed against main (merge base with
-`origin/main`) plus every workspace crate that depends on one of them (dev-dependencies and transitive ones included): `cargo test -p a -p b ...`
-(`scripts/affected_crates.py`, handed over by the `diff-base` input of `actions/gates` as `FS_GATES_DIFF_BASE`). fmt, clippy, the rules, the lock
+**Scope of the test gate (CI cost).** On a branch `unreviewed/*` steps 2 (clippy) and 3 run only the crates that own a file changed against main (merge base with
+`origin/main`) plus every workspace crate that depends on one of them (dev-dependencies and transitive ones included): `cargo clippy -p a -p b ...` and `cargo test -p a -p b ...`
+(`scripts/affected_crates.py`, handed over by the `diff-base` input of `actions/gates` as `FS_GATES_DIFF_BASE`). fmt, the rules, the lock
 check and the file checks always run on the whole workspace. `main`, tags, every other ref and `full: true` test the whole workspace, and so does
 every unclear case (Cargo.lock, a workspace manifest, toolchain or cargo config, a file that no crate owns, an error): the gate output says which
 (`gates: test NARROWED ...` / `gates: test runs the WHOLE workspace (...)`). Locally `scripts/gates.sh` is unchanged.

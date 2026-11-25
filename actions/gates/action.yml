@@ -2,7 +2,7 @@ name: gates
 description: Run scripts/gates.sh (fmt, clippy pedantic, test, coding rules ADR 0043) from this repo, at the same ref as the action. The toolchain is the one in RUST_VERSION.
 inputs:
   working-directory: { description: "Cargo workspace root", default: "." }
-  diff-base: { description: "Git revision to diff against (e.g. origin/main): the TEST gate then runs only the crates changed since it and their dependants (fmt, clippy, rules, lock, files stay full); empty = the whole workspace", default: "" }
+  diff-base: { description: "Git revision to diff against (e.g. origin/main): the TEST and CLIPPY gates then run only the crates changed since it and their dependants (fmt, rules, lock, files stay full); empty = the whole workspace", default: "" }
   also-profile: { description: "second nextest profile run after the first when the caller defines it (check.yml sets security on main); skipped with a log line otherwise", default: "" }
   land-profiles: { description: "space separated nextest profiles run once more AFTER the first (and also-profile) for the landing head, only for the crates changed since land-base and their dependants (check.yml sets `picture platform` on a push to main); a profile the caller does not define is skipped with a log line", default: "" }
   land-base: { description: "commit before the push (github.event.before) the landing-head runs diff against; empty or all zeros = the whole workspace", default: "" }
