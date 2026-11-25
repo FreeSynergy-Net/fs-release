@@ -287,6 +287,10 @@ jobs:
               put("probe", "false")
               sys.exit(0)
           workdir = os.path.join(root, vals["working-directory"])
+          if vals["kind"] == "data" and os.path.exists(os.path.join(workdir, "Cargo.toml")):
+              # a data release has no cargo build: a Cargo.toml next to kind data is a wrong input (or a wrong kind), red here and not silently ignored
+              print("::error::release.yml says kind data but the repo has a Cargo.toml: a data package has no cargo build (use kind cli, daemon, app, module or library)")
+              sys.exit(1)
           if vals["kind"] == "data":
               # kind data (usage.md: no binaries, no cargo build; the tag must equal the blueprint version): the tag is the version of scaffold.toml, no `cargo metadata`; said, never silent
               import tomllib

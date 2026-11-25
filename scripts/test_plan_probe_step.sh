@@ -116,6 +116,9 @@ all_cases() { # <script>: every case against it
   CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data says out loud that the Cargo part is skipped" "$s" "$tmp/data" "probe=true plan_rc=0" "Cargo-Teil der Plan-Probe entfaellt"
   release_yml "$tmp/data" "$RELNEW" "kind: data" "name: leer" "binaries: x"
   CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data with binaries: the plan is red (its own message)" "$s" "$tmp/data" "probe=true plan_rc=1" "has no binary"
+  printf '[package]\nname = "x"\nversion = "0.0.7"\n' >"$tmp/data/Cargo.toml"
+  CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data WITH a Cargo.toml: red, not silently ignored" "$s" "$tmp/data" "probe=reader-rc1 plan_rc=-" "has a Cargo.toml"
+  rm "$tmp/data/Cargo.toml"
   rm "$tmp/data/scaffold.toml"
   release_yml "$tmp/data" "$RELNEW" "kind: data" "name: leer"
   CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data without scaffold.toml: the reader is red (never a made-up tag)" "$s" "$tmp/data" "probe=reader-rc1 plan_rc=-"
@@ -179,6 +182,7 @@ mutant "expressions are passed on" 's/"\$" \+ "\{\{" in v or //'
 mutant "booleans are passed as Python words" 's/\("true" if v else "false"\) if isinstance\(v, bool\) else str\(v\)/str(v)/'
 mutant "owner not looked for (first package)" 's/ or mine$/ or mine\nowners = mine/'
 mutant "kind data still calls cargo" 's/if vals\["kind"\] == "data":/if False:/'
+mutant "kind data with Cargo.toml passes" 's/and os.path.exists\(os.path.join\(workdir, "Cargo.toml"\)\)/and False/'
 mutant "kind data tag fixed" 's/tag = "v" \+ str\(tomllib.load\(f\)\["program"\]\["version"\]\)/tag = "v0.0.1"/'
 mutant "kind data skip not announced" 's/Cargo-Teil der Plan-Probe entfaellt/x/'
 mutant "working directory ignored" 's/workdir = os.path.join\(root, vals\["working-directory"\]\)/workdir = root/'

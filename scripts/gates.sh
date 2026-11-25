@@ -189,11 +189,11 @@ else
     echo "gates: test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST, named exception of gates-komplett; not green for this test)"
   fi
   # [DATEN-MODUS] A pure data repo (kind data: scaffold.toml, NO Cargo.toml) has nothing for the Cargo gates. Said out loud (step `daten-modus`, its `gates-skipped:` lines end up in the Beleg as
-  # "lokal NICHT gelaufen"), never silently green. A repo with scaffold.toml AND Cargo.lock/crates/src but no Cargo.toml is RED (no way to dodge the gates by losing the manifest); without scaffold.toml nothing changes (the Cargo gates run and are red by themselves).
+  # "lokal NICHT gelaufen"), never silently green. A repo with scaffold.toml and no Cargo.toml in the root but ANY Cargo.toml (any case), Cargo.lock or *.rs file anywhere (git ls-files) is RED (no way to dodge the gates by losing the manifest); without scaffold.toml nothing changes (the Cargo gates run and are red by themselves).
   data_mode=""
   if [ ! -f Cargo.toml ] && [ -f scaffold.toml ]; then
     step daten-modus error gates_data_mode_check "$root"
-    if [ ! -e Cargo.lock ] && [ ! -e crates ] && [ ! -e src ]; then data_mode=1; fi
+    if [ -z "$(gates_rust_files "$root")" ]; then data_mode=1; fi
   fi
   if [ -z "$data_mode" ]; then
   step fmt style cargo fmt --check

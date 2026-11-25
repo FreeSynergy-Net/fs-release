@@ -22,7 +22,7 @@ printf '#!/usr/bin/env bash\necho rustc-stub\n' >"$tmp/bin/rustc"; chmod +x "$tm
 export STUBLOG="$tmp/cargo.log"
 # mkrepo <dir> <gates.sh to copy or empty>: a repo with its own copy of the scripts (no fs-release tag is pinned), identity base = HEAD
 mkrepo() {
-  rm -rf "$1"; mkdir -p "$1/configs"; cp -r "$here" "$1/scripts"; cp "$here/../configs/nextest.toml" "$1/configs/"; rm -rf "$1/scripts/__pycache__"
+  rm -rf "$1"; mkdir -p "$1/configs"; cp -r "$here" "$1/scripts"; cp "$here/../configs/nextest.toml" "$1/configs/"; rm -rf "$1/scripts/__pycache__" "$1/scripts/typing-test"; : # the helper crate of fs-release is not part of a data repo
   printf '#!/usr/bin/env bash\nexit 0\n' >"$1/scripts/licence-gate.sh"; echo 1.0.0 >"$1/RUST_VERSION"
   [ -z "${2:-}" ] || cp "$2" "$1/scripts/gates.sh"
   git init -q -b main "$1"; echo "__pycache__/" >"$1/.gitignore"
@@ -54,8 +54,26 @@ chk "lost manifest: gates rc 1" [ "$rc" -eq 1 ]
 chk "lost manifest: daten-modus is red and says why" bash -c "grep -q '^gate daten-modus: rc=1' '$tmp/o.txt' && grep -q 'not a pure data repo' '$tmp/o.txt'"
 chk "lost manifest: the Cargo gates were not skipped" grep -q '^gate fmt: ' "$tmp/o.txt"
 # 3b. crates/ without Cargo.toml
-rm "$l/Cargo.lock"; mkdir -p "$l/crates/a"; echo x >"$l/crates/a/f"; commit "$l"; run "$l"; rc=$?
+rm "$l/Cargo.lock"; mkdir -p "$l/crates/a"; echo x >"$l/crates/a/lib.rs"; commit "$l"; run "$l"; rc=$?
 chk "lost manifest (crates/): gates rc 1" [ "$rc" -eq 1 ]
+
+# 3c. ways around the data mode (review M1): a scaffold.toml repo that hides Rust code or a manifest must be red, the Cargo gates must run
+hide() { # <name> <file> [<file>...]: scaffold.toml + the files, committed (untracked case below)
+  local name="$1" f; shift
+  datarepo "$tmp/h-$name"; for f in "$@"; do mkdir -p "$tmp/h-$name/$(dirname "$f")"; echo "x" >"$tmp/h-$name/$f"; done; commit "$tmp/h-$name"
+  run "$tmp/h-$name"; rc=$?
+  chk "hidden Rust ($name): gates rc 1, daten-modus red, fmt ran, no 'entfallen'" bash -c "[ $rc -eq 1 ] && grep -q '^gate daten-modus: rc=1' '$tmp/o.txt' && grep -q '^gate fmt: ' '$tmp/o.txt' && ! grep -q 'Cargo-Gates entfallen' '$tmp/o.txt'"
+}
+hide sub-crate sub/Cargo.toml sub/src/main.rs
+hide lib-rs-in-root lib.rs
+hide build-rs-and-tests build.rs tests/a.rs
+hide lowercase-manifest cargo.toml
+hide lock-in-subfolder sub/Cargo.lock
+hide uppercase-ext sub/X.rs
+datarepo "$tmp/h-untracked"; echo x >"$tmp/h-untracked/lib.rs"; run "$tmp/h-untracked"; rc=$?
+chk "hidden Rust (untracked, not ignored lib.rs): rc 1" bash -c "[ $rc -eq 1 ] && grep -q '^gate daten-modus: rc=1' '$tmp/o.txt'"
+datarepo "$tmp/h-doc"; mkdir -p "$tmp/h-doc/docs"; echo "fn main() {}" >"$tmp/h-doc/docs/readme.md"; commit "$tmp/h-doc"; run "$tmp/h-doc"; rc=$?
+chk "a .md or other text with Rust inside is no Rust file: data mode stays green" [ "$rc" -eq 0 ]
 
 # 4. neither scaffold.toml nor Cargo.toml: unchanged behaviour, the Cargo gates run (red by themselves with the real cargo)
 n="$tmp/neither"; mkrepo "$n"; echo x >"$n/a.txt"; commit "$n"; run "$n"
@@ -75,6 +93,14 @@ mutant() { # <name> <sed -E expression>
 }
 mutant "data mode never entered" 's/data_mode=1; fi/true; fi/'
 mutant "no announcement step" 's/^    step daten-modus error gates_data_mode_check "\$root"$/    true/'
+mutant_hide() { # the detection looks only at the root: the sub-crate case must turn red (the mutant run is green = it survives)
+  sed -E "s/^gates_rust_files\(\) \{.*/gates_rust_files() { ls \"\$1\" | grep -iE '^cargo\\.(toml|lock)\$|\\.rs\$' || true; }/" "$here/lib_gates_list.sh" >"$tmp/ml.sh"
+  if cmp -s "$tmp/ml.sh" "$here/lib_gates_list.sh"; then bad "mutant 'detection root only' changed nothing (NOT APPLIED)"; return; fi
+  local m="$tmp/mutl"; datarepo "$m"; cp "$tmp/ml.sh" "$m/scripts/lib_gates_list.sh"; mkdir -p "$m/sub/src"; printf '[package]\nname = "x"\nversion = "0.1.0"\n' >"$m/sub/Cargo.toml"; printf "//! Pattern: none (test).\\nfn main() {}\\n" >"$m/sub/src/main.rs"; commit "$m"
+  run "$m"; rc=$?
+  if [ "$rc" -eq 0 ]; then ok "mutant 'detection root only' lets the sub-crate case through (the real case above is red)"; else bad "mutant 'detection root only' SURVIVES (still red)"; fi
+}
+mutant_hide
 mutant "fmt not guarded" 's/^  if \[ -z "\$data_mode" \]; then$/  if true; then/'
 echo
 if [ "$fails" = 0 ]; then echo "test_gates_data_mode: all ok"; else echo "test_gates_data_mode: $fails failures"; exit 1; fi
