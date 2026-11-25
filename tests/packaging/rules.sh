@@ -41,6 +41,7 @@ mkdir -p "$TR/crates/fs-components"; : > "$TR/crates/fs-components/Cargo.toml"; 
 printf '[package]\nname = "other"\n' > "$TR/crates/fs-components/Cargo.toml"; bad "a crate with another name at that path is no exemption"
 printf '[package]\nname = "fs-components"\nrepository = "https://github.com/someone/else"\n' > "$TR/crates/fs-components/Cargo.toml"; bad "a foreign repository url is no exemption"
 printf '[package]\nname = "fs-components"\nrepository = "https://github.com/FreeSynergy/fs-components"\n' > "$TR/crates/fs-components/Cargo.toml"; ok "the real fs-components crate may carry blinc"
+printf '[package]\nname = "fs-components"\nrepository = "https://github.com/FreeSynergy-Net/fs-components"\n' > "$TR/crates/fs-components/Cargo.toml"; ok "the -Net repository url of fs-components is exempt too"
 printf '[package]\nname = "fs-components"\n' > "$TR/crates/fs-components/Cargo.toml"; bad "a self-made fs-components crate without repository/origin is no exemption"
 printf '[package]\nname = "fs-components"\n' > "$TR/crates/fs-components/Cargo.toml"
 git init -q "$TR"; git -C "$TR" remote add origin https://github.com/FreeSynergy/fs-components.git; ok "no repository but the git origin is FreeSynergy/fs-components: exempt"
@@ -73,6 +74,10 @@ printf '[package]\nname = "p"\n[dependencies]\nfs-components = "0.4"\n' > "$TR/C
 printf '[package]\nname = "p"\n[dependencies]\nx = { package = "fs-components", version = "0.4" }\n' > "$TR/Cargo.toml"; bad "package = fs-components from the registry fails"
 printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy-Net/fs-components", rev = "06a77a6a" }\n' > "$TR/Cargo.toml"; ok "fs-components by the -Net url and a rev passes (bundles are pinned by rev, ADR bundling)"
 printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy/fs-components", branch = "main" }\n' > "$TR/Cargo.toml"; bad "fs-components without a tag fails"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy-Net-evil/fs-components", rev = "06a77a6a" }\n' > "$TR/Cargo.toml"; bad "a -Net-evil fork with a rev fails"
+mkdir -p "$TR/crates/y"; printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy-Net/fs-components", rev = "06a77a6a" }\n' > "$TR/Cargo.toml"; printf '[package]\nname = "y"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy/fs-components", rev = "06a77a6a" }\n' > "$TR/crates/y/Cargo.toml"; bad "the same rev under both org urls is two sources for cargo and fails"; rm -rf "$TR/crates/y"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy/fs-components", rev = "main" }\n' > "$TR/Cargo.toml"; bad "rev = a branch name fails (rev must be a commit hex)"
+printf '[package]\nname = "p"\n[dependencies]\nx = { git = "https://github.com/FreeSynergy/fs-components", branch = "main" }\n' > "$TR/Cargo.toml"; bad "another dependency name on the fs-components url with a branch fails"
 # cargo config: `include` is followed
 mkdir -p "$TR/.cargo"; printf '[package]\nname = "p"\n' > "$TR/Cargo.toml"
 printf 'include = "extra.toml"\n' > "$TR/.cargo/config.toml"; printf '[patch."https://github.com/FreeSynergy/fs-components"]\nfs-components = { path = "../c" }\n' > "$TR/.cargo/extra.toml"; bad "a patch in an included cargo config fails"

@@ -146,6 +146,12 @@ def _config_docs(f: Path, repo: Path, seen: set):
         path = i.get("path") if isinstance(i, dict) else i
         if isinstance(path, str): yield from _config_docs(f.parent / path, repo, seen)
 
+REV_HEX = re.compile(r"^[0-9a-f]{7,40}$", re.I)
+
+def _fixed_version(spec) -> bool:
+    """A tag, or a rev that is a commit hash (`rev = "main"` / `refs/heads/…` would hide a branch)."""
+    return isinstance(spec, dict) and ("tag" in spec or bool(REV_HEX.match(str(spec.get("rev", "")))))
+
 def check_blinc(repo: Path):
     """Only when `.fs-rules.toml` says blinc = "components-only" (the repo is migrated); fs-components is exempt.
     A program then has no blinc dependency, no blinc [patch]/[replace] (Cargo.toml or .cargo/config.toml) and
@@ -166,12 +172,16 @@ def check_blinc(repo: Path):
                     errors.append(f"{rel}: dependency `{name}`: programs take Blinc through fs_components::blinc")
                 if "fs-components" in (name, real):
                     if isinstance(spec, dict) and spec.get("workspace") is True: pass      # resolved in [workspace.dependencies]
-                    elif not isinstance(spec, dict) or not COMPONENTS_GIT.search(str(git)) or not ("tag" in spec or "rev" in spec):
-                        errors.append(f"{rel}: dependency `{name}`: fs-components must be `git = \"https://github.com/FreeSynergy/fs-components\", tag = \"…\"` or `rev = \"…\"` (github.com/FreeSynergy-Net/fs-components is the same repo; no path, registry, other url or branch)")
+                    elif not isinstance(spec, dict) or not COMPONENTS_GIT.search(str(git)) or not _fixed_version(spec):
+                        errors.append(f"{rel}: dependency `{name}`: fs-components must be `git = \"https://github.com/FreeSynergy/fs-components\"` (or the same repo under FreeSynergy-Net) with `tag = \"…\"` or `rev = \"<commit hex>\"` (no path, registry, other url, branch)")
                 elif COMPONENTS_ANY.search(str(git)) and not COMPONENTS_GIT.search(str(git)):
                     errors.append(f"{rel}: dependency `{name}`: git url {git} is not github.com/FreeSynergy/fs-components")
+                elif COMPONENTS_GIT.search(str(git)) and not _fixed_version(spec):
+                    errors.append(f"{rel}: dependency `{name}`: fs-components by git needs `tag` or a commit hex `rev` (no branch)")
                 if COMPONENTS_GIT.search(str(git)):
-                    pins.setdefault(next((f"{k} {spec[k]}" for k in ("tag", "rev", "branch") if k in spec), "unpinned"), []).append(rel)
+                    # the url form is part of the pin: FreeSynergy/ and FreeSynergy-Net/ are two sources for cargo = two Blinc
+                    url = "net" if "-net/" in str(git).lower().replace(":", "/") else "org"
+                    pins.setdefault(next((f"{k} {spec[k]} ({url} url)" for k in ("tag", "rev", "branch") if k in spec), "unpinned"), []).append(rel)
         errors.extend(_patch_errors(rel, doc))
     for name in ("config.toml", "config"):
         for f in _walk(repo, f".cargo/{name}"):
