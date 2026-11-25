@@ -229,7 +229,7 @@ do:
           branch: unreviewed/${ .input.ziel }
           head: ${ $context.bau.sha // "HEAD" }
           delta: origin/main..HEAD
-          scope: end
+          scope: gezielt
           crate: ${ .input.crate }
           profil: quick
       export:
@@ -239,7 +239,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "EXACTLY ONE `testlauf`, stage `ende`, only this module (`-p <crate>`), profile quick (CLAUDE.md section 4); through `build-slot.sh`. Afterwards the module counts as frozen until it changes. Never the whole workspace."
+        freesynergy.net:summary: "EXACTLY ONE `testlauf` (`scope: gezielt` = only the changed crates, never the full workspace run `end`), only this module (`-p <crate>`), profile quick (CLAUDE.md section 4); through `build-slot.sh`. Afterwards the module counts as frozen until it changes. Never the whole workspace."
   - testlauf-again:
       switch:
         - runden:
