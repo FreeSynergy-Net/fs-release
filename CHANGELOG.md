@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- CI tempo, profiles everywhere (workflow workflow-pflege, Controller 4; AI-assisted by Claude Sonnet 5.5): the new action `actions/test-profile` (cargo-nextest from the same pinned install as `actions/gates`, then `scripts/test-gate.sh`; profile by ref: tag `release`, else `quick`; missing profile = default profile plus a log line, never a silent skip; doc tests as their own step) replaces the plain `cargo test` of `ci.yml` and of `blueprint-e2e.yml`.
+- CI tempo, profiles everywhere (workflow workflow-pflege, Controller 4; AI-assisted by Claude Sonnet 5.5): the new action `actions/test-profile` (cargo-nextest from the same pinned install as `actions/gates`, then `scripts/test-gate.sh`; profile by ref: tag `release`, else `quick`; missing profile = default profile plus a log line, never a silent skip; doc tests as their own step) replaces the plain `cargo test` of `ci.yml` and of `blueprint-e2e.yml`. `scripts/test-gate.sh` hands nextest a Windows path (`cygpath -m`) for the tool config under Git Bash (seen red on windows-2022: `tool-config-file is not an absolute path: /d/a/...`).
 
 - CI tempo (workflow pruefung/ci-tempo, Controller 4; AI-assisted by Claude Sonnet 5.5): on `unreviewed/*` (`FS_GATES_DIFF_BASE`) the `clippy` gate now runs `cargo clippy -p <changed crates and their dependants>` with the same selection as `test` (`scripts/affected_crates.py`, measured 49 s of 318 s); `main`, tags and every unclear case stay on `--workspace`. fmt, rust-rules, lock and files stay full. Tests: `test_affected_crates.sh` (narrowed, unset, bad rev, mutant). Split of build and run in `test-gate.sh` NOT built (documented in the report: nextest already prints the build/run split, no gain).
 

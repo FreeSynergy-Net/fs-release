@@ -41,6 +41,8 @@ if [ "${1:-}" = --profile ]; then
   fi
 fi
 [ -f "$config" ] || notrun "configuration $config is missing"
+# Git Bash on Windows: nextest is a native program and wants a Windows path (D:/a/...), not /d/a/... (cygpath is there only under MSYS/Git Bash)
+cfg_arg="$config"; if command -v cygpath >/dev/null 2>&1; then cfg_arg="$(cygpath -m "$config")"; fi
 version="$(sed -n 's/^NEXTEST_VERSION=//p' "$here/nextest.pin" 2>/dev/null | head -n 1)"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || notrun "scripts/nextest.pin has no exact version"
 got="$(cargo nextest --version 2>&1 | sed -n 's/^cargo-nextest \([0-9][0-9.]*\).*/\1/p' | head -n 1)"
@@ -54,12 +56,12 @@ fi
 echo "test gate: cargo-nextest $got, configuration $config"
 # --no-fail-fast always: it beats `fail-fast = true` of a profile of the caller (every red test is reported). --color never: CARGO_TERM_COLOR=always of the CI would put ANSI codes into the FAIL lines the list of
 # re-checks in gates.sh reads (nextest takes the option before the environment variable, see `cargo nextest run --help`)
-cargo nextest run --color never ${profile_args[@]+"${profile_args[@]}"} --tool-config-file "freesynergy:$config" --no-tests=pass --no-fail-fast "$@"; rc=$?
+cargo nextest run --color never ${profile_args[@]+"${profile_args[@]}"} --tool-config-file "freesynergy:$cfg_arg" --no-tests=pass --no-fail-fast "$@"; rc=$?
 # --then-profile <name> (first argument; main only, set by check.yml): afterwards the same selection once more with that profile if the caller defines it, else skipped with a line in the log
 if [ -n "$also" ]; then
   if grep -qE "^[[:space:]]*\[profile\.${also}(\.[A-Za-z0-9_-]+)?\][[:space:]]*(#.*)?\$" .config/nextest.toml 2>/dev/null; then
     echo "test gate: second run with profile $also"
-    cargo nextest run --color never --profile "$also" --tool-config-file "freesynergy:$config" --no-tests=pass --no-fail-fast "$@"; rc2=$?
+    cargo nextest run --color never --profile "$also" --tool-config-file "freesynergy:$cfg_arg" --no-tests=pass --no-fail-fast "$@"; rc2=$?
     [ "$rc" -eq 0 ] && rc=$rc2
   else
     echo "test gate: profile $also not defined here, second run skipped"
