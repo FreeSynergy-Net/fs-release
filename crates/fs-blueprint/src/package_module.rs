@@ -32,7 +32,7 @@ pub fn module_package(name: &str) -> Result<String, String> {
     Ok(format!("fs-module-{name}"))
 }
 
-fn dir(dest: &str) -> SpecFile {
+pub(crate) fn dir(dest: &str) -> SpecFile {
     SpecFile {
         dest: dest.into(),
         bytes: None,
@@ -90,7 +90,7 @@ fn read(p: &Path) -> Result<Vec<u8>, String> {
 }
 
 /// A file of the module folder that is a plain file: a link is refused (it could pull a file of the build machine into a signed package).
-fn read_plain(p: &Path) -> Result<Vec<u8>, String> {
+pub(crate) fn read_plain(p: &Path) -> Result<Vec<u8>, String> {
     let meta = std::fs::symlink_metadata(p).map_err(|e| format!("{}: {e}", p.display()))?;
     if meta.file_type().is_symlink() {
         return Err(format!("{}: a link is not packaged", p.display()));

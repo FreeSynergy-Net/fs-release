@@ -18,6 +18,9 @@ fn the_program_package_has_exactly_the_files_of_the_decision() {
         "/usr/share/freesynergy/programs/demo/forms",
         "/usr/share/freesynergy/programs/demo/forms/demo.toml",
         "/usr/share/freesynergy/programs/demo/scaffold.toml",
+        "/usr/share/licenses/fs-demo",
+        "/usr/share/licenses/fs-demo/LICENSE-APACHE",
+        "/usr/share/licenses/fs-demo/LICENSE-MIT",
     ];
     assert_eq!(list.lines().collect::<Vec<_>>(), want);
     let info = rpm(
@@ -35,10 +38,9 @@ fn requires_come_from_the_blueprint_and_the_option() {
     let f = make_demo(&scratch("req"), &["--starter-min", "0.0.4"]);
     let req = rpm(&["-qpR"], &f);
     assert!(req.lines().any(|l| l == "fs-starter >= 0.0.4"), "{req}");
-    assert!(
-        req.lines().any(|l| l == "fs-module-board >= 0.0.29"),
-        "{req}"
-    );
+    // `board` is a component (display only): no package of its own, so no Requires
+    assert!(!req.contains("fs-module-board"), "{req}");
+    assert!(req.lines().any(|l| l == "freesynergy-filesystem"), "{req}");
     let plain = make_demo(&scratch("req2"), &[]);
     assert!(rpm(&["-qpR"], &plain).lines().any(|l| l == "fs-starter"));
 }

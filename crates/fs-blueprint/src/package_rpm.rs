@@ -1,10 +1,12 @@
 //! Pattern: Builder (turns a checked blueprint folder, or the definition of `freesynergy-release`, into an `RpmSpec`; the file format is the adapter's job).
 //!
 //! ADR 0094 table (b): a program is a noarch package `fs-<name>` with its data below `/usr/share/freesynergy/programs/<name>/`, a `.desktop` entry
-//! (`Exec=fs-starter <name>`), and `Requires` taken from the blueprint (`fs-starter`, and `fs-module-<x> >= version` per `[[module]]`).
+//! (`Exec=fs-starter <name>`), and `Requires` taken from the blueprint (`fs-starter`, `freesynergy-filesystem`, and `fs-module-<x> >= version` per `[[module]]` of kind standard or toolkit; a component needs no package) and the two licence files below `/usr/share/licenses/fs-<name>/`.
 
 use crate::emit::slot::pascal;
+use crate::kit::Kind;
 use crate::model::Blueprint;
+use crate::package_module::{dir, read_plain};
 use crate::rpm_spec::{Req, RpmSpec, SpecFile};
 use std::fmt::Write as _;
 use std::path::Path;
@@ -102,10 +104,19 @@ fn desktop(bp: &Blueprint) -> String {
     s
 }
 
-/// The package `fs-<name>` of a blueprint folder (`scaffold.toml` and `forms/`). `starter_min` is the version of `fs-starter` the program needs; unknown = none.
+/// The licence files a program carries (as the module package does, `/usr/share/licenses/<package>/`).
+const LICENSE_FILES: [&str; 2] = ["LICENSE-MIT", "LICENSE-APACHE"];
+
+/// Rule (Pattern: Specification, one predicate): only a module of kind `standard` or `toolkit` is a package of its own and a `Requires`; a `component` is display-only data of the host and fs-starter (no package `fs-module-<component>` exists).
+#[must_use]
+pub fn needs_package(kind: &str) -> bool {
+    matches!(Kind::parse(kind), Some(Kind::Standard | Kind::Toolkit))
+}
+
+/// The package `fs-<name>` of a blueprint folder ((`scaffold.toml`, `forms/`, `LICENSE-MIT`, `LICENSE-APACHE`). `starter_min` is the version of `fs-starter` the program needs; unknown = none.
 ///
 /// # Errors
-/// A text when the name is unsafe, a file cannot be read or a link is in the folder.
+/// A text when the name is unsafe, a file cannot be read, a licence file is missing or a link is in the folder.
 pub fn program_spec(
     bp: &Blueprint,
     folder: &Path,
@@ -145,6 +156,15 @@ pub fn program_spec(
         });
         tree(&folder.join("forms"), &format!("{base}/forms"), &mut files)?;
     }
+    let lic = format!("/usr/share/licenses/fs-{}", p.name);
+    files.push(dir(&lic));
+    for l in LICENSE_FILES {
+        files.push(file(
+            format!("{lic}/{l}"),
+            read_plain(&folder.join(l))?,
+            0o644,
+        ));
+    }
     let app = format!(
         "/usr/share/applications/net.freesynergy.{}.desktop",
         pascal(&p.name)
@@ -160,7 +180,7 @@ pub fn program_spec(
             at_least: None,
         },
     ];
-    for m in &bp.module {
+    for m in bp.module.iter().filter(|m| needs_package(&m.kind)) {
         requires.push(Req {
             name: module_package(&m.name)?,
             at_least: Some(m.version.clone()),

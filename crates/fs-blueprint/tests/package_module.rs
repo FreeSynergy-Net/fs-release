@@ -182,15 +182,15 @@ fn the_requires_use_the_host_module_name_and_a_repo_name_is_refused() {
     let f = make_demo(&scratch("reqname"), &[]);
     let req = rpm(&["-qpR"], &f);
     assert!(req.lines().any(|l| l == "freesynergy-filesystem"), "{req}");
-    // `[[module]] name = "board"` gives fs-module-board, nothing is cut off
-    assert!(
-        req.lines().any(|l| l == "fs-module-board >= 0.0.29"),
-        "{req}"
-    );
+    // `board` is a component: no Requires (tests/package_requires_kind.rs: a standard `board` gives fs-module-board, nothing is cut off)
+    assert!(!req.contains("fs-module-board"), "{req}");
     // a blueprint that names the repo (`fs-modules-planning`) must not become fs-module-modules-planning
     let text = std::fs::read_to_string(data("ok").join("scaffold.toml"))
         .unwrap()
-        .replace("name = \"board\"", "name = \"fs-modules-planning\"");
+        .replace(
+            "name = \"board\"\nkind = \"component\"",
+            "name = \"fs-modules-planning\"\nkind = \"standard\"",
+        );
     let bp =
         fs_blueprint::model::Blueprint::from_toml(&text).unwrap_or_else(|_| panic!("blueprint"));
     let Err(err) = fs_blueprint::package_rpm::program_spec(&bp, &data("ok"), None, "1") else {
