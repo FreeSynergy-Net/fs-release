@@ -368,6 +368,17 @@ do:
         freesynergy.net:gate: opus-ja
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Landing by the controller: ff onto main ONLY after Opus YES for exactly this SHA and green CI at exactly this SHA; never force, never a tag; proof `git merge-base --is-ancestor <branch> origin/main`."
+  - ziel-aufraeumen:
+      call: cleanup-targets:0.0.18@fs
+      with:
+        mode: worktree
+        target: ${ "fs-components/" + $context.zweig.worktree }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "After landing: `cleanup-targets --worktree <repo>/<worktree>` deletes the build folder of the landed branch (only that folder, only when nothing runs there); the next build of the worktree starts from the shared compiler cache."
   - pin:
       call: pin-eintragen:0.0.18@fs
       with:

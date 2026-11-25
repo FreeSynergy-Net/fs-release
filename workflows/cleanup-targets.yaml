@@ -1,5 +1,14 @@
 # Cleaning up the throw-away build folders (`target/`) of finished runs. The script is named in the project handbook of the
 # machine; its path is deliberately not written here. FS profile: see README.md.
+# What is already shared (checked 26.11.): ONE folder per worktree under the build root (`<root>/<repo>/<worktree>`, set by the build slot helper
+# via CARGO_TARGET_DIR) and ONE compiler cache (sccache) for all of them; only the folder is per worktree. Two worktrees of the same repo could
+# share one target folder, but NOT safely: cargo locks the folder, so parallel builds would block each other, and different branches change the
+# same artifacts (rebuilds back and forth, the cache effect would be lost). Not changed; the answer to the disk is the cleanup below + less debug
+# info in dev builds (CARGO_PROFILE_DEV_DEBUG / _TEST_DEBUG = line-tables-only, set by the build slot helper unless the caller sets them).
+# Three modes of the same helper: `dry-run`/`apply` (old: top folders with a cache tag, older than a day), `worktree` (after landing a branch:
+# ONLY `<repo>/<worktree>`, refused for `..`, absolute or foreign paths, symlinks and while a cargo/rustc/build slot works there) and
+# `auto` (>= 70 % of the disk: oldest folders at level `<repo>/<worktree>` under the build root until < 60 %, at least 60 min old, never clones,
+# sccache or anything else; log `auto.log`; the build slot helper calls it by itself with APPLY, at most every 10 min, never blocking the build).
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -27,3 +36,27 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: objective
         freesynergy.net:summary: Deletes the listed targets (APPLY); the coordinator looked at the dry run first.
+  - worktree:
+      call: cleanup-targets:0.0.18@fs
+      with:
+        mode: worktree
+        target: ${ $context.zweig.repo + "/" + $context.zweig.worktree }
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "After landing a branch: deletes ONLY the build folder of this worktree (`<repo>/<worktree>` under the build root; build cache only, rebuildable); refuses a path with `..`, an absolute or foreign path, a symlink, or a worktree where cargo/rustc/the build slot still runs."
+  - auto:
+      call: cleanup-targets:0.0.18@fs
+      with:
+        mode: auto
+        from_percent: 70
+        to_percent: 60
+        min_age_minutes: 60
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Automatic, called by the build slot helper (APPLY, at most every 10 min, errors never block a build): from 70 % disk use deletes the oldest worktree build folders under the build root until below 60 %; protects running processes (cwd, command line, CARGO_TARGET_DIR); log in `auto.log`; touches nothing outside the build root."
