@@ -68,12 +68,16 @@ gates_guard_snapshot "$root" "$guard_snap"
 findings=()
 finding_names=()
 step_rcs=()
+step_secs=() # [GATES-ZEIT] "name=seconds=nextest-run-seconds" per step (measure before optimising); table printed by gates_timing_table
 step() {
   local name="$1" severity="$2"
   shift 2
-  local out="$finding_work/$name.out" rc=0
+  local out="$finding_work/$name.out" rc=0 t0="${EPOCHREALTIME:-0}" t1 run=-
   { rc=0; "$@" 2>&1 || rc=$?; echo "$rc" > "$out.rc"; } | tee "$out" || true
   rc="$(gates_read_rc "$out.rc")"
+  t1="${EPOCHREALTIME:-0}"
+  run="$(awk '/^ *Summary \[ *[0-9.]+s\]/ { s = $0; sub(/^ *Summary \[ */, "", s); sub(/s\].*/, "", s); t += s; n++ } END { if (n) printf "%.1f", t }' "$out" 2>/dev/null || true)"
+  step_secs+=("$name=$(awk -v a="${t0//,/.}" -v b="${t1//,/.}" 'BEGIN { printf "%.1f", b - a }')=${run:--}")
   echo "gate $name: rc=$rc"
   step_rcs+=("$name=$rc")
   if [ "$rc" != 0 ]; then
@@ -122,6 +126,15 @@ nachpruefung_of() {
 # gates_findings_write: the list of ALL findings of this run as a Markdown checklist `fehlerliste-<branch>[-<run>].md` (step, severity, rc, command, `nachpruefung:` lines, first
 # error lines) in $FS_GATES_FEHLERLISTE_DIR (default: the scratch folder; in CI $RUNNER_TEMP); NEVER inside the repo tree. It is also appended to $GITHUB_STEP_SUMMARY when that
 # is set, and every finding is printed as a `gates-finding:` line (read by gates-komplett). No finding: the list says so (0 findings) and the run is green.
+# gates_timing_table: [GATES-ZEIT] "Phase | Sekunden" of every step of this run (+ the sum of the nextest `Summary` times = the pure test run; the rest of a test step is the build) to stdout and $GITHUB_STEP_SUMMARY.
+gates_timing_table() {
+  local e n s r tot=0
+  {
+    echo "### Gates: Phase | Sekunden"; echo; echo "| Phase | Sekunden | davon nextest-Lauf |"; echo "|---|---:|---:|"
+    for e in "${step_secs[@]}"; do IFS="=" read -r n s r <<< "$e"; echo "| $n | $s | $r |"; tot="$(awk -v a="$tot" -v b="$s" 'BEGIN { printf "%.1f", a + b }')"; done
+    echo "| **sum of steps** | $tot | |"
+  } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+}
 findings_file=""
 gates_findings_write() {
   local dir branch safe f name severity rc cmd lines
@@ -229,6 +242,7 @@ if [ -n "${GATES_ONLY_GUARD:-}" ]; then
 else
   step guard error gates_guard_compare "$guard_snap" "$guard_snap.end"
   gates_findings_write
+  gates_timing_table
   gates_beleg "$root" "$RUSTUP_TOOLCHAIN" "$(rustc --version)" "$like_ci" "${step_rcs[@]}" | tee -a "$findings_file"
   if [ "${#findings[@]}" -ne 0 ]; then
     echo "gates FAILED: ${#findings[@]} step(s) red: $(printf '%s ' "${finding_names[@]}")(list: $findings_file)" >&2

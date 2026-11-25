@@ -77,6 +77,7 @@ chk "licence red: exit code 1, rc 64 printed, finding on the list with its nachp
 gates "$app/scripts/gates.sh" "$tmp/l2"; rc=$?
 chk "no error: exit code 0" [ "$rc" -eq 0 ]
 chk "no error: the list says 0 findings and has no item" bash -c "grep -q '^0 findings' '$tmp/l2'/*.md && ! grep -q '^- \[' '$tmp/l2'/*.md"
+chk "no error: the timing table (Phase | Sekunden) is printed with a row for fmt, clippy, test and the sum" bash -c "grep -q '^| Phase | Sekunden |' '$tmp/o.txt' && grep -q '^| fmt | [0-9]\+\.[0-9] |' '$tmp/o.txt' && grep -q '^| test | [0-9]\+\.[0-9] |' '$tmp/o.txt' && grep -q 'sum of steps' '$tmp/o.txt'"
 # 3. one clippy error: one item with the crates named in the output
 gates "$app/scripts/gates.sh" "$tmp/l3" RED_CLIPPY=1; rc=$?
 chk "clippy only: exit code 1 and one finding with -p fs-demo" bash -c "[ $rc -eq 1 ] && grep -q '^1 findings' '$tmp/l3'/*.md && grep -q 'nachpruefung: cargo clippy -p fs-demo --all-targets' '$tmp/l3'/*.md"
