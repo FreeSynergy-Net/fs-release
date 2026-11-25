@@ -37,6 +37,20 @@ pub fn tag(env: &LiftEnv) -> String {
         .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")))
 }
 
+/// The extra environment for `pin-refs.sh`: `FS_RELEASE_BIN` = the own binary `exe`, unless the lift options (`opts_env`) or the process environment (`in_process_env`) already name one (or the own path is unknown): then nothing.
+#[must_use]
+pub fn bin_env(
+    opts_env: &[(String, String)],
+    in_process_env: bool,
+    exe: Option<&std::path::Path>,
+) -> Vec<(String, String)> {
+    let named = in_process_env || opts_env.iter().any(|(k, _)| k == BIN_ENV);
+    match exe {
+        Some(e) if !named => vec![(BIN_ENV.to_string(), e.display().to_string())],
+        _ => vec![],
+    }
+}
+
 /// `scripts/pin-refs.sh --dir <repo> <tag>`: (owner rewritten to FreeSynergy-Net) every `uses: FreeSynergy-Net/fs-release/...@<ref>` of the repo's `.github/workflows/*.yml`
 /// (`@main`, an older tag or a commit) becomes `@<tag>`; other actions stay. No workflows = skipped. A pin is never lowered, the whole run is red (not line by
 /// line): the script checks (`FS_RELEASE_REPO`, default its own repo) in the fs-release clone that the tag equals or descends from every existing pin (git merge-base --is-ancestor); a lower, unrelated or unknown pin = red (rc 3), nothing written. Before writing, the script runs the hard chain gate
@@ -65,12 +79,11 @@ impl Task<LiftEnv<'_>> for Pins {
             tag(env),
         ];
         // The chain gate of the script needs a built `fs-release`: lift IS one, so it hands itself over (unless the caller named another).
-        let named =
-            env.opts.env.iter().any(|(k, _)| k == BIN_ENV) || std::env::var_os(BIN_ENV).is_some();
-        let extra = match std::env::current_exe() {
-            Ok(exe) if !named => vec![(BIN_ENV.to_string(), exe.display().to_string())],
-            _ => vec![],
-        };
+        let extra = bin_env(
+            &env.opts.env,
+            std::env::var_os(BIN_ENV).is_some(),
+            std::env::current_exe().ok().as_deref(),
+        );
         let o = env.exec("bash", args, extra)?;
         if o.ok() {
             Ok(o.stdout

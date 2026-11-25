@@ -5,6 +5,7 @@ mod commit;
 mod lockpin;
 mod opts;
 mod pins;
+pub use pins::bin_env;
 mod report;
 mod run;
 mod steps;
