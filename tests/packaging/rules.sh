@@ -71,6 +71,7 @@ printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://
 printf '[package]\nname = "p"\n[dependencies]\nfs-components = { path = "vendor/x" }\n' > "$TR/Cargo.toml"; bad "fs-components by path fails"
 printf '[package]\nname = "p"\n[dependencies]\nfs-components = "0.4"\n' > "$TR/Cargo.toml"; bad "fs-components from the registry fails"
 printf '[package]\nname = "p"\n[dependencies]\nx = { package = "fs-components", version = "0.4" }\n' > "$TR/Cargo.toml"; bad "package = fs-components from the registry fails"
+printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy-Net/fs-components", rev = "06a77a6a" }\n' > "$TR/Cargo.toml"; ok "fs-components by the -Net url and a rev passes (bundles are pinned by rev, ADR bundling)"
 printf '[package]\nname = "p"\n[dependencies]\nfs-components = { git = "https://github.com/FreeSynergy/fs-components", branch = "main" }\n' > "$TR/Cargo.toml"; bad "fs-components without a tag fails"
 # cargo config: `include` is followed
 mkdir -p "$TR/.cargo"; printf '[package]\nname = "p"\n' > "$TR/Cargo.toml"

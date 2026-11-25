@@ -59,7 +59,7 @@ DEP_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 SWITCH_FILE = ".fs-rules.toml"
 SKIP_DIRS = {"target", ".git", "node_modules"}
 COMPONENTS_ANY = re.compile(r"/fs-components(\.git)?/?$", re.I)       # any repo named fs-components
-COMPONENTS_GIT = re.compile(r"^(https://(www\.)?|ssh://git@|git@)github\.com[/:]FreeSynergy/fs-components(\.git)?/?$", re.I)  # the FreeSynergy one
+COMPONENTS_GIT = re.compile(r"^(https://(www\.)?|ssh://git@|git@)github\.com[/:]FreeSynergy(-Net)?/fs-components(\.git)?/?$", re.I)  # the FreeSynergy one
 
 def _walk(repo: Path, pattern: str):
     """rglob without target/, .git/, node_modules/ and nested worktrees (.wt-*)."""
@@ -166,8 +166,8 @@ def check_blinc(repo: Path):
                     errors.append(f"{rel}: dependency `{name}`: programs take Blinc through fs_components::blinc")
                 if "fs-components" in (name, real):
                     if isinstance(spec, dict) and spec.get("workspace") is True: pass      # resolved in [workspace.dependencies]
-                    elif not isinstance(spec, dict) or not COMPONENTS_GIT.search(str(git)) or "tag" not in spec:
-                        errors.append(f"{rel}: dependency `{name}`: fs-components must be `git = \"https://github.com/FreeSynergy/fs-components\", tag = \"…\"` (no path, registry, other url, rev or branch)")
+                    elif not isinstance(spec, dict) or not COMPONENTS_GIT.search(str(git)) or not ("tag" in spec or "rev" in spec):
+                        errors.append(f"{rel}: dependency `{name}`: fs-components must be `git = \"https://github.com/FreeSynergy/fs-components\", tag = \"…\"` or `rev = \"…\"` (github.com/FreeSynergy-Net/fs-components is the same repo; no path, registry, other url or branch)")
                 elif COMPONENTS_ANY.search(str(git)) and not COMPONENTS_GIT.search(str(git)):
                     errors.append(f"{rel}: dependency `{name}`: git url {git} is not github.com/FreeSynergy/fs-components")
                 if COMPONENTS_GIT.search(str(git)):
