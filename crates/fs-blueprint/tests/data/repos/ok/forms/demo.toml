@@ -8,7 +8,7 @@ title = "demo-title"
 
 [[requires]]
 elem = "requires:1"
-contract = "people >=0.1 <0.2"
+contract = "people@>=0.1, <0.2"
 
 [[message]]
 elem = "message:demo-title/en"

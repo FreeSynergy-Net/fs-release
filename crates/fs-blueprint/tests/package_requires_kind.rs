@@ -39,12 +39,23 @@ fn a_standard_and_a_toolkit_are_required_a_component_is_not() {
 }
 
 #[test]
-fn a_missing_licence_file_stops_the_package() {
-    let d = std::env::temp_dir().join(format!("fsbp-lic-{}", std::process::id()));
-    std::fs::create_dir_all(&d).unwrap();
-    std::fs::write(d.join("scaffold.toml"), OK).unwrap();
+fn each_missing_licence_file_alone_stops_the_package() {
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/repos/ok");
     let bp = Blueprint::from_toml(OK).unwrap();
-    let e = program_spec(&bp, &d, None, "1").err().unwrap();
-    assert!(e.contains("LICENSE-MIT"), "{e}");
-    std::fs::remove_dir_all(&d).unwrap();
+    for gone in ["LICENSE-MIT", "LICENSE-APACHE"] {
+        let d = Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("lic-{gone}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("scaffold.toml"), OK).unwrap();
+        for keep in ["LICENSE-MIT", "LICENSE-APACHE"]
+            .into_iter()
+            .filter(|k| *k != gone)
+        {
+            std::fs::copy(src.join(keep), d.join(keep)).unwrap();
+        }
+        let e = program_spec(&bp, &d, None, "1").err().expect("must stop");
+        assert!(e.contains(gone), "{gone}: {e}");
+        std::fs::remove_dir_all(&d).unwrap();
+    }
 }

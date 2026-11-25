@@ -62,7 +62,7 @@ fn new_makes_a_minimal_valid_forms_description_when_the_author_brought_none() {
         "id = \"simple\"",
         "extends = \"net.freesynergy.Probe\"",
         "exec = \"fs-forms-run\"",
-        "contract = \"probing >=0.1 <0.2\"",
+        "contract = \"probing@>=0.1, <0.2\"",
         "lang = \"de\"",
     ] {
         assert!(made.contains(needle), "{needle} missing in\n{made}");
@@ -164,8 +164,34 @@ fn format_3_and_4_are_read_and_the_newer_keys_are_known() {
 #[test]
 fn a_table_of_a_list_without_elem_is_refused_like_the_host_does() {
     let head = "schema = 3\nkind = \"frontend\"\nid = \"a\"\nextends = \"b\"\nexec = \"c\"\ntitle = \"d\"\n";
-    let bad = format!("{head}[[requires]]\ncontract = \"x >=0.1 <0.2\"\n");
+    let bad = format!("{head}[[requires]]\ncontract = \"x@>=0.1, <0.2\"\n");
     assert_eq!(unreadable(&bad).as_deref(), Some("key-missing elem"));
-    let good = format!("{head}[[requires]]\nelem = \"requires:1\"\ncontract = \"x >=0.1 <0.2\"\n");
+    let good = format!("{head}[[requires]]\nelem = \"requires:1\"\ncontract = \"x@>=0.1, <0.2\"\n");
     assert_eq!(unreadable(&good), None);
+}
+
+#[test]
+fn the_contract_of_a_requires_must_be_spelled_like_the_host_reads_it() {
+    let head = "schema = 3\nkind = \"frontend\"\nid = \"a\"\nextends = \"b\"\nexec = \"c\"\ntitle = \"d\"\n";
+    for bad in [
+        "tasks >=0.1 <0.2",
+        "tasks@>=0.1 <0.2",
+        "tasks@>=0.1,<0.2",
+        "tasks@^0.1",
+        "@>=0.1, <0.2",
+        "",
+    ] {
+        let text = format!("{head}[[requires]]\nelem = \"requires:1\"\ncontract = \"{bad}\"\n");
+        assert_eq!(
+            unreadable(&text),
+            Some(format!("range-invalid {bad}")),
+            "{bad}"
+        );
+    }
+    let src = format!("{head}[[source]]\nelem = \"source:1\"\ncontract = \"tasks >=0.1 <0.2\"\n");
+    assert!(unreadable(&src).unwrap().starts_with("range-invalid"));
+    for good in ["tasks@>=0.1, <0.2", "planning@>=0.0.1, <0.1.0"] {
+        let text = format!("{head}[[requires]]\nelem = \"requires:1\"\ncontract = \"{good}\"\n");
+        assert_eq!(unreadable(&text), None, "{good}");
+    }
 }

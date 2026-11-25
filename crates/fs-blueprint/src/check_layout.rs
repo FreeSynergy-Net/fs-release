@@ -4,6 +4,9 @@
 //! unknown key is an error, and every table of a list carries its element id (`elem`, format 3: the host reports `elem-missing`). Format 1 and 2 are refused by
 //! the host (`format-old`, no second reading path), a format above 4 too (`format-newer`). The blueprint does not carry the whole parser; it refuses what the host
 //! refuses at the first look, so that `new` never hands out a description the window cannot open.
+//! Limits, said honestly: `elem` is checked only on the tables of the seven lists of the head, not on nested tables (`page.place`, `menu.entries`, `view.order`, schemes), and
+//! its characters (`elem-invalid`) are the host's to judge; the places, bindings and blocks are not judged at all. `contract` of `requires` and `source` is checked for its
+//! spelling only (`name@>=a.b, <c.d`, as `range_bounds` of the host reads it), not for its numbers.
 
 /// The oldest format the host reads (`fs_forms_layout::FORMAT_MIN`; 3 is a subset of 4).
 pub const FORMAT_MIN: i64 = 3;
@@ -50,14 +53,54 @@ pub fn unreadable(text: &str) -> Option<String> {
     if let Some(k) = doc.keys().find(|k| !KNOWN.contains(&k.as_str())) {
         return Some(format!("key-unknown {k}"));
     }
-    LISTS
-        .iter()
-        .filter_map(|l| doc.get(*l).and_then(toml::Value::as_array))
-        .flatten()
-        .find(|t| {
-            t.get("elem")
+    let tables = || {
+        LISTS
+            .iter()
+            .filter_map(|l| doc.get(*l).and_then(toml::Value::as_array))
+            .flatten()
+    };
+    if tables().any(|t| {
+        t.get("elem")
+            .and_then(toml::Value::as_str)
+            .is_none_or(str::is_empty)
+    }) {
+        return Some("key-missing elem".to_string());
+    }
+    for l in ["requires", "source"] {
+        let list = doc
+            .get(l)
+            .and_then(toml::Value::as_array)
+            .into_iter()
+            .flatten();
+        for t in list {
+            let text = t
+                .get("contract")
                 .and_then(toml::Value::as_str)
-                .is_none_or(str::is_empty)
-        })
-        .map(|_| "key-missing elem".to_string())
+                .unwrap_or_default();
+            if !range_spelling_ok(text) {
+                return Some(format!("range-invalid {text}"));
+            }
+        }
+    }
+    None
+}
+
+/// The spelling of a contract range: `name@>=a.b, <c.d` (one name, `@`, a lower bound `>=`, comma and one space, an upper bound `<`).
+fn range_spelling_ok(text: &str) -> bool {
+    let Some((name, req)) = text.split_once('@') else {
+        return false;
+    };
+    let Some(bounds) = req.strip_prefix(">=").and_then(|r| r.split_once(", <")) else {
+        return false;
+    };
+    let version = |v: &str| {
+        !v.is_empty()
+            && v.split('.').count() <= 3
+            && v.split('.')
+                .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+    };
+    !name.is_empty()
+        && !name.contains(char::is_whitespace)
+        && version(bounds.0)
+        && version(bounds.1)
 }

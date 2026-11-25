@@ -39,7 +39,7 @@ struct Description<'a> {
     message: Vec<Message<'a>>,
 }
 
-/// The range of the contract versions the frontend works with: `0.1` becomes `tasks >=0.1 <0.2`, `2.3` becomes `tasks >=2.3 <3.0`.
+/// The range of the contract versions the frontend works with: `0.1` becomes `tasks@>=0.1, <0.2`, `2.3` becomes `tasks@>=2.3, <3.0` (the grammar of `fs-forms-layout` `range_bounds`).
 fn range(capability: &str, version: &str) -> String {
     let mut parts = version.split('.').map(|p| p.parse::<u64>().unwrap_or(0));
     let (major, minor) = (parts.next().unwrap_or(0), parts.next().unwrap_or(0));
@@ -48,7 +48,7 @@ fn range(capability: &str, version: &str) -> String {
     } else {
         format!("{}.0", major + 1)
     };
-    format!("{capability} >={major}.{minor} <{above}")
+    format!("{capability}@>={major}.{minor}, <{above}")
 }
 
 /// True for a path the head line can be written to as TOML (the same rule as `header::form_of`: lower case `.toml`, nothing else).

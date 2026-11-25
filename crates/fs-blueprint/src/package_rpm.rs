@@ -113,7 +113,7 @@ pub fn needs_package(kind: &str) -> bool {
     matches!(Kind::parse(kind), Some(Kind::Standard | Kind::Toolkit))
 }
 
-/// The package `fs-<name>` of a blueprint folder ((`scaffold.toml`, `forms/`, `LICENSE-MIT`, `LICENSE-APACHE`). `starter_min` is the version of `fs-starter` the program needs; unknown = none.
+/// The package `fs-<name>` of a blueprint folder (`scaffold.toml`, `forms/`, `LICENSE-MIT`, `LICENSE-APACHE`). `starter_min` is the version of `fs-starter` the program needs; unknown = none.
 ///
 /// # Errors
 /// A text when the name is unsafe, a file cannot be read, a licence file is missing or a link is in the folder.
