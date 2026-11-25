@@ -161,15 +161,12 @@ jobs:
           ARCHIVES: ${{ runner.temp }}/apt-archives
         run: |
           mkdir -p "$ARCHIVES"
-          # cache hit: try without `apt-get update` (the files are there; the package lists of the image are enough to resolve); if that fails, the normal way (update + install, still using the cached files)
+          # Always update first: the package lists of the runner image are stale (probe run 45531413030: a cache hit WITHOUT update failed with 404 on a mesa file the mirror no longer has). The update is the small
+          # part (index files, ~30 s); the cached .deb files of the same versions save the big part, the download.
+          echo "System packages: cache of the .deb files hit: $CACHE_HIT"
+          sudo apt-get update
           # shellcheck disable=SC2086
-          if [ "$CACHE_HIT" = "true" ] && sudo apt-get install -y --no-install-recommends -o "Dir::Cache::archives=$ARCHIVES" $PACKAGES; then
-            echo "System packages: installed from the cache of the .deb files, no download"
-          else
-            sudo apt-get update
-            # shellcheck disable=SC2086
-            sudo apt-get install -y --no-install-recommends -o "Dir::Cache::archives=$ARCHIVES" $PACKAGES
-          fi
+          sudo apt-get install -y --no-install-recommends -o "Dir::Cache::archives=$ARCHIVES" $PACKAGES
           # the cache step (a post step as the runner user) must be able to read what apt wrote
           sudo chmod -R a+rX "$ARCHIVES"
       - uses: FreeSynergy-Net/fs-release/actions/setup-rust@b9e406cb228bcdfa06f796f5da570c56f6aeebb0
