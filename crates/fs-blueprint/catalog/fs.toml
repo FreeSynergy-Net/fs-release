@@ -1,6 +1,6 @@
 # The catalog of the building blocks that exist, as `fs-blueprint check` knows them (a file, no code: it is read by `FileCatalog`; `--catalog FILE` takes another one).
 # Every list says where it comes from. A block that is NOT listed does not exist for the check: a blueprint that names it is refused (`module-unknown`, `bundle-unknown`).
-# Checked 2026-11-19. To be replaced by the real registry of the catalog repo once it carries modules and tags.
+# Checked 2026-11-25 (module planning). There is no registry of modules and tags in fs-catalog yet (its catalog.xml lists installable packages only); until there is one, this file is that registry and is kept by hand. To be replaced by the real registry of the catalog repo once it carries modules and tags.
 
 # Capability keys that programs declare today (ADR 0068; code of fs-tasks `wire_caps.rs`, fs-people).
 capabilities = ["tasks", "people", "forms", "dependency.evaluate", "dependency.cycle-check", "people.persons"]
@@ -31,11 +31,12 @@ levels = ["0.1"]
 version = "0.1.0"
 pending = ["session", "update", "mcp-switch"]
 
-# Art 1 (standard): the planning standard of the repo fs-modules-planning (tag v0.0.1; no presets, no kit facade: Opus verdict of the tag round).
+# Art 1 (standard): the planning standard of the repo fs-modules-planning. `name` is the HOST module name (`planning`, the name of `[[module]]` in a blueprint and of the RPM `fs-module-planning`), never the repo name.
+# Tags of the repo (git ls-remote 2026-11-25): v0.0.1 to v0.0.5; v0.0.5 is published as the signed RPM fs-module-planning-0.0.5-1. No presets, no kit facade (Opus verdict of the tag round).
 [[module]]
-name = "fs-modules-planning"
+name = "planning"
 kind = "standard"
-tags = ["0.0.1"]
+tags = ["0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.0.5"]
 
 # Art 3 (components): crates of fs-components (tag v0.0.29): `task_card` in fs-components-widgets, the board in fs-components-kanban.
 [[module]]

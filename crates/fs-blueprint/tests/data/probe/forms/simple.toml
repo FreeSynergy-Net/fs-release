@@ -1,5 +1,5 @@
 # the forms description of the probe program: the head of the exchange form, the contract it needs and the title in both languages
-schema = 1
+schema = 3
 kind = "frontend"
 id = "simple"
 extends = "net.freesynergy.Probe"
@@ -7,14 +7,17 @@ exec = "fs-forms-run"
 title = "probe-title"
 
 [[requires]]
+elem = "requires:1"
 contract = "probing >=0.1 <0.2"
 
 [[message]]
+elem = "message:probe-title/en"
 key = "probe-title"
 lang = "en"
 text = "Probe"
 
 [[message]]
+elem = "message:probe-title/de"
 key = "probe-title"
 lang = "de"
 text = "Probe"

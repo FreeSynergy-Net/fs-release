@@ -1,6 +1,6 @@
 //! Pattern: Strategy (the emitter of the forms description: a minimal, valid frontend description of the program, written once as a seed).
 //!
-//! The file lies at `[frontend] layout` and is in the exchange form the forms host reads (format 1: no element ids, they are derived): header, the contract the
+//! The file lies at `[frontend] layout` and is in the exchange form the forms host reads (format 3: every table of a list carries its element id `elem`, written as the host derives it: `requires:1`, `message:<key>/<lang>`): header, the contract the
 //! frontend needs, and the title in both languages. It has no page yet: the author adds the pages. A description the author brought along is never replaced
 //! (`new` leaves the seed out when the file is there; the writer never overwrites a seed).
 
@@ -15,11 +15,13 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 struct Requires {
+    elem: String,
     contract: String,
 }
 
 #[derive(Serialize)]
 struct Message<'a> {
+    elem: String,
     key: String,
     lang: &'a str,
     text: &'a str,
@@ -70,13 +72,14 @@ impl Emitter for Layout {
         let title = format!("{}-title", values.get(Slot::Program));
         let name = values.get(Slot::Pascal);
         let doc = Description {
-            schema: 1,
+            schema: 3,
             kind: "frontend",
             id: &bp.frontend.standard,
             extends: values.get(Slot::AppId),
             exec: HOST,
             title: title.clone(),
             requires: vec![Requires {
+                elem: "requires:1".to_string(),
                 contract: range(
                     values.get(Slot::Capability),
                     values.get(Slot::ContractVersion),
@@ -84,11 +87,13 @@ impl Emitter for Layout {
             }],
             message: vec![
                 Message {
+                    elem: format!("message:{title}/en"),
                     key: title.clone(),
                     lang: "en",
                     text: name,
                 },
                 Message {
+                    elem: format!("message:{title}/de"),
                     key: title,
                     lang: "de",
                     text: name,

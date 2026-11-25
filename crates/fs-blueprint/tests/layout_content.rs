@@ -84,7 +84,7 @@ fn a_description_the_author_brought_stays_and_is_not_replaced() {
     let d = scratch("kept");
     let src = bare_probe(&d);
     std::fs::create_dir_all(src.join("forms")).unwrap();
-    let own = "schema = 1\nkind = \"frontend\"\nid = \"own\"\nextends = \"x\"\nexec = \"fs-forms-run\"\ntitle = \"t\"\n";
+    let own = "schema = 3\nkind = \"frontend\"\nid = \"own\"\nextends = \"x\"\nexec = \"fs-forms-run\"\ntitle = \"t\"\n";
     std::fs::write(src.join("forms/simple.toml"), own).unwrap();
     let (cat, out) = (probe_catalog(&d), d.join("out"));
     let (code, text) = cli(&[
@@ -127,15 +127,17 @@ fn a_description_the_host_cannot_read_is_red_and_nothing_is_written() {
 
 #[test]
 fn the_content_rules_of_the_head() {
-    let ok = "schema = 2\nkind = \"frontend\"\nid = \"a\"\nextends = \"b\"\nexec = \"c\"\ntitle = \"d\"\n";
+    let ok = "schema = 3\nkind = \"frontend\"\nid = \"a\"\nextends = \"b\"\nexec = \"c\"\ntitle = \"d\"\n";
     assert_eq!(unreadable(ok), None);
     let cases = [
         ("not = toml [", "toml"),
         ("# comment\n", "key-missing schema"),
-        ("schema = 3\n", "schema-unsupported"),
-        ("schema = 1\nkind = \"backend\"\n", "kind"),
+        ("schema = 1\n", "schema-unsupported"),
+        ("schema = 2\n", "schema-unsupported"),
+        ("schema = 5\n", "schema-unsupported"),
+        ("schema = 3\nkind = \"backend\"\n", "kind"),
         (
-            "schema = 1\nkind = \"frontend\"\nid = \"a\"\n",
+            "schema = 3\nkind = \"frontend\"\nid = \"a\"\n",
             "key-missing extends",
         ),
         (&format!("{ok}wat = 1\n"), "key-unknown wat"),
@@ -144,4 +146,26 @@ fn the_content_rules_of_the_head() {
     for (text, cause) in cases {
         assert_eq!(unreadable(text).as_deref(), Some(cause), "{text}");
     }
+}
+
+#[test]
+fn format_3_and_4_are_read_and_the_newer_keys_are_known() {
+    let head = "kind = \"frontend\"\nid = \"a\"\nextends = \"b\"\nexec = \"c\"\ntitle = \"d\"\n";
+    for schema in [3, 4] {
+        assert_eq!(unreadable(&format!("schema = {schema}\n{head}")), None);
+    }
+    // `sample` is a key of the exchange form (read by fs-forms-testdata)
+    assert_eq!(
+        unreadable(&format!("schema = 4\n{head}[sample]\nx = \"y\"\n")),
+        None
+    );
+}
+
+#[test]
+fn a_table_of_a_list_without_elem_is_refused_like_the_host_does() {
+    let head = "schema = 3\nkind = \"frontend\"\nid = \"a\"\nextends = \"b\"\nexec = \"c\"\ntitle = \"d\"\n";
+    let bad = format!("{head}[[requires]]\ncontract = \"x >=0.1 <0.2\"\n");
+    assert_eq!(unreadable(&bad).as_deref(), Some("key-missing elem"));
+    let good = format!("{head}[[requires]]\nelem = \"requires:1\"\ncontract = \"x >=0.1 <0.2\"\n");
+    assert_eq!(unreadable(&good), None);
 }
