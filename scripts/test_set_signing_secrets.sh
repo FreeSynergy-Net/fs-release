@@ -54,6 +54,7 @@ MOCK
 cat >"$tmp/bin/gpg" <<'MOCK'
 #!/usr/bin/env bash
 echo "gpg $*" >>"$MOCK_GPG"
+case "$*" in *--passphrase-fd\ 3*) pw=$(cat <&3); if [ "$pw" = "${ASKPW:-}" ]; then echo "gpg-fd3-passphrase-ok" >>"$MOCK_GPG"; else echo "gpg-fd3-passphrase-WRONG" >>"$MOCK_GPG"; fi ;; esac
 case "$*" in
   *--with-colons*) printf 'ssb:u:255:22:AAAA:1700000000::::::s:::::\nfpr:::::::::1111222233334444555566667777888899990000:\n' ;;
   *--export-secret-subkeys*) printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\n%s\n-----END PGP PRIVATE KEY BLOCK-----\n' "$SECRETVAL" ;;
@@ -208,6 +209,32 @@ suite() {
   EXTRA="REVIEWER=alice"
   run x "" "" --env --env-only --repos texts
   ck "--env with --env-only: rc 2" '[ "$rc" = 2 ]'
+  # ask mode (typed passphrase): needs a terminal. run_tty feeds the lines through a pseudo-terminal (socat) so the real prompt path runs.
+  ASKPW="ask-PASSPHRASE-91c4e7"
+  run x "" "" --env --repos texts --yes --ask-passphrase
+  ck "ask mode without a terminal: clear error, rc != 0, nothing written" '[ "$rc" != 0 ] && grep -q "no terminal" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  run x "" "" --env --repos texts --yes --ask-passphrase --dry-run
+  ck "ask mode dry run: rc 0, no prompt, no passphrase printed, redacted note" '[ "$rc" = 0 ] && ! grep -q "$ASKPW" "$tmp/out" && grep -q "typed passphrase" "$tmp/out"'
+  if [ "${PTY:-1}" = 1 ] && command -v socat >/dev/null; then
+    run_tty() { # <input lines separated by \n> <args...>
+      local in=$1; shift
+      : >"$tmp/args"; : >"$tmp/stdin"; : >"$tmp/gpg"; rm -rf "$tmp/keys" "$tmp/state/"{env,policy,env.GPG_PRIVATE_KEY,env.GPG_PASSPHRASE}
+      touch "$tmp/state/repo.GPG_PRIVATE_KEY" "$tmp/state/repo.GPG_PASSPHRASE"
+      (sleep 0.5; printf "$in"; sleep 1.5) | env PATH="$tmp/bin:$PATH" MOCK_ARGS="$tmp/args" MOCK_STDIN="$tmp/stdin" MOCK_STATE="$tmp/state" MOCK_GPG="$tmp/gpg" SECRETVAL="$SECRETVAL" ASKPW="$ASKPW" \
+        OUT_DIR="$tmp/keys" OUT_OWNER="$(id -un):$(id -gn)" NO_UPLOAD=1 FS_SIGN_TMP="$tmp" REVIEWER=alice HOME="$tmp/nohome" \
+        socat - "EXEC:bash $SCRIPT_DIR/set-signing-secrets.sh $*,pty,setsid,ctty,echo=0" >"$tmp/out" 2>&1
+      rc=$?
+    }
+    run_tty "y\n$ASKPW\n$ASKPW\ny\n" --env --repos texts
+    ck "ask mode in a terminal: typed once (+ repeat), gpg got it on fd 3, gh on stdin, rc 0" '[ "$rc" = 0 ] && grep -q "gpg-fd3-passphrase-ok" "$tmp/gpg" && grep -q "STDIN\[secret set GPG_PASSPHRASE --env release-signing -R FreeSynergy-Net/fs-texts\]: $ASKPW" "$tmp/stdin"'
+    ck "typed passphrase: in NO argument (gh, gpg), NOT in the output" '! grep -q "$ASKPW" "$tmp/args" && ! grep -q "$ASKPW" "$tmp/out" && ! grep -Eq "passphrase-(file|fd).*$ASKPW|$ASKPW" "$tmp/gpg"'
+    ck "typed passphrase: no file anywhere in the temp tree except the mock log of gh stdin" '[ -z "$(grep -rlF "$ASKPW" "$tmp" 2>/dev/null | grep -v "^$tmp/stdin$" | grep -v "^$tmp/out$")" ]'
+    ck "ask mode does not use a passphrase file" '! grep -q -- "--passphrase-file" "$tmp/gpg"'
+    run_tty "y\n$ASKPW\nOTHER-typo\n" --env --repos texts
+    ck "ask mode: two different entries abort, nothing written" '[ "$rc" != 0 ] && grep -q "differ" "$tmp/out" && ! grep -q "environments" "$tmp/args" && ! grep -q "$ASKPW" "$tmp/out"'
+  else
+    echo "note: socat not installed, pseudo-terminal tests skipped"
+  fi
   EXTRA="REVIEWER=alice"
   run x "" "" --repo-secrets --repos texts --yes
   ck "--repo-secrets: warning (deprecated, unprotected), repo secrets set, no environment, no delete" '[ "$rc" = 0 ] && grep -qi "deprecated" "$tmp/out" && grep -qi "unprotected" "$tmp/out" && grep -q "^secret set GPG_PRIVATE_KEY -R FreeSynergy-Net/fs-texts" "$tmp/args" && ! grep -q "environments" "$tmp/args" && ! grep -q "secret delete" "$tmp/args"'
@@ -225,6 +252,7 @@ real=$fails
 # Mutants: each must turn the suite red.
 mutant() { # <label> <file> <old> <new>
   local d="$tmp/mut" before=$fails
+  PTY=${PTYM:-0}
   rm -rf "$d"; mkdir -p "$d"; cp "$here/set-signing-secrets.sh" "$here/signing_env_lib.sh" "$d/"
   python3 - "$d/$2" "$3" "$4" <<'PY'
 import sys
@@ -250,6 +278,12 @@ mutant "env-only still runs the secret sequence" set-signing-secrets.sh '    if 
 mutant "FS_ORG not validated against FreeSynergy" set-signing-secrets.sh '[ "${ORG,,}" != freesynergy ] ||' 'true ||'
 mutant "pending membership accepted" set-signing-secrets.sh '[ "${role#* }" = active ] ||' 'true ||'
 mutant "no Ziel line in dry run" set-signing-secrets.sh 'echo "Ziel: Organisation' ': "Ziel: Organisation'
+PTYM=1 mutant "passphrase as gh argument" signing_env_lib.sh 'gh "$@" < <(printf '"'"'%s'"'"' "$PW")' 'gh "$@" --body "$PW" < <(printf '"'"'%s'"'"' "$PW")'
+PTYM=1 mutant "passphrase written to a file" set-signing-secrets.sh 'unset pw2
+  else' 'unset pw2; printf "%s" "$PW" >"$TMP_PWFILE_DEBUG"
+  else'
+PTYM=1 mutant "ask mode without terminal check" set-signing-secrets.sh '[ -t 0 ] || die "the passphrase is typed' 'true || die "the passphrase is typed'
+PTYM=1 mutant "typo check removed" set-signing-secrets.sh '[ -n "$PW" ] && [ "$PW" = "$pw2" ] ||' 'true ||'
 mutant "REVIEWER default" set-signing-secrets.sh 'REVIEWER=${REVIEWER:-} DEV=0' 'REVIEWER=${REVIEWER:-alice} DEV=0'
 mutant "dry run executes" signing_env_lib.sh 'if [ "$DRY" = 1 ]; then
     printf' 'if false; then

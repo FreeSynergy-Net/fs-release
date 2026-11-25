@@ -249,6 +249,8 @@ confirmation: delete the repository secrets of the same names (an error in betwe
 secret names, repository secrets gone): any deviation ends with rc 1. `--repo-secrets` is the old mode (repository secrets), deprecated and unprotected,
 kept only on request.
 
+**Typed passphrase (`--ask-passphrase`, the default when `PASSFILE` is not set and `~/.config/freesynergy/release-passphrase` does not exist):** the script asks for the passphrase of the signing key in the terminal (no echo, twice as a typo check; no terminal = clear error). It lives only in a shell variable, goes to gpg through a pipe on a file descriptor (`--passphrase-fd`) and to `gh secret set GPG_PASSPHRASE` on standard input; no file, no argument, no output, the variable is deleted on exit. GitHub still needs the passphrase as a secret (the CI unlocks the signing subkey with it); only the local file is gone. `PASSFILE` stays as the alternative. `--env-only` needs no passphrase.
+
 **`--env-only` (for organisation secrets):** `REVIEWER=<login> bash scripts/set-signing-secrets.sh --env-only [--repos ...] [--allow-self-review]` creates ONLY the environment `release-signing` (required reviewer,
 deployment only for tags) and the tag rule `v*` per repository: no key is exported, no secret is set or deleted, no gpg, no keys.openpgp.org, no delete question; the read-only check covers environment and tag rule only.
 Use it when the two secrets are ORGANISATION secrets (*Organization > Settings > Secrets and variables > Actions*, "Repository access" must include the repository). An organisation secret gives NO reviewer protection by itself;

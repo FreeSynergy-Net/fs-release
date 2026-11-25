@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Helpers of scripts/set-signing-secrets.sh (source it, do not execute it): the GitHub environment `release-signing`, its tag rule,
 # the environment secrets, the removal of the old repository secrets, the read-only check and the tag ruleset.
-# Expects: ORG, TMP (private dir), DRY (0|1), REVIEWER_ID_JSON, PREVENT (true|false), PASSFILE, DEV (deviation counter).
+# Expects: ORG, TMP (private dir), DRY (0|1), REVIEWER_ID_JSON, PREVENT (true|false), PASSFILE, ASK, PW, DEV (deviation counter).
 # Secret values are only ever handed to gh on STANDARD INPUT (`< file`), never as an argument, never printed.
 # shellcheck shell=bash
 ENV_NAME=release-signing
@@ -25,6 +25,13 @@ gh_do() {
     return 0
   fi
   gh "$@" <"${GH_IN:-/dev/null}" >"$TMP/out" 2>"$TMP/err"
+}
+
+# pass_gh_do <gh args>: the passphrase on standard input, from the file or (ask mode) from a pipe fed by the shell variable (never a file, never an argument).
+pass_gh_do() {
+  if [ "$ASK" != 1 ]; then GH_IN=$PASSFILE gh_do "<redacted: passphrase file>" "$@"; return; fi
+  if [ "$DRY" = 1 ]; then gh_do "<redacted: typed passphrase>" "$@"; return; fi
+  gh "$@" < <(printf '%s' "$PW") >"$TMP/out" 2>"$TMP/err"
 }
 
 http_code() { grep -oE 'HTTP [0-9]{3}' "$TMP/err" | head -n1 | cut -d' ' -f2 || true; }
@@ -76,7 +83,7 @@ env_policy() {
 env_secrets() {
   local r=$1
   GH_IN=$TMP/sub.asc gh_do "<redacted: signing subkey file>" secret set GPG_PRIVATE_KEY --env "$ENV_NAME" -R "$ORG/$r" || { explain "$r: environment secret GPG_PRIVATE_KEY"; return 1; }
-  GH_IN=$PASSFILE gh_do "<redacted: passphrase file>" secret set GPG_PASSPHRASE --env "$ENV_NAME" -R "$ORG/$r" || { explain "$r: environment secret GPG_PASSPHRASE"; return 1; }
+  pass_gh_do secret set GPG_PASSPHRASE --env "$ENV_NAME" -R "$ORG/$r" || { explain "$r: environment secret GPG_PASSPHRASE"; return 1; }
   say "environment secrets set: $r"
 }
 

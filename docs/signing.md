@@ -41,6 +41,8 @@ then for real: *Settings > Environments > release-signing > Environment secrets*
 | `GPG_PRIVATE_KEY` | full text of `FreeSynergy-release-secret.asc` |
 | `GPG_PASSPHRASE` | the passphrase (empty is allowed but discouraged) |
 
+`scripts/set-signing-secrets.sh` asks for the passphrase by typing (no echo, no file on disk; `--ask-passphrase`, default without `PASSFILE`). The passphrase must still exist as a GitHub secret `GPG_PASSPHRASE`, because the CI unlocks the signing subkey with it; locally it no longer has to lie in a file.
+
 Organisation secrets (*Organization > Settings > Secrets and variables > Actions*, with "Repository access" including the repository; not "Selected repositories" without it) are the recommended way
 to hold the key once for all repositories. They give NO reviewer protection: the protection only comes from the environment `release-signing` of each repository, which you create with
 `scripts/set-signing-secrets.sh --env-only` (environment, reviewer, tag rule `v*`, no secrets); `--env-only` plus an organisation secret is the protected combination. According to the GitHub documentation
