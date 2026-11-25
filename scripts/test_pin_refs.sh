@@ -4,7 +4,7 @@
 # A mutation (the ref check removed) must turn the bad-ref cases red.
 # `--dir <repo>` (a foreign repo): only fs-release `uses:` lines of .github/workflows/*.yml change (@main, @v0.0.6, @sha), foreign actions,
 # comments and other lines stay, a second run changes nothing, no .github/workflows = rc 2; mutations (anchor removed, pattern widened,
-# --dir ignored) must turn it red.
+# --dir ignored, chain gate removed or made report-only) must turn it red; the chain gate (stub `fs-release`) is hard: rc != 0 = rc 4, nothing written.
 #   bash scripts/test_pin_refs.sh
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -68,6 +68,14 @@ mkrel() {
 }
 mkrel "$tmp/rel"
 export FS_RELEASE_REPO="$tmp/rel"
+# Stand-in for `fs-release` (the throw-away clone has no pin chains): logs its arguments, rc from $tmp/stub.rc (default 0).
+cat >"$tmp/stub-fs-release" <<STUB
+#!/usr/bin/env bash
+echo "\$*" >>"$tmp/stub.log"
+exit "\$(cat "$tmp/stub.rc" 2>/dev/null || echo 0)"
+STUB
+chmod +x "$tmp/stub-fs-release"
+export FS_RELEASE_BIN="$tmp/stub-fs-release"
 tagsha() { git -C "$tmp/rel" rev-parse "$1^{commit}"; }
 side="$(git -C "$tmp/rel" rev-parse side)"
 
@@ -176,6 +184,27 @@ nolower_checks() {
 }
 nolower_checks "$here/pin-refs.sh" real
 
+# chain gate (--dir): `check-pin-chain --repo <clone> <full sha>` runs WITHOUT --melden before anything is written; rc != 0 (1 red, 2 bad input, tool missing) = rc 4, nothing written.
+chain_checks() {
+  local s=$1 l=$2 d="$tmp/c-$2" rc want
+  want="check-pin-chain --repo $tmp/rel $(tagsha v0.0.10)"
+  for stubrc in 0 1 2; do
+    mkforeign "$d.$stubrc"; echo "$stubrc" >"$tmp/stub.rc"; : >"$tmp/stub.log"
+    bash "$s" --dir "$d.$stubrc" v0.0.10 >/dev/null 2>&1; rc=$?
+    if [ "$stubrc" -eq 0 ]; then
+      { [ "$rc" -eq 0 ] && [ -n "$(git -C "$d.$stubrc" status --porcelain)" ]; } && ok "$l chain gate green: written" || bad "$l chain gate green (rc=$rc)"
+    else
+      { [ "$rc" -eq 4 ] && [ -z "$(git -C "$d.$stubrc" status --porcelain)" ]; } && ok "$l chain gate rc $stubrc: rc 4, nothing written" || bad "$l chain gate rc $stubrc (rc=$rc, want 4 and untouched)"
+    fi
+    [ "$(cat "$tmp/stub.log")" = "$want" ] && ok "$l chain gate rc $stubrc called as '$want' (no --melden)" || bad "$l chain gate call was: $(cat "$tmp/stub.log")"
+  done
+  mkforeign "$d.missing"; : >"$tmp/stub.log"
+  FS_RELEASE_BIN="$tmp/no-such-tool" bash "$s" --dir "$d.missing" v0.0.10 >/dev/null 2>&1; rc=$?
+  { [ "$rc" -eq 4 ] && [ -z "$(git -C "$d.missing" status --porcelain)" ]; } && ok "$l chain gate tool missing: rc 4, nothing written" || bad "$l chain gate tool missing (rc=$rc)"
+  echo 0 >"$tmp/stub.rc"
+}
+chain_checks "$here/pin-refs.sh" real
+
 # never lower, SELF mode (no --dir; review pin-chain-gate r4 S5): pins at a newer commit than the target = rc 3, nothing written, a message; the same or an
 # older pin is raised. A throw-away copy whose own history gives the pins (c1 older, c2 newer).
 self_checks() {
@@ -199,7 +228,7 @@ red_by() { # <label> <sed expression on the script>
   sed -E "$2" "$here/pin-refs.sh" >"$m"
   if cmp -s "$m" "$here/pin-refs.sh"; then bad "mutation $1 did not change the script"; return; fi
   local res
-  res="$(dir_checks "$m" "$1" 2>&1; nolower_checks "$m" "$1" 2>&1; self_checks "$m" "$1" 2>&1)"
+  res="$(dir_checks "$m" "$1" 2>&1; nolower_checks "$m" "$1" 2>&1; self_checks "$m" "$1" 2>&1; chain_checks "$m" "$1" 2>&1)"
   if echo "$res" | grep -q '^FAIL'; then ok "mutation $1 turns the --dir checks red"; else bad "mutation $1 stayed green"; fi
 }
 red_by noanchor 's@\$0 ~ "\^\[\[:space:\]\]\*\(-\[\[:space:\]\]\+\)\?uses:"@$0 ~ "uses:"@'
@@ -215,5 +244,7 @@ red_by noboundary-awk 's@if \(RSTART > 1\) \{ c =@if (0) { c =@'
 red_by noboundary-grep 's@\(\^\|[^)]*\)\(\$owners\)/fs-release@(\$owners)/fs-release@'
 red_by selfnocheck 's#^\[ "\$\{\#selfs\[@\]\}" -eq 0 \] \|\| check_no_lower .*#true#'
 red_by dirignored 's@^if \[ -n "\$dir" \]; then@if false; then@'
+red_by nochain 's@^  chain_gate .*@  true@'
+red_by chain-melden 's@check-pin-chain --repo@check-pin-chain --melden --repo@'
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

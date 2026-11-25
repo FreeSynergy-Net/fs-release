@@ -4,11 +4,13 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd); here=$root/tests/module-probe
 arch=$(uname -m); triple=$arch-unknown-linux-gnu
-cd "$here"; rm -rf dist target; out=$(mktemp)
+cd "$here"; rm -rf dist target; out=$(mktemp); runner_tmp=""
+# remove the temp files on every exit (the plan output; the runner temp dir only when this script made it)
+trap 'rm -f "$out"; [ -z "$runner_tmp" ] || rm -rf "$runner_tmp"' EXIT
 env TAG=v0.1.1 NAME=probe KIND=module BINARIES=probe-service LINUX_TARGETS="$arch" WINDOWS_TARGETS="" MACOS=false GITHUB_OUTPUT="$out" python3 -I "$root/actions/plan/plan.py" >/dev/null
 PLAN=$(sed -n 's/^plan=//p' "$out")
 [[ "$(jq -r .kind <<<"$PLAN")" == module ]]
-PLAN=$PLAN ARCH=$arch TRIPLE=$triple RUNNER_TEMP=${RUNNER_TEMP:-$(mktemp -d)} GITHUB_WORKSPACE="$here" bash "$root/actions/package-linux/package.sh"
+PLAN=$PLAN ARCH=$arch TRIPLE=$triple RUNNER_TEMP=${RUNNER_TEMP:-${runner_tmp:=$(mktemp -d)}} GITHUB_WORKSPACE="$here" bash "$root/actions/package-linux/package.sh"
 rpm_file=$(find dist -name 'fs-module-probe-*.rpm')
 [[ -n "$rpm_file" && "$(echo "$rpm_file" | wc -l)" == 1 ]]
 [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}' "$rpm_file")" == "fs-module-probe 0.1.1 $arch" ]]
