@@ -62,6 +62,14 @@ impl Emitter for Program {
     }
 }
 
+/// The `.desktop` entry of the program, the ONE source of both the file in `packaging/` and the file of the RPM (the RPM has no head line): `Exec=fs-starter <name>` starts the program (ADR 0094).
+///
+/// # Errors
+/// The errors of `Values::of` and `fill`.
+pub fn desktop_entry(bp: &Blueprint) -> Result<String, Coded> {
+    fill(tmpl!("desktop.tmpl"), &Values::of(bp)?, "desktop")
+}
+
 #[must_use]
 pub fn all() -> Vec<Box<dyn Emitter>> {
     vec![

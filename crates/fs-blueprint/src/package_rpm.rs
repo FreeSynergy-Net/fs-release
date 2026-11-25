@@ -8,7 +8,6 @@ use crate::kit::Kind;
 use crate::model::Blueprint;
 use crate::package_module::{dir, read_plain};
 use crate::rpm_spec::{Req, RpmSpec, SpecFile};
-use std::fmt::Write as _;
 use std::path::Path;
 
 pub use crate::package_module::{
@@ -70,38 +69,6 @@ pub(crate) fn tree(from: &Path, to: &str, out: &mut Vec<SpecFile>) -> Result<(),
         }
     }
     Ok(())
-}
-
-/// The `.desktop` entry: `fs-starter <name>` starts the program (ADR 0094).
-fn desktop(bp: &Blueprint) -> String {
-    let p = &bp.program;
-    let line = |t: &Option<String>| {
-        t.as_deref()
-            .unwrap_or_default()
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-    };
-    let mut s = format!(
-        "[Desktop Entry]\nType=Application\nName={}\n",
-        pascal(&p.name)
-    );
-    let _ = write!(
-        s,
-        "Comment={}\nComment[de]={}\nExec=fs-starter {}\nCategories={};\n",
-        line(&p.summary.en),
-        line(&p.summary.de),
-        p.name,
-        p.categories
-            .iter()
-            .map(|c| line(&Some(c.clone())))
-            .collect::<Vec<_>>()
-            .join(";")
-    );
-    if p.icon.is_some() {
-        let _ = writeln!(s, "Icon={}", line(&p.icon));
-    }
-    s
 }
 
 /// The licence files a program carries (as the module package does, `/usr/share/licenses/<package>/`).
@@ -169,7 +136,8 @@ pub fn program_spec(
         "/usr/share/applications/net.freesynergy.{}.desktop",
         pascal(&p.name)
     );
-    files.push(file(app, desktop(bp).into_bytes(), 0o644));
+    let entry = crate::emit::files::desktop_entry(bp).map_err(|e| e.to_string())?;
+    files.push(file(app, entry.into_bytes(), 0o644));
     let mut requires = vec![
         Req {
             name: "fs-starter".into(),

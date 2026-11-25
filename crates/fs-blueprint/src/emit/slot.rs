@@ -32,12 +32,14 @@ pub enum Slot {
     SummaryDe,
     /// `Office;ProjectManagement;`
     Categories,
+    /// `Icon=name\n`, or empty when the program has no icon (the one optional line of the `.desktop` entry)
+    IconLine,
     /// The SHA-256 of the blueprint in its canonical form (64 hex digits): the only reference to the blueprint a generated file carries as a value
     BlueprintHash,
 }
 
 impl Slot {
-    pub const ALL: [Slot; 14] = [
+    pub const ALL: [Slot; 15] = [
         Slot::Program,
         Slot::Kebab,
         Slot::Snake,
@@ -51,6 +53,7 @@ impl Slot {
         Slot::SummaryEn,
         Slot::SummaryDe,
         Slot::Categories,
+        Slot::IconLine,
         Slot::BlueprintHash,
     ];
 
@@ -71,6 +74,7 @@ impl Slot {
             Slot::SummaryEn => "summary_en",
             Slot::SummaryDe => "summary_de",
             Slot::Categories => "categories",
+            Slot::IconLine => "icon_line",
             Slot::BlueprintHash => "blueprint_hash",
         }
     }
@@ -134,6 +138,11 @@ impl Values {
             Slot::SummaryEn => one_line(bp.program.summary.en.as_deref()),
             Slot::SummaryDe => one_line(bp.program.summary.de.as_deref()),
             Slot::Categories => bp.program.categories.join(";") + ";",
+            Slot::IconLine => bp
+                .program
+                .icon
+                .as_deref()
+                .map_or_else(String::new, |i| format!("Icon={}\n", one_line(Some(i)))),
             Slot::BlueprintHash => hash.clone(),
         };
         Ok(Self {

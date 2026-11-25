@@ -130,7 +130,7 @@ fn the_desktop_file_has_the_name_the_summary_in_both_languages_and_the_categorie
     let d = get(&a, "packaging/net.freesynergy.Probe.desktop");
     assert!(
         d.contains("Name=Probe\n")
-            && d.contains("Exec=fs-probe\n")
+            && d.contains("Exec=fs-starter probe\n")
             && d.contains("Categories=Utility;\n")
     );
     assert!(d.contains("Comment=A probe program without any function\n"));
