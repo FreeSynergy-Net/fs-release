@@ -22,7 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           [ "$GITHUB_REF_TYPE" = tag ] || { echo "::error::signing-check runs only for a tag (ref_type=$GITHUB_REF_TYPE)"; exit 1; }
-      - uses: FreeSynergy-Net/fs-release/actions/sign-files@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
+      - uses: FreeSynergy-Net/fs-release/actions/sign-files@ff414f196673c088922d7c97228bed1463d68e56
         with:
           mode: check
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
