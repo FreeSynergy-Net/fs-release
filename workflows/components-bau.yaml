@@ -1,0 +1,419 @@
+# Build in the components package (fs-components): draft -> builder -> gates -> review -> landing. Maps the real run of controller C4.
+# Order: `Workflow components-bau, step <id>, parameters ziel, auftrag, crate, karte` (docs/prompt-template.md). FS profile: see README.md. Run through `workflow-pflege`.
+# DRAFT / SPECIFICATION: the `@fs` calls have no script yet, a real run is not proven. Agents never push to main without the landing step, never tag, never force-push; output first on `unreviewed/<ziel>`.
+# Loops: a red check jumps back at most twice; the third red round goes to `eskalation`. Only `red == false` goes on; a missing result goes to `eskalation`, never on.
+# Rules. (1) Existing first (CLAUDE.md section 8): Blinc, own crates, crates.io before own code. (2) Pattern first (CLAUDE.md section 7a, ADR 0043): `Pattern: <Name> - <one sentence>` in the head, interface before program.
+# (3) Commit identity FreeSynergy <support@freesynergy.net> BEFORE the commit (lesson 25.11.: otherwise check/identity is red and the force-push is refused, new branch -r2). (4) While working only `cargo check -p <crate>`;
+# builds only through `build-slot.sh` (`--status` first, at most one build per controller). (5) Generated files (`contract/BLOCKS*.md`) only through `contract/render`, never by hand.
+# (6) ONE `testlauf`, stage `ende`, only this module (`-p`), profile quick. (7) Landing = ff after Opus YES for exactly this SHA and green CI at exactly this SHA; never force; never a tag.
+document:
+  dsl: 1.0.3
+  namespace: freesynergy.net
+  name: components-bau
+  version: 0.0.17
+  title: Build in fs-components - existing first, pattern, branch with identity, builder, gates, one testlauf, Opus review, CI, ff landing, pin, checklist
+do:
+  - vorhanden-pruefen:
+      call: vorhanden-pruefen-ai:0.0.17@fs
+      with:
+        suche: ${ .input }
+      export:
+        as: '${ $context + { befund: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.vorhanden-pruefen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "MANDATORY FIRST STEP: look whether it already exists - Blinc, own crates and modules, crates.io (a crate found is used first: pin plus own adapter), `unreviewed/` branches (`git ls-remote ... 'refs/heads/unreviewed/*'`), `.scratch`, inventories. Result `befund` = { art: vorhanden | neu, verweis (\"extend X\"), beleg (what was searched, with paths and heads) }. `neu` only WITH a reason and proof."
+  - vorhanden-pruefen-check:
+      call: befund-beleg:0.0.17@fs
+      with:
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { belegcheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): `befund` without proof is RED; a missing `befund` is red."
+  - vorhanden-pruefen-again:
+      switch:
+        - runden:
+            when: '${ $context.belegcheck.red == true and ($context.belegcheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.belegcheck.red == true }'
+            then: vorhanden-pruefen
+        - green:
+            when: '${ $context.belegcheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `vorhanden-pruefen` (at most two repeats), from the third red round to `eskalation`; a missing result goes to `eskalation`."
+  - vorhanden-weiche:
+      switch:
+        - vorhanden:
+            when: '${ $context.befund.art == "vorhanden" and ($context.befund.nur_nutzen // false) == true }'
+            then: abbruch
+        - weiter:
+            when: '${ $context.befund.art == "neu" or $context.befund.art == "vorhanden" }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - an existing crate that only has to be used ends the run with the reference; `vorhanden` with an extension or `neu` goes on; a missing result goes to `eskalation`."
+  - entwurf:
+      call: build-ai:0.0.17@fs
+      with:
+        repo: fs-components
+        task: "write the interface first - head line `Pattern: <Name> - <one sentence>` (closest pattern, deviation in one sentence), first doc line of every trait names its pattern (conventions/coding.md section 2), then the plan; the program runs against the interface"
+        befund: ${ $context.befund }
+      export:
+        as: '${ $context + { entwurf: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.entwurf
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Draft (CLAUDE.md sections 7a, 8): pattern first, then the interface (trait), standard per method, as little own code as possible; the draft names pattern, standard and the crates reused."
+  - entwurf-check:
+      call: pattern-beleg:0.0.17@fs
+      with:
+        entwurf: ${ $context.entwurf }
+      export:
+        as: '${ $context + { patterncheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: the head line `Pattern: <Name> - ...` exists, every new trait names a pattern in its first doc line; missing is red."
+  - entwurf-again:
+      switch:
+        - runden:
+            when: '${ $context.patterncheck.red == true and ($context.patterncheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.patterncheck.red == true }'
+            then: entwurf
+        - green:
+            when: '${ $context.patterncheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `entwurf` (at most two repeats), then `eskalation`; a missing result goes to `eskalation`."
+  - slot-pruefen:
+      call: build-slot-status:0.0.17@fs
+      export:
+        as: '${ $context + { slot: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`bash .scratch/build-slot.sh --status` first; at most ONE build agent per controller (4 slots, 4 controllers); no free slot means: work without a build (reading, drafts, docs) and ask again later, never `/tmp` for builds."
+  - zweig:
+      call: branch-identity:0.0.17@fs
+      with:
+        repo: fs-components
+        branch: unreviewed/${ .input.ziel }
+        base: origin/main
+        user_name: FreeSynergy
+        user_email: support@freesynergy.net
+      export:
+        as: '${ $context + { zweig: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Worktree with branch `unreviewed/<ziel>` from `origin/main`; BEFORE the first commit `git config user.name FreeSynergy` and `git config user.email support@freesynergy.net` in this worktree (lesson 25.11.)."
+  - bauen:
+      call: build-ai:0.0.17@fs
+      with:
+        repo: fs-components
+        branch: ${ $context.zweig.branch }
+        task: "build to the draft; only `cargo check -p <crate>` while working (no tests); builds only through build-slot.sh; generated files (contract/BLOCKS*.md) only through `contract/render`; commits as FreeSynergy; commit message ends with the Co-Authored-By line"
+        entwurf: ${ $context.entwurf }
+      export:
+        as: '${ $context + { bau: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.bauen
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "The builder (Sonnet) works in the worktree and commits locally ([COMMIT]); no push to main, no tag; report [BERICHT] with SHA, and in `_bericht/FEATURES.md` which existing checklist lines are done."
+  - identitaet-pruefen:
+      call: commit-identity:0.0.17@fs
+      with:
+        repo: ${ $context.zweig.worktree }
+        expect: FreeSynergy <support@freesynergy.net> | FreeSynergy <support@freesynergy.net>
+      export:
+        as: '${ $context + { identitaet: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check: `git log -1 --format='%an <%ae> | %cn <%ce>'` must read exactly `FreeSynergy <support@freesynergy.net> | FreeSynergy <support@freesynergy.net>` (script `scripts/identity-check`); red BEFORE the first push: amend or rebase locally; once pushed, a force-push is refused - then a new branch `-r2`, never force."
+  - render-pruefen:
+      call: contract-render-check:0.0.17@fs
+      with:
+        repo: ${ $context.zweig.worktree }
+      export:
+        as: '${ $context + { render: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Generated files (`contract/BLOCKS*.md`) are produced only by `contract/render`; the check runs it and compares: a hand-written or stale file is red."
+  - gates:
+      call: gates:0.0.17@fs
+      with:
+        repo: ${ $context.zweig.worktree }
+        rustflags: -D warnings -W clippy::pedantic
+      export:
+        as: '${ $context + { gates: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Local gates with the REAL flags (`-D warnings -W clippy::pedantic`, as in CI): fmt, clippy, check, identity; the result is `red` or not. A gate output is never shortened (pipefail and rc)."
+  - gates-again:
+      switch:
+        - runden:
+            when: '${ ($context.gates.red == true or $context.identitaet.red == true or $context.render.red == true) and ($context.gates.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.gates.red == true or $context.identitaet.red == true or $context.render.red == true }'
+            then: bauen
+        - green:
+            when: '${ $context.gates.red == false and $context.identitaet.red == false and $context.render.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red goes back to `bauen` (at most two repeats), the third red round to `eskalation`; only `red == false` everywhere goes on."
+  - testlauf:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: testlauf
+          version: 0.0.17
+        input:
+          stufe: ende
+          crate: ${ .input.crate }
+          profil: quick
+      export:
+        as: '${ $context + { test: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "EXACTLY ONE `testlauf`, stage `ende`, only this module (`-p <crate>`), profile quick (CLAUDE.md section 4); through `build-slot.sh`. Afterwards the module counts as frozen until it changes. Never the whole workspace."
+  - testlauf-again:
+      switch:
+        - runden:
+            when: '${ $context.test.red == true and ($context.test.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.test.red == true }'
+            then: bauen
+        - green:
+            when: '${ $context.test.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red test goes back to `bauen` (at most two repeats; the gates run again), the third red round to `eskalation`."
+  - push:
+      call: push-unreviewed:0.0.17@fs
+      with:
+        branch: ${ $context.zweig.branch }
+      export:
+        as: '${ $context + { push: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.push
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "`git push origin unreviewed/<ziel>` - only `unreviewed/*`, never main, never a tag, never force; refused means a new branch `-r2`."
+  - kopf:
+      call: resolve-head:0.0.17@fs
+      with:
+        branch: ${ $context.zweig.branch }
+      export:
+        as: '${ $context + { kopf: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Resolves the CURRENT head SHA of the pushed branch (after gates, test and push); review, CI and landing refer to exactly this SHA."
+  - review:
+      run:
+        workflow:
+          namespace: freesynergy.net
+          name: review
+          version: 0.0.17
+        input:
+          head: ${ $context.kopf.sha }
+          scope: normal
+      export:
+        as: '${ $context + { urteil: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.review
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "ONE normal Opus review (building phase: no mutation tests, no Opus HIGH) for exactly this SHA, with the pattern check (head line and trait doc lines). Non-MUST findings become `[ ]` cards; a NO goes back to `bauen`."
+  - review-again:
+      switch:
+        - runden:
+            when: '${ $context.urteil.ja == false and ($context.urteil.runde // 0) >= 3 }'
+            then: eskalation
+        - nein:
+            when: '${ $context.urteil.ja == false }'
+            then: bauen
+        - ja:
+            when: '${ $context.urteil.ja == true and $context.urteil.sha == $context.kopf.sha }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a YES counts only for the SHA it names (equal to `kopf.sha`); a NO goes back to `bauen` (at most two repeats), then `eskalation`; a missing result or a YES for another SHA goes to `eskalation`."
+  - ci:
+      call: ci-status:0.0.17@fs
+      with:
+        repo: fs-components
+        sha: ${ $context.kopf.sha }
+      export:
+        as: '${ $context + { ci: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "CI at exactly this SHA, read by the controller itself (`gh run list --commit <sha>`); a green run of another SHA does not count. Waiting: look again after 3-5 minutes, no long pauses (CLAUDE.md section 4a)."
+  - ci-again:
+      switch:
+        - rot:
+            when: '${ $context.ci.red == true }'
+            then: bauen
+        - gruen:
+            when: '${ $context.ci.red == false and $context.ci.sha == $context.kopf.sha }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - red CI goes back to `bauen` (a new SHA needs a new review); only green at exactly `kopf.sha` goes on."
+  - landen:
+      call: merge-ff:0.0.17@fs
+      with:
+        into: main
+        branch: ${ $context.zweig.branch }
+        sha: ${ $context.kopf.sha }
+      export:
+        as: '${ $context + { landung: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.landen
+        freesynergy.net:gate: opus-ja
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Landing by the controller: ff onto main ONLY after Opus YES for exactly this SHA and green CI at exactly this SHA; never force, never a tag; proof `git merge-base --is-ancestor <branch> origin/main`."
+  - pin:
+      call: pin-eintragen:0.0.17@fs
+      with:
+        sha: ${ $context.kopf.sha }
+        datei: .scratch/sonnet/PINS.md
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.pin
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "A pin line in `.scratch/sonnet/PINS.md` (crate, SHA, what changed) and a message to everybody affected (other controllers directly, the pins also stay in PINS.md)."
+  - checkliste:
+      call: checkliste-abhaken:0.0.17@fs
+      with:
+        karte: ${ .input.karte }
+        datei: .scratch/FEATURES-OFFEN.md
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.checkliste
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Tick the EXISTING line in `.scratch/FEATURES-OFFEN.md` (`[ ]` to `[x]` plus date), never a new `[x]` line; new things as `[ ]` in the right section; read before writing (lesson 24.11.). No report is final before this."
+  - bericht:
+      call: report-to-strategy:0.0.17@fs
+      with:
+        lauf: ${ $context }
+      then: end
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: components-bau.bericht
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Report (one line per result with SHA in `sonnet/C<N>-BERICHT.md`): branch, head SHA, gate and test result, review verdict, CI, landing, pin; what is not proven is named."
+  - abbruch:
+      set:
+        todo: abbruch
+      then: end
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Abort with a reference (the existing crate is only used): nothing new is built; the report names the reference. The run ends here."
+  - eskalation:
+      set:
+        todo: eskalation
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "A check was red for the third time, a NO came for the third time, a decision is open, or a result is missing: the loop stops and the person decides. The report names the step and the last red result; nothing goes on by itself."
