@@ -105,6 +105,13 @@ confirm_delete() {
   [ "$ans" = y ] || [ "$ans" = Y ]
 }
 
+# --env-only: environment with reviewer and tag rule, nothing else (the secrets are organisation secrets).
+env_only_run() {
+  local r=$1
+  env_put "$r" || return 1
+  env_policy "$r" || return 1
+}
+
 # The whole sequence for one repository. Deleting happens ONLY after both environment secrets are set.
 env_run() {
   local r=$1
@@ -148,6 +155,7 @@ verify_repo() {
     explain "$r: read tag rules"
     deviation "$r: tag rules not readable"
   fi
+  [ "$MODE" != env-only ] || return 0
   if secret_names --env "$ENV_NAME" -R "$ORG/$r"; then
     names=$(cat "$TMP/names")
     for n in "${SECRETS[@]}"; do

@@ -32,7 +32,7 @@ revocation certificate, publish it, remove the secrets from GitHub, generate a n
 
 ## Give it to GitHub
 
-The target state is **environment secrets** of the GitHub environment `release-signing` in EACH repository that releases (the environment holds the required
+The target state is the GitHub environment `release-signing` in EACH repository that releases, holding the secrets (`--env`) or, with organisation secrets (below), only the protection (`--env-only`); the environment holds the required
 reviewer, so nobody signs unseen; `docs/usage.md`, "Approval for the signing job"). Set it up with `scripts/set-signing-secrets.sh --env --dry-run` first (read it) (target organisation `FreeSynergy-Net`, overridable with `FS_ORG`; never the unrelated organisation `FreeSynergy`; the logged-in account must be admin of it and the script asks before writing),
 then for real: *Settings > Environments > release-signing > Environment secrets*:
 
@@ -41,9 +41,13 @@ then for real: *Settings > Environments > release-signing > Environment secrets*
 | `GPG_PRIVATE_KEY` | full text of `FreeSynergy-release-secret.asc` |
 | `GPG_PASSPHRASE` | the passphrase (empty is allowed but discouraged) |
 
-Repository or organisation secrets (*Settings > Secrets and variables > Actions*) are the older way and are not protected by a reviewer. Whether GitHub makes them
-visible inside a job with `environment:` was not checked, so this guide does not rely on it. A tag run without a key fails early (job `signing-check`) with
-"Secrets fehlen fuer dieses Repo/diese Organisation: GPG_PRIVATE_KEY, GPG_PASSPHRASE". The caller workflows pass the secrets explicitly; fs-release only uses
+Organisation secrets (*Organization > Settings > Secrets and variables > Actions*, with "Repository access" including the repository; not "Selected repositories" without it) are the recommended way
+to hold the key once for all repositories. They give NO reviewer protection: the protection only comes from the environment `release-signing` of each repository, which you create with
+`scripts/set-signing-secrets.sh --env-only` (environment, reviewer, tag rule `v*`, no secrets); `--env-only` plus an organisation secret is the protected combination. According to the GitHub documentation
+(not tried here) a job with `environment:` gets the environment, repository and organisation secrets, and with the same name the environment secret wins over the repository secret over the organisation secret.
+Repository secrets are the oldest way and are not protected. (This replaces the older sentence that it was unknown whether such secrets reach a job with `environment:`; it stays unproven by a run of ours.)
+A tag run without a key fails early (job `signing-check`) with "Secrets fehlen fuer dieses Repo/diese Organisation: GPG_PRIVATE_KEY, GPG_PASSPHRASE".
+The caller workflows pass the secrets explicitly; fs-release only uses
 them in the `signing-check` and `finalize` jobs, never in jobs that run build scripts of the app.
 (A dedicated signing subkey that is exported without the primary key is an option for later: `gpg --export-secret-subkeys`.)
 

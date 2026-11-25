@@ -24,7 +24,7 @@ for ((i = 1; i <= $#; i++)); do [ "${!i}" = -R ] && j=$((i + 1)) && repo=${!j//\
 case "$*" in
   "api user --jq .login") echo FreeSynergy ;;
   "api user --jq .id") echo 1 ;;
-  "api orgs/"*"/memberships/"*" --jq .role") echo "${MOCK_ROLE:-admin}"; [ -z "${MOCK_ROLE_FAIL:-}" ] || exit 1 ;;
+  "api orgs/"*"/memberships/"*" --jq "*) echo "${MOCK_ROLE:-admin} ${MOCK_MSTATE:-active}"; [ -z "${MOCK_ROLE_FAIL:-}" ] || exit 1 ;;
   "api users/alice --jq "*) echo "4242 User" ;;
   "api users/FreeSynergy --jq "* | "api users/freesynergy --jq "*) echo "1 User" ;;
   "api users/someorg --jq "*) echo "77 Organization" ;;
@@ -102,7 +102,7 @@ suite() {
   ck "secret value in NO argument and NOT in the output" '! grep -q "$SECRETVAL" "$tmp/args" && ! grep -q "$SECRETVAL" "$tmp/out"'
   ck "check at the end green" 'grep -q -- "--- check" "$tmp/out" && ! grep -q DEVIATION "$tmp/out"'
   run x "" "" --env --yes
-  ck "default list = the 9 release.yml callers + planning, person, starter (12), all hardened" '[ "$rc" = 0 ] && [ "$(grep -c -- "-X PUT repos/FreeSynergy-Net/fs-[a-z-]*/environments" "$tmp/args")" = 12 ] && for n in texts people calendars tasks groups maps capnpc packages files modules-planning modules-person starter; do grep -q "PUT repos/FreeSynergy-Net/fs-$n/environments" "$tmp/args" || exit 1; done'
+  ck "default list = the 9 release.yml callers + messages, broadcast, draw, planning, person, starter (15), all hardened" '[ "$rc" = 0 ] && [ "$(grep -c -- "-X PUT repos/FreeSynergy-Net/fs-[a-z-]*/environments" "$tmp/args")" = 15 ] && for n in texts people calendars tasks groups maps capnpc packages files messages broadcast draw modules-planning modules-person starter; do grep -q "PUT repos/FreeSynergy-Net/fs-$n/environments" "$tmp/args" || exit 1; done'
   EXTRA="REVIEWER=alice MOCK_ENV_EXISTS=1"
   run x "" "" --env --repos packages --yes
   ck "fixture existing environment without reviewer/rule/env secrets: updated and hardened, rc 0" '[ "$rc" = 0 ] && grep -q "PUT repos/FreeSynergy-Net/fs-packages/environments/release-signing" "$tmp/args" && grep -q "POST repos/FreeSynergy-Net/fs-packages/environments/release-signing/deployment-branch-policies" "$tmp/args" && grep -q "secret set GPG_PASSPHRASE --env" "$tmp/args"'
@@ -187,6 +187,27 @@ suite() {
   EXTRA="REVIEWER=alice MOCK_ROLE_FAIL=1"
   run x "" "" --env --repos texts --yes
   ck "account not in the organisation: clear message, nothing written" '[ "$rc" != 0 ] && grep -q "not a member of the organisation" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=alice MOCK_MSTATE=pending"
+  run x "" "" --env --repos texts --yes
+  ck "pending invitation (state != active): refused, nothing written" '[ "$rc" != 0 ] && grep -q "state active is required" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  for bad in FreeSynergy freesynergy FREESYNERGY "-x" "a_b"; do
+    EXTRA="REVIEWER=alice FS_ORG=$bad"
+    run x "" "" --env --repos texts --dry-run
+    ck "FS_ORG '$bad' rejected: rc 2, nothing run" '[ "$rc" = 2 ] && [ ! -s "$tmp/args" ] && grep -q "FS_ORG" "$tmp/out"'
+  done
+  EXTRA="REVIEWER=alice"
+  run x "" "" --env --repos texts --dry-run
+  ck "dry run also prints the Ziel line" 'grep -q "Ziel: Organisation FreeSynergy-Net, Repositories: fs-texts" "$tmp/out"'
+  run x "" "y" --env-only --repos texts,messages
+  ck "--env-only: environment + tag rule only; no secret set/delete, no gpg, no curl-free export, no delete question, no secret check" '[ "$rc" = 0 ] && grep -q "PUT repos/FreeSynergy-Net/fs-texts/environments/release-signing" "$tmp/args" && grep -q "POST repos/FreeSynergy-Net/fs-texts/environments/release-signing/deployment-branch-policies" "$tmp/args" && grep -q "PUT repos/FreeSynergy-Net/fs-messages/environments" "$tmp/args" && ! grep -q "secret" "$tmp/args" && [ ! -s "$tmp/gpg" ] && ! grep -qi "delete the repository" "$tmp/out" && ! grep -q "public key written" "$tmp/out"'
+  run x "" "" --env-only --repos texts --yes
+  ck "--env-only does not need the passphrase file or gpg" '[ "$rc" = 0 ] && [ ! -s "$tmp/gpg" ]'
+  EXTRA=""
+  run x "" "" --env-only --repos texts --dry-run
+  ck "--env-only needs REVIEWER: rc 2" '[ "$rc" = 2 ] && grep -q "REVIEWER" "$tmp/out"'
+  EXTRA="REVIEWER=alice"
+  run x "" "" --env --env-only --repos texts
+  ck "--env with --env-only: rc 2" '[ "$rc" = 2 ]'
   EXTRA="REVIEWER=alice"
   run x "" "" --repo-secrets --repos texts --yes
   ck "--repo-secrets: warning (deprecated, unprotected), repo secrets set, no environment, no delete" '[ "$rc" = 0 ] && grep -qi "deprecated" "$tmp/out" && grep -qi "unprotected" "$tmp/out" && grep -q "^secret set GPG_PRIVATE_KEY -R FreeSynergy-Net/fs-texts" "$tmp/args" && ! grep -q "environments" "$tmp/args" && ! grep -q "secret delete" "$tmp/args"'
@@ -222,8 +243,13 @@ fails=$real
 mutant "delete before set" signing_env_lib.sh '  env_secrets "$r" ||' '  delete_repo_secrets "$r" || true; env_secrets "$r" ||'
 mutant "secret value as argument" signing_env_lib.sh 'secret set GPG_PRIVATE_KEY --env' 'secret set GPG_PRIVATE_KEY --body "$(cat "$TMP/sub.asc")" --env'
 mutant "ORG back to the foreign organisation" set-signing-secrets.sh 'ORG=${FS_ORG:-FreeSynergy-Net}' 'ORG=FreeSynergy'
-mutant "admin role not checked" set-signing-secrets.sh '[ "$role" = admin ] ||' 'true ||'
+mutant "admin role not checked" set-signing-secrets.sh '[ "${role% *}" = admin ] ||' 'true ||'
 mutant "no target confirmation" set-signing-secrets.sh '[ "$ans" = y ] || [ "$ans" = Y ] || die "not confirmed' 'true || die "not confirmed'
+mutant "env-only still sets secrets" set-signing-secrets.sh 'KEYS=1; [ "$MODE" != env-only ] || KEYS=0' 'KEYS=1'
+mutant "env-only still runs the secret sequence" set-signing-secrets.sh '    if [ "$MODE" = env-only ]; then' '    if false; then'
+mutant "FS_ORG not validated against FreeSynergy" set-signing-secrets.sh '[ "${ORG,,}" != freesynergy ] ||' 'true ||'
+mutant "pending membership accepted" set-signing-secrets.sh '[ "${role#* }" = active ] ||' 'true ||'
+mutant "no Ziel line in dry run" set-signing-secrets.sh 'echo "Ziel: Organisation' ': "Ziel: Organisation'
 mutant "REVIEWER default" set-signing-secrets.sh 'REVIEWER=${REVIEWER:-} DEV=0' 'REVIEWER=${REVIEWER:-alice} DEV=0'
 mutant "dry run executes" signing_env_lib.sh 'if [ "$DRY" = 1 ]; then
     printf' 'if false; then
@@ -234,7 +260,7 @@ mutant "ruleset without update rule" signing_env_lib.sh '{type:"non_fast_forward
 mutant "REVIEWER pattern removed" set-signing-secrets.sh '[[ "$REVIEWER" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] ||' 'true ||'
 mutant "set -e removed" set-signing-secrets.sh 'set -euo pipefail' 'set -uo pipefail'
 mutant "any delete error = already gone" signing_env_lib.sh 'elif [ "$(http_code)" = 404 ]; then' 'elif true; then'
-mutant "tag rule error ignored" signing_env_lib.sh 'env_policy "$r" || return 1' 'env_policy "$r" || true'
+mutant "tag rule error ignored" signing_env_lib.sh $'  env_policy "$r" || return 1\n  env_secrets' $'  env_policy "$r" || true\n  env_secrets'
 mutant "reviewer id not checked numeric" set-signing-secrets.sh '[[ "$rid" =~ ^[0-9]+$ ]] ||' 'true ||'
 mutant "self review compared by login, case sensitive" set-signing-secrets.sh '[ "$rid" = "$whoid" ]' '[ "$REVIEWER" = "$who" ]'
 mutant "reviewer type not checked" set-signing-secrets.sh '[ "$rtype" = User ] ||' 'true ||'

@@ -207,10 +207,11 @@ alone, also after the agents work under their own account. The owner sets this u
 1. Repository -> Settings -> Environments -> New environment `release-signing`.
 2. **Required reviewers**: the owner's own account (never the account of an agent); switch on "Prevent self-review" only if the run is started by another account.
 3. **Deployment branches and tags**: "Selected branches and tags" with the tag rule `v*` (no branch rule), so only a tag run can reach the key.
-4. **Environment secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as secrets of THIS environment (the target state; repository secrets are the old, unprotected
-   way; the repository secrets of the same names are deleted afterwards). Organisation secrets are NOT the target state: they would reach the job without the
-   approval. Whether GitHub hands repository or organisation secrets on into a job that has `environment:` was NOT checked (and is not claimed here); only the
-   environment secrets are what this document promises. `docs/signing.md` says the same. `scripts/set-signing-secrets.sh --env` does steps 1 to 4 (see "Setting it up with the script" below).
+4. **Secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`, either as environment secrets of THIS environment (`--env`; the repository secrets of the same names are deleted afterwards) or, recommended, as
+   ORGANISATION secrets held once for all repositories (`--env-only` sets up steps 1 to 3 only; "Repository access" of the secret must include the repository). An organisation secret gives NO reviewer protection by
+   itself: the protection comes only from steps 1 to 3 in each repository (environment with reviewer, tag rule), so organisation secret WITHOUT this environment would reach the job without approval.
+   According to the GitHub documentation (not tried by us) a job with `environment:` gets environment, repository and organisation secrets; with the same name environment beats repository beats organisation.
+   `docs/signing.md` says the same. `scripts/set-signing-secrets.sh --env` does steps 1 to 4, `--env-only` steps 1 to 3 (see "Setting it up with the script" below).
 5. The same for every repo that signs: the mirror workflow of a wrapper repo (template `mirror.yml`, for example fs-zentinel) and `site.yml` of the site repo
    get `environment: release-signing` on their signing job too, and nothing else.
 6. **Every repo that calls `release.yml` needs its OWN environment `release-signing`** (steps 1 to 4 in THAT repo): the environment belongs to the repo in which the
@@ -237,7 +238,9 @@ bash scripts/set-signing-secrets.sh --ruleset-tags fs-release
 
 The target organisation is `FreeSynergy-Net` (where our repositories are); the unrelated GitHub organisation `FreeSynergy` is NEVER a target. `FS_ORG=<org>` overrides it. For a real run the script checks that the logged-in account (your own, NOT a fixed account name) is a member of the organisation with the role `admin` (`gh api orgs/$ORG/memberships/<you>`), prints `Ziel: Organisation <org>, Repositories: ...` and asks for confirmation (`--yes` skips the question); a dry run reads and asks nothing.
 
-Default list of `--env` (the 9 callers of `release.yml` plus fs-modules-planning, fs-modules-person and fs-starter, which are planned for tag releases): fs-texts, fs-people, fs-calendars, fs-tasks, fs-groups, fs-maps, fs-capnpc, fs-packages, fs-files, fs-modules-planning, fs-modules-person, fs-starter;
+`FS_ORG` is checked: it must look like a GitHub organisation name and `FreeSynergy` (any case, without `-Net`) is refused with rc 2. The membership must be `active` (a pending invitation is refused). The `Ziel:` line is also printed in a dry run.
+
+Default list of `--env` (15 repositories: the 12 that call `release.yml` - fs-texts, fs-people, fs-calendars, fs-tasks, fs-groups, fs-maps, fs-capnpc, fs-packages, fs-files, fs-messages, fs-broadcast, fs-draw - plus fs-modules-planning, fs-modules-person (no `release.yml` caller yet) and fs-starter, which are planned for tag releases);
 `--repos texts,packages` (program names, with or without `fs-`) overrides it. Per repository, in this order: (1) PUT the environment `release-signing` with the
 required reviewer (`REVIEWER`, a required argument or variable: there is no default; the login becomes a numeric id) and deployment only for named refs
 (creates a missing environment and hardens an existing unprotected one); (2) tag rule `v*` (listed first, never created twice); (3) `GPG_PRIVATE_KEY` and
@@ -246,24 +249,32 @@ confirmation: delete the repository secrets of the same names (an error in betwe
 secret names, repository secrets gone): any deviation ends with rc 1. `--repo-secrets` is the old mode (repository secrets), deprecated and unprotected,
 kept only on request.
 
+**`--env-only` (for organisation secrets):** `REVIEWER=<login> bash scripts/set-signing-secrets.sh --env-only [--repos ...] [--allow-self-review]` creates ONLY the environment `release-signing` (required reviewer,
+deployment only for tags) and the tag rule `v*` per repository: no key is exported, no secret is set or deleted, no gpg, no keys.openpgp.org, no delete question; the read-only check covers environment and tag rule only.
+Use it when the two secrets are ORGANISATION secrets (*Organization > Settings > Secrets and variables > Actions*, "Repository access" must include the repository). An organisation secret gives NO reviewer protection by itself;
+the protection comes only from the environment of each repository. Organisation secrets are the recommended way, `--env-only` plus an organisation secret is the protected combination. According to the GitHub documentation
+(not tried by us) a job with `environment:` gets environment, repository and organisation secrets, and with the same name the environment secret wins over the repository secret over the organisation secret.
+
 `prevent_self_review` is ON by default: the account that starts a run cannot approve it, so a second pair of eyes is real. The script compares the reviewer with the
 logged-in account by numeric id (logins are case-insensitive) and checks that the reviewer is a `User` (an organisation is refused, rc 2). `--ruleset-tags <repo>`
 creates (or updates) the ruleset "tags v* immutable": target `tag`, `refs/tags/v*`, rules `deletion`, `non_fast_forward` and `update` (a tag cannot be deleted or moved,
 not even to a successor commit; there is NO `creation` rule, so a new tag can still be created). It has no bypass actor: to remove a wrong tag, the owner must switch
 the ruleset off first.
 
-**Variant b (reviewer FreeSynergy = logged-in gh account = the account that pushes the tags): only with `--allow-self-review`.** Without it every run waits
-forever (the script refuses with rc 2, rightly). RISK: everyone who holds the FreeSynergy token (agents too) can give the approval; until the accounts are
+**Variant b (reviewer = your own logged-in gh account = the account that pushes the tags): only with `--allow-self-review`.** With `prevent_self_review` (the default) GitHub
+does not let the account that started a run approve it, so a run started by the reviewer itself would wait forever; the script therefore refuses this combination before it
+changes anything (rc 2, `set-signing-secrets.sh` "REVIEWER is the logged-in account"). `--allow-self-review` switches `prevent_self_review` off. (`FreeSynergy` as a login is NOT an
+example: `users/FreeSynergy` is an unrelated organisation, type `Organization`, and is refused as reviewer.) RISK: everyone who holds the token of this account (agents too) can give the approval; until the accounts are
 separated, the only technical protection is the tag rule `v*` (plus the ruleset with `update`). The protection stays ORGANISATIONAL, not technical: GitHub cannot tell
-who approves with the FreeSynergy token; the hard bar in the Claude Code settings (Claude and agents NEVER give a deployment or environment approval) only binds
+who approves with the token of this account; the hard bar in the Claude Code settings (Claude and agents NEVER give a deployment or environment approval) only binds
 Claude and agents and is no GitHub protection rule.
 
 **WARNING, unsigned draft (partly fixed):** in a TAG run `sign-files` now fails when the key is empty (and the early job `signing-check` stops the run before the builds); outside a tag run it still only warns (rc 0). If the environment secret does not arrive in the nested call
 (`release.yml` -> `_release-finalize.yml`), then after the repository secrets are deleted a draft is created silently unsigned. Check after the first test tag: the log of
 `finalize` shows "Signing key fingerprint" and NO line "NOT signed". Only then convert further repositories or delete repository secrets.
 
-Checklist before the first real run: (1) `REVIEWER=FreeSynergy bash scripts/set-signing-secrets.sh --env --allow-self-review --dry-run` and read it;
-(2) for real only `--repos texts`, answer `n` to the delete question (repository secrets stay, rc 1 expected); (3) test tag in fs-texts: the approval appears, the log shows
+Checklist before the first real run: (1) `REVIEWER=<your GitHub login> bash scripts/set-signing-secrets.sh --env --allow-self-review --dry-run` and read it;
+(2) for real the same command without `--dry-run` and with `--repos texts`: answer `y` to the target question ("Ziel: Organisation ..."), `n` to the delete question (repository secrets stay, rc 1 expected); (3) test tag in fs-texts: the approval appears, the log shows
 "Signing key fingerprint: ...372A583D..." without "NOT signed"; (4) then fs-texts again, answer `y`; (5) the rest of the list without `--yes`, the check output without DEVIATION.
 
 The signing job also checks that it runs for a tag (`github.ref_type == 'tag'`) and that the checkout is the commit of that tag (`git rev-parse HEAD` = `github.sha`).

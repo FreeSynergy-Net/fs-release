@@ -12,6 +12,8 @@
 #                     deployment only for named refs), (2) tag rule v* (listed first, never twice), (3) GPG_PRIVATE_KEY and GPG_PASSPHRASE as
 #                     environment secrets, (4) delete the same-named repository secrets, ONLY after both environment secrets were set and only
 #                     after confirmation (--yes, else a question per repository), (5) read-only check; any deviation = rc 1.
+#   --env-only        for organisation secrets: ONLY (1) the environment release-signing with required reviewer and (2) the tag rule v*; no signing key is
+#                     exported, no secret is set or deleted, no gpg, no keys.openpgp.org, no delete question. The check reads environment and tag rule only.
 #   --repo-secrets    old mode: repository secrets (deprecated, unprotected: any workflow of the repo can read them).
 # Options:
 #   --repos a,b       repositories (program names `texts` or `fs-texts`); default: the repositories that call release.yml. `all` = every non-archived fs-*.
@@ -28,7 +30,7 @@
 #   OUT_DIR (default /srv/FreeSynergy/.scratch/keys), OUT_OWNER (default kal:kal), FS_SIGN_TMP (private dir for the export, default /dev/shm).
 #   FS_ORG            the GitHub organisation (default FreeSynergy-Net, where our repositories are). Never `FreeSynergy` (a different organisation).
 # Needs: gpg, gh (logged in with YOUR account; it must be admin of the organisation, checked via orgs/$ORG/memberships/<you>), curl, jq.
-# Before every real write the line "Ziel: Organisation ..., Repositories: ..." is printed and confirmed (without --yes).
+# The line "Ziel: Organisation ..., Repositories: ..." is always printed (also in a dry run); before every real write it is confirmed (without --yes).
 # shellcheck disable=SC2034  # YES, REVIEWER_ID_JSON, PREVENT, DEV, MODE, DRY are read by signing_env_lib.sh
 set -euo pipefail
 set +x
@@ -39,17 +41,20 @@ PASSFILE=${PASSFILE:-$HOME/.config/freesynergy/release-passphrase}
 OUT_DIR=${OUT_DIR:-/srv/FreeSynergy/.scratch/keys}
 OUT_OWNER=${OUT_OWNER:-kal:kal}
 ORG=${FS_ORG:-FreeSynergy-Net}  # the GitHub organisation of our repositories; NOT the unrelated organisation `FreeSynergy`
-DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-capnpc fs-packages fs-files fs-modules-planning fs-modules-person fs-starter)  # the 9 callers of release.yml plus the 3 repositories planned for tag releases
+DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-capnpc fs-packages fs-files fs-messages fs-broadcast fs-draw fs-modules-planning fs-modules-person fs-starter)  # callers of release.yml: 9 old ones, fs-messages, fs-broadcast, fs-draw (checked 25.11.), plus fs-modules-planning, fs-modules-person (no caller yet) and fs-starter, planned for tag releases
 
 die() { echo "error: $*" >&2; exit 1; }
-usage() { echo "error: $*" >&2; echo "usage: REVIEWER=<login> $0 [--env|--repo-secrets] [--repos a,b] [--allow-self-review] [--yes] [--ruleset-tags <repo>] [--dry-run]" >&2; exit 2; }
+usage() { echo "error: $*" >&2; echo "usage: REVIEWER=<login> $0 [--env|--env-only|--repo-secrets] [--repos a,b] [--allow-self-review] [--yes] [--ruleset-tags <repo>] [--dry-run]" >&2; exit 2; }
+
+[[ "$ORG" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]] || usage "FS_ORG '$ORG' is not a GitHub organisation name"
+[ "${ORG,,}" != freesynergy ] || usage "FS_ORG 'FreeSynergy' is the unrelated foreign organisation; our repositories are in FreeSynergy-Net"
 
 whoid="" ans="" role="" tgt=() rinfo="" rid="" rtype="" MODE="" DRY=0 YES=0 PREVENT=true RULESET_REPO="" REPOS_ARG="" REVIEWER=${REVIEWER:-} DEV=0
 REPOS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --env | --repo-secrets)
-      [ -z "$MODE" ] || [ "$MODE" = "${1#--}" ] || usage "--env and --repo-secrets exclude each other"
+    --env | --env-only | --repo-secrets)
+      [ -z "$MODE" ] || [ "$MODE" = "${1#--}" ] || usage "--env, --env-only and --repo-secrets exclude each other"
       MODE=${1#--} ;;
     --repos) [ $# -ge 2 ] || usage "--repos needs a list"; REPOS_ARG=$2; shift ;;
     --reviewer) [ $# -ge 2 ] || usage "--reviewer needs a login"; REVIEWER=$2; shift ;;
@@ -57,7 +62,7 @@ while [ $# -gt 0 ]; do
     --allow-self-review) PREVENT=false ;;
     --yes) YES=1 ;;
     --dry-run) DRY=1 ;;
-    -h | --help) sed -n "2,32p" "$0"; exit 0 ;;
+    -h | --help) sed -n "2,33p" "$0"; exit 0 ;;
     -*) usage "unknown option $1" ;;
     *) REPOS_ARG=${REPOS_ARG:+$REPOS_ARG,}$1 ;;
   esac
@@ -69,10 +74,11 @@ norm() { local n=${1#fs-}; [[ "$n" =~ ^[a-z0-9][a-z0-9-]*$ ]] || usage "bad repo
 DO_SECRETS=1
 if [ -n "$RULESET_REPO" ] && [ -z "$REPOS_ARG" ] && [ -z "$MODE" ]; then DO_SECRETS=0; fi
 MODE=${MODE:-env}
+KEYS=1; [ "$MODE" != env-only ] || KEYS=0   # KEYS=1: the signing key is exported and secrets are set/deleted (never with --env-only)
 RULESET_REPO=${RULESET_REPO:+$(norm "$RULESET_REPO")}
 
 if [ "$DO_SECRETS" = 1 ]; then
-  if [ "$MODE" = env ]; then
+  if [ "$MODE" = env ] || [ "$MODE" = env-only ]; then
     [ -n "$REVIEWER" ] || usage "REVIEWER (login of the approving account) is required for --env; there is no default"
     [[ "$REVIEWER" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || usage "REVIEWER '$REVIEWER' is not a GitHub login"
   else
@@ -93,17 +99,18 @@ if [ "$DRY" = 0 ]; then
   for tool in gh curl; do command -v "$tool" >/dev/null || die "$tool is needed"; done
   who=$(gh api user --jq .login </dev/null) || die "gh is not logged in (gh auth login)"
   whoid=$(gh api user --jq .id </dev/null) || die "cannot read the id of the logged-in account"
-  role=$(gh api "orgs/$ORG/memberships/$who" --jq .role </dev/null 2>/dev/null) \
+  role=$(gh api "orgs/$ORG/memberships/$who" --jq '"\(.role) \(.state)"' </dev/null 2>/dev/null) \
     || die "'$who' is not a member of the organisation '$ORG' (or gh may not read it); log in with an account that is admin of '$ORG' (gh auth switch)"
-  [ "$role" = admin ] || die "'$who' has the role '$role' in '$ORG', but the role admin is required"
-  tgt=("${REPOS[@]}"); [ -z "$RULESET_REPO" ] || tgt+=("$RULESET_REPO")
-  if [ "$REPOS_ARG" = all ]; then tgt=("(every non-archived fs-* repository)"); fi
-  echo "Ziel: Organisation $ORG, Repositories: ${tgt[*]}" >&2
-  if [ "$YES" != 1 ]; then
-    printf 'Write to the organisation %s as shown above? [y/N] ' "$ORG" >&2
-    read -r ans || ans=n
-    [ "$ans" = y ] || [ "$ans" = Y ] || die "not confirmed; nothing was changed"
-  fi
+  [ "${role% *}" = admin ] || die "'$who' has the role '${role% *}' in '$ORG', but the role admin is required"
+  [ "${role#* }" = active ] || die "the membership of '$who' in '$ORG' is '${role#* }' (an invitation must be accepted first); state active is required"
+fi
+tgt=("${REPOS[@]}"); [ -z "$RULESET_REPO" ] || tgt+=("$RULESET_REPO")
+if [ "$REPOS_ARG" = all ]; then tgt=("(every non-archived fs-* repository)"); fi
+echo "Ziel: Organisation $ORG, Repositories: ${tgt[*]}" >&2
+if [ "$DRY" = 0 ] && [ "$YES" != 1 ]; then
+  printf 'Write to the organisation %s as shown above? [y/N] ' "$ORG" >&2
+  read -r ans || ans=n
+  [ "$ans" = y ] || [ "$ans" = Y ] || die "not confirmed; nothing was changed"
 fi
 
 TMP=$(mktemp -d "${FS_SIGN_TMP:-/dev/shm}/fs-sign.XXXXXX") || die "no private temp dir"
@@ -114,7 +121,7 @@ trap 'for f in sub.asc body out err names; do shred -u "$TMP/$f" 2>/dev/null || 
 . "$(dirname "${BASH_SOURCE[0]}")/signing_env_lib.sh"
 
 REVIEWER_ID_JSON='"<id of the reviewer>"'
-if [ "$DO_SECRETS" = 1 ] && [ "$MODE" = env ] && [ "$DRY" = 0 ]; then
+if [ "$DO_SECRETS" = 1 ] && [ "$MODE" != repo-secrets ] && [ "$DRY" = 0 ]; then
   rinfo=$(gh api "users/$REVIEWER" --jq '"\(.id) \(.type)"' </dev/null 2>"$TMP/err") || { explain "user $REVIEWER"; exit 1; }
   rid=${rinfo%% *} rtype=${rinfo#* }
   [[ "$rid" =~ ^[0-9]+$ ]] || die "no numeric id for $REVIEWER"
@@ -124,11 +131,16 @@ if [ "$DO_SECRETS" = 1 ] && [ "$MODE" = env ] && [ "$DRY" = 0 ]; then
     usage "REVIEWER is the logged-in account '$who': with prevent_self_review the run that account starts could never be approved; use another account or --allow-self-review"
   fi
   REVIEWER_ID_JSON=$rid
-elif [ "$DO_SECRETS" = 1 ] && [ "$MODE" = env ]; then
+elif [ "$DO_SECRETS" = 1 ] && [ "$MODE" != repo-secrets ]; then
   REVIEWER_ID_JSON=$(jq -nc --arg r "$REVIEWER" '"<id of \($r)>"')
 fi
 
-if [ "$DO_SECRETS" = 1 ] && [ "$DRY" = 0 ]; then
+if [ "$DO_SECRETS" = 1 ] && [ "$DRY" = 0 ] && [ "$REPOS_ARG" = all ]; then
+  mapfile -t REPOS < <(gh repo list "$ORG" --limit 200 --json name,isArchived </dev/null \
+    -q '.[] | select(.isArchived|not) | .name' | grep '^fs-' | grep -v -- '-archive$')
+fi
+
+if [ "$DO_SECRETS" = 1 ] && [ "$KEYS" = 1 ] && [ "$DRY" = 0 ]; then
   command -v gpg >/dev/null || die "gpg is needed"
   [ -f "$PASSFILE" ] || die "passphrase file $PASSFILE not found"
   [ "$(stat -c %a "$PASSFILE")" = 600 ] || die "$PASSFILE must have mode 600 (chmod 600 $PASSFILE)"
@@ -151,16 +163,14 @@ if [ "$DO_SECRETS" = 1 ] && [ "$DRY" = 0 ]; then
   echo "signing subkey: $SUB"
   "${GPGP[@]}" --armor --export-secret-subkeys "${SUB}!" >"$TMP/sub.asc"
   grep -q "BEGIN PGP PRIVATE KEY BLOCK" "$TMP/sub.asc" || die "export of the subkey failed"
-  if [ "$REPOS_ARG" = all ]; then
-    mapfile -t REPOS < <(gh repo list "$ORG" --limit 200 --json name,isArchived </dev/null \
-      -q '.[] | select(.isArchived|not) | .name' | grep '^fs-' | grep -v -- '-archive$')
-  fi
 fi
 
 FAILED=0
 if [ "$DO_SECRETS" = 1 ]; then
   for r in "${REPOS[@]}"; do
-    if [ "$MODE" = env ]; then
+    if [ "$MODE" = env-only ]; then
+      env_only_run "$r" || FAILED=$((FAILED + 1))
+    elif [ "$MODE" = env ]; then
       env_run "$r" || FAILED=$((FAILED + 1))
     else
       GH_IN=$TMP/sub.asc gh_do "<redacted: signing subkey file>" secret set GPG_PRIVATE_KEY -R "$ORG/$r" || { explain "$r: GPG_PRIVATE_KEY"; FAILED=$((FAILED + 1)); continue; }
@@ -178,7 +188,7 @@ if [ "$DO_SECRETS" = 1 ]; then
   for r in "${REPOS[@]}"; do verify_repo "$r"; done
 fi
 
-if [ "$DO_SECRETS" = 1 ] && [ "$DRY" = 0 ]; then
+if [ "$DO_SECRETS" = 1 ] && [ "$KEYS" = 1 ] && [ "$DRY" = 0 ]; then
   mkdir -p "$OUT_DIR"
   gpg --armor --export "$PRIMARY" >"$OUT_DIR/release-signing-key.asc"
   echo "$SUB" >"$OUT_DIR/signing-subkey-fingerprint.txt"
