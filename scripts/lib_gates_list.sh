@@ -155,13 +155,21 @@ gates_land_steps() {
   done
 }
 
-# gates_data_repo_files <root>: the files that make a repo a Rust repo: any Cargo.toml (any case, any depth), any Cargo.lock, any *.rs (build.rs, lib.rs, tests/ ...), tracked or untracked-not-ignored.
-gates_rust_files() { git -C "$1" ls-files -co --exclude-standard | grep -iE '(^|/)cargo\.(toml|lock)$|\.rs$' || true; }
+# gates_rust_files <root>: the files that make a repo a Rust repo: any Cargo.toml (any case), any Cargo.lock, any *.rs (build.rs, lib.rs, tests/ ...), tracked or untracked-not-ignored; one name per line.
+# The list is read with `-z` (git quotes names with umlauts or tabs otherwise and `$` would not match). rc 0 = listed (output may be empty), rc 2 = git or grep FAILED: never "no files" (only grep rc 1 = no match is fine).
+gates_rust_files() {
+  local t rc=0
+  t="$(mktemp "${TMPDIR:-/tmp}/gates-rs.XXXXXX")" || return 2
+  git -C "$1" ls-files -z -co --exclude-standard >"$t" || rc=2
+  if [ "$rc" = 0 ]; then { grep -ziE '(^|/)cargo\.(toml|lock)$|\.rs$' "$t" || [ $? -eq 1 ]; } | tr '\0' '\n' || rc=2; fi
+  rm -f "$t"
+  return "$rc"
+}
 # gates_data_mode_check <root>: step `daten-modus` of gates.sh, run when there is a scaffold.toml but no Cargo.toml in the root. Green ONLY for a pure data repo (NO Cargo.toml/Cargo.lock/*.rs anywhere in the
 # file list): it then says out loud which gates do not run (`gates-skipped:` lines are copied into the Beleg as "lokal NICHT gelaufen"). A Rust repo that lost or hid its manifest is red.
 gates_data_mode_check() {
   local root="$1" what found
-  found="$(gates_rust_files "$root")"
+  found="$(gates_rust_files "$root")" || { echo "gates FAILED: the file list of $root could not be read (git ls-files), so the repo kind is unknown" >&2; return 1; }
   if [ -z "$found" ]; then
     echo "gates: Cargo-Gates entfallen (kind data: scaffold.toml, kein Cargo.toml, kein Cargo.lock, keine .rs-Datei)"
     for what in fmt clippy test doctest licence msrv clippy-windows; do echo "gates-skipped: $what (Cargo-Gate, kind data: kein Cargo.toml)"; done

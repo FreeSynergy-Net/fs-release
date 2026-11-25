@@ -70,6 +70,9 @@ hide build-rs-and-tests build.rs tests/a.rs
 hide lowercase-manifest cargo.toml
 hide lock-in-subfolder sub/Cargo.lock
 hide uppercase-ext sub/X.rs
+hide umlaut-dir "ü/Cargo.toml" "ü/src/main.rs"
+hide umlaut-lib "ä/lib.rs"
+hide tab-in-name "$(printf 'a\tb.rs')"
 datarepo "$tmp/h-untracked"; echo x >"$tmp/h-untracked/lib.rs"; run "$tmp/h-untracked"; rc=$?
 chk "hidden Rust (untracked, not ignored lib.rs): rc 1" bash -c "[ $rc -eq 1 ] && grep -q '^gate daten-modus: rc=1' '$tmp/o.txt'"
 datarepo "$tmp/h-doc"; mkdir -p "$tmp/h-doc/docs"; echo "fn main() {}" >"$tmp/h-doc/docs/readme.md"; commit "$tmp/h-doc"; run "$tmp/h-doc"; rc=$?
@@ -94,13 +97,25 @@ mutant() { # <name> <sed -E expression>
 mutant "data mode never entered" 's/data_mode=1; fi/true; fi/'
 mutant "no announcement step" 's/^    step daten-modus error gates_data_mode_check "\$root"$/    true/'
 mutant_hide() { # the detection looks only at the root: the sub-crate case must turn red (the mutant run is green = it survives)
-  sed -E "s/^gates_rust_files\(\) \{.*/gates_rust_files() { ls \"\$1\" | grep -iE '^cargo\\.(toml|lock)\$|\\.rs\$' || true; }/" "$here/lib_gates_list.sh" >"$tmp/ml.sh"
+  sed -E '/^gates_rust_files\(\) \{$/,/^\}$/c\
+gates_rust_files() { ls "$1" | grep -iE "^cargo\\.(toml|lock)\$|\\.rs\$" || true; }' "$here/lib_gates_list.sh" >"$tmp/ml.sh"
   if cmp -s "$tmp/ml.sh" "$here/lib_gates_list.sh"; then bad "mutant 'detection root only' changed nothing (NOT APPLIED)"; return; fi
   local m="$tmp/mutl"; datarepo "$m"; cp "$tmp/ml.sh" "$m/scripts/lib_gates_list.sh"; mkdir -p "$m/sub/src"; printf '[package]\nname = "x"\nversion = "0.1.0"\n' >"$m/sub/Cargo.toml"; printf "//! Pattern: none (test).\\nfn main() {}\\n" >"$m/sub/src/main.rs"; commit "$m"
   run "$m"; rc=$?
   if [ "$rc" -eq 0 ]; then ok "mutant 'detection root only' lets the sub-crate case through (the real case above is red)"; else bad "mutant 'detection root only' SURVIVES (still red)"; fi
 }
 mutant_hide
+mutant_noz() { # git without -z quotes umlaut/tab names: the umlaut case must go through (green = survives; the real case above is red)
+  sed -E 's/ls-files -z -co/ls-files -co/; s/grep -ziE/grep -iE/' "$here/lib_gates_list.sh" >"$tmp/mz.sh"
+  if cmp -s "$tmp/mz.sh" "$here/lib_gates_list.sh"; then bad "mutant 'without -z' changed nothing (NOT APPLIED)"; return; fi
+  local m="$tmp/mutz"; datarepo "$m"; cp "$tmp/mz.sh" "$m/scripts/lib_gates_list.sh"; mkdir -p "$m/ä"; printf '//! Pattern: none (test).\n' >"$m/ä/lib.rs"; commit "$m"
+  run "$m"; rc=$?
+  if [ "$rc" -eq 0 ]; then ok "mutant 'without -z' lets the umlaut case through (the real case above is red)"; else bad "mutant 'without -z' SURVIVES (still red)"; fi
+}
+mutant_noz
+# K4: a failing git must not look like "no Rust files": a repo whose git cannot list (broken index) is red, never data mode
+g="$tmp/gitfail"; datarepo "$g"; printf 'garbage' >"$g/.git/index"; run "$g"; rc=$?
+chk "git ls-files fails: not data mode, rc 1 (never green)" bash -c "[ $rc -ne 0 ] && ! grep -q 'Cargo-Gates entfallen' '$tmp/o.txt'"
 mutant "fmt not guarded" 's/^  if \[ -z "\$data_mode" \]; then$/  if true; then/'
 echo
 if [ "$fails" = 0 ]; then echo "test_gates_data_mode: all ok"; else echo "test_gates_data_mode: $fails failures"; exit 1; fi

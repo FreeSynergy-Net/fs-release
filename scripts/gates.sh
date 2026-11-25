@@ -193,7 +193,7 @@ else
   data_mode=""
   if [ ! -f Cargo.toml ] && [ -f scaffold.toml ]; then
     step daten-modus error gates_data_mode_check "$root"
-    if [ -z "$(gates_rust_files "$root")" ]; then data_mode=1; fi
+    if found_rs="$(gates_rust_files "$root")" && [ -z "$found_rs" ]; then data_mode=1; fi # a failed listing (rc 2) is never data mode
   fi
   if [ -z "$data_mode" ]; then
   step fmt style cargo fmt --check
