@@ -156,12 +156,23 @@ gates_land_steps() {
 }
 
 # gates_rust_files <root>: the files that make a repo a Rust repo: any Cargo.toml (any case), any Cargo.lock, any *.rs (build.rs, lib.rs, tests/ ...), tracked or untracked-not-ignored; one name per line.
-# The list is read with `-z` (git quotes names with umlauts or tabs otherwise and `$` would not match). rc 0 = listed (output may be empty), rc 2 = git or grep FAILED: never "no files" (only grep rc 1 = no match is fine).
+# The list is read with `-z` (git quotes names with umlauts or tabs otherwise); grep runs as `LC_ALL=C grep -a` (a name that is not valid UTF-8 makes GNU grep call the list binary under a UTF-8 locale: empty output, rc 0).
+# A symlink to a directory that lies outside the repo hides its content from git: listed as `symlink-outside: <path>`. rc 0 = listed (output may be empty), rc 2 = git, grep, find or mktemp FAILED:
+# never "no files" (only grep rc 1 = no match is fine). pipefail is set INSIDE (a subshell), the function does not rely on the caller.
 gates_rust_files() {
-  local t rc=0
-  t="$(mktemp "${TMPDIR:-/tmp}/gates-rs.XXXXXX")" || return 2
+  local t rc=0 base="${TMPDIR:-/tmp}" l r
+  [ -d "$base" ] || base=/tmp
+  t="$(mktemp "$base/gates-rs.XXXXXX")" || return 2
   git -C "$1" ls-files -z -co --exclude-standard >"$t" || rc=2
-  if [ "$rc" = 0 ]; then { grep -ziE '(^|/)cargo\.(toml|lock)$|\.rs$' "$t" || [ $? -eq 1 ]; } | tr '\0' '\n' || rc=2; fi
+  if [ "$rc" = 0 ]; then
+    ( set -o pipefail; { LC_ALL=C grep -zaiE '(^|/)cargo\.(toml|lock)$|\.rs$' "$t" || [ $? -eq 1 ]; } | tr '\0' '\n' ) || rc=2
+  fi
+  if [ "$rc" = 0 ]; then
+    r="$(cd "$1" && pwd -P)" || rc=2
+    while IFS= read -r -d '' l; do
+      case "$(realpath -- "$1/$l" 2>/dev/null || echo "$r/missing")/" in "$r"/*) ;; *) printf 'symlink-outside: %s\n' "$l" ;; esac
+    done < <(cd "$1" && find . -path ./.git -prune -o -type l -xtype d -print0) || rc=2
+  fi
   rm -f "$t"
   return "$rc"
 }

@@ -29,7 +29,7 @@ mkrepo() {
 }
 commit() { git -C "$1" add -A; git -C "$1" commit -qm one; git -C "$1" config --local freesynergy.identity-test-base HEAD; }
 datarepo() { mkrepo "$1" "${2:-}"; printf 'schema = 2\n\n[program]\nname = "leer"\nversion = "0.0.1"\n' >"$1/scaffold.toml"; commit "$1"; }
-run() { : >"$STUBLOG"; env PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/lists" bash "$1/scripts/gates.sh" "$1" >"$tmp/o.txt" 2>&1; }
+run() { : >"$STUBLOG"; env LC_ALL=C.UTF-8 PATH="$tmp/bin:$PATH" CI=true FS_GATES_FEHLERLISTE_DIR="$tmp/lists" bash "$1/scripts/gates.sh" "$1" >"$tmp/o.txt" 2>&1; }
 
 # 1. a pure data repo: green, says so, cargo never called
 d="$tmp/data"; datarepo "$d"; run "$d"; rc=$?
@@ -60,7 +60,7 @@ chk "lost manifest (crates/): gates rc 1" [ "$rc" -eq 1 ]
 # 3c. ways around the data mode (review M1): a scaffold.toml repo that hides Rust code or a manifest must be red, the Cargo gates must run
 hide() { # <name> <file> [<file>...]: scaffold.toml + the files, committed (untracked case below)
   local name="$1" f; shift
-  datarepo "$tmp/h-$name"; for f in "$@"; do mkdir -p "$tmp/h-$name/$(dirname "$f")"; echo "x" >"$tmp/h-$name/$f"; done; commit "$tmp/h-$name"
+  datarepo "$tmp/h-$name"; for f in "$@"; do mkdir -p "$tmp/h-$name/$(dirname -- "$f")"; echo "x" >"$tmp/h-$name/./$f"; done; commit "$tmp/h-$name"
   run "$tmp/h-$name"; rc=$?
   chk "hidden Rust ($name): gates rc 1, daten-modus red, fmt ran, no 'entfallen'" bash -c "[ $rc -eq 1 ] && grep -q '^gate daten-modus: rc=1' '$tmp/o.txt' && grep -q '^gate fmt: ' '$tmp/o.txt' && ! grep -q 'Cargo-Gates entfallen' '$tmp/o.txt'"
 }
@@ -72,11 +72,48 @@ hide lock-in-subfolder sub/Cargo.lock
 hide uppercase-ext sub/X.rs
 hide umlaut-dir "ü/Cargo.toml" "ü/src/main.rs"
 hide umlaut-lib "ä/lib.rs"
+hide invalid-utf8-name "$(printf 'q\377/lib.rs')"
+hide upper-RS sub/x.RS
+hide dash-name -lib.rs
+hide long-path "$(printf 'd%.0s' $(seq 1 200))/$(printf 'e%.0s' $(seq 1 200))/lib.rs"
 hide tab-in-name "$(printf 'a\tb.rs')"
 datarepo "$tmp/h-untracked"; echo x >"$tmp/h-untracked/lib.rs"; run "$tmp/h-untracked"; rc=$?
 chk "hidden Rust (untracked, not ignored lib.rs): rc 1" bash -c "[ $rc -eq 1 ] && grep -q '^gate daten-modus: rc=1' '$tmp/o.txt'"
 datarepo "$tmp/h-doc"; mkdir -p "$tmp/h-doc/docs"; echo "fn main() {}" >"$tmp/h-doc/docs/readme.md"; commit "$tmp/h-doc"; run "$tmp/h-doc"; rc=$?
 chk "a .md or other text with Rust inside is no Rust file: data mode stays green" [ "$rc" -eq 0 ]
+
+# 3d. symlinks: to a directory OUTSIDE the repo (its Rust code is invisible to git) = red; to a directory inside = green (its files are listed anyway)
+mkdir -p "$tmp/outside/crate"; printf '[package]\nname = "x"\nversion = "0.1.0"\n' >"$tmp/outside/crate/Cargo.toml"
+datarepo "$tmp/sl"; ln -s ../outside/crate "$tmp/sl/linked"; commit "$tmp/sl"; run "$tmp/sl"; rc=$?
+chk "symlink to a directory outside the repo: rc 1, daten-modus red, says symlink-outside" bash -c "[ $rc -eq 1 ] && grep -q '^gate daten-modus: rc=1' '$tmp/o.txt' && grep -q 'symlink-outside' '$tmp/o.txt'"
+datarepo "$tmp/sl2"; mkdir "$tmp/sl2/docs"; ln -s docs "$tmp/sl2/doclink"; commit "$tmp/sl2"; run "$tmp/sl2"; rc=$?
+chk "symlink to a directory inside the repo: data mode stays green" [ "$rc" -eq 0 ]
+
+# 3e. the function itself, called from a shell WITHOUT pipefail, with a git or grep that fails: rc 2, never an empty list with rc 0 (K7, K8)
+mkdir -p "$tmp/stub-git" "$tmp/stub-grep"
+realgit="$(command -v git)"; realgrep="$(command -v grep)"
+printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = ls-files ] && exit 1; done\nexec %s "$@"\n' "$realgit" >"$tmp/stub-git/git"
+printf '#!/usr/bin/env bash\ncase "$*" in *-zaiE*) exit 2 ;; esac\nexec %s "$@"\n' "$realgrep" >"$tmp/stub-grep/grep"
+chmod +x "$tmp/stub-git/git" "$tmp/stub-grep/grep"
+fn_rc() { # <lib file> <stub dir>: rc of gates_rust_files on the data repo, in a plain bash (no pipefail); prints "rc=<n> out=<bytes>"
+  env PATH="$2:$PATH" bash -c 'source "$1"; o="$(gates_rust_files "$2")"; echo "rc=$? out=${#o}"' _ "$1" "$datar" 2>/dev/null
+}
+datar="$tmp/fnrepo"; datarepo "$datar"
+chk "function: a real git lists the data repo: rc=0 out=0" [ "$(fn_rc "$here/lib_gates_list.sh" "$tmp/none")" = "rc=0 out=0" ]
+chk "function: git ls-files fails: rc 2" [ "$(fn_rc "$here/lib_gates_list.sh" "$tmp/stub-git")" = "rc=2 out=0" ]
+chk "function: grep fails (rc 2), the caller has no pipefail: rc 2" [ "$(fn_rc "$here/lib_gates_list.sh" "$tmp/stub-grep")" = "rc=2 out=0" ]
+mfn() { # <name> <sed -E expr> <stub dir> <what survives>: the mutated library must give rc 0 where the real one gives rc 2
+  sed -E "$2" "$here/lib_gates_list.sh" >"$tmp/mf.sh"
+  if cmp -s "$tmp/mf.sh" "$here/lib_gates_list.sh"; then bad "mutant '$1' changed nothing (NOT APPLIED)"; return; fi
+  if [ "$(fn_rc "$tmp/mf.sh" "$3")" = "rc=0 out=0" ]; then ok "mutant '$1' lets the failure through (the real function gives rc 2)"; else bad "mutant '$1' SURVIVES (still rc 2)"; fi
+}
+mfn "git failure not checked" 's/ls-files -z -co --exclude-standard >"\$t" \|\| rc=2/ls-files -z -co --exclude-standard >"$t" || true/' "$tmp/stub-git"
+mfn "pipefail not set inside" 's/\( set -o pipefail; /( /' "$tmp/stub-grep"
+# the invalid UTF-8 mutant: without LC_ALL=C and -a the binary-file rule hides the name (tested on a real repo under C.UTF-8)
+sed -E "s/LC_ALL=C grep -zaiE/grep -ziE/" "$here/lib_gates_list.sh" >"$tmp/mu.sh"
+cmp -s "$tmp/mu.sh" "$here/lib_gates_list.sh" && bad "mutant 'no -a / LC_ALL=C' changed nothing (NOT APPLIED)"
+m="$tmp/mutu"; datarepo "$m"; cp "$tmp/mu.sh" "$m/scripts/lib_gates_list.sh"; mkdir -p "$m/$(printf 'q\377')"; printf '//! Pattern: none (test).\n' >"$m/$(printf 'q\377/lib.rs')"; commit "$m"; run "$m"; rc=$?
+if [ "$rc" -eq 0 ]; then ok "mutant 'no -a / LC_ALL=C' lets the invalid UTF-8 name through (the real case above is red)"; else bad "mutant 'no -a / LC_ALL=C' SURVIVES (still red)"; fi
 
 # 4. neither scaffold.toml nor Cargo.toml: unchanged behaviour, the Cargo gates run (red by themselves with the real cargo)
 n="$tmp/neither"; mkrepo "$n"; echo x >"$n/a.txt"; commit "$n"; run "$n"
