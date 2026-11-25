@@ -4,14 +4,22 @@
 # 3. write SHA256SUMS.txt (by the caller step), 4. detached ASCII-armoured .asc for every file.
 # Key ring and passphrase live in a private temp dir/file that a trap removes at the end of THIS call (the action calls
 # it once per mode, each call imports the key again). Test: tests/packaging/sign.sh.
-# Usage: sign.sh packages|detached DIR
+# Usage: sign.sh packages|detached DIR   or   sign.sh check   (only proves that the key is set; the early job signing-check)
+# Missing key: an ERROR in a tag run (GITHUB_REF_TYPE=tag) and in mode check, because a release without a signature must not be built or drafted
+# (publish would stay red anyway); only a non-tag run (probe, branch) warns and goes on unsigned.
 set -euo pipefail
-mode=$1 dir=$2
+mode=${1:-} dir=${2:-}
 
 if [[ -z "${GPG_PRIVATE_KEY:-}" ]]; then
-  echo "::warning::GPG_PRIVATE_KEY is not set - artefacts are NOT signed (see docs/signing.md)"
+  if [[ "$mode" == check || "${GITHUB_REF_TYPE:-}" == tag ]]; then
+    echo "::error::Secrets fehlen fuer dieses Repo/diese Organisation: GPG_PRIVATE_KEY, GPG_PASSPHRASE (siehe docs/signing.md)"
+    exit 1
+  fi
+  echo "::warning::GPG_PRIVATE_KEY is not set - artefacts are NOT signed (see docs/signing.md; a tag run would fail here)"
   exit 0
 fi
+[[ "$mode" == check ]] && { echo "signing-check: GPG_PRIVATE_KEY is set (value not shown, not checked further)"; exit 0; }
+[[ -n "$dir" ]] || { echo "usage: sign.sh packages|detached DIR | check" >&2; exit 2; }
 
 # Own, private files only (0700 dir, 0600 passphrase file), removed on EVERY exit (also on error): later steps of the
 # job must not find the key ring or the passphrase in RUNNER_TEMP. Only these two paths are touched, no globs.

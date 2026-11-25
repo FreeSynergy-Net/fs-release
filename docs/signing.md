@@ -32,15 +32,19 @@ revocation certificate, publish it, remove the secrets from GitHub, generate a n
 
 ## Give it to GitHub
 
-Organisation level (recommended, one place for all repos): *Settings > Secrets and variables > Actions*
+The target state is **environment secrets** of the GitHub environment `release-signing` in EACH repository that releases (the environment holds the required
+reviewer, so nobody signs unseen; `docs/usage.md`, "Approval for the signing job"). Set it up with `scripts/set-signing-secrets.sh --env --dry-run` first (read it),
+then for real: *Settings > Environments > release-signing > Environment secrets*:
 
 | Secret | Content |
 |--------|---------|
 | `GPG_PRIVATE_KEY` | full text of `FreeSynergy-release-secret.asc` |
 | `GPG_PASSPHRASE` | the passphrase (empty is allowed but discouraged) |
 
-Limit the secrets to the repositories that release. The caller workflows pass them explicitly; fs-release only uses
-them in the `finalize` job, never in jobs that run build scripts of the app.
+Repository or organisation secrets (*Settings > Secrets and variables > Actions*) are the older way and are not protected by a reviewer. Whether GitHub makes them
+visible inside a job with `environment:` was not checked, so this guide does not rely on it. A tag run without a key fails early (job `signing-check`) with
+"Secrets fehlen fuer dieses Repo/diese Organisation: GPG_PRIVATE_KEY, GPG_PASSPHRASE". The caller workflows pass the secrets explicitly; fs-release only uses
+them in the `signing-check` and `finalize` jobs, never in jobs that run build scripts of the app.
 (A dedicated signing subkey that is exported without the primary key is an option for later: `gpg --export-secret-subkeys`.)
 
 ## Publish the public key

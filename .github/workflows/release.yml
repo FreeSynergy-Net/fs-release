@@ -1,4 +1,4 @@
-# Reusable release pipeline: plan -> platform jobs -> signed, attested draft -> Pre-release (fs-catalog pulls it from there). Usage: docs/usage.md
+# Reusable release pipeline: plan -> signing-check (tag runs: no key, no build) -> platform jobs -> signed, attested draft -> Pre-release (fs-catalog pulls it from there). Usage: docs/usage.md
 # LIBRARY MODE: with `kind: library` and an empty `binaries` (pure library, no packages; an empty `binaries` WITHOUT `kind: library` is still an error) the plan carries `library: true`, every platform job, `finalize` (SBOM,
 # signatures, checksums, provenance) and `publish` are skipped, and the job `library` creates the Pre-release whose notes are the CHANGELOG section
 # of the tag version. The plan fails unless tag = Cargo workspace version = non-empty CHANGELOG section. No artefacts, so no binary packages and no
@@ -76,9 +76,18 @@ jobs:
           windows-formats: ${{ inputs.windows-formats }}
           macos-formats: ${{ inputs.macos-formats }}
 
-  linux:
+  # Early proof of the signing secrets (tag runs only, not in library mode): no build, no draft when the signature is impossible anyway (docs/signing.md).
+  signing-check:
     needs: plan
-    if: fromJSON(needs.plan.outputs.plan).has_linux
+    if: ${{ github.ref_type == 'tag' && !fromJSON(needs.plan.outputs.plan).library }}
+    uses: FreeSynergy-Net/fs-release/.github/workflows/_release-signing-check.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
+    secrets:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+  linux:
+    needs: [plan, signing-check]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && fromJSON(needs.plan.outputs.plan).has_linux }}
     uses: FreeSynergy-Net/fs-release/.github/workflows/_release-linux.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
     with:
       plan: ${{ needs.plan.outputs.plan }}
@@ -87,8 +96,8 @@ jobs:
       smoke-args: ${{ inputs.smoke-args }}
 
   windows:
-    needs: plan
-    if: fromJSON(needs.plan.outputs.plan).has_windows
+    needs: [plan, signing-check]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && fromJSON(needs.plan.outputs.plan).has_windows }}
     uses: FreeSynergy-Net/fs-release/.github/workflows/_release-windows.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
     with:
       plan: ${{ needs.plan.outputs.plan }}
@@ -96,15 +105,15 @@ jobs:
       smoke-args: ${{ inputs.smoke-args }}
 
   macos:
-    needs: plan
-    if: fromJSON(needs.plan.outputs.plan).has_macos
+    needs: [plan, signing-check]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && fromJSON(needs.plan.outputs.plan).has_macos }}
     uses: FreeSynergy-Net/fs-release/.github/workflows/_release-macos.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
     with:
       plan: ${{ needs.plan.outputs.plan }}
 
   flatpak:
-    needs: plan
-    if: inputs.flatpak && !fromJSON(needs.plan.outputs.plan).library
+    needs: [plan, signing-check]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && inputs.flatpak && !fromJSON(needs.plan.outputs.plan).library }}
     uses: FreeSynergy-Net/fs-release/.github/workflows/_release-flatpak.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
     with:
       plan: ${{ needs.plan.outputs.plan }}
@@ -124,8 +133,8 @@ jobs:
       push: ${{ inputs.container-push }}
 
   mobile:
-    needs: plan
-    if: (inputs.android || inputs.ios) && !fromJSON(needs.plan.outputs.plan).library
+    needs: [plan, signing-check]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.signing-check.result != 'failure' && (inputs.android || inputs.ios) && !fromJSON(needs.plan.outputs.plan).library }}
     uses: FreeSynergy-Net/fs-release/.github/workflows/_release-mobile.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
     with:
       plan: ${{ needs.plan.outputs.plan }}
@@ -133,7 +142,7 @@ jobs:
       ios: ${{ inputs.ios }}
 
   finalize:
-    needs: [plan, linux, windows, macos, flatpak, container, mobile]
+    needs: [plan, signing-check, linux, windows, macos, flatpak, container, mobile]
     if: ${{ !cancelled() && needs.plan.result == 'success' && !fromJSON(needs.plan.outputs.plan).library && !contains(needs.*.result, 'failure') }}
     uses: FreeSynergy-Net/fs-release/.github/workflows/_release-finalize.yml@a509bb16828cdeac9aba107553b39cf6d97d33b9
     permissions:

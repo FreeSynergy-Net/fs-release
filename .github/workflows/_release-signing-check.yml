@@ -1,0 +1,29 @@
+# Internal: the early proof that the signing secrets arrive, BEFORE anything is built. Same position as the signing job (_release-finalize.yml): the same
+# reusable-workflow level, the same `environment: release-signing`, the same way the secrets are handed on, so its verdict is the one finalize will see.
+# Pattern: Fail Fast / Guard - a release that cannot be signed stops in seconds, not after the builds. It prints no secret and tests no value but "not empty".
+name: _release-signing-check
+on:
+  workflow_call:
+    secrets:
+      GPG_PRIVATE_KEY: { required: false }
+      GPG_PASSPHRASE: { required: false }
+
+permissions:
+  contents: read
+
+jobs:
+  signing-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Waits for the same reviewer as finalize (once per run, here instead of only later); secrets belong to this environment (docs/usage.md).
+    environment: release-signing
+    steps:
+      - name: only a tag run is checked
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF_TYPE" = tag ] || { echo "::error::signing-check runs only for a tag (ref_type=$GITHUB_REF_TYPE)"; exit 1; }
+      - uses: FreeSynergy-Net/fs-release/actions/sign-files@a509bb16828cdeac9aba107553b39cf6d97d33b9
+        with:
+          mode: check
+          private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}

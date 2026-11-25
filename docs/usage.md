@@ -207,8 +207,10 @@ alone, also after the agents work under their own account. The owner sets this u
 1. Repository -> Settings -> Environments -> New environment `release-signing`.
 2. **Required reviewers**: the owner's own account (never the account of an agent); switch on "Prevent self-review" only if the run is started by another account.
 3. **Deployment branches and tags**: "Selected branches and tags" with the tag rule `v*` (no branch rule), so only a tag run can reach the key.
-4. **Environment secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as secrets of THIS environment (not repository or organisation secrets); delete them from
-   the repository secrets. `scripts/set-signing-secrets.sh --env` does steps 1 to 4 (see "Setting it up with the script" below).
+4. **Environment secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as secrets of THIS environment (the target state; repository secrets are the old, unprotected
+   way; the repository secrets of the same names are deleted afterwards). Organisation secrets are NOT the target state: they would reach the job without the
+   approval. Whether GitHub hands repository or organisation secrets on into a job that has `environment:` was NOT checked (and is not claimed here); only the
+   environment secrets are what this document promises. `docs/signing.md` says the same. `scripts/set-signing-secrets.sh --env` does steps 1 to 4 (see "Setting it up with the script" below).
 5. The same for every repo that signs: the mirror workflow of a wrapper repo (template `mirror.yml`, for example fs-zentinel) and `site.yml` of the site repo
    get `environment: release-signing` on their signing job too, and nothing else.
 6. **Every repo that calls `release.yml` needs its OWN environment `release-signing`** (steps 1 to 4 in THAT repo): the environment belongs to the repo in which the
@@ -254,7 +256,7 @@ separated, the only technical protection is the tag rule `v*` (plus the ruleset 
 who approves with the FreeSynergy token; the hard bar in the Claude Code settings (Claude and agents NEVER give a deployment or environment approval) only binds
 Claude and agents and is no GitHub protection rule.
 
-**WARNING, unsigned draft:** the action `sign-files` does NOT sign when the key is empty; it only warns (rc 0). If the environment secret does not arrive in the nested call
+**WARNING, unsigned draft (partly fixed):** in a TAG run `sign-files` now fails when the key is empty (and the early job `signing-check` stops the run before the builds); outside a tag run it still only warns (rc 0). If the environment secret does not arrive in the nested call
 (`release.yml` -> `_release-finalize.yml`), then after the repository secrets are deleted a draft is created silently unsigned. Check after the first test tag: the log of
 `finalize` shows "Signing key fingerprint" and NO line "NOT signed". Only then convert further repositories or delete repository secrets.
 
@@ -265,6 +267,24 @@ Checklist before the first real run: (1) `REVIEWER=FreeSynergy bash scripts/set-
 The signing job also checks that it runs for a tag (`github.ref_type == 'tag'`) and that the checkout is the commit of that tag (`git rev-parse HEAD` = `github.sha`).
 A mirror workflow should check the same two things before it signs. Not proven until the first real run: that the environment secrets reach the job inside the
 reusable workflow (a job with `uses:` cannot carry an `environment`, so the environment sits on the called job); the first run is a `dry-run` with the owner watching.
+
+**New repository that releases (step "create the repo"):** besides the caller `release.yml`, the owner sets up the signature BEFORE the first tag: environment
+`release-signing` with reviewer and tag rule `v*`, plus the two environment secrets, with `scripts/set-signing-secrets.sh --env --repos <name> --dry-run` first
+(read it), then without `--dry-run` (`REVIEWER=<login>`, see above). Without that, GitHub creates the environment at the first run without any protection rule and
+without secrets.
+
+**Early check (job `signing-check`, `_release-signing-check.yml`):** in a tag run (not in library mode) `release.yml` first runs a job in the same environment
+`release-signing` that fails within seconds with `Secrets fehlen fuer dieses Repo/diese Organisation: GPG_PRIVATE_KEY, GPG_PASSPHRASE (siehe docs/signing.md)` when
+`GPG_PRIVATE_KEY` is empty. The build, `finalize` and `publish` jobs depend on it, so nothing is built when the signature is impossible anyway. It sits at the same
+nesting level as `finalize` (called from `release.yml`, own `environment:`, secrets handed on in the same way), so it sees what `finalize` will see. It checks
+only that the key is NOT EMPTY (the passphrase may be empty, `docs/signing.md`); a wrong key still fails in `finalize`. Because the job has the environment, the
+required reviewer is asked once more (once for the check, once for `finalize`). `sign.sh` itself fails too in a tag run without a key (before, it only warned and
+the draft was created unsigned); only a run that is not a tag run still warns and goes on unsigned.
+
+**When `publish` is red (signature missing, nothing published):** the safe way is "Re-run all jobs" of the same run after the secrets are set. `draft.sh` then finds
+the existing DRAFT and replaces the assets of the same name (`gh release upload --clobber`); an already PUBLISHED release is never touched (it refuses). No new tag
+is needed as long as the commit stays the same (the tag and the run stay bound to it). Assets that the new run no longer produces are not removed from the draft.
+This was read from the scripts, not tried out by a re-run.
 
 Structure test: `scripts/check-signing-env [files...]` (also run by `scripts/test_check_signing_env.sh`, which has counter-checks): a job with `sign-files` without
 `environment:` is RED, and so is any other job that touches `GPG_*` secrets (only the call of `release.yml` / `_release-finalize.yml` may hand them on). Pass the mirror

@@ -204,7 +204,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release). MANDATORY after the merge into main of a program or of fs-release itself: the SHA of `<owner>/fs-release/...@<sha>` in release.yml, ci.yml and check.yml is raised to the merge commit in a second reviewed commit (scripts/pin-refs.sh; a commit cannot contain its own SHA), otherwise the signing job still runs the refs of the older commit (docs/usage.md)."
+        freesynergy.net:summary: "release.yml builds the artefacts and publishes the Pre-release; the flow waits (halt release). Before any build the job `signing-check` fails a tag run with a clear message when the signing secrets do not arrive (environment `release-signing` of THAT repo with reviewer and secrets: docs/usage.md); a red `publish` is repaired by \"Re-run all jobs\" (the draft is replaced, no new tag). MANDATORY after the merge into main of a program or of fs-release itself: the SHA of `<owner>/fs-release/...@<sha>` in release.yml, ci.yml and check.yml is raised to the merge commit in a second reviewed commit (scripts/pin-refs.sh; a commit cannot contain its own SHA), otherwise the signing job still runs the refs of the older commit (docs/usage.md)."
   - announce:
       emit:
         event:

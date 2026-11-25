@@ -47,7 +47,7 @@ def check(path):
         steps = job.get("steps") or []
         signer = any(isinstance(s, dict) and "/actions/sign-files@" in str(s.get("uses", "")) for s in steps)
         # a job with `uses:` cannot have an `environment:`; it only hands the secrets to the reusable workflow whose signing job has one
-        calls_final = any(f"fs-release/.github/workflows/{w}.yml@" in str(job.get("uses", "")) for w in ("release", "_release-finalize")) or str(job.get("uses", "")).startswith("./.github/workflows/_release-finalize.yml")
+        calls_final = any(f"fs-release/.github/workflows/{w}.yml@" in str(job.get("uses", "")) for w in ("release", "_release-finalize", "_release-signing-check")) or str(job.get("uses", "")).startswith("./.github/workflows/_release-finalize.yml")
         if signer and not job.get("environment"):
             problems.append(f"{path}: {name}: the signing job has no `environment:` (required reviewer = the owner)")
         if "GPG_" in text and not (signer or calls_final):
