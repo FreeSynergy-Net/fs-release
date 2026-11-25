@@ -16,13 +16,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@78cc989d267fb11fc2df0137174ea8b4559b21a5
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@da5a7d9c6c0c00a569759163d8401a684c30cd41
         with:
           toolchain: pinned
           targets: x86_64-apple-darwin,aarch64-apple-darwin
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
           cache-key: release-macos
-      - uses: FreeSynergy-Net/fs-release/actions/package-macos@78cc989d267fb11fc2df0137174ea8b4559b21a5
+      - uses: FreeSynergy-Net/fs-release/actions/package-macos@da5a7d9c6c0c00a569759163d8401a684c30cd41
         with:
           plan: ${{ inputs.plan }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
