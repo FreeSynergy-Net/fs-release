@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0 # the next step needs origin/main
       - name: the commit of the tag is on main
-        uses: FreeSynergy-Net/fs-release/actions/tag-on-main@c3b021017a419f0495eff4da661136b7e74c1c12
+        uses: FreeSynergy-Net/fs-release/actions/tag-on-main@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         env:
           TAG: ${{ fromJSON(inputs.plan).tag }}
       - name: the checkout is the commit of the tag
@@ -48,19 +48,19 @@ jobs:
         if: fromJSON(inputs.plan).kind == 'data' || fromJSON(inputs.plan).kind == 'module'
         run: echo "::notice::kind ${{ fromJSON(inputs.plan).kind }} - no SBOM for now, on purpose (no exact package-level SBOM yet)"
       - if: fromJSON(inputs.plan).kind != 'data' && fromJSON(inputs.plan).kind != 'module'
-        uses: FreeSynergy-Net/fs-release/actions/sbom@c3b021017a419f0495eff4da661136b7e74c1c12
+        uses: FreeSynergy-Net/fs-release/actions/sbom@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           name: ${{ fromJSON(inputs.plan).name }}
           version: ${{ fromJSON(inputs.plan).version }}
           working-directory: ${{ fromJSON(inputs.plan).workdir }}
       # Order matters: package signatures change the files, so they come before the checksums.
-      - uses: FreeSynergy-Net/fs-release/actions/sign-files@c3b021017a419f0495eff4da661136b7e74c1c12
+      - uses: FreeSynergy-Net/fs-release/actions/sign-files@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           mode: packages
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      - uses: FreeSynergy-Net/fs-release/actions/checksums@c3b021017a419f0495eff4da661136b7e74c1c12
-      - uses: FreeSynergy-Net/fs-release/actions/sign-files@c3b021017a419f0495eff4da661136b7e74c1c12
+      - uses: FreeSynergy-Net/fs-release/actions/checksums@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
+      - uses: FreeSynergy-Net/fs-release/actions/sign-files@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           mode: detached
           private-key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -69,7 +69,7 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*
-      - uses: FreeSynergy-Net/fs-release/actions/draft-release@c3b021017a419f0495eff4da661136b7e74c1c12
+      - uses: FreeSynergy-Net/fs-release/actions/draft-release@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           tag: ${{ fromJSON(inputs.plan).tag }}
           name: ${{ fromJSON(inputs.plan).name }}

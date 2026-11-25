@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@c3b021017a419f0495eff4da661136b7e74c1c12
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           toolchain: pinned
           targets: ${{ matrix.triple }}
@@ -39,11 +39,11 @@ jobs:
           cache-key: release-${{ matrix.arch }}
           cache: ${{ fromJSON(inputs.plan).kind == 'data' && 'false' || 'true' }} # kind data has no Cargo.toml: nothing for rust-cache to read
       - if: contains(fromJSON(inputs.plan).linux_formats, 'deb')
-        uses: FreeSynergy-Net/fs-release/actions/install-tools@c3b021017a419f0495eff4da661136b7e74c1c12
+        uses: FreeSynergy-Net/fs-release/actions/install-tools@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           tools: cargo-deb@3.8.0
       - if: contains(fromJSON(inputs.plan).linux_formats, 'rpm') && !contains(fromJSON('["module","data"]'), fromJSON(inputs.plan).kind)
-        uses: FreeSynergy-Net/fs-release/actions/install-tools@c3b021017a419f0495eff4da661136b7e74c1c12
+        uses: FreeSynergy-Net/fs-release/actions/install-tools@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           tools: cargo-generate-rpm@0.21.1
       # kind module/data (INST-4b): the RPM is made by `fs-blueprint package module|rpm`, built from the commit of THIS workflow file (as check.yml does; a full SHA, never a name)
@@ -56,7 +56,7 @@ jobs:
           if ! [[ "$REV" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::cannot read the fs-release commit of this workflow file"; exit 2; fi
           cargo install --git https://github.com/FreeSynergy-Net/fs-release --rev "$REV" --locked --root "$RUNNER_TEMP/fsbp" fs-blueprint
           echo "$RUNNER_TEMP/fsbp/bin" >> "$GITHUB_PATH"
-      - uses: FreeSynergy-Net/fs-release/actions/package-linux@c3b021017a419f0495eff4da661136b7e74c1c12
+      - uses: FreeSynergy-Net/fs-release/actions/package-linux@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           plan: ${{ inputs.plan }}
           arch: ${{ matrix.arch }}
@@ -81,7 +81,7 @@ jobs:
         with:
           name: dist-linux-x86_64
           path: dist
-      - uses: FreeSynergy-Net/fs-release/actions/package-arch@c3b021017a419f0495eff4da661136b7e74c1c12
+      - uses: FreeSynergy-Net/fs-release/actions/package-arch@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           plan: ${{ inputs.plan }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -110,7 +110,7 @@ jobs:
         with:
           name: dist-linux-${{ matrix.entry.arch }}
           path: dist
-      - uses: FreeSynergy-Net/fs-release/actions/smoke@c3b021017a419f0495eff4da661136b7e74c1c12
+      - uses: FreeSynergy-Net/fs-release/actions/smoke@88275fdf6b14d363f86f5920eb2c2d7a4d2801c0
         with:
           plan: ${{ inputs.plan }}
           format: deb
