@@ -88,6 +88,10 @@ branch, not first at the tag. Needs the check workflow of a pin that contains it
 rendered text the same on every runner). It is merged with `apt-packages` into one list without duplicates, so a repo needs only
 `software-gpu: true` instead of naming the packages.
 
+### Data mode (repo without `Cargo.toml`, `kind: data`)
+
+A pure data repo (`scaffold.toml`, no `Cargo.toml`, no `Cargo.lock`, `crates/` or `src/`) is checked in data mode, with no disguise `Cargo.toml`: `scripts/gates.sh` runs `identity`, `rust-rules`, `lock` and `files`; the Cargo gates (`fmt`, `clippy`, `test`, `doctest`, `licence`, MSRV, Windows clippy) do not run and the output says so (`gates: Cargo-Gates entfallen (kind data ...)`, `gates-beleg: lokal NICHT gelaufen: <gate> ...`), never silently green. The release plan probe reads the tag from `program.version` of `scaffold.toml` instead of `cargo metadata`. A repo with `scaffold.toml` and `Cargo.lock`/`crates/`/`src/` but without `Cargo.toml` is red (a Rust repo must not lose its gates by losing the manifest). Set `blueprint: warn` or `block` in the caller so that `fs-blueprint check` runs. Self tests: `scripts/test_gates_data_mode.sh`, `scripts/test_plan_probe_step.sh`.
+
 ## Windows gate (`_windows-check.yml`)
 
 One reusable workflow instead of a copied `windows.yml` per repo. A repo copies [`examples/callers/windows.yml`](../examples/callers/windows.yml)

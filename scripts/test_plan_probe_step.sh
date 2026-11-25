@@ -52,12 +52,12 @@ RELNEW=FreeSynergy-Net/fs-release/.github/workflows/release.yml@v0.0.18   # the 
 run_case() {
   local script=$1 d=$2 rc=0
   : >"$tmp/gh_out"
-  (cd "$d" && REPO_ROOT="$d" GITHUB_OUTPUT="$tmp/gh_out" bash -eo pipefail "$script" >"$tmp/case.out" 2>&1) || rc=$?
+  (cd "$d" && PATH="${CASE_PATH:-$PATH}" REPO_ROOT="$d" GITHUB_OUTPUT="$tmp/gh_out" bash -eo pipefail "$script" >"$tmp/case.out" 2>&1) || rc=$?
   local probe; probe=$(sed -n 's/^probe=//p' "$tmp/gh_out")
   cat "$tmp/gh_out" >>"$tmp/case.out"   # the reader's outputs are part of what the cases may look at
   [ "$rc" = 0 ] || { echo "probe=reader-rc$rc plan_rc=-"; return; }
   if [ "$probe" = true ]; then
-    local prc=0; python3 -I "$tmp/plan_run.py" "$repo" "$tmp/gh_out" "$d" >>"$tmp/case.out" 2>&1 || prc=$?
+    local prc=0; PATH="${CASE_PATH:-$PATH}" python3 -I "$tmp/plan_run.py" "$repo" "$tmp/gh_out" "$d" >>"$tmp/case.out" 2>&1 || prc=$?
     echo "probe=true plan_rc=$prc"
   else echo "probe=${probe:-none} plan_rc=-"; fi
 }
@@ -107,6 +107,18 @@ all_cases() { # <script>: every case against it
   expect "an expression as input: no probe, with a warning" "$s" "$D" "probe=false plan_rc=-" "::warning::"
   release_yml "$D" "$REL" "binaries: fs-forms" "apt-packages: libx" "flatpak: true" "smoke: false"
   expect "inputs the plan does not read are ignored (red because of fs-forms-run)" "$s" "$D" "probe=true plan_rc=1" "fs-forms-run"
+  # kind data (pure data repo: scaffold.toml, NO Cargo.toml): the tag comes from scaffold.toml, `cargo` is never called (a cargo that fails on any call stands in front of PATH)
+  rm -rf "$tmp/data"; mkdir -p "$tmp/data/.github/workflows" "$tmp/cargo-fails"
+  printf '#!/usr/bin/env bash\necho "cargo must not be called for kind data" >&2\nexit 101\n' >"$tmp/cargo-fails/cargo"; chmod +x "$tmp/cargo-fails/cargo"
+  printf 'schema = 2\n\n[program]\nname = "leer"\nversion = "0.0.7"\n' >"$tmp/data/scaffold.toml"
+  release_yml "$tmp/data" "$RELNEW" "kind: data" "name: leer"
+  CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data without Cargo.toml: no cargo metadata, tag v0.0.7 from scaffold.toml, plan green" "$s" "$tmp/data" "probe=true plan_rc=0" "tag=v0.0.7"
+  CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data says out loud that the Cargo part is skipped" "$s" "$tmp/data" "probe=true plan_rc=0" "Cargo-Teil der Plan-Probe entfaellt"
+  release_yml "$tmp/data" "$RELNEW" "kind: data" "name: leer" "binaries: x"
+  CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data with binaries: the plan is red (its own message)" "$s" "$tmp/data" "probe=true plan_rc=1" "has no binary"
+  rm "$tmp/data/scaffold.toml"
+  release_yml "$tmp/data" "$RELNEW" "kind: data" "name: leer"
+  CASE_PATH="$tmp/cargo-fails:$PATH" expect "kind data without scaffold.toml: the reader is red (never a made-up tag)" "$s" "$tmp/data" "probe=reader-rc1 plan_rc=-"
 }
 cases_fail=0
 all_cases "$tmp/reader.sh"
@@ -166,6 +178,9 @@ mutant "the new owner is not probed (silent skip)" 's/, "FreeSynergy-Net\/fs-rel
 mutant "expressions are passed on" 's/"\$" \+ "\{\{" in v or //'
 mutant "booleans are passed as Python words" 's/\("true" if v else "false"\) if isinstance\(v, bool\) else str\(v\)/str(v)/'
 mutant "owner not looked for (first package)" 's/ or mine$/ or mine\nowners = mine/'
+mutant "kind data still calls cargo" 's/if vals\["kind"\] == "data":/if False:/'
+mutant "kind data tag fixed" 's/tag = "v" \+ str\(tomllib.load\(f\)\["program"\]\["version"\]\)/tag = "v0.0.1"/'
+mutant "kind data skip not announced" 's/Cargo-Teil der Plan-Probe entfaellt/x/'
 mutant "working directory ignored" 's/workdir = os.path.join\(root, vals\["working-directory"\]\)/workdir = root/'
 
 echo

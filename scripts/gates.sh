@@ -188,6 +188,14 @@ else
     skip=(-E "not test(=$FS_GATES_SKIP_TEST)")
     echo "gates: test $FS_GATES_SKIP_TEST SKIPPED (FS_GATES_SKIP_TEST, named exception of gates-komplett; not green for this test)"
   fi
+  # [DATEN-MODUS] A pure data repo (kind data: scaffold.toml, NO Cargo.toml) has nothing for the Cargo gates. Said out loud (step `daten-modus`, its `gates-skipped:` lines end up in the Beleg as
+  # "lokal NICHT gelaufen"), never silently green. A repo with scaffold.toml AND Cargo.lock/crates/src but no Cargo.toml is RED (no way to dodge the gates by losing the manifest); without scaffold.toml nothing changes (the Cargo gates run and are red by themselves).
+  data_mode=""
+  if [ ! -f Cargo.toml ] && [ -f scaffold.toml ]; then
+    step daten-modus error gates_data_mode_check "$root"
+    if [ ! -e Cargo.lock ] && [ ! -e crates ] && [ ! -e src ]; then data_mode=1; fi
+  fi
+  if [ -z "$data_mode" ]; then
   step fmt style cargo fmt --check
   # FS_GATES_DIFF_BASE: set ONLY by CI on `unreviewed/*` branches (actions/gates input diff-base, never locally, never on main or a tag): the TEST and CLIPPY gates then run the crates that own a changed
   # file plus their dependants (scripts/affected_crates.py); fmt, rust-rules, lock and files stay on the whole workspace. Anything unclear (error, global file, every crate) = whole workspace, said below.
@@ -216,21 +224,24 @@ else
   step doctest error bash "$here/test-gate.sh" --doc "${testsel[@]}" --all-features --locked --no-fail-fast
   # landing head (push on main; FS_GATES_LAND_PROFILES / FS_GATES_LAND_BASE from check.yml): picture and platform once more, for the changed crates and their dependants (own steps `test-<profile>`)
   gates_land_steps
+  fi
   step rust-rules rule python3 -I "$rules" "$root"
   # lock check: one source per shared library in every Cargo.lock (warning first, error later: switch `strict`); own file, so it has a test.
   step lock error bash "$here/gates-lock.sh" "$root"
   # yaml-check and the workflows/ schema check: own file, so the evaluation of their exit codes has a test.
   step files error bash "$here/gates-files.sh" "$root"
+  if [ -z "$data_mode" ]; then
   # licence: cargo-deny `check licenses bans sources` with the ONE policy configs/deny.toml and the cargo-deny pinned in scripts/cargo-deny.pin (version + sha256). Own file, so it has a self test
   # (scripts/test_licence_gate.sh). NOT RUN (no binary, wrong version, no policy) is red with its own line, never green and never skipped.
   step licence error bash "$here/licence-gate.sh" "$root"
+  fi
   # --like-ci: the lint job of CI (the tool missing = "NICHT GEPRUEFT" in the Beleg, never silently skipped) and, with rustup, the MSRV job
   if [ -n "$like_ci" ]; then
     if command -v shellcheck >/dev/null 2>&1; then step shellcheck lint gates_lint_shell "$root"; fi
     if [ -d .github/workflows ] && command -v actionlint >/dev/null 2>&1; then step actionlint lint gates_lint_actions "$root"; fi
     # Windows cfg code: clippy for the windows target when it is installed (no linker needed); not installed = "NICHT GEPRUEFT" in the Beleg (gates_ci_diff), never silently skipped
     wintarget="$(gates_windows_target)"
-    if [ -n "$wintarget" ] && gates_has_windows_cfg "$root"; then step clippy-windows lint cargo clippy --workspace --all-targets --all-features --locked --keep-going --target "$wintarget" -- -D warnings -W clippy::pedantic; fi
+    if [ -z "$data_mode" ] && [ -n "$wintarget" ] && gates_has_windows_cfg "$root"; then step clippy-windows lint cargo clippy --workspace --all-targets --all-features --locked --keep-going --target "$wintarget" -- -D warnings -W clippy::pedantic; fi
     if [ -f .github/workflows/lint.yml ]; then step selftests error gates_lint_selftests "$root"; fi
     msrv="$(grep -m1 -E '^rust-version[[:space:]]*=' Cargo.toml 2>/dev/null | sed 's/[^"]*"\([0-9.]*\)".*/\1/' || true)"
     if [ -n "$msrv" ] && command -v rustup >/dev/null 2>&1; then step msrv error env RUSTUP_TOOLCHAIN="$msrv" cargo check --all-targets --locked; fi
