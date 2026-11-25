@@ -123,6 +123,10 @@ jobs:
         id: plan-probe-step
         continue-on-error: true
         run: bash scripts/test_plan_probe_step.sh
+      - name: data mode of the gates self test (repo without Cargo.toml, Cargo gates omitted and said so, Cargo repo unchanged, mutants)
+        id: gates-data-mode
+        continue-on-error: true
+        run: bash scripts/test_gates_data_mode.sh
       - name: changed-crates test scope self test (fixture workspace, gates.sh with stub cargo; mutants)
         id: affected-crates
         continue-on-error: true
@@ -224,6 +228,7 @@ jobs:
             blueprint-check-step ${{ steps.blueprint-check-step.outcome }}
             plan-probe-step ${{ steps.plan-probe-step.outcome }}
             affected-crates ${{ steps.affected-crates.outcome }}
+            gates-data-mode ${{ steps.gates-data-mode.outcome }}
             topmost-changelog-section ${{ steps.topmost-changelog-section.outcome }}
             signing-setup-script ${{ steps.signing-setup-script.outcome }}
             lock-check-self ${{ steps.lock-check-self.outcome }}

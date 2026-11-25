@@ -287,11 +287,19 @@ jobs:
               put("probe", "false")
               sys.exit(0)
           workdir = os.path.join(root, vals["working-directory"])
-          pkgs = json.loads(subprocess.run(["cargo", "metadata", "--format-version", "1", "--no-deps"], cwd=workdir, check=True, capture_output=True, text=True).stdout)["packages"]
-          bins = set(re.split(r"[,\s]+", vals["binaries"]))
-          mine = [p for p in pkgs if not vals["cargo-package"] or p["name"] == vals["cargo-package"]]
-          owners = [p for p in mine if any("bin" in t["kind"] and t["name"] in bins for t in p["targets"])] or mine
-          put("tag", "v" + owners[0]["version"] if owners else "v0.0.0")
+          if vals["kind"] == "data":
+              # kind data (usage.md: no binaries, no cargo build; the tag must equal the blueprint version): the tag is the version of scaffold.toml, no `cargo metadata`; said, never silent
+              import tomllib
+              with open(os.path.join(workdir, "scaffold.toml"), "rb") as f:
+                  tag = "v" + str(tomllib.load(f)["program"]["version"])
+              print(f"::notice::kind data: Cargo-Teil der Plan-Probe entfaellt (kein cargo metadata), Tag {tag} aus scaffold.toml")
+              put("tag", tag)
+          else:
+              pkgs = json.loads(subprocess.run(["cargo", "metadata", "--format-version", "1", "--no-deps"], cwd=workdir, check=True, capture_output=True, text=True).stdout)["packages"]
+              bins = set(re.split(r"[,\s]+", vals["binaries"]))
+              mine = [p for p in pkgs if not vals["cargo-package"] or p["name"] == vals["cargo-package"]]
+              owners = [p for p in mine if any("bin" in t["kind"] and t["name"] in bins for t in p["targets"])] or mine
+              put("tag", "v" + owners[0]["version"] if owners else "v0.0.0")
           for k, v in vals.items():
               put(k, v)
           put("probe", "true")

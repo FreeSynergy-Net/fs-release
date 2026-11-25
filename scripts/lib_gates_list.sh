@@ -154,3 +154,17 @@ gates_land_steps() {
     fi
   done
 }
+
+# gates_data_mode_check <root>: step `daten-modus` of gates.sh, run when there is a scaffold.toml but no Cargo.toml in the root. Green ONLY for a pure data repo (no Cargo.lock, crates/, src/): it then
+# says out loud which gates do not run (`gates-skipped:` lines are copied into the Beleg as "lokal NICHT gelaufen"). A Rust repo that lost its manifest is red.
+gates_data_mode_check() {
+  local root="$1" what
+  if [ ! -e "$root/Cargo.lock" ] && [ ! -e "$root/crates" ] && [ ! -e "$root/src" ]; then
+    echo "gates: Cargo-Gates entfallen (kind data: scaffold.toml, kein Cargo.toml)"
+    for what in fmt clippy test doctest licence msrv clippy-windows; do echo "gates-skipped: $what (Cargo-Gate, kind data: kein Cargo.toml)"; done
+    echo "gates: im Daten-Modus laufen: identity, rust-rules, lock, files (und mit --like-ci: shellcheck, actionlint, selftests)"
+    return 0
+  fi
+  echo "gates FAILED: no Cargo.toml in $root but Cargo.lock, crates/ or src/ exists: not a pure data repo; a Rust repo must not lose its Cargo gates by losing the manifest" >&2
+  return 1
+}
