@@ -17,11 +17,14 @@ fn nothing_named_sets_the_own_binary() {
 
 #[test]
 fn named_in_opts_or_process_env_stays_untouched() {
-    assert!(bin_env(&[kv("FS_RELEASE_BIN", "/x")], false, Some(Path::new(EXE))).is_empty());
-    assert!(bin_env(&[], true, Some(Path::new(EXE))).is_empty());
+    assert_eq!(
+        bin_env(&[kv("FS_RELEASE_BIN", "/x")], false, Some(Path::new(EXE))).len(),
+        0
+    );
+    assert_eq!(bin_env(&[], true, Some(Path::new(EXE))).len(), 0);
 }
 
 #[test]
 fn unknown_own_path_sets_nothing() {
-    assert!(bin_env(&[], false, None).is_empty());
+    assert_eq!(bin_env(&[], false, None).len(), 0);
 }
