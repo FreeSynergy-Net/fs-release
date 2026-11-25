@@ -8,7 +8,7 @@
 # Option `--dir <repo>` (before or after the ref): work in ANOTHER repository (a program or library that calls fs-release).
 # Only `<repo>/.github/workflows/*.yml` is touched, only `uses: <owner>/fs-release/<path>@<old>` (owner = one of the two known owners) becomes `@<ref>`; other
 # actions (actions/checkout@..., ...) stay as they are. No `.github/workflows/` there = rc 2. Prints the changed files, rc 0.
-# Before writing, `fs-release check-pin-chain <sha>` (hard, without --melden) must be green in the fs-release clone ($FS_RELEASE_REPO); red or not runnable = rc 4, nothing written ($FS_RELEASE_BIN names a built `fs-release`).
+# Before writing, `fs-release check-pin-chain <sha>` (hard, without --melden) must be green in the fs-release clone ($FS_RELEASE_REPO); red or not runnable = rc 4, nothing written ($FS_RELEASE_BIN names a built `fs-release`, else `fs-release` on PATH, else rc 4; the lift sets FS_RELEASE_BIN to itself).
 # A pin is never lowered (rc 3, nothing written; the whole run is red, not line by line): every existing `@<old>` (tag or SHA) must resolve in the fs-release clone ($FS_RELEASE_REPO, default: this repo) and <ref> must be equal to it or a descendant (git merge-base --is-ancestor). Unknown, older or unrelated = rc 3. `@main` is raised. The owner name is rewritten to FreeSynergy-Net.
 # Without `--dir` the script rewrites this repository (workflows and actions) and prints `git diff --stat`; the never-lower check holds there too (rc 3, nothing written).
 set -euo pipefail
@@ -72,7 +72,8 @@ check_no_lower() {
 
 # Chain gate (HARD, never --melden): `fs-release check-pin-chain --repo <fs-release clone> <sha>` must be green BEFORE a caller is re-pinned to <ref>
 # (a pin whose chain is red makes the caller's release fail late, e.g. planning v0.0.4). rc != 0 (red, or the tool missing/failing) = rc 4, nothing written.
-# The tool: $FS_RELEASE_BIN (a built `fs-release`), else `fs-release` on PATH, else `cargo run -p fs-release` in the clone.
+# The tool: $FS_RELEASE_BIN (a built `fs-release`), else `fs-release` on PATH, else rc 4 with a clear message (no silent local build: it would run outside
+# build-slot and check with the code of the clone's HEAD, not with the tool of the caller).
 chain_gate() {
   local repo=${FS_RELEASE_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)} sha rc=0
   sha=$(git -C "$repo" rev-parse --verify -q "$ref^{commit}") || { echo "pin-refs: target $ref not found in $repo (chain gate)" >&2; return 4; }
@@ -81,7 +82,8 @@ chain_gate() {
   elif command -v fs-release >/dev/null 2>&1; then
     fs-release check-pin-chain --repo "$repo" "$sha" || rc=$?
   else
-    (cd "$repo" && cargo run --locked --quiet -p fs-release -- check-pin-chain --repo . "$sha") || rc=$?
+    echo "pin-refs: no fs-release tool for the chain gate: set FS_RELEASE_BIN to a built fs-release or put fs-release on PATH (nothing written)" >&2
+    return 4
   fi
   [ "$rc" -eq 0 ] || echo "pin-refs: chain gate red or not runnable (check-pin-chain $sha rc $rc): nothing written" >&2
   return "$rc"

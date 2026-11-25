@@ -24,6 +24,10 @@ jobs:
         id: shellcheck
         continue-on-error: true
         run: shellcheck -x -S warning scripts/*.sh scripts/typing-test/*.sh tests/packaging/*.sh tests/typing-test/*.sh tests/module-probe/*.sh actions/*/*.sh && grep -d skip -slE "^#!(/usr/bin/env |/bin/)(ba)?sh" scripts/* | xargs -r shellcheck -x -S warning
+      - name: pin-refs test
+        id: pinrefs
+        continue-on-error: true
+        run: bash scripts/test_pin_refs.sh
       - name: python
         id: python
         continue-on-error: true
@@ -34,6 +38,7 @@ jobs:
           RESULTS: |
             actionlint ${{ steps.actionlint.outcome }}
             shellcheck ${{ steps.shellcheck.outcome }}
+            pinrefs ${{ steps.pinrefs.outcome }}
             python ${{ steps.python.outcome }}
         run: |
           red=0

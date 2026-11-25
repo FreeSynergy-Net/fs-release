@@ -201,6 +201,11 @@ chain_checks() {
   mkforeign "$d.missing"; : >"$tmp/stub.log"
   FS_RELEASE_BIN="$tmp/no-such-tool" bash "$s" --dir "$d.missing" v0.0.10 >/dev/null 2>&1; rc=$?
   { [ "$rc" -eq 4 ] && [ -z "$(git -C "$d.missing" status --porcelain)" ]; } && ok "$l chain gate tool missing: rc 4, nothing written" || bad "$l chain gate tool missing (rc=$rc)"
+  if ! command -v fs-release >/dev/null 2>&1; then
+    mkforeign "$d.notool"
+    out=$(env -u FS_RELEASE_BIN bash "$s" --dir "$d.notool" v0.0.10 2>&1); rc=$?
+    { [ "$rc" -eq 4 ] && [ -z "$(git -C "$d.notool" status --porcelain)" ] && echo "$out" | grep -q 'FS_RELEASE_BIN'; } && ok "$l no tool at all: rc 4 with a clear message, nothing written, no cargo run" || bad "$l no tool (rc=$rc): $out"
+  fi
   echo 0 >"$tmp/stub.rc"
 }
 chain_checks "$here/pin-refs.sh" real
@@ -245,6 +250,7 @@ red_by noboundary-grep 's@\(\^\|[^)]*\)\(\$owners\)/fs-release@(\$owners)/fs-rel
 red_by selfnocheck 's#^\[ "\$\{\#selfs\[@\]\}" -eq 0 \] \|\| check_no_lower .*#true#'
 red_by dirignored 's@^if \[ -n "\$dir" \]; then@if false; then@'
 red_by nochain 's@^  chain_gate .*@  true@'
+red_by cargo-fallback 's@^    echo "pin-refs: no fs-release tool.*@    true@; s@^    return 4$@    :@'
 red_by chain-melden 's@check-pin-chain --repo@check-pin-chain --melden --repo@'
 
 if [ "$fails" -eq 0 ]; then echo "all ok"; else echo "$fails failed"; exit 1; fi

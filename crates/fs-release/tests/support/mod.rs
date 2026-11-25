@@ -11,6 +11,7 @@ use fs_release::lift::LiftOpts;
 use tempfile::TempDir;
 
 pub mod aufrufer;
+pub mod chain_stub;
 pub mod flow;
 pub mod flowcheck;
 pub mod gh;
@@ -252,6 +253,7 @@ impl World {
                 .trim()
                 .into(),
         ));
+        v.push(chain_stub::green(self));
         v
     }
 

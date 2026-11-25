@@ -9,6 +9,9 @@ use crate::task::{Task, SKIPPED};
 /// Environment variable that overrides the tag the pins are raised to (`vX.Y.Z`).
 pub const TAG_ENV: &str = "FS_LIFT_PIN_TAG";
 
+/// Environment variable the script `pin-refs.sh` reads for the built `fs-release` that runs its chain gate (`check-pin-chain`).
+pub const BIN_ENV: &str = "FS_RELEASE_BIN";
+
 /// `vX.Y.Z` of exactly this string.
 fn is_tag(t: &str) -> bool {
     t.strip_prefix('v').is_some_and(|r| {
@@ -36,7 +39,8 @@ pub fn tag(env: &LiftEnv) -> String {
 
 /// `scripts/pin-refs.sh --dir <repo> <tag>`: (owner rewritten to FreeSynergy-Net) every `uses: FreeSynergy-Net/fs-release/...@<ref>` of the repo's `.github/workflows/*.yml`
 /// (`@main`, an older tag or a commit) becomes `@<tag>`; other actions stay. No workflows = skipped. A pin is never lowered, the whole run is red (not line by
-/// line): the script checks (`FS_RELEASE_REPO`, default its own repo) in the fs-release clone that the tag equals or descends from every existing pin (git merge-base --is-ancestor); a lower, unrelated or unknown pin = red (rc 3), nothing written. It changes
+/// line): the script checks (`FS_RELEASE_REPO`, default its own repo) in the fs-release clone that the tag equals or descends from every existing pin (git merge-base --is-ancestor); a lower, unrelated or unknown pin = red (rc 3), nothing written. Before writing, the script runs the hard chain gate
+/// (`fs-release check-pin-chain <sha>`) with the running binary (`FS_RELEASE_BIN`, set here unless the caller or the environment names one): red or not runnable = red (rc 4), nothing written. It changes
 /// files; the step `commit` takes them along.
 pub struct Pins;
 
@@ -60,7 +64,14 @@ impl Task<LiftEnv<'_>> for Pins {
             dir.display().to_string(),
             tag(env),
         ];
-        let o = env.exec("bash", args, vec![])?;
+        // The chain gate of the script needs a built `fs-release`: lift IS one, so it hands itself over (unless the caller named another).
+        let named =
+            env.opts.env.iter().any(|(k, _)| k == BIN_ENV) || std::env::var_os(BIN_ENV).is_some();
+        let extra = match std::env::current_exe() {
+            Ok(exe) if !named => vec![(BIN_ENV.to_string(), exe.display().to_string())],
+            _ => vec![],
+        };
+        let o = env.exec("bash", args, extra)?;
         if o.ok() {
             Ok(o.stdout
                 .lines()
