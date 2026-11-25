@@ -207,9 +207,9 @@ alone, also after the agents work under their own account. The owner sets this u
 1. Repository -> Settings -> Environments -> New environment `release-signing`.
 2. **Required reviewers**: the owner's own account (never the account of an agent); switch on "Prevent self-review" only if the run is started by another account.
 3. **Deployment branches and tags**: "Selected branches and tags" with the tag rule `v*` (no branch rule), so only a tag run can reach the key.
-4. **Secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`, either as environment secrets of THIS environment (`--env`; the repository secrets of the same names are deleted afterwards) or, recommended, as
-   ORGANISATION secrets held once for all repositories (`--env-only` sets up steps 1 to 3 only; "Repository access" of the secret must include the repository). An organisation secret gives NO reviewer protection by
-   itself: the protection comes only from steps 1 to 3 in each repository (environment with reviewer, tag rule), so organisation secret WITHOUT this environment would reach the job without approval.
+4. **Secrets**: `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` as environment secrets of THIS environment (`--env`; the repository secrets of the same names are deleted afterwards). This is the target state.
+   An environment protects only its OWN secrets. Repository secrets and ORGANISATION secrets are NOT protected: any job without `environment:` in a repository that may use the secret reads it without any approval
+   (an organisation secret is as unprotected as a repository secret, only spread over many repositories). `--env-only` sets up steps 1 to 3 only (for example in advance); the secrets follow afterwards with `--env`.
    According to the GitHub documentation (not tried by us) a job with `environment:` gets environment, repository and organisation secrets; with the same name environment beats repository beats organisation.
    `docs/signing.md` says the same. `scripts/set-signing-secrets.sh --env` does steps 1 to 4, `--env-only` steps 1 to 3 (see "Setting it up with the script" below).
 5. The same for every repo that signs: the mirror workflow of a wrapper repo (template `mirror.yml`, for example fs-zentinel) and `site.yml` of the site repo
@@ -240,7 +240,7 @@ The target organisation is `FreeSynergy-Net` (where our repositories are); the u
 
 `FS_ORG` is checked: it must look like a GitHub organisation name and `FreeSynergy` (any case, without `-Net`) is refused with rc 2. The membership must be `active` (a pending invitation is refused). The `Ziel:` line is also printed in a dry run.
 
-Default list of `--env` (15 repositories: the 12 that call `release.yml` - fs-texts, fs-people, fs-calendars, fs-tasks, fs-groups, fs-maps, fs-capnpc, fs-packages, fs-files, fs-messages, fs-broadcast, fs-draw - plus fs-modules-planning, fs-modules-person (no `release.yml` caller yet) and fs-starter, which are planned for tag releases);
+Default list of `--env` (15 repositories: the 14 that call `release.yml` - fs-texts, fs-people, fs-calendars, fs-tasks, fs-groups, fs-maps, fs-capnpc, fs-packages, fs-files, fs-messages, fs-broadcast, fs-draw, fs-modules-planning, fs-starter - plus fs-modules-person (no `release.yml` caller yet; fs-settings is not in the list));
 `--repos texts,packages` (program names, with or without `fs-`) overrides it. Per repository, in this order: (1) PUT the environment `release-signing` with the
 required reviewer (`REVIEWER`, a required argument or variable: there is no default; the login becomes a numeric id) and deployment only for named refs
 (creates a missing environment and hardens an existing unprotected one); (2) tag rule `v*` (listed first, never created twice); (3) `GPG_PRIVATE_KEY` and
@@ -251,11 +251,10 @@ kept only on request.
 
 **Typed passphrase (`--ask-passphrase`, the default when `PASSFILE` is not set and `~/.config/freesynergy/release-passphrase` does not exist):** the script asks for the passphrase of the signing key in the terminal (no echo, twice as a typo check; no terminal = clear error). It lives only in a shell variable, goes to gpg through a pipe on a file descriptor (`--passphrase-fd`) and to `gh secret set GPG_PASSPHRASE` on standard input; no file, no argument, no output, the variable is deleted on exit. GitHub still needs the passphrase as a secret (the CI unlocks the signing subkey with it); only the local file is gone. `PASSFILE` stays as the alternative. `--env-only` needs no passphrase.
 
-**`--env-only` (for organisation secrets):** `REVIEWER=<login> bash scripts/set-signing-secrets.sh --env-only [--repos ...] [--allow-self-review]` creates ONLY the environment `release-signing` (required reviewer,
+**`--env-only` (environment only, for example in advance):** `REVIEWER=<login> bash scripts/set-signing-secrets.sh --env-only [--repos ...] [--allow-self-review]` creates ONLY the environment `release-signing` (required reviewer,
 deployment only for tags) and the tag rule `v*` per repository: no key is exported, no secret is set or deleted, no gpg, no keys.openpgp.org, no delete question; the read-only check covers environment and tag rule only.
-Use it when the two secrets are ORGANISATION secrets (*Organization > Settings > Secrets and variables > Actions*, "Repository access" must include the repository). An organisation secret gives NO reviewer protection by itself;
-the protection comes only from the environment of each repository. Organisation secrets are the recommended way, `--env-only` plus an organisation secret is the protected combination. According to the GitHub documentation
-(not tried by us) a job with `environment:` gets environment, repository and organisation secrets, and with the same name the environment secret wins over the repository secret over the organisation secret.
+The secrets come afterwards with `--env`. Organisation secrets are NOT a protected alternative: the environment protects only its own secrets, an organisation secret is read by every job without `environment:` in every repository it is shared with, without approval.
+According to the GitHub documentation (not tried by us) a job with `environment:` gets environment, repository and organisation secrets, and with the same name the environment secret wins over the repository secret over the organisation secret.
 
 `prevent_self_review` is ON by default: the account that starts a run cannot approve it, so a second pair of eyes is real. The script compares the reviewer with the
 logged-in account by numeric id (logins are case-insensitive) and checks that the reviewer is a `User` (an organisation is refused, rc 2). `--ruleset-tags <repo>`

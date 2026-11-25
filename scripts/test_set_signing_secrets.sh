@@ -15,6 +15,7 @@ mkdir -p "$tmp/bin" "$tmp/state"
 cat >"$tmp/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$MOCK_ARGS"
+if tr '\0' '\n' </proc/$$/environ | grep -q '^PW=\|^pw2=\|^GH_HOST='; then echo "LEAK $0" >>"$MOCK_STATE/leak"; fi
 in=""
 [ -t 0 ] || in=$(cat)
 [ -z "$in" ] || printf 'STDIN[%s]: %s\n' "$*" "$in" >>"$MOCK_STDIN"
@@ -54,7 +55,11 @@ MOCK
 cat >"$tmp/bin/gpg" <<'MOCK'
 #!/usr/bin/env bash
 echo "gpg $*" >>"$MOCK_GPG"
-case "$*" in *--passphrase-fd\ 3*) pw=$(cat <&3); if [ "$pw" = "${ASKPW:-}" ]; then echo "gpg-fd3-passphrase-ok" >>"$MOCK_GPG"; else echo "gpg-fd3-passphrase-WRONG" >>"$MOCK_GPG"; fi ;; esac
+if tr '\0' '\n' </proc/$$/environ | grep -q '^PW=\|^pw2=\|^GH_HOST='; then echo "LEAK $0" >>"$MOCK_STATE/leak"; fi
+good=1
+case "$*" in *--passphrase-fd\ 3*) pw=$(cat <&3); if [ "$pw" = "${ASKPW:-}" ]; then echo "gpg-fd3-passphrase-ok" >>"$MOCK_GPG"; else good=0; echo "gpg-fd3-passphrase-WRONG" >>"$MOCK_GPG"; fi ;; esac
+if [[ "$*" =~ --passphrase-file\ ([^\ ]+) ]]; then [ "$(head -n1 "${BASH_REMATCH[1]}")" = "$SECRETVAL-passphrase" ] || good=0; fi
+case "$*" in *--sign*) cat >/dev/null; [ "$good" = 1 ] || { echo "gpg: signing failed: Bad passphrase" >&2; exit 2; } ;; esac
 case "$*" in
   *--with-colons*) printf 'ssb:u:255:22:AAAA:1700000000::::::s:::::\nfpr:::::::::1111222233334444555566667777888899990000:\n' ;;
   *--export-secret-subkeys*) printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\n%s\n-----END PGP PRIVATE KEY BLOCK-----\n' "$SECRETVAL" ;;
@@ -64,7 +69,8 @@ MOCK
 printf '#!/usr/bin/env bash\ncat >/dev/null\n' >"$tmp/bin/curl"
 chmod +x "$tmp/bin/gh" "$tmp/bin/gpg" "$tmp/bin/curl"
 printf '%s\n' "$SECRETVAL-passphrase" >"$tmp/pass"
-chmod 600 "$tmp/pass"
+printf '%s\n' "WRONG-file-passphrase" >"$tmp/pass-wrong"
+chmod 600 "$tmp/pass" "$tmp/pass-wrong"
 
 fails=0
 ok() { echo "ok   $1"; }
@@ -76,7 +82,7 @@ line() { grep -nF -- "$1" "$tmp/args" | head -n1 | cut -d: -f1; }
 run() {
   local s=$SCRIPT_DIR/set-signing-secrets.sh in=$3
   shift 3
-  : >"$tmp/args"; : >"$tmp/stdin"; : >"$tmp/gpg"; rm -f "$tmp/state/"{env,policy,env.GPG_PRIVATE_KEY,env.GPG_PASSPHRASE}
+  : >"$tmp/args"; : >"$tmp/stdin"; : >"$tmp/gpg"; rm -f "$tmp/state/"{env,policy,leak,env.GPG_PRIVATE_KEY,env.GPG_PASSPHRASE}
   touch "$tmp/state/repo.GPG_PRIVATE_KEY" "$tmp/state/repo.GPG_PASSPHRASE"
   # shellcheck disable=SC2086
   env PATH="$tmp/bin:$PATH" MOCK_ARGS="$tmp/args" MOCK_STDIN="$tmp/stdin" MOCK_STATE="$tmp/state" MOCK_GPG="$tmp/gpg" SECRETVAL="$SECRETVAL" \
@@ -218,7 +224,7 @@ suite() {
   if [ "${PTY:-1}" = 1 ]; then
     run_tty() { # <input lines separated by \n> <args...>
       local in=$1; shift
-      : >"$tmp/args"; : >"$tmp/stdin"; : >"$tmp/gpg"; rm -rf "$tmp/keys" "$tmp/state/"{env,policy,env.GPG_PRIVATE_KEY,env.GPG_PASSPHRASE}
+      : >"$tmp/args"; : >"$tmp/stdin"; : >"$tmp/gpg"; rm -rf "$tmp/keys" "$tmp/state/"{env,policy,leak,env.GPG_PRIVATE_KEY,env.GPG_PASSPHRASE}
       touch "$tmp/state/repo.GPG_PRIVATE_KEY" "$tmp/state/repo.GPG_PASSPHRASE"
       PTY_IN="$(printf "$in")" python3 -I -c '
 import os, pty, sys, time, termios, signal
@@ -237,7 +243,7 @@ while True:
         break
     sys.stdout.buffer.write(d); sys.stdout.flush()
 sys.exit(os.waitstatus_to_exitcode(os.waitpid(pid, 0)[1]))
-' env PATH="$tmp/bin:$PATH" MOCK_ARGS="$tmp/args" MOCK_STDIN="$tmp/stdin" MOCK_STATE="$tmp/state" MOCK_GPG="$tmp/gpg" SECRETVAL="$SECRETVAL" ASKPW="$ASKPW" \
+' env PATH="$tmp/bin:$PATH" MOCK_ARGS="$tmp/args" MOCK_STDIN="$tmp/stdin" MOCK_STATE="$tmp/state" MOCK_GPG="$tmp/gpg" SECRETVAL="$SECRETVAL" ASKPW="$ASKPW" PW="$ASKPW" pw2=preexported \
         OUT_DIR="$tmp/keys" OUT_OWNER="$(id -un):$(id -gn)" NO_UPLOAD=1 FS_SIGN_TMP="$tmp" REVIEWER=alice HOME="$tmp/nohome" \
         bash "$SCRIPT_DIR/set-signing-secrets.sh" "$@" >"$tmp/out" 2>&1
       rc=$?
@@ -247,9 +253,22 @@ sys.exit(os.waitstatus_to_exitcode(os.waitpid(pid, 0)[1]))
     ck "typed passphrase: in NO argument (gh, gpg), NOT in the output" '! grep -q "$ASKPW" "$tmp/args" && ! grep -q "$ASKPW" "$tmp/out" && ! grep -Eq "passphrase-(file|fd).*$ASKPW|$ASKPW" "$tmp/gpg"'
     ck "typed passphrase: no file anywhere in the temp tree except the mock log of gh stdin" '[ -z "$(grep -rlF "$ASKPW" "$tmp" 2>/dev/null | grep -v "^$tmp/stdin$" | grep -v "^$tmp/out$")" ]'
     ck "ask mode does not use a passphrase file" '! grep -q -- "--passphrase-file" "$tmp/gpg"'
+    ck "an exported PW/pw2 in the environment does not reach gh, gpg (environ of the children)" '[ ! -s "$tmp/state/leak" ]'
+    run_tty "y\nWRONGPW-typed\nWRONGPW-typed\ny\n" --env --repos texts
+    ck "typed passphrase does not match the key: refused before any write (rc != 0, no environment call, no secret call)" '[ "$rc" != 0 ] && grep -q "does not match the key" "$tmp/out" && ! grep -q "environments" "$tmp/args" && ! grep -q "secret" "$tmp/args"'
+    ASKPW=" lead and trail "
+    run_tty "y\n$ASKPW\n$ASKPW\ny\n" --env --repos texts
+    ck "passphrase with spaces at the edges is kept exactly (IFS= read), rc 0" '[ "$rc" = 0 ] && grep -q "gpg-fd3-passphrase-ok" "$tmp/gpg" && ! grep -q "WRONG" "$tmp/gpg"'
+    ASKPW="ask-PASSPHRASE-91c4e7"
     run_tty "y\n$ASKPW\nOTHER-typo\n" --env --repos texts
     ck "ask mode: two different entries abort, nothing written" '[ "$rc" != 0 ] && grep -q "differ" "$tmp/out" && ! grep -q "environments" "$tmp/args" && ! grep -q "$ASKPW" "$tmp/out"'
   fi
+  EXTRA="REVIEWER=alice PASSFILE=$tmp/pass-wrong"
+  run x "" "" --env --repos texts --yes
+  ck "passphrase FILE that does not match the key: refused before any write" '[ "$rc" != 0 ] && grep -q "does not match the key" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=alice GH_HOST=evil.example"
+  run x "" "" --env --repos texts --yes
+  ck "GH_HOST from the environment does not reach gh (unset)" '[ "$rc" = 0 ] && [ ! -s "$tmp/state/leak" ]'
   EXTRA="REVIEWER=alice"
   run x "" "" --repo-secrets --repos texts --yes
   ck "--repo-secrets: warning (deprecated, unprotected), repo secrets set, no environment, no delete" '[ "$rc" = 0 ] && grep -qi "deprecated" "$tmp/out" && grep -qi "unprotected" "$tmp/out" && grep -q "^secret set GPG_PRIVATE_KEY -R FreeSynergy-Net/fs-texts" "$tmp/args" && ! grep -q "environments" "$tmp/args" && ! grep -q "secret delete" "$tmp/args"'
@@ -295,10 +314,14 @@ mutant "pending membership accepted" set-signing-secrets.sh '[ "${role#* }" = ac
 mutant "no Ziel line in dry run" set-signing-secrets.sh 'echo "Ziel: Organisation' ': "Ziel: Organisation'
 PTYM=1 mutant "passphrase as gh argument" signing_env_lib.sh 'gh "$@" < <(printf '"'"'%s'"'"' "$PW")' 'gh "$@" --body "$PW" < <(printf '"'"'%s'"'"' "$PW")'
 PTYM=1 mutant "passphrase written to a file" set-signing-secrets.sh 'unset pw2
-  else' 'unset pw2; printf "%s" "$PW" >"$TMP_PWFILE_DEBUG"
+  else' 'unset pw2; printf "%s" "$PW" >"$TMP/pw"
   else'
 PTYM=1 mutant "ask mode without terminal check" set-signing-secrets.sh '[ -t 0 ] || die "the passphrase is typed' 'true || die "the passphrase is typed'
 PTYM=1 mutant "typo check removed" set-signing-secrets.sh '[ -n "$PW" ] && [ "$PW" = "$pw2" ] ||' 'true ||'
+PTYM=1 mutant "passphrase never verified" set-signing-secrets.sh '    || die "the passphrase does not match the key (Passphrase passt nicht zum Schluessel); nothing was written"' '    || true'
+PTYM=1 mutant "IFS not cleared (edge spaces lost)" set-signing-secrets.sh 'IFS= read -rsp "Passphrase of the signing key' 'read -rsp "Passphrase of the signing key'
+PTYM=1 mutant "PW stays exported" set-signing-secrets.sh 'export -n PW pw2   # a PW or pw2 inherited' 'true   # a PW or pw2 inherited'
+mutant "GH_HOST kept" set-signing-secrets.sh 'unset GH_HOST   #' 'true   #'
 mutant "REVIEWER default" set-signing-secrets.sh 'REVIEWER=${REVIEWER:-} DEV=0' 'REVIEWER=${REVIEWER:-alice} DEV=0'
 mutant "dry run executes" signing_env_lib.sh 'if [ "$DRY" = 1 ]; then
     printf' 'if false; then

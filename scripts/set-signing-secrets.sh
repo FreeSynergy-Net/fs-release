@@ -12,7 +12,7 @@
 #                     deployment only for named refs), (2) tag rule v* (listed first, never twice), (3) GPG_PRIVATE_KEY and GPG_PASSPHRASE as
 #                     environment secrets, (4) delete the same-named repository secrets, ONLY after both environment secrets were set and only
 #                     after confirmation (--yes, else a question per repository), (5) read-only check; any deviation = rc 1.
-#   --env-only        for organisation secrets: ONLY (1) the environment release-signing with required reviewer and (2) the tag rule v*; no signing key is
+#   --env-only        creates only the environment, reviewer and tag rule (for example in advance; the secrets follow with --env; organisation secrets are NOT protected): ONLY (1) the environment release-signing with required reviewer and (2) the tag rule v*; no signing key is
 #                     exported, no secret is set or deleted, no gpg, no keys.openpgp.org, no delete question. The check reads environment and tag rule only.
 #   --repo-secrets    old mode: repository secrets (deprecated, unprotected: any workflow of the repo can read them).
 # Options:
@@ -41,11 +41,13 @@ umask 077
 
 PRIMARY=16A4A3EE563AEF51FCF0C55DED7B57C4A1904342
 PASSFILE=${PASSFILE:-}
+export -n PW pw2   # a PW or pw2 inherited from the environment must not stay exported to gh, gpg, jq or curl
+unset GH_HOST   # gh must talk to github.com: the Ziel line names the organisation, not a host
 PW=""   # the typed passphrase (ask mode): only ever in this shell variable, never in a file, argument or output; unset on EXIT
 OUT_DIR=${OUT_DIR:-/srv/FreeSynergy/.scratch/keys}
 OUT_OWNER=${OUT_OWNER:-kal:kal}
 ORG=${FS_ORG:-FreeSynergy-Net}  # the GitHub organisation of our repositories; NOT the unrelated organisation `FreeSynergy`
-DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-capnpc fs-packages fs-files fs-messages fs-broadcast fs-draw fs-modules-planning fs-modules-person fs-starter)  # callers of release.yml: 9 old ones, fs-messages, fs-broadcast, fs-draw (checked 25.11.), plus fs-modules-planning, fs-modules-person (no caller yet) and fs-starter, planned for tag releases
+DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-capnpc fs-packages fs-files fs-messages fs-broadcast fs-draw fs-modules-planning fs-modules-person fs-starter)  # callers of release.yml: 9 old ones, fs-messages, fs-broadcast, fs-draw, fs-modules-planning, fs-starter (checked 25.11.), plus fs-modules-person (no caller yet, planned for tag releases)
 
 die() { echo "error: $*" >&2; exit 1; }
 usage() { echo "error: $*" >&2; echo "usage: REVIEWER=<login> $0 [--env|--env-only|--repo-secrets] [--repos a,b] [--allow-self-review] [--yes] [--ruleset-tags <repo>] [--dry-run]" >&2; exit 2; }
@@ -124,7 +126,7 @@ fi
 TMP=$(mktemp -d "${FS_SIGN_TMP:-/dev/shm}/fs-sign.XXXXXX") || die "no private temp dir"
 chmod 700 "$TMP"
 # shellcheck disable=SC2154  # f is the loop variable inside the single-quoted trap
-trap 'unset PW; for f in sub.asc body out err names; do shred -u "$TMP/$f" 2>/dev/null || rm -f "$TMP/$f"; done; rmdir "$TMP" 2>/dev/null || true' EXIT
+trap 'unset PW; gpgconf --homedir "$TMP/vh" --kill all >/dev/null 2>&1; rm -rf "$TMP/vh"; for f in sub.asc body out err names; do shred -u "$TMP/$f" 2>/dev/null || rm -f "$TMP/$f"; done; rmdir "$TMP" 2>/dev/null || true' EXIT
 # shellcheck source=signing_env_lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/signing_env_lib.sh"
 
@@ -152,9 +154,9 @@ if [ "$DO_SECRETS" = 1 ] && [ "$KEYS" = 1 ] && [ "$DRY" = 0 ]; then
   command -v gpg >/dev/null || die "gpg is needed"
   if [ "$ASK" = 1 ]; then
     [ -t 0 ] || die "the passphrase is typed, but there is no terminal (stdin is not a terminal); run it in a terminal, or give PASSFILE (mode 600)"
-    pw2=""
-    read -rsp "Passphrase of the signing key (not shown): " PW || die "no passphrase read"; echo >&2
-    read -rsp "Passphrase again (typo check): " pw2 || die "no passphrase read"; echo >&2
+    pw2=""; export -n pw2
+    IFS= read -rsp "Passphrase of the signing key (not shown): " PW || die "no passphrase read"; echo >&2
+    IFS= read -rsp "Passphrase again (typo check): " pw2 || die "no passphrase read"; echo >&2
     [ -n "$PW" ] && [ "$PW" = "$pw2" ] || { unset pw2; die "the two entries differ or are empty; nothing was done"; }
     unset pw2
   else
@@ -187,6 +189,12 @@ if [ "$DO_SECRETS" = 1 ] && [ "$KEYS" = 1 ] && [ "$DRY" = 0 ]; then
   echo "signing subkey: $SUB"
   gpgp --armor --export-secret-subkeys "${SUB}!" >"$TMP/sub.asc"
   grep -q "BEGIN PGP PRIVATE KEY BLOCK" "$TMP/sub.asc" || die "export of the subkey failed"
+  # The export also works with a WRONG passphrase, so prove the passphrase before anything is written: import the exported subkey into a
+  # throw-away GNUPGHOME (no agent cache there) and sign a test string with it.
+  mkdir -m 700 "$TMP/vh"
+  gpg --homedir "$TMP/vh" --batch --quiet --import "$TMP/sub.asc" >/dev/null 2>&1 || die "the exported subkey could not be imported for the passphrase check"
+  printf 'test' | gpgp --homedir "$TMP/vh" --quiet --local-user "${SUB}!" --sign -o /dev/null >/dev/null 2>&1 \
+    || die "the passphrase does not match the key (Passphrase passt nicht zum Schluessel); nothing was written"
 fi
 
 FAILED=0
