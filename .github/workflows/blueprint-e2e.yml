@@ -124,6 +124,32 @@ jobs:
             echo "== $p"
             "$bin" check --repo "acceptance/$p" | sed -e 's/  .*//' -e 's/{.*//' | sort | uniq -c | sort -rn || true
           done
+  # The release path of kind `module` BEFORE the tag (8a: v0.0.4 of planning was red at "package rpm"): the REAL plan.py, package-linux/package.sh of THIS branch
+  # (no pin) and the fs-blueprint built from THIS branch run on a tiny module (tests/module-probe); the RPM fs-module-probe is read back with rpm.
+  # Both CPUs like the release (x86_64 and aarch64 runner). tests/packaging/kinds.sh has the same path with stubs.
+  module-probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@78cc989d267fb11fc2df0137174ea8b4559b21a5
+        with:
+          toolchain: pinned
+          cache-key: module-probe-${{ matrix.os }}
+      - name: rpm tool and fs-blueprint of this branch
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends rpm
+          cargo install --path crates/fs-blueprint --locked --root "$RUNNER_TEMP/fsbp"
+          echo "$RUNNER_TEMP/fsbp/bin" >> "$GITHUB_PATH"
+      - name: kind module, step "package rpm" for real (plan.py, package.sh, fs-blueprint package module, rpm -qp)
+        run: bash tests/module-probe/run.sh
+
   # The commands of the README run WORD FOR WORD (scripts/readme-run.sh reads the block after `<!-- readme-run -->`): install from the tag into a work
   # folder, copy examples/leer, `new` with the catalog that comes with the command (no --catalog), `check --repo`. A wrong README line or an invalid example is red.
   readme:

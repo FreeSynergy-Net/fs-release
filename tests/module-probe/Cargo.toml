@@ -1,0 +1,15 @@
+# Probe module for the release path of kind `module` (tests/module-probe/run.sh): not a member of the workspace, built only by that script.
+[workspace]
+
+[package]
+name = "fs-module-probe"
+version = "0.1.1"
+edition = "2021"
+authors = ["FreeSynergy <support@freesynergy.net>"]
+description = "Probe module of the fs-release module packaging"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/FreeSynergy-Net/fs-release"
+
+[[bin]]
+name = "probe-service"
+path = "src/main.rs"
