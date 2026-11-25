@@ -33,7 +33,7 @@ revocation certificate, publish it, remove the secrets from GitHub, generate a n
 ## Give it to GitHub
 
 The target state is **environment secrets** of the GitHub environment `release-signing` in EACH repository that releases (the environment holds the required
-reviewer, so nobody signs unseen; `docs/usage.md`, "Approval for the signing job"). Set it up with `scripts/set-signing-secrets.sh --env --dry-run` first (read it),
+reviewer, so nobody signs unseen; `docs/usage.md`, "Approval for the signing job"). Set it up with `scripts/set-signing-secrets.sh --env --dry-run` first (read it) (target organisation `FreeSynergy-Net`, overridable with `FS_ORG`; never the unrelated organisation `FreeSynergy`; the logged-in account must be admin of it and the script asks before writing),
 then for real: *Settings > Environments > release-signing > Environment secrets*:
 
 | Secret | Content |

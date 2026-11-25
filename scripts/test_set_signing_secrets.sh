@@ -24,6 +24,7 @@ for ((i = 1; i <= $#; i++)); do [ "${!i}" = -R ] && j=$((i + 1)) && repo=${!j//\
 case "$*" in
   "api user --jq .login") echo FreeSynergy ;;
   "api user --jq .id") echo 1 ;;
+  "api orgs/"*"/memberships/"*" --jq .role") echo "${MOCK_ROLE:-admin}"; [ -z "${MOCK_ROLE_FAIL:-}" ] || exit 1 ;;
   "api users/alice --jq "*) echo "4242 User" ;;
   "api users/FreeSynergy --jq "* | "api users/freesynergy --jq "*) echo "1 User" ;;
   "api users/someorg --jq "*) echo "77 Organization" ;;
@@ -91,9 +92,9 @@ suite() {
   EXTRA="REVIEWER=alice"
   run x "" "" --env --repos texts --yes
   ck "normal run rc 0" '[ "$rc" = 0 ]'
-    a=$(line "-X PUT repos/FreeSynergy/fs-texts/environments/release-signing"); b=$(line "-X POST repos/FreeSynergy/fs-texts/environments/release-signing/deployment-branch-policies")
-  c=$(line "secret set GPG_PRIVATE_KEY --env release-signing -R FreeSynergy/fs-texts"); d=$(line "secret set GPG_PASSPHRASE --env release-signing -R FreeSynergy/fs-texts")
-  e=$(line "secret delete GPG_PRIVATE_KEY -R FreeSynergy/fs-texts"); f=$(line "secret delete GPG_PASSPHRASE -R FreeSynergy/fs-texts")
+    a=$(line "-X PUT repos/FreeSynergy-Net/fs-texts/environments/release-signing"); b=$(line "-X POST repos/FreeSynergy-Net/fs-texts/environments/release-signing/deployment-branch-policies")
+  c=$(line "secret set GPG_PRIVATE_KEY --env release-signing -R FreeSynergy-Net/fs-texts"); d=$(line "secret set GPG_PASSPHRASE --env release-signing -R FreeSynergy-Net/fs-texts")
+  e=$(line "secret delete GPG_PRIVATE_KEY -R FreeSynergy-Net/fs-texts"); f=$(line "secret delete GPG_PASSPHRASE -R FreeSynergy-Net/fs-texts")
   ck "order: PUT env < POST tag rule < set private < set passphrase < delete private < delete passphrase" '[ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ -n "$d" ] && [ -n "$e" ] && [ -n "$f" ] && [ "$a" -lt "$b" ] && [ "$b" -lt "$c" ] && [ "$c" -lt "$d" ] && [ "$d" -lt "$e" ] && [ "$e" -lt "$f" ]'
   ck "environment body: reviewer id, prevent_self_review true, tag-only deployment" 'grep -q "\"prevent_self_review\":true" "$tmp/stdin" && grep -q "\"reviewers\":\[{\"type\":\"User\",\"id\":4242}\]" "$tmp/stdin" && grep -q "\"custom_branch_policies\":true" "$tmp/stdin"'
   ck "tag rule body" 'grep -q "{\"name\":\"v\*\",\"type\":\"tag\"}" "$tmp/stdin"'
@@ -101,13 +102,13 @@ suite() {
   ck "secret value in NO argument and NOT in the output" '! grep -q "$SECRETVAL" "$tmp/args" && ! grep -q "$SECRETVAL" "$tmp/out"'
   ck "check at the end green" 'grep -q -- "--- check" "$tmp/out" && ! grep -q DEVIATION "$tmp/out"'
   run x "" "" --env --yes
-  ck "default list = the 9 release.yml callers, all hardened" '[ "$rc" = 0 ] && [ "$(grep -c -- "-X PUT repos/FreeSynergy/fs-[a-z]*/environments" "$tmp/args")" = 9 ] && for n in texts people calendars tasks groups maps capnpc packages files; do grep -q "PUT repos/FreeSynergy/fs-$n/environments" "$tmp/args" || exit 1; done'
+  ck "default list = the 9 release.yml callers + planning, person, starter (12), all hardened" '[ "$rc" = 0 ] && [ "$(grep -c -- "-X PUT repos/FreeSynergy-Net/fs-[a-z-]*/environments" "$tmp/args")" = 12 ] && for n in texts people calendars tasks groups maps capnpc packages files modules-planning modules-person starter; do grep -q "PUT repos/FreeSynergy-Net/fs-$n/environments" "$tmp/args" || exit 1; done'
   EXTRA="REVIEWER=alice MOCK_ENV_EXISTS=1"
   run x "" "" --env --repos packages --yes
-  ck "fixture existing environment without reviewer/rule/env secrets: updated and hardened, rc 0" '[ "$rc" = 0 ] && grep -q "PUT repos/FreeSynergy/fs-packages/environments/release-signing" "$tmp/args" && grep -q "POST repos/FreeSynergy/fs-packages/environments/release-signing/deployment-branch-policies" "$tmp/args" && grep -q "secret set GPG_PASSPHRASE --env" "$tmp/args"'
+  ck "fixture existing environment without reviewer/rule/env secrets: updated and hardened, rc 0" '[ "$rc" = 0 ] && grep -q "PUT repos/FreeSynergy-Net/fs-packages/environments/release-signing" "$tmp/args" && grep -q "POST repos/FreeSynergy-Net/fs-packages/environments/release-signing/deployment-branch-policies" "$tmp/args" && grep -q "secret set GPG_PASSPHRASE --env" "$tmp/args"'
   EXTRA="REVIEWER=alice"
   run x "" "" --repos texts --yes
-  ck "fixture environment absent (404 on read): created by PUT, rc 0" '[ "$rc" = 0 ] && grep -q "PUT repos/FreeSynergy/fs-texts/environments/release-signing" "$tmp/args"'
+  ck "fixture environment absent (404 on read): created by PUT, rc 0" '[ "$rc" = 0 ] && grep -q "PUT repos/FreeSynergy-Net/fs-texts/environments/release-signing" "$tmp/args"'
   ck "default mode is --env" 'grep -q "environments/release-signing" "$tmp/args"'
   EXTRA="REVIEWER=alice MOCK_FAIL_MATCH=GPG_PASSPHRASE"
   run x "" "" --env --repos texts --yes
@@ -122,9 +123,9 @@ suite() {
   run x "" "" --env --repos texts --yes
   ck "idempotent: tag rule exists, no second POST" '[ "$rc" = 0 ] && ! grep -q -- "-X POST" "$tmp/args"'
   EXTRA="REVIEWER=alice"
-  run x "" "n" --env --repos texts
+  run x "" $'y\nn' --env --repos texts
   ck "delete declined: no delete, rc 1 (unprotected copy remains)" '[ "$rc" = 1 ] && ! grep -q "secret delete" "$tmp/args" && grep -q "still exists" "$tmp/out"'
-  run x "" "y" --env --repos texts
+  run x "" $'y\ny' --env --repos texts
   ck "delete confirmed by answer y" '[ "$rc" = 0 ] && grep -q "secret delete GPG_PASSPHRASE" "$tmp/args"'
   EXTRA="REVIEWER=FreeSynergy"
   run x "" "" --env --repos texts --yes
@@ -160,18 +161,35 @@ suite() {
   ck "dry run prints the calls, redacted, for both repos, no value" 'grep -q "redacted" "$tmp/out" && grep -q "fs-packages" "$tmp/out" && grep -q "secret set GPG_PRIVATE_KEY" "$tmp/out" && ! grep -q "$SECRETVAL" "$tmp/out"'
   ck "dry run left the state untouched (repo secrets still there)" '[ -e "$tmp/state/repo.GPG_PRIVATE_KEY" ]'
   EXTRA=""
-  run x "" "" --ruleset-tags fs-release
-  ck "ruleset only: rc 0, no REVIEWER needed, no secrets, POST" '[ "$rc" = 0 ] && grep -q "^api -X POST repos/FreeSynergy/fs-release/rulesets --input -" "$tmp/args" && ! grep -q "secret" "$tmp/args" && [ ! -s "$tmp/gpg" ]'
+  run x "" "y" --ruleset-tags fs-release
+  ck "ruleset only: rc 0, no REVIEWER needed, no secrets, POST" '[ "$rc" = 0 ] && grep -q "^api -X POST repos/FreeSynergy-Net/fs-release/rulesets --input -" "$tmp/args" && ! grep -q "secret" "$tmp/args" && [ ! -s "$tmp/gpg" ]'
   ck "ruleset body: tag, active, refs/tags/v*, deletion + non_fast_forward + update, NO creation" 'grep -q "\"target\":\"tag\"" "$tmp/stdin" && grep -q "\"enforcement\":\"active\"" "$tmp/stdin" && grep -q "\"include\":\[\"refs/tags/v\*\"\]" "$tmp/stdin" && grep -q "\"rules\":\[{\"type\":\"deletion\"},{\"type\":\"non_fast_forward\"},{\"type\":\"update\"}\]" "$tmp/stdin" && ! grep -q "creation" "$tmp/stdin"'
   EXTRA="MOCK_RULESET_ID=7"
-  run x "" "" --ruleset-tags fs-release
-  ck "ruleset idempotent: existing one is updated (PUT /7), not duplicated" '[ "$rc" = 0 ] && grep -q "^api -X PUT repos/FreeSynergy/fs-release/rulesets/7 --input -" "$tmp/args" && ! grep -q -- "-X POST" "$tmp/args"'
+  run x "" "y" --ruleset-tags fs-release
+  ck "ruleset idempotent: existing one is updated (PUT /7), not duplicated" '[ "$rc" = 0 ] && grep -q "^api -X PUT repos/FreeSynergy-Net/fs-release/rulesets/7 --input -" "$tmp/args" && ! grep -q -- "-X POST" "$tmp/args"'
   EXTRA=""
   run x "" "" --ruleset-tags fs-release --dry-run
   ck "ruleset dry run: nothing run" '[ "$rc" = 0 ] && [ ! -s "$tmp/args" ] && grep -q "rulesets" "$tmp/out"'
   EXTRA="REVIEWER=alice"
+  run x "" "" --env --repos texts,modules-planning --dry-run
+  ck "dry run: every gh call names FreeSynergy-Net/<repo>, NEVER the foreign org FreeSynergy/" '[ "$rc" = 0 ] && grep -q "FreeSynergy-Net/fs-texts" "$tmp/out" && grep -q "FreeSynergy-Net/fs-modules-planning" "$tmp/out" && ! grep -q "FreeSynergy/fs-" "$tmp/out" && ! grep -q "FreeSynergy/" "$tmp/args"'
+  run x "" "" --env --repos fs-modules-planning --yes
+  ck "--repos fs-modules-planning accepted; real run only talks to FreeSynergy-Net, never FreeSynergy/" '[ "$rc" = 0 ] && grep -q "PUT repos/FreeSynergy-Net/fs-modules-planning/environments" "$tmp/args" && ! grep -q "FreeSynergy/" "$tmp/args"'
+  EXTRA="REVIEWER=alice FS_ORG=OtherOrg"
+  run x "" "" --env --repos texts --yes
+  ck "FS_ORG overrides the organisation" '[ "$rc" = 0 ] && grep -q "PUT repos/OtherOrg/fs-texts/environments" "$tmp/args" && ! grep -q "FreeSynergy-Net" "$tmp/args"'
+  EXTRA="REVIEWER=alice"
+  run x "" "n" --env --repos texts
+  ck "target line shown; answer n: nothing written, rc != 0" '[ "$rc" != 0 ] && grep -q "Ziel: Organisation FreeSynergy-Net, Repositories: fs-texts" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=alice MOCK_ROLE=member"
+  run x "" "" --env --repos texts --yes
+  ck "account is member but not admin: refused, nothing written" '[ "$rc" != 0 ] && grep -q "role admin is required" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=alice MOCK_ROLE_FAIL=1"
+  run x "" "" --env --repos texts --yes
+  ck "account not in the organisation: clear message, nothing written" '[ "$rc" != 0 ] && grep -q "not a member of the organisation" "$tmp/out" && ! grep -q "environments" "$tmp/args"'
+  EXTRA="REVIEWER=alice"
   run x "" "" --repo-secrets --repos texts --yes
-  ck "--repo-secrets: warning (deprecated, unprotected), repo secrets set, no environment, no delete" '[ "$rc" = 0 ] && grep -qi "deprecated" "$tmp/out" && grep -qi "unprotected" "$tmp/out" && grep -q "^secret set GPG_PRIVATE_KEY -R FreeSynergy/fs-texts" "$tmp/args" && ! grep -q "environments" "$tmp/args" && ! grep -q "secret delete" "$tmp/args"'
+  ck "--repo-secrets: warning (deprecated, unprotected), repo secrets set, no environment, no delete" '[ "$rc" = 0 ] && grep -qi "deprecated" "$tmp/out" && grep -qi "unprotected" "$tmp/out" && grep -q "^secret set GPG_PRIVATE_KEY -R FreeSynergy-Net/fs-texts" "$tmp/args" && ! grep -q "environments" "$tmp/args" && ! grep -q "secret delete" "$tmp/args"'
   run x "" "" --env --repo-secrets --repos texts
   ck "--env with --repo-secrets: rc 2" '[ "$rc" = 2 ]'
   run x "" "" --bogus
@@ -203,6 +221,9 @@ PY
 fails=$real
 mutant "delete before set" signing_env_lib.sh '  env_secrets "$r" ||' '  delete_repo_secrets "$r" || true; env_secrets "$r" ||'
 mutant "secret value as argument" signing_env_lib.sh 'secret set GPG_PRIVATE_KEY --env' 'secret set GPG_PRIVATE_KEY --body "$(cat "$TMP/sub.asc")" --env'
+mutant "ORG back to the foreign organisation" set-signing-secrets.sh 'ORG=${FS_ORG:-FreeSynergy-Net}' 'ORG=FreeSynergy'
+mutant "admin role not checked" set-signing-secrets.sh '[ "$role" = admin ] ||' 'true ||'
+mutant "no target confirmation" set-signing-secrets.sh '[ "$ans" = y ] || [ "$ans" = Y ] || die "not confirmed' 'true || die "not confirmed'
 mutant "REVIEWER default" set-signing-secrets.sh 'REVIEWER=${REVIEWER:-} DEV=0' 'REVIEWER=${REVIEWER:-alice} DEV=0'
 mutant "dry run executes" signing_env_lib.sh 'if [ "$DRY" = 1 ]; then
     printf' 'if false; then

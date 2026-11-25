@@ -17,7 +17,7 @@
 #   --repos a,b       repositories (program names `texts` or `fs-texts`); default: the repositories that call release.yml. `all` = every non-archived fs-*.
 #   --reviewer LOGIN  or the variable REVIEWER: the account that approves a signing run (REQUIRED for --env, no default; never an agent account).
 #   --allow-self-review  switch prevent_self_review off (default: on, see docs/usage.md); needed when REVIEWER is the account that pushes the tag.
-#   --yes             delete the repository secrets without asking.
+#   --yes             no questions: neither the target confirmation (organisation + repositories) nor the delete confirmation.
 #   --ruleset-tags R  tag ruleset "tags v* immutable" in repository R (rules deletion, non_fast_forward, update: tags v* cannot be deleted or moved; new tags can still be created).
 #                     Alone it does nothing else; with --repos it runs in addition.
 #   --dry-run         only print the gh calls (no value, `<redacted>`), run nothing, read nothing (also no gpg, no gh); rc 0.
@@ -26,7 +26,9 @@
 #   3. the public key (primary + subkeys) and the subkey fingerprint go to $OUT_DIR, 4. upload to keys.openpgp.org (NO_UPLOAD=1 skips).
 # Settings (environment): PASSFILE (passphrase file, mode 600, default ~/.config/freesynergy/release-passphrase), GNUPGHOME,
 #   OUT_DIR (default /srv/FreeSynergy/.scratch/keys), OUT_OWNER (default kal:kal), FS_SIGN_TMP (private dir for the export, default /dev/shm).
-# Needs: gpg, gh (logged in as FreeSynergy; the account must be admin of the repositories), curl, jq.
+#   FS_ORG            the GitHub organisation (default FreeSynergy-Net, where our repositories are). Never `FreeSynergy` (a different organisation).
+# Needs: gpg, gh (logged in with YOUR account; it must be admin of the organisation, checked via orgs/$ORG/memberships/<you>), curl, jq.
+# Before every real write the line "Ziel: Organisation ..., Repositories: ..." is printed and confirmed (without --yes).
 # shellcheck disable=SC2034  # YES, REVIEWER_ID_JSON, PREVENT, DEV, MODE, DRY are read by signing_env_lib.sh
 set -euo pipefail
 set +x
@@ -36,13 +38,13 @@ PRIMARY=16A4A3EE563AEF51FCF0C55DED7B57C4A1904342
 PASSFILE=${PASSFILE:-$HOME/.config/freesynergy/release-passphrase}
 OUT_DIR=${OUT_DIR:-/srv/FreeSynergy/.scratch/keys}
 OUT_OWNER=${OUT_OWNER:-kal:kal}
-ORG=FreeSynergy
-DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-capnpc fs-packages fs-files)  # the 9 callers of release.yml
+ORG=${FS_ORG:-FreeSynergy-Net}  # the GitHub organisation of our repositories; NOT the unrelated organisation `FreeSynergy`
+DEFAULT_REPOS=(fs-texts fs-people fs-calendars fs-tasks fs-groups fs-maps fs-capnpc fs-packages fs-files fs-modules-planning fs-modules-person fs-starter)  # the 9 callers of release.yml plus the 3 repositories planned for tag releases
 
 die() { echo "error: $*" >&2; exit 1; }
 usage() { echo "error: $*" >&2; echo "usage: REVIEWER=<login> $0 [--env|--repo-secrets] [--repos a,b] [--allow-self-review] [--yes] [--ruleset-tags <repo>] [--dry-run]" >&2; exit 2; }
 
-whoid="" rinfo="" rid="" rtype="" MODE="" DRY=0 YES=0 PREVENT=true RULESET_REPO="" REPOS_ARG="" REVIEWER=${REVIEWER:-} DEV=0
+whoid="" ans="" role="" tgt=() rinfo="" rid="" rtype="" MODE="" DRY=0 YES=0 PREVENT=true RULESET_REPO="" REPOS_ARG="" REVIEWER=${REVIEWER:-} DEV=0
 REPOS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -55,7 +57,7 @@ while [ $# -gt 0 ]; do
     --allow-self-review) PREVENT=false ;;
     --yes) YES=1 ;;
     --dry-run) DRY=1 ;;
-    -h | --help) sed -n "2,29p" "$0"; exit 0 ;;
+    -h | --help) sed -n "2,32p" "$0"; exit 0 ;;
     -*) usage "unknown option $1" ;;
     *) REPOS_ARG=${REPOS_ARG:+$REPOS_ARG,}$1 ;;
   esac
@@ -91,7 +93,17 @@ if [ "$DRY" = 0 ]; then
   for tool in gh curl; do command -v "$tool" >/dev/null || die "$tool is needed"; done
   who=$(gh api user --jq .login </dev/null) || die "gh is not logged in (gh auth login)"
   whoid=$(gh api user --jq .id </dev/null) || die "cannot read the id of the logged-in account"
-  [ "$who" = "$ORG" ] || die "gh is logged in as '$who', not '$ORG' (gh auth switch -u $ORG)"
+  role=$(gh api "orgs/$ORG/memberships/$who" --jq .role </dev/null 2>/dev/null) \
+    || die "'$who' is not a member of the organisation '$ORG' (or gh may not read it); log in with an account that is admin of '$ORG' (gh auth switch)"
+  [ "$role" = admin ] || die "'$who' has the role '$role' in '$ORG', but the role admin is required"
+  tgt=("${REPOS[@]}"); [ -z "$RULESET_REPO" ] || tgt+=("$RULESET_REPO")
+  if [ "$REPOS_ARG" = all ]; then tgt=("(every non-archived fs-* repository)"); fi
+  echo "Ziel: Organisation $ORG, Repositories: ${tgt[*]}" >&2
+  if [ "$YES" != 1 ]; then
+    printf 'Write to the organisation %s as shown above? [y/N] ' "$ORG" >&2
+    read -r ans || ans=n
+    [ "$ans" = y ] || [ "$ans" = Y ] || die "not confirmed; nothing was changed"
+  fi
 fi
 
 TMP=$(mktemp -d "${FS_SIGN_TMP:-/dev/shm}/fs-sign.XXXXXX") || die "no private temp dir"

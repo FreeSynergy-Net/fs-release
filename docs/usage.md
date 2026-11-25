@@ -235,7 +235,9 @@ REVIEWER=<login> bash scripts/set-signing-secrets.sh --env
 bash scripts/set-signing-secrets.sh --ruleset-tags fs-release
 ```
 
-Default list of `--env` (the 9 callers of `release.yml`): fs-texts, fs-people, fs-calendars, fs-tasks, fs-groups, fs-maps, fs-capnpc, fs-packages, fs-files;
+The target organisation is `FreeSynergy-Net` (where our repositories are); the unrelated GitHub organisation `FreeSynergy` is NEVER a target. `FS_ORG=<org>` overrides it. For a real run the script checks that the logged-in account (your own, NOT a fixed account name) is a member of the organisation with the role `admin` (`gh api orgs/$ORG/memberships/<you>`), prints `Ziel: Organisation <org>, Repositories: ...` and asks for confirmation (`--yes` skips the question); a dry run reads and asks nothing.
+
+Default list of `--env` (the 9 callers of `release.yml` plus fs-modules-planning, fs-modules-person and fs-starter, which are planned for tag releases): fs-texts, fs-people, fs-calendars, fs-tasks, fs-groups, fs-maps, fs-capnpc, fs-packages, fs-files, fs-modules-planning, fs-modules-person, fs-starter;
 `--repos texts,packages` (program names, with or without `fs-`) overrides it. Per repository, in this order: (1) PUT the environment `release-signing` with the
 required reviewer (`REVIEWER`, a required argument or variable: there is no default; the login becomes a numeric id) and deployment only for named refs
 (creates a missing environment and hardens an existing unprotected one); (2) tag rule `v*` (listed first, never created twice); (3) `GPG_PRIVATE_KEY` and
