@@ -18,6 +18,7 @@ fn pack_texts(folder: &Path, base: &str, files: &mut Vec<SpecFile>) -> Result<()
         return Ok(());
     }
     check_plain_dir(&src)?;
+    no_links(&src)?;
     let sources = fs_texts_pack::read_dir(&src).map_err(|e| format!("{}: {e}", src.display()))?;
     for l in TEXT_LANGUAGES {
         if !sources.iter().any(|s| s.language == l) {
@@ -29,9 +30,10 @@ fn pack_texts(folder: &Path, base: &str, files: &mut Vec<SpecFile>) -> Result<()
     }
     let packed =
         fs_texts_pack::pack(&sources, &[]).map_err(|e| format!("{}: {e}", src.display()))?;
+    let own = format!("{base}/catalog/texts");
     if files
         .iter()
-        .any(|f| f.dest.starts_with(&format!("{base}/catalog/texts")))
+        .any(|f| f.dest == own || f.dest.starts_with(&format!("{own}/")))
     {
         return Err("catalog/texts exists next to texts/: the packed texts would collide".into());
     }
@@ -144,6 +146,22 @@ pub(crate) fn read_plain(p: &Path) -> Result<Vec<u8>, String> {
         return Err(format!("{}: not a plain file", p.display()));
     }
     read(p)
+}
+
+/// Every entry below `dir`, at any depth, must be a plain file or folder: a link is refused (it could pull a file of the build machine into a signed package).
+fn no_links(dir: &Path) -> Result<(), String> {
+    let list = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    for e in list.flatten() {
+        let meta = std::fs::symlink_metadata(e.path())
+            .map_err(|x| format!("{}: {x}", e.path().display()))?;
+        if meta.file_type().is_symlink() {
+            return Err(format!("{}: a link is not packaged", e.path().display()));
+        }
+        if meta.is_dir() {
+            no_links(&e.path())?;
+        }
+    }
+    Ok(())
 }
 
 /// The folder `catalog` must be a real folder, not a link.

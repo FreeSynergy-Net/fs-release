@@ -107,11 +107,12 @@ fn a_module_without_texts_is_unchanged() {
 
 #[test]
 fn a_gap_or_a_broken_source_is_an_error() {
-    for (tag, texts) in [
-        ("tx-only-en", vec![("en.mf2", EN)]),
+    for (tag, texts, why) in [
+        ("tx-only-en", vec![("en.mf2", EN)], "de.mf2 is missing"),
         (
             "tx-pair",
             vec![("en.mf2", EN), ("de.mf2", "person.emails = E-Mails\n")],
+            "missing in de",
         ),
         (
             "tx-broken",
@@ -119,13 +120,39 @@ fn a_gap_or_a_broken_source_is_an_error() {
                 ("en.mf2", EN),
                 ("de.mf2", "person.emails = {oops\nperson.titles = Titel\n"),
             ],
+            "does not parse",
         ),
     ] {
         let (d, bin) = module(tag, &texts);
         let out = scratch(&format!("{tag}-out"));
         let (code, msg) = make(&out, &d, &bin);
         assert_ne!(code, 0, "{tag}: {msg}");
-        assert!(msg.contains("texts"), "{tag}: {msg}");
+        assert!(msg.contains(why), "{tag}: {msg}");
+        assert!(
+            !out.join("fs-module-person-0.0.4-1.x86_64.rpm").exists(),
+            "{tag}"
+        );
+    }
+}
+
+#[test]
+fn a_link_in_texts_is_refused_for_a_file_and_for_a_folder() {
+    use std::os::unix::fs::symlink;
+    for (tag, deep) in [("tx-link-file", false), ("tx-link-dir", true)] {
+        let (d, bin) = module(tag, &[("en.mf2", EN), ("de.mf2", DE)]);
+        let outside = scratch(&format!("{tag}-outside"));
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("x.mf2"), DE).unwrap();
+        if deep {
+            symlink(&outside, d.join("texts/sub")).unwrap();
+        } else {
+            std::fs::remove_file(d.join("texts/de.mf2")).unwrap();
+            symlink(outside.join("x.mf2"), d.join("texts/de.mf2")).unwrap();
+        }
+        let out = scratch(&format!("{tag}-out"));
+        let (code, msg) = make(&out, &d, &bin);
+        assert_ne!(code, 0, "{tag}: {msg}");
+        assert!(msg.contains("a link is not packaged"), "{tag}: {msg}");
         assert!(
             !out.join("fs-module-person-0.0.4-1.x86_64.rpm").exists(),
             "{tag}"
