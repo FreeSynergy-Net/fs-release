@@ -49,7 +49,7 @@ fn two_runs_write_the_same_files() {
     assert_eq!(run(&data(), a.path(), &["--locales", "de,en"]).0, 0);
     assert_eq!(run(&data(), b.path(), &[]).0, 0);
     let (fa, fb) = (files(a.path()), files(b.path()));
-    assert_eq!(fa.len(), 5);
+    assert_eq!(fa.len(), 7);
     assert_eq!(fa, fb);
 }
 
@@ -59,7 +59,7 @@ fn only_the_asked_languages_are_written_and_the_manifest_stays() {
     assert_eq!(run(&data(), all.path(), &[]).0, 0);
     assert_eq!(run(&data(), en.path(), &["--locales", "en"]).0, 0);
     let names: Vec<String> = files(en.path()).into_iter().map(|f| f.0).collect();
-    assert_eq!(names.len(), 3, "{names:?}");
+    assert_eq!(names.len(), 4, "{names:?}");
     let manifest = |d: &Path| std::fs::read(d.join("manifest.mf2m")).unwrap();
     assert_eq!(manifest(all.path()), manifest(en.path()));
 }

@@ -1038,13 +1038,24 @@ dependencies = [
 name = "fs-texts-pack"
 version = "0.0.18"
 dependencies = [
+ "icu",
+ "icu_calendar",
+ "icu_calendar_data",
+ "icu_datetime",
+ "icu_datetime_data",
+ "icu_decimal",
+ "icu_decimal_data",
+ "icu_locale",
+ "icu_provider",
  "icu_provider_blob",
+ "icu_provider_export",
  "mf2",
  "mf2-catalog",
  "mf2-locale-data",
  "mf2-model",
  "mf2-syntax",
  "tempfile",
+ "zerovec",
 ]
 
 [[package]]
