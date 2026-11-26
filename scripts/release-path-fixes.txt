@@ -1,3 +1,4 @@
 # Fix commits of the RELEASE PATH (one full SHA per line). Every internal pin of release.yml, _release-*.yml and actions/ must have each of them as an ancestor
 # (fs-release check-pin-chain; the tag run builds fs-blueprint and the actions from the pinned commit). Add a line when a fix is made that the release path needs.
 13b680abd03278010a1272637e7e777255b312b8  # fs-blueprint: module package takes requires of commands.json as Requires/Recommends
+669072abd94c1e3711e89fcee7d40e06ec4380b5  # fs-blueprint: versions in Requires (at_least, form_source_level); requires-from-pin.sh proves them
