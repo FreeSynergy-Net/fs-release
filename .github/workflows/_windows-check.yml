@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@7ff892881f4222bb8aa3c7e62f28ee408df2eecf
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@2baf06fe5a273ee03795c76a590054bf0f4d5d04
         with:
           toolchain: pinned
           components: rustfmt,clippy
