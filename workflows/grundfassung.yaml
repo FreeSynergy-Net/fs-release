@@ -478,6 +478,7 @@ do:
           ours: ${ $context.images }
           waechter: ${ $context.waechter }
           paare: ${ $context.bildpaar }
+          installiert: false
       export:
         as: '${ $context + { verdict: . } }'
       metadata:

@@ -306,6 +306,7 @@ do:
           model: ${ $context.before }
           ours: ${ $context.after }
           waechter: ${ $context.gates }
+          installiert: false
       export:
         as: '${ $context + { pictures: . } }'
       metadata:

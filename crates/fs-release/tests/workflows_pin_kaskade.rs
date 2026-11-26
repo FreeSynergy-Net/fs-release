@@ -73,7 +73,7 @@ fn ok(t: &str) -> bool {
         && step_body(t, "ein-stand").contains("DEV-DEPENDENCIES FIRST")
         && step_body(t, "ein-stand").contains("cargo tree -d")
         && step_body(t, "ein-stand").contains("exactly ONE state")
-        && step_body(t, "ein-stand").contains("cargo tree -d --workspace --all-targets")
+        && step_body(t, "ein-stand").contains("cargo tree -d --workspace --target all")
         && step_body(t, "nachbar-pins").contains("[DEV-DEPS-ZUERST]")
         && step_body(t, "nachbar-pins-weiter").contains("then: eskalation")
         && !step_body(t, "nachbar-pins-weiter").contains("then: pin-lift")
@@ -157,7 +157,7 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     assert!(bad(t.replace("  - nachbar-pins:", "  - nachbar-x:")));
     assert!(bad(t.replace("  - nachbar-pins-weiter:", "  - nachbar-x:")));
     assert!(bad(t.replace(
-        "cargo tree -d --workspace --all-targets",
+        "cargo tree -d --workspace --target all",
         "cargo tree -d"
     )));
     assert!(bad(t.replace("pin-refs.sh --dir", "pin-refs.sh")));

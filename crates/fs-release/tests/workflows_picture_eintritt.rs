@@ -33,5 +33,31 @@ fn picture_acceptance_stops_before_any_picture_when_an_entry_precondition_is_red
             "precondition names {k}"
         );
     }
+    // M1: development pictures skip the entry measure, installed ones go through it
+    let w = step_body(&text, "eintritt-weiche");
+    assert!(at("eintritt-weiche") < at("vorbedingungen"));
+    assert!(w.contains("installiert // false) == true") && w.contains("then: vorbedingungen"));
+    assert!(w.contains("then: menue-bilder"));
+    for f in [
+        "frontend-round",
+        "frontend-umbau",
+        "programm-grundgeruest",
+        "grundfassung",
+    ] {
+        assert!(
+            read(f).contains("installiert: false"),
+            "{f} passes installiert"
+        );
+    }
+    // M2: `befunde` = failed points only, the evidence of every point is in `belege`; the gate reads red and befunde
+    let step = step_body(&text, "vorbedingungen");
+    assert!(
+        step.contains("belege: [{ punkt, beleg }]")
+            && step.contains("ONLY the failed or unchecked points")
+    );
+    assert!(
+        weiche.contains("red // false) == true") && weiche.contains("befunde // [] | length) > 0")
+    );
+    assert!(weiche.contains("then: continue") && weiche.contains("ohne-ergebnis"));
     assert!(step_body(&text, "vorbedingung-fehlt").contains("no picture is taken"));
 }

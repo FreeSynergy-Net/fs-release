@@ -468,6 +468,7 @@ do:
           model: ${ .input.model }
           ours: ${ $context.images }
           waechter: ${ $context.waechter }
+          installiert: false
       export:
         as: '${ $context + { bild: . } }'
       metadata:
