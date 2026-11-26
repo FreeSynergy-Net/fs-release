@@ -8,6 +8,8 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+# Packs `texts/` of a module (ADR 0057, same library call as `fs-release pack-texts`); workspace member, no second copy.
+fs-texts-pack = { path = "../fs-texts-pack" }
 serde = { version = "1", features = ["derive"] }
 # Reads `catalog/commands.json` (field `requires`) of a module folder; the crate had no JSON reader yet (already in the workspace graph).
 serde_json = "1"

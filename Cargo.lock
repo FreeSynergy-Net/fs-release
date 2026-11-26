@@ -986,6 +986,7 @@ dependencies = [
 name = "fs-blueprint"
 version = "0.0.18"
 dependencies = [
+ "fs-texts-pack",
  "pgp",
  "rpm",
  "serde",
