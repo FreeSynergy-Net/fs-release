@@ -142,16 +142,19 @@ pub fn program_spec(
         Req {
             name: "fs-starter".into(),
             at_least: starter_min.map(Into::into),
+            ..Req::default()
         },
         Req {
             name: FILESYSTEM.into(),
             at_least: None,
+            ..Req::default()
         },
     ];
     for m in bp.module.iter().filter(|m| needs_package(&m.kind)) {
         requires.push(Req {
             name: module_package(&m.name)?,
             at_least: Some(m.version.clone()),
+            ..Req::default()
         });
     }
     let text = |t: &Option<String>| {

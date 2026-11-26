@@ -15,10 +15,20 @@ pub struct SpecFile {
     pub config: bool,
 }
 
-/// A `Requires` entry: a name, and `>= version` when a version is given.
+/// How a package depends on another: `Requires` (must be there) or `Recommends` (installed by default, may be left out).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ReqKind {
+    #[default]
+    Requires,
+    Recommends,
+}
+
+/// A dependency entry: a name, and `>= version` when a version is given.
+#[derive(Default)]
 pub struct Req {
     pub name: String,
     pub at_least: Option<String>,
+    pub kind: ReqKind,
 }
 
 /// Everything a package needs (data: `noarch`; a module with a binary: its CPU).
@@ -100,10 +110,14 @@ impl RpmSpec {
             };
         }
         for r in &self.requires {
-            b.requires(match &r.at_least {
+            let dep = match &r.at_least {
                 Some(v) => Dependency::greater_eq(&r.name, v),
                 None => Dependency::any(&r.name),
-            });
+            };
+            match r.kind {
+                ReqKind::Requires => b.requires(dep),
+                ReqKind::Recommends => b.recommends(dep),
+            };
         }
         let pkg = b.build().map_err(e)?;
         std::fs::create_dir_all(out_dir).map_err(|x| format!("{}: {x}", out_dir.display()))?;

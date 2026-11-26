@@ -9,6 +9,8 @@ publish = false
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+# Reads `catalog/commands.json` (field `requires`) of a module folder; the crate had no JSON reader yet (already in the workspace graph).
+serde_json = "1"
 toml = "0.9"
 sha2 = "0.11"
 toml_edit = "=0.22.27"

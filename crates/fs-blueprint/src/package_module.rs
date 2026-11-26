@@ -1,9 +1,10 @@
-//! Pattern: Builder (turns a module folder, or the definition of `freesynergy-filesystem`, into an `RpmSpec`; the file format is the adapter's job).
+//! Pattern: Builder (the dependencies of a module are read from its `commands.json` as plain data, Adapter to the RPM tags; turns a module folder, or the definition of `freesynergy-filesystem`, into an `RpmSpec`; the file format is the adapter's job).
 //!
 //! ENTSCHEID-install §1: a module is an arch package `fs-module-<name>` with its service below `/usr/libexec/freesynergy/modules/<name>/`.
 
 use crate::package_rpm::{tree, valid_name, LICENSE, PROGRAMS_DIR, REPOSITORY_URL};
-use crate::rpm_spec::{Req, RpmSpec, SpecFile};
+use crate::rpm_spec::{Req, ReqKind, RpmSpec, SpecFile};
+use serde::Deserialize;
 use std::path::Path;
 
 /// The package that owns the shared folders; every module and program package requires it (INST-4a).
@@ -177,10 +178,53 @@ pub fn module_spec(folder: &Path, i: &ModuleInput) -> Result<RpmSpec, String> {
         license: LICENSE.into(),
         url: Some(REPOSITORY_URL.into()),
         files,
-        requires: vec![Req {
-            name: FILESYSTEM.into(),
-            at_least: None,
-        }],
+        requires: module_requires(folder, i.name)?,
         source_date: None,
     })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NeedRow {
+    module: String,
+    required: bool,
+}
+
+/// The dependencies of a module package: always `freesynergy-filesystem`, plus every entry of `requires` in `catalog/commands.json`
+/// (`required: true` = `Requires`, `false` = `Recommends`, package `fs-module-<module>`; no versions: the file names none).
+/// No `requires` field: only the filesystem.
+///
+/// # Errors
+/// A text when `requires` is not a list of `{module, required}`, a module name is not `[a-z0-9-]` (or starts with `fs-`), or a module names itself.
+fn module_requires(folder: &Path, own: &str) -> Result<Vec<Req>, String> {
+    let file = folder.join("catalog/commands.json");
+    let bytes = read_plain(&file)?;
+    let at = |m: String| format!("{}: requires: {m}", file.display());
+    let doc: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", file.display()))?;
+    let mut out = vec![Req {
+        name: FILESYSTEM.into(),
+        ..Req::default()
+    }];
+    let Some(raw) = doc.get("requires").cloned() else {
+        return Ok(out);
+    };
+    let rows: Vec<NeedRow> = serde_json::from_value(raw).map_err(|e| at(e.to_string()))?;
+    for r in rows {
+        if r.module == own {
+            return Err(at(format!("the module {own:?} requires itself")));
+        }
+        let name = module_package(&r.module).map_err(at)?;
+        let kind = if r.required {
+            ReqKind::Requires
+        } else {
+            ReqKind::Recommends
+        };
+        out.push(Req {
+            name,
+            at_least: None,
+            kind,
+        });
+    }
+    Ok(out)
 }
