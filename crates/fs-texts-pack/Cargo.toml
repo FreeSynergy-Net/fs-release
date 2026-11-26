@@ -1,7 +1,7 @@
 [package]
 name = "fs-texts-pack"
 version = "0.0.18"
-description = "fs-texts-pack: packs the .mf2 text sources of a program (pair check de/en) into MessageFormat 2 catalogs, one manifest and the date data blob of each language (ADR 0057)"
+description = "fs-texts-pack: packs the .mf2 text sources of a program (pair check de/en) into MessageFormat 2 catalogs, one manifest and, per language, the date data (format blob and calendar names blob) (ADR 0057)"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -14,6 +14,19 @@ mf2-syntax = "=3.0.0"
 mf2-model = "=3.0.0"
 mf2-catalog = { version = "=3.0.0", features = ["writer", "content-hash"] }
 mf2-locale-data = { version = "=3.0.0", features = ["icu-blob"] }
+# Calendar names and week data (ADR 0057 addendum, decision calendar words): CLDR through ICU4X, exported with the public `ExportDriver` of ICU4X from its baked data
+# (the same crates `mf2-locale-data` bakes; same versions, so one ICU4X in the graph). `datagen` and `serde` are the features `mf2-locale-data` switches on too.
+icu = { version = "=2.4.0", default-features = false }
+icu_datetime = { version = "=2.4.0", default-features = false, features = ["serde", "datagen"] }
+icu_calendar = { version = "=2.4.0", default-features = false, features = ["serde", "datagen"] }
+icu_decimal = { version = "=2.4.0", default-features = false, features = ["serde", "datagen"] }
+icu_locale = { version = "=2.4.0", default-features = false, features = ["compiled_data"] }
+icu_provider = { version = "=2.4.0", default-features = false, features = ["export", "baked"] }
+icu_provider_export = { version = "=2.4.0", default-features = false, features = ["blob_exporter"] }
+icu_datetime_data = "=2.4.0"
+icu_calendar_data = "=2.4.0"
+icu_decimal_data = "=2.4.0"
+zerovec = { version = "0.11.9", default-features = false }
 
 [dev-dependencies]
 tempfile = "3"

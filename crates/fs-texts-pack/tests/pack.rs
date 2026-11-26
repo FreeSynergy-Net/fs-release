@@ -63,8 +63,8 @@ fn two_runs_give_the_same_bytes_on_disk() {
     assert_eq!(la, lb, "byte-equal");
     assert_eq!(
         la.len(),
-        5,
-        "manifest, 2 catalogs, 2 blobs: {:?}",
+        7,
+        "manifest, 2 catalogs, 2 date tables, 2 name blobs: {:?}",
         la.iter().map(|x| &x.0).collect::<Vec<_>>()
     );
 }
