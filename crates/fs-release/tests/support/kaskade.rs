@@ -172,6 +172,14 @@ pub const SWITCHES: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     (
+        "nachbar-pins-weiter",
+        &[
+            ("befund", "eskalation"),
+            ("ohne-befund", "continue"),
+            ("ohne-ergebnis", "eskalation"),
+        ],
+    ),
+    (
         "ein-stand-weiter",
         &[
             ("rot", "eskalation"),

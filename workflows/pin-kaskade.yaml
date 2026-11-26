@@ -41,6 +41,15 @@
 #   ("local toolchain, not in the diff"); the CI at the exact head decides. A finding in a file the branch changed is never dismissed this way ([GATE-BELEG] of `testlauf`). CARD (not built): the gates should compare `rustc --version`
 #   with `RUST_VERSION` themselves and print the deviation as a visible line (`toolchain: lokal 1.100.0, CI 1.99.1`), so nobody has to find it in the log. Occasions: K-4-r1 (fmt red only local), pin-dag-r1 (clippy local only).
 # [NICHT-GELAUFEN-NIE-GRUEN] (card 2) A gate of a Glied that did not run, has no `rc` or no result is red, never green (see `ff-und-tag` and `testlauf`); `gates-weiter` already treats a missing result as red.
+# RULES ADDED BY workflow-pflege-2 (26.11.2026, lessons of controller 1 and 4; each rule names its occasion):
+# [DEV-DEPS-ZUERST] In every Glied the dev-dependencies (and build-dependencies) are pinned FIRST, then the normal ones, and the result is proven DIRECTLY in the worktree (NOT through `build-slot.sh`) with `cargo tree -d --workspace --all-targets`: 0 root lines that
+#   name an fs crate (every `fs-*` line of the duplicate list is a finding). Occasions: 24.11. (planning/person as dev-dependencies of fs-starter pulled old fs-rpc states) and 26.11. (pin-11: the pin of fs-rpc `cde5b025` pulled fs-settings from an OLD fs-components
+#   -> duplicate, fs-starter rc=101). Therefore the step `nachbar-pins` runs BEFORE the first build of a pin branch: the pins of the NEIGHBOURS (fs-rpc, fs-forms, fs-modules-planning, ...) must stand on the same fs-components and fs-interfaces tag/rev as the Glied;
+#   a neighbour on an older state is NOT worked around (no `[patch]`, no pin by hand): a wave goes over the OWNER of that neighbour first (`eskalation`, the owner controller pins and lands, then `ab`).
+# [PIN-REFS-DIR] Every pin round in a repo that calls fs-release ends with the hard call `scripts/pin-refs.sh --dir <repo> <sha>` (needs `FS_RELEASE_BIN` or `fs-release` on PATH; without `--melden`: `check-pin-chain` inside is hard, rc 4 = red, rc 3 = a pin would be lowered).
+#   Its rc is part of the result of the step `windows-aufrufer` (red = rc != 0), never read from the log. Occasion: controller 4 - at `d4fe48cc` `check-pin-chain` was red and nobody noticed because the call was missing.
+# [PIN-INNEN-BIS-RELEASE] The INNER `@` references of the release workflows (`_release-linux.yml@...` builds `fs-blueprint` from `job.workflow_sha`) must stand at or above the fix commit that the release needs; a dry run builds from the PINNED sha, the RPM carries its `Requires`
+#   (gate `requires-from-pin`, since fs-release baae80b4; only referenced here, not rebuilt). Occasion: the tag run built from `d68860e`, which lay before the requires fix `13b680a` (module RPMs without `Requires`, see CHANGELOG).
 # Inputs: `ausloeser-tag` (tag of fs-types, e.g. v0.0.3), `glieder` (list of { repo, art, tag, allow, besonderes } in DAG order; optional per Glied, passed on to `ff-und-tag` (r1, S4): `pakete` (true = builds rpm and deb), `registry_crate` (true | false; not set = list in `ff-und-tag`: fs-types, fs-conformance, fs-records), `erstkette_ok`, `rot_freigabe` = { run_ids, workflows, grund, wort } (r3: `workflows` = list of the workflow names of exactly the red branch runs; without it `ff-und-tag` escalates, an order from before r2 must add it)), `ab` (optional resume: name of the Glied to start at), `workdir` (own folder for the fresh clones of `ff-und-tag`), `worktrees` (optional, default /srv/FreeSynergy/.scratch/api-runner/wt: the worktree of a Glied is `<worktrees>/pk-<repo>`).
 # Loops: a red check step with repeats jumps back at most twice, the third red round goes to `eskalation`; the Glied steps do NOT repeat: red = abort.
 document:
@@ -255,6 +264,35 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - a finding of `rev-pins` (a rev that is on no tag, a wrong source that cannot be moved) stops the cascade at once and goes to `eskalation` (the strategy decides: tag the owner repo first or add a Glied); without finding on to the lift; a missing result goes to `eskalation`."
+  - nachbar-pins:
+      call: kaskade-nachbar-pins:0.0.18@fs
+      with:
+        glied: ${ $context.glied }
+        dir: ${ .input.worktrees // "/srv/FreeSynergy/.scratch/api-runner/wt" }/pk-${ $context.glied.repo }
+      export:
+        as: '${ $context + { nachbarn: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check BEFORE the lift and BEFORE any build ([DEV-DEPS-ZUERST]; specification, no script yet; occasion 26.11. pin-11: fs-rpc `cde5b025` pulled fs-settings from an old fs-components, duplicate, fs-starter rc=101): reads (git ls-remote / `git show <tag>:Cargo.toml`, read only, no build) the Cargo.toml of every NEIGHBOUR the Glied pins (fs-rpc, fs-forms, fs-modules-planning, fs-modules-person, fs-settings, ...) at the exact tag or rev the Glied pins, and compares the fs-components and fs-interfaces (and fs-types, fs-objects) states they pin with the target state of this run (`glied.libs` / `glied.tags`). Result `nachbarn` = { red, befunde: [{ nachbar, pin, zieht, soll }] }; red when one neighbour pin stands on another state, also when a neighbour cannot be read. No fix by hand, no `[patch]`: a wave over the OWNER of the neighbour comes first."
+  - nachbar-pins-weiter:
+      switch:
+        - befund:
+            when: '${ ($context.nachbarn.befunde // [] | length) > 0 or ($context.nachbarn.red // false) == true }'
+            then: eskalation
+        - ohne-befund:
+            when: '${ ($context.nachbarn.befunde // [] | length) == 0 and ($context.nachbarn.red // false) == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a neighbour on an old state stops the Glied BEFORE the lift (`eskalation`: the strategy/owner controller pins the neighbour first, then `ab`); only `red == false` without findings goes on to the lift; a missing result goes to `eskalation`."
   - pin-lift:
       run:
         workflow:
@@ -285,7 +323,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "Check (specification, no script yet; lesson 24.11.: `planning` and `person` as dev-dependencies of fs-starter pulled old fs-rpc states): DEV-DEPENDENCIES FIRST - in the Cargo.toml files of the Glied (also every member crate, `[dev-dependencies]` and `[build-dependencies]` as well as `[dependencies]`) every fs crate of `glied.libs` / `glied.tags` is on the new tag, the dev-dependency pins before the normal ones (a dev-dependency left behind pulls the old state of a lower crate into the graph); then, directly in the worktree and NOT through `build-slot.sh` (own target, `cargo tree -d --workspace --target all --edges normal,build,dev`, one run of `cargo` with the lock as the lift made it), the TARGET GRAPH has exactly ONE state (version and source/tag) per fs crate (`fs-types`, `fs-objects`, `fs-interfaces`, `fs-rpc`, `fs-conformance`, the modules, `fs-components`, `fs-forms`); a second state of an fs crate is RED with the crate, both states and the path that pulls the old one (`cargo tree -i <crate>@<old>`). Result `einstand` = { red, befunde: [{ crate, staende, zieht }] }; red is also a `cargo tree` that fails or prints nothing. No fix by hand and no `[patch]`: the pin of the Glied that pulls the old state is raised first (back to `glied-weiche`/`eskalation`, the strategy decides), Cargo.lock only by cargo."
+        freesynergy.net:summary: "Check (specification, no script yet; lesson 24.11.: `planning` and `person` as dev-dependencies of fs-starter pulled old fs-rpc states): DEV-DEPENDENCIES FIRST - in the Cargo.toml files of the Glied (also every member crate, `[dev-dependencies]` and `[build-dependencies]` as well as `[dependencies]`) every fs crate of `glied.libs` / `glied.tags` is on the new tag, the dev-dependency pins before the normal ones (a dev-dependency left behind pulls the old state of a lower crate into the graph); then, directly in the worktree and NOT through `build-slot.sh` (own target, `cargo tree -d --workspace --target all --edges normal,build,dev`, one run of `cargo` with the lock as the lift made it), the TARGET GRAPH has exactly ONE state (version and source/tag) per fs crate (`fs-types`, `fs-objects`, `fs-interfaces`, `fs-rpc`, `fs-conformance`, the modules, `fs-components`, `fs-forms`); a second state of an fs crate is RED with the crate, both states and the path that pulls the old one (`cargo tree -i <crate>@<old>`). [DEV-DEPS-ZUERST]: the command is exactly `cargo tree -d --workspace --all-targets`, run DIRECTLY in the worktree (not through `build-slot.sh`), and the proof is 0 root lines that name an fs crate. Result `einstand` = { red, befunde: [{ crate, staende, zieht }] }; red is also a `cargo tree` that fails or prints nothing. No fix by hand and no `[patch]`: the pin of the Glied that pulls the old state is raised first (back to `glied-weiche`/`eskalation`, the strategy decides), Cargo.lock only by cargo."
   - ein-stand-weiter:
       switch:
         - rot:
@@ -326,7 +364,7 @@ do:
         freesynergy.net:actor-type: Service
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
-        freesynergy.net:summary: "B4, NO exceptions: every Glied gets the caller `FreeSynergy/fs-release/.github/workflows/_windows-check.yml@v0.0.11` BEFORE its tag. Checks and, where it is missing or pinned lower, creates the file `.github/workflows/windows.yml` in the own worktree of the Glied repo (local commit with the identity FreeSynergy <support@freesynergy.net>, no push here; `scripts/pin-refs.sh --dir <repo> v0.0.11` raises an existing pin and never lowers one). Template: `examples/callers/windows.yml` of fs-release (branch `unreviewed/windows-check`, may not be on main yet: referenced, NOT a precondition of the cascade; the cascade itself starts only after fs-release v0.0.11). Result `windows` = { red, datei, pin }; red when the file cannot be created or the pin is lower. Specification, no script yet (`windows-aufrufer`); `kaskade-lage` already reports the caller and the Windows run per head."
+        freesynergy.net:summary: "B4, NO exceptions: every Glied gets the caller `FreeSynergy/fs-release/.github/workflows/_windows-check.yml@v0.0.11` BEFORE its tag. Checks and, where it is missing or pinned lower, creates the file `.github/workflows/windows.yml` in the own worktree of the Glied repo (local commit with the identity FreeSynergy <support@freesynergy.net>, no push here; `scripts/pin-refs.sh --dir <repo> v0.0.11` raises an existing pin and never lowers one). Template: `examples/callers/windows.yml` of fs-release (branch `unreviewed/windows-check`, may not be on main yet: referenced, NOT a precondition of the cascade; the cascade itself starts only after fs-release v0.0.11). [PIN-REFS-DIR]: the call `scripts/pin-refs.sh --dir <repo> <sha>` is HARD (`FS_RELEASE_BIN` or `fs-release` on PATH; its rc != 0 makes `windows.red` true, `pinrefs_rc` is part of the result; occasion: at `d4fe48cc` `check-pin-chain` was red unnoticed); [PIN-INNEN-BIS-RELEASE]: the inner `@` references of the release workflows (`_release-linux.yml@...`) must stand at or above the fix commit, the dry run builds from the pinned sha (gate `requires-from-pin`, fs-release baae80b4). Result `windows` = { red, datei, pin, pinrefs_rc }; red when the file cannot be created, the pin is lower or `pinrefs_rc` is not 0. Specification, no script yet (`windows-aufrufer`); `kaskade-lage` already reports the caller and the Windows run per head."
   - windows-weiter:
       switch:
         - rot:

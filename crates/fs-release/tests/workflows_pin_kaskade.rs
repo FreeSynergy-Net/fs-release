@@ -23,6 +23,8 @@ fn ok(t: &str) -> bool {
             "glied-start",
             "rev-pins",
             "rev-pins-weiter",
+            "nachbar-pins",
+            "nachbar-pins-weiter",
             "pin-lift",
             "ein-stand",
             "ein-stand-weiter",
@@ -71,6 +73,20 @@ fn ok(t: &str) -> bool {
         && step_body(t, "ein-stand").contains("DEV-DEPENDENCIES FIRST")
         && step_body(t, "ein-stand").contains("cargo tree -d")
         && step_body(t, "ein-stand").contains("exactly ONE state")
+        && step_body(t, "ein-stand").contains("cargo tree -d --workspace --all-targets")
+        && step_body(t, "nachbar-pins").contains("[DEV-DEPS-ZUERST]")
+        && step_body(t, "nachbar-pins-weiter").contains("then: eskalation")
+        && !step_body(t, "nachbar-pins-weiter").contains("then: pin-lift")
+        && step_body(t, "windows-aufrufer").contains("[PIN-REFS-DIR]")
+        && step_body(t, "windows-aufrufer").contains("[PIN-INNEN-BIS-RELEASE]")
+        && step_body(t, "windows-aufrufer").contains("pin-refs.sh --dir")
+        && [
+            "[DEV-DEPS-ZUERST]",
+            "[PIN-REFS-DIR]",
+            "[PIN-INNEN-BIS-RELEASE]",
+        ]
+        .iter()
+        .all(|r| t.contains(r))
         && step_body(t, "ein-stand-weiter").contains("then: eskalation")
         && !step_body(t, "ein-stand-weiter").contains("then: besonderes")
         && step_body(t, "plan").contains("REAL dependencies")
@@ -138,6 +154,14 @@ fn counter_own_tag_way_skipped_abort_or_changed_order_are_caught() {
     assert!(bad(t.replace("  - rev-pins:", "  - rev-x:")));
     assert!(bad(t.replace("  - ein-stand:", "  - ein-x:")));
     assert!(bad(t.replace("  - ein-stand-weiter:", "  - ein-x:")));
+    assert!(bad(t.replace("  - nachbar-pins:", "  - nachbar-x:")));
+    assert!(bad(t.replace("  - nachbar-pins-weiter:", "  - nachbar-x:")));
+    assert!(bad(t.replace(
+        "cargo tree -d --workspace --all-targets",
+        "cargo tree -d"
+    )));
+    assert!(bad(t.replace("pin-refs.sh --dir", "pin-refs.sh")));
+    assert!(bad(t.replace("[PIN-INNEN-BIS-RELEASE]", "[X]")));
     assert!(bad(
         t.replace("DEV-DEPENDENCIES FIRST", "DEV-DEPENDENCIES LATER")
     ));

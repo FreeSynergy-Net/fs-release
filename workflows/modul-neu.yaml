@@ -391,6 +391,50 @@ do:
         freesynergy.net:gate: none
         freesynergy.net:kind: objective
         freesynergy.net:summary: "Control flow - red goes back to `doku-hilfe` (at most two repeats), from the third red round to the escalation; only `red == false` goes on; a missing result goes to the escalation, never to green."
+  - verbraucher-probe:
+      call: verbraucher-probe-ai:0.0.18@fs
+      with:
+        name: ${ .input.name }
+        nutzer: ${ .input.nutzer }
+        standard: ${ .input.standard }
+      export:
+        as: '${ $context + { probe: . } }'
+      metadata:
+        freesynergy.net:actor: ai
+        freesynergy.net:actor-type: Service
+        freesynergy.net:bot-seat: modul-neu.verbraucher-probe
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Consumer probe BEFORE `bericht` (= before the module counts as finished; specification, no script yet; occasion 26.11. - modules were reported done and only the first real consumer found the gaps, e.g. planning without `person`): ONE program or frontend of `nutzer` is run as a CONSUMER against the new module, with test data and without special rules (quality principle 5: no special case for the frontend or Forms): it reads the module only through its published contract (the form versions the module lists, the commands of the catalog), creates, reads, changes and deletes one record, and shows it in a form. Result `probe` = { red, verbraucher, befunde: [{ was, erwartet, war }] }; a missing attribute is not worked around in the consumer but goes to the module at once (a finding for step `anlegen`); a special case found in the consumer becomes a `[ ]` card with the goal \"remove special case\". Without a consumer (`nutzer` empty, only possible for a specialist module that has none yet) the step is `red` with the reason `kein-verbraucher`, the report names it."
+  - verbraucher-probe-check:
+      call: verbraucher-probe-regel:0.0.18@fs
+      export:
+        as: '${ $context + { probecheck: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Check (gate): `probe` has a result, `red == false`, a consumer is named and the record round trip (create, read, change, delete, show in a form) is proven by output lines; a probe without result or without consumer is red."
+  - verbraucher-probe-again:
+      switch:
+        - runden:
+            when: '${ $context.probecheck.red == true and ($context.probecheck.runde // 0) >= 3 }'
+            then: eskalation
+        - red:
+            when: '${ $context.probecheck.red == true }'
+            then: anlegen
+        - green:
+            when: '${ $context.probecheck.red == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: eskalation
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a red probe goes back to `anlegen` (the MODULE is fixed, never worked around in the consumer; at most two repeats), from the third red round to `eskalation`; only `red == false` goes on to the report; a missing result goes to `eskalation`, never to green."
   - bericht:
       call: report-write:0.0.18@fs
       with:

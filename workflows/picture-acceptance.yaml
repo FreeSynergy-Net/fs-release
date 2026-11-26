@@ -1,7 +1,8 @@
 # Pictures of a Frontend: model (Vorbild) against ours, two verdicts. FS profile: see README.md.
 # [THEME-WAECHTER]: pictures count as evidence only with a green theme guard (`waechter.red == false`, see testlauf); without it the verdict is not asked for.
 # [MENUES-ZUM-AUSSEHEN] Menus count as looks (user, b7): the pictures show not only the content area but, per main menu and per context menu, the model and ours side by side; the picture package names are `<programm>-menue-<hauptmenue>-vorbild|unser.png` and `<programm>-kontext-<ort>-vorbild|unser.png`. Order: picture package (model | ours) first, THEN build (frontend-round). The look is made through the style layers, not copied; \"rebuild\" means structure, naming, order, shortcuts and behaviour (ADR 0013).
-# Input: model, ours, waechter, dossier (folder of the model dossier with the full menu tree: menus.md, context-menus.md, toolbar, shortcuts; see docs/usage.md \"Menus\").
+# Input: programm (name of the program, for the entry measure `--check-system --program`), model, ours, waechter, dossier (folder of the model dossier with the full menu tree: menus.md, context-menus.md, toolbar, shortcuts; see docs/usage.md \"Menus\").
+# RULES ADDED BY workflow-pflege-2 (26.11.2026, occasion: the install picture INST-10 of `tasks` failed three times for reasons BEFORE the picture, report `.scratch/sonnet/c1-inst-10-BERICHT.md`): [EINTRITT-SYSTEM] a picture of an INSTALLED program counts only after the step `vorbedingungen` is green: (1) `freesynergy-filesystem` is PUBLISHED in the channel (signed; a local unsigned build does not count; attempt 1: nothing provided it); (2) every service the program needs is installed, the `Requires` of the program RPM prove it (planning needs `person`: without `person.sock` the planning service ends with `owner-unreachable`, picture without board; attempt 3); (3) the installed fs-starter knows `--check-system` and reads layout format 3/4 (fs-starter 0.0.8 had neither: `unknown option`, `layout-error-import-invalid key-unknown`; attempt 2); (4) the channel holds ALL program packages (Repository publish input `repos` lists them; otherwise the run names local files and the dnf warning `skipped OpenPGP checks`); (5) entry measure: `fs-starter --check-system --program <programm>` prints `red=0` (0.0.9: red=1 `module-down`, yellow=4). The step results are NOT guessed: each `befunde` entry is read from rpm/dnf/`--check-system` output.
 document:
   dsl: 1.0.3
   namespace: freesynergy.net
@@ -9,6 +10,34 @@ document:
   version: 0.0.18
   title: Show model and our pictures, take the strategy's and the user's verdict
 do:
+  - vorbedingungen:
+      call: install-preconditions:0.0.18@fs
+      with:
+        programm: ${ .input.programm }
+      export:
+        as: '${ $context + { vorbedingungen: . } }'
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Specification (@fs, no script yet; rule [EINTRITT-SYSTEM] in the header). Only for pictures of an INSTALLED program (not for pictures of a development build). Proves in this order, each with its evidence line: `filesystem` (`freesynergy-filesystem` signed in the channel, `rpm -K` and `dnf repoquery`), `dienste` (every `Requires` of the program RPM resolves, every service socket the program needs has its module installed, e.g. `person` for planning), `starter` (`fs-starter --version` is a tag whose `--help` lists `--check-system` and that reads layout format 3 and 4), `kanal` (all program packages are in the channel, input `repos` of the Repository publish), `check-system` (`fs-starter --check-system --program <programm>` prints `red=0`). Result `vorbedingungen` = { red, befunde: [{ punkt, beleg }] }; a point that was not checked is red, never green."
+  - vorbedingungen-weiche:
+      switch:
+        - rot:
+            when: '${ ($context.vorbedingungen.befunde // [] | length) > 0 or ($context.vorbedingungen.red // false) == true }'
+            then: vorbedingung-fehlt
+        - gruen:
+            when: '${ ($context.vorbedingungen.befunde // [] | length) == 0 and ($context.vorbedingungen.red // false) == false }'
+            then: continue
+        - ohne-ergebnis:
+            then: vorbedingung-fehlt
+      metadata:
+        freesynergy.net:actor: machine
+        freesynergy.net:actor-type: Service
+        freesynergy.net:gate: none
+        freesynergy.net:kind: objective
+        freesynergy.net:summary: "Control flow - a failed precondition stops BEFORE the menu pictures and the pictures (no picture without the entry measure); a missing result goes to `vorbedingung-fehlt`, never on."
   - menue-bilder:
       call: menu-images:0.0.18@fs
       with:
@@ -98,3 +127,13 @@ do:
         freesynergy.net:gate: human
         freesynergy.net:kind: subjective
         freesynergy.net:summary: "A picture pair is missing (a main menu or a context menu without model or without our picture); the round that called this flow takes the missing pictures first (name scheme in the header). This flow ends."
+  - vorbedingung-fehlt:
+      set:
+        todo: vorbedingung-fehlt
+      then: end
+      metadata:
+        freesynergy.net:actor: human
+        freesynergy.net:actor-type: Person
+        freesynergy.net:gate: human
+        freesynergy.net:kind: subjective
+        freesynergy.net:summary: "An entry precondition is red (or not checked): no picture is taken. The report names every point of `vorbedingungen.befunde` with its evidence and the owner (publish run = user click, missing `Requires` = owner of the module, old fs-starter = C1); the picture is repeated after the fix, nobody shows a picture of a broken install. This flow ends."

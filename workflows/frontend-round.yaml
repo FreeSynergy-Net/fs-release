@@ -167,6 +167,7 @@ do:
           name: picture-acceptance
           version: 0.0.18
         input:
+          programm: ${ .input.frontend }
           dossier: ${ .input.dossier }
           model: ${ .input.model }
           ours: ${ $context.images }

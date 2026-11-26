@@ -33,6 +33,7 @@ fn modul_ok(t: &str) -> bool {
         "anlegen",
         "katalog-vorschlag",
         "doku-hilfe",
+        "verbraucher-probe",
         "bericht",
         "abbruch",
         "eskalation",
@@ -48,8 +49,11 @@ fn modul_ok(t: &str) -> bool {
                 ("anlegen", "anlegen"),
                 ("katalog-vorschlag", "katalog-vorschlag"),
                 ("doku-hilfe", "doku-hilfe"),
+                ("verbraucher-probe", "anlegen"),
             ],
         )
+        && step_body(t, "verbraucher-probe").contains("CONSUMER")
+        && step_body(t, "verbraucher-probe").contains("without special rules")
         && again_ok(t, "trait-review-again", "beschreibung", "eskalation")
         && step_body(t, "nutzer-pruefen").contains("at least 2 users")
         && step_body(t, "nutzer-pruefen").contains("at least 1")
