@@ -39,7 +39,7 @@ jobs:
           sudo apt-get update
           # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends $PACKAGES
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@2ef5d0d6273ebdb71e5f375f2f3a8d5a38126afd
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@cbea64668cbfeecd47aa10e092fb1f56234c764a
         with:
           toolchain: pinned
           components: rustfmt,clippy
@@ -53,7 +53,7 @@ jobs:
           cargo clippy --all-targets $FEATURE_FLAGS -- -D warnings
       # tests through the nextest profiles like check.yml (tag -> release, else quick; a repo without that profile runs the default profile = everything, said in the log); doc tests as their own step
       - name: cargo test (nextest profile)
-        uses: FreeSynergy-Net/fs-release/actions/test-profile@2ef5d0d6273ebdb71e5f375f2f3a8d5a38126afd
+        uses: FreeSynergy-Net/fs-release/actions/test-profile@cbea64668cbfeecd47aa10e092fb1f56234c764a
         with:
           working-directory: ${{ inputs.working-directory }}
           args: ${{ env.FEATURE_FLAGS }}
@@ -66,7 +66,7 @@ jobs:
           python3 -I "$RUNNER_TEMP/check_rust_rules.py" "$PWD"
       - name: Licences (cargo-deny)
         if: inputs.licences
-        uses: FreeSynergy-Net/fs-release/actions/licence-check@2ef5d0d6273ebdb71e5f375f2f3a8d5a38126afd
+        uses: FreeSynergy-Net/fs-release/actions/licence-check@cbea64668cbfeecd47aa10e092fb1f56234c764a
         with:
           working-directory: ${{ inputs.working-directory }}
 
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@2ef5d0d6273ebdb71e5f375f2f3a8d5a38126afd
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@cbea64668cbfeecd47aa10e092fb1f56234c764a
         with:
           toolchain: ${{ inputs.msrv }}
           working-directory: ${{ inputs.working-directory }}
