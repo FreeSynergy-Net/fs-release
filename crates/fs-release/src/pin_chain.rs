@@ -39,7 +39,7 @@ fn git(repo: &Path, args: &[&str]) -> Option<String> {
         .then(|| String::from_utf8_lossy(&o.stdout).into_owned())
 }
 
-fn files_at(repo: &Path, commit: &str, path: &str) -> Vec<String> {
+pub(crate) fn files_at(repo: &Path, commit: &str, path: &str) -> Vec<String> {
     git(repo, &["ls-tree", "-r", "--name-only", commit, "--", path])
         .map_or_else(Vec::new, |s| s.lines().map(str::to_string).collect())
 }
@@ -50,7 +50,7 @@ fn is_yaml(f: &str) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case("yml") || e.eq_ignore_ascii_case("yaml"))
 }
 
-fn show(repo: &Path, commit: &str, file: &str) -> Option<String> {
+pub(crate) fn show(repo: &Path, commit: &str, file: &str) -> Option<String> {
     git(repo, &["show", &format!("{commit}:{file}")])
 }
 
@@ -246,6 +246,7 @@ pub fn check(repo: &Path, start: &str) -> Result<Vec<String>, String> {
     if roots == 0 {
         return Err("no internal `uses: .../fs-release/...@<sha>` at the start".into());
     }
+    w.red.extend(crate::release_path::findings(repo, &sha));
     Ok(w.red)
 }
 

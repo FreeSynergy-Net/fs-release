@@ -12,5 +12,6 @@ pub mod flow;
 pub mod lift;
 pub mod pin_chain;
 mod pin_chain_text;
+mod release_path;
 pub mod task;
 pub mod texts_pack;
