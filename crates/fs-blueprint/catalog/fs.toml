@@ -32,11 +32,11 @@ version = "0.1.0"
 pending = ["session", "update", "mcp-switch"]
 
 # Art 1 (standard): the planning standard of the repo fs-modules-planning. `name` is the HOST module name (`planning`, the name of `[[module]]` in a blueprint and of the RPM `fs-module-planning`), never the repo name.
-# Tags of the repo (git ls-remote 2026-11-25): v0.0.1 to v0.0.5; v0.0.5 is published as the signed RPM fs-module-planning-0.0.5-1. No presets, no kit facade (Opus verdict of the tag round).
+# Tags of the repo (git ls-remote 2026-11-26): v0.0.1 to v0.0.6 and v0.0.8 (no v0.0.7); v0.0.6 and v0.0.8 are published as signed RPMs (fs-module-planning). No presets, no kit facade (Opus verdict of the tag round).
 [[module]]
 name = "planning"
 kind = "standard"
-tags = ["0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.0.5"]
+tags = ["0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.0.5", "0.0.6", "0.0.8"]
 
 # Art 3 (components): crates of fs-components (tag v0.0.29): `task_card` in fs-components-widgets, the board in fs-components-kanban.
 [[module]]
