@@ -44,6 +44,8 @@ pub struct RpmSpec {
     pub url: Option<String>,
     pub files: Vec<SpecFile>,
     pub requires: Vec<Req>,
+    /// Extra `Provides: <name> = <version>` besides the package itself (e.g. `freesynergy-form-source = 2` of a host).
+    pub provides: Vec<(String, String)>,
     /// Seconds since 1970 for a reproducible package (`SOURCE_DATE_EPOCH`); `None` = now.
     pub source_date: Option<u32>,
 }
@@ -118,6 +120,9 @@ impl RpmSpec {
                 ReqKind::Requires => b.requires(dep),
                 ReqKind::Recommends => b.recommends(dep),
             };
+        }
+        for (name, version) in &self.provides {
+            b.provides(Dependency::eq(name, version));
         }
         let pkg = b.build().map_err(e)?;
         std::fs::create_dir_all(out_dir).map_err(|x| format!("{}: {x}", out_dir.display()))?;

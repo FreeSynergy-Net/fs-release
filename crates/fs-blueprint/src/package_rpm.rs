@@ -6,7 +6,7 @@
 use crate::emit::slot::pascal;
 use crate::kit::Kind;
 use crate::model::Blueprint;
-use crate::package_module::{dir, read_plain};
+use crate::package_module::{dir, read_plain, FORM_SOURCE};
 use crate::rpm_spec::{Req, RpmSpec, SpecFile};
 use std::path::Path;
 
@@ -175,6 +175,11 @@ pub fn program_spec(
         url: Some(REPOSITORY_URL.into()),
         files,
         requires,
+        provides: match bp.contract.form_source_level {
+            None => Vec::new(),
+            Some(0) => return Err("contract.form_source_level must be a whole number >= 1".into()),
+            Some(l) => vec![(FORM_SOURCE.into(), l.to_string())],
+        },
         source_date: None,
     })
 }
@@ -221,6 +226,7 @@ pub fn release_spec(
             SpecFile { dest: KEY_PATH.into(), bytes: Some(key), mode: 0o644, config: false },
         ],
         requires: Vec::new(),
+        provides: Vec::new(),
         source_date: None,
     })
 }

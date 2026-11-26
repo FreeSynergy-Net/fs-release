@@ -86,6 +86,9 @@ pub struct Contract {
     /// The contracts of fs-interfaces this program provides: only the NAME (the capability key) and the level, never the contract itself.
     #[serde(default)]
     pub provides: Vec<Provide>,
+    /// Host only: the level of the form source contract (`fs_interfaces::forms::FORM_SOURCE_LEVEL`) this program speaks; `package rpm` writes `Provides: freesynergy-form-source = <level>`. A test of the program repo keeps it equal to the constant.
+    #[serde(default)]
+    pub form_source_level: Option<u32>,
 }
 
 /// A reference to a contract of fs-interfaces (`capabilities.txt`: key plus level `major.minor`); the contract text lives there, in one place.

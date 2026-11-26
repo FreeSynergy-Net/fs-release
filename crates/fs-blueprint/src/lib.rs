@@ -26,6 +26,7 @@ pub mod mf2;
 pub mod model;
 pub mod package_module;
 pub mod package_rpm;
+mod package_texts;
 pub mod release_args;
 pub mod repo_fs;
 pub mod rpm_spec;

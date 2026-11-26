@@ -7,54 +7,10 @@ use crate::rpm_spec::{Req, ReqKind, RpmSpec, SpecFile};
 use serde::Deserialize;
 use std::path::Path;
 
-/// The languages a module that ships `texts/` must carry (ENTSCHEID person Entscheid (b): en and de until the language packages exist).
-const TEXT_LANGUAGES: [&str; 2] = ["en", "de"];
-
-/// Optional `texts/<lang>.mf2` of the module: checked and packed with the library of `fs-release pack-texts` into `catalog/texts/` (`manifest.mf2m`, `<tag>.<hash>.mf2b`).
-/// The `dates/` of the packer are language packages and stay out. No `texts/` folder: nothing changes.
-fn pack_texts(folder: &Path, base: &str, files: &mut Vec<SpecFile>) -> Result<(), String> {
-    let src = folder.join("texts");
-    if std::fs::symlink_metadata(&src).is_err() {
-        return Ok(());
-    }
-    check_plain_dir(&src)?;
-    no_links(&src)?;
-    let sources = fs_texts_pack::read_dir(&src).map_err(|e| format!("{}: {e}", src.display()))?;
-    for l in TEXT_LANGUAGES {
-        if !sources.iter().any(|s| s.language == l) {
-            return Err(format!(
-                "{}: {l}.mf2 is missing (en and de are both required)",
-                src.display()
-            ));
-        }
-    }
-    let packed =
-        fs_texts_pack::pack(&sources, &[]).map_err(|e| format!("{}: {e}", src.display()))?;
-    let own = format!("{base}/catalog/texts");
-    if files
-        .iter()
-        .any(|f| f.dest == own || f.dest.starts_with(&format!("{own}/")))
-    {
-        return Err("catalog/texts exists next to texts/: the packed texts would collide".into());
-    }
-    files.push(dir(&format!("{base}/catalog/texts")));
-    for (name, bytes) in packed
-        .files
-        .into_iter()
-        .filter(|(n, _)| !n.starts_with("dates/"))
-    {
-        files.push(SpecFile {
-            dest: format!("{base}/catalog/texts/{name}"),
-            bytes: Some(bytes),
-            mode: 0o644,
-            config: false,
-        });
-    }
-    Ok(())
-}
-
 /// The package that owns the shared folders; every module and program package requires it (INST-4a).
 pub const FILESYSTEM: &str = "freesynergy-filesystem";
+/// The virtual package a host provides (`= <level>`) and a module requires (`>= <level>`): the level of the form source contract (`FORM_SOURCE_LEVEL` of fs-interfaces; only `>=`, no upper bound).
+pub const FORM_SOURCE: &str = "freesynergy-form-source";
 /// Where the host looks for modules: one folder per module, `service` inside (INST-2a: one place).
 pub const MODULES_LIBEXEC: &str = "/usr/libexec/freesynergy/modules";
 /// Where the self-description (`AppStream` metainfo) of a module lives.
@@ -113,6 +69,7 @@ pub fn filesystem_spec(version: &str, release: &str) -> RpmSpec {
         .map(|d| dir(d))
         .collect(),
         requires: Vec::new(),
+        provides: Vec::new(),
         source_date: None,
     }
 }
@@ -148,24 +105,8 @@ pub(crate) fn read_plain(p: &Path) -> Result<Vec<u8>, String> {
     read(p)
 }
 
-/// Every entry below `dir`, at any depth, must be a plain file or folder: a link is refused (it could pull a file of the build machine into a signed package).
-fn no_links(dir: &Path) -> Result<(), String> {
-    let list = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    for e in list.flatten() {
-        let meta = std::fs::symlink_metadata(e.path())
-            .map_err(|x| format!("{}: {x}", e.path().display()))?;
-        if meta.file_type().is_symlink() {
-            return Err(format!("{}: a link is not packaged", e.path().display()));
-        }
-        if meta.is_dir() {
-            no_links(&e.path())?;
-        }
-    }
-    Ok(())
-}
-
 /// The folder `catalog` must be a real folder, not a link.
-fn check_plain_dir(p: &Path) -> Result<(), String> {
+pub(crate) fn check_plain_dir(p: &Path) -> Result<(), String> {
     let meta = std::fs::symlink_metadata(p).map_err(|e| format!("{}: {e}", p.display()))?;
     if meta.file_type().is_symlink() {
         return Err(format!("{}: a link is not packaged", p.display()));
@@ -214,7 +155,7 @@ pub fn module_spec(folder: &Path, i: &ModuleInput) -> Result<RpmSpec, String> {
         &format!("{base}/catalog"),
         &mut files,
     )?;
-    pack_texts(folder, &base, &mut files)?;
+    crate::package_texts::pack_texts(folder, &base, &mut files)?;
     files.push(file(
         format!("{MODULES_SHARE}/{}.metainfo.xml", i.name),
         read_plain(&folder.join("metainfo.xml"))?,
@@ -242,6 +183,7 @@ pub fn module_spec(folder: &Path, i: &ModuleInput) -> Result<RpmSpec, String> {
         url: Some(REPOSITORY_URL.into()),
         files,
         requires: module_requires(folder, i.name)?,
+        provides: Vec::new(),
         source_date: None,
     })
 }
@@ -251,10 +193,13 @@ pub fn module_spec(folder: &Path, i: &ModuleInput) -> Result<RpmSpec, String> {
 struct NeedRow {
     module: String,
     required: bool,
+    /// `x.y.z`: the oldest version of the module that is enough (`Requires: fs-module-<module> >= x.y.z`); missing = any version.
+    #[serde(default)]
+    at_least: Option<String>,
 }
 
 /// The dependencies of a module package: always `freesynergy-filesystem`, plus every entry of `requires` in `catalog/commands.json`
-/// (`required: true` = `Requires`, `false` = `Recommends`, package `fs-module-<module>`; no versions: the file names none).
+/// (`required: true` = `Requires`, `false` = `Recommends`, package `fs-module-<module>`; optional `at_least` x.y.z gives `>= x.y.z`) and, when `form_source_level` (whole number >= 1) is set, `Requires: freesynergy-form-source >= <level>`.
 /// No `requires` field: only the filesystem.
 ///
 /// # Errors
@@ -269,6 +214,19 @@ fn module_requires(folder: &Path, own: &str) -> Result<Vec<Req>, String> {
         name: FILESYSTEM.into(),
         ..Req::default()
     }];
+    if let Some(l) = doc.get("form_source_level") {
+        let level = l.as_u64().filter(|n| *n >= 1).ok_or_else(|| {
+            format!(
+                "{}: form_source_level must be a whole number >= 1, found {l}",
+                file.display()
+            )
+        })?;
+        out.push(Req {
+            name: FORM_SOURCE.into(),
+            at_least: Some(level.to_string()),
+            ..Req::default()
+        });
+    }
     let Some(raw) = doc.get("requires").cloned() else {
         return Ok(out);
     };
@@ -276,6 +234,11 @@ fn module_requires(folder: &Path, own: &str) -> Result<Vec<Req>, String> {
     for r in rows {
         if r.module == own {
             return Err(at(format!("the module {own:?} requires itself")));
+        }
+        if let Some(v) = &r.at_least {
+            if !crate::form::is_semver(v) {
+                return Err(at(format!("at_least {v:?} of {:?} is not x.y.z", r.module)));
+            }
         }
         let name = module_package(&r.module).map_err(at)?;
         let kind = if r.required {
@@ -285,7 +248,7 @@ fn module_requires(folder: &Path, own: &str) -> Result<Vec<Req>, String> {
         };
         out.push(Req {
             name,
-            at_least: None,
+            at_least: r.at_least,
             kind,
         });
     }
