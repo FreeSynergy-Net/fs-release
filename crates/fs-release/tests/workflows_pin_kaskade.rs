@@ -7,6 +7,23 @@ use support::kaskade::{cases, graph_ok, switches_ok, with_then, SWITCHES};
 use support::kaskade_rules::lock_rules_ok;
 use support::workflows::{in_order, read, step_body};
 
+/// The checks of workflow-pflege-2: neighbour pins, the hard pin-refs call and the three rules.
+fn ok_neu(t: &str) -> bool {
+    step_body(t, "nachbar-pins").contains("[DEV-DEPS-ZUERST]")
+        && step_body(t, "nachbar-pins-weiter").contains("then: eskalation")
+        && !step_body(t, "nachbar-pins-weiter").contains("then: pin-lift")
+        && step_body(t, "windows-aufrufer").contains("[PIN-REFS-DIR]")
+        && step_body(t, "windows-aufrufer").contains("[PIN-INNEN-BIS-RELEASE]")
+        && step_body(t, "windows-aufrufer").contains("pin-refs.sh --dir")
+        && [
+            "[DEV-DEPS-ZUERST]",
+            "[PIN-REFS-DIR]",
+            "[PIN-INNEN-BIS-RELEASE]",
+        ]
+        .iter()
+        .all(|r| t.contains(r))
+}
+
 fn ok(t: &str) -> bool {
     let to = |s: &str, target: &str| {
         let b = step_body(t, s);
@@ -74,19 +91,7 @@ fn ok(t: &str) -> bool {
         && step_body(t, "ein-stand").contains("cargo tree -d")
         && step_body(t, "ein-stand").contains("exactly ONE state")
         && step_body(t, "ein-stand").contains("cargo tree -d --workspace --target all")
-        && step_body(t, "nachbar-pins").contains("[DEV-DEPS-ZUERST]")
-        && step_body(t, "nachbar-pins-weiter").contains("then: eskalation")
-        && !step_body(t, "nachbar-pins-weiter").contains("then: pin-lift")
-        && step_body(t, "windows-aufrufer").contains("[PIN-REFS-DIR]")
-        && step_body(t, "windows-aufrufer").contains("[PIN-INNEN-BIS-RELEASE]")
-        && step_body(t, "windows-aufrufer").contains("pin-refs.sh --dir")
-        && [
-            "[DEV-DEPS-ZUERST]",
-            "[PIN-REFS-DIR]",
-            "[PIN-INNEN-BIS-RELEASE]",
-        ]
-        .iter()
-        .all(|r| t.contains(r))
+        && ok_neu(t)
         && step_body(t, "ein-stand-weiter").contains("then: eskalation")
         && !step_body(t, "ein-stand-weiter").contains("then: besonderes")
         && step_body(t, "plan").contains("REAL dependencies")

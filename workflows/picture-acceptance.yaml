@@ -41,7 +41,7 @@ do:
             when: '${ ($context.vorbedingungen.befunde // [] | length) > 0 or ($context.vorbedingungen.red // false) == true }'
             then: vorbedingung-fehlt
         - gruen:
-            when: '${ ($context.vorbedingungen.befunde // [] | length) == 0 and ($context.vorbedingungen.red // false) == false }'
+            when: '${ $context.vorbedingungen.red == false and ($context.vorbedingungen.befunde // [] | length) == 0 and ($context.vorbedingungen.belege // [] | length) == 5 }'
             then: continue
         - ohne-ergebnis:
             then: vorbedingung-fehlt
