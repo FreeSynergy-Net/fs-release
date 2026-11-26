@@ -150,6 +150,22 @@ jobs:
       - name: kind module, step "package rpm" for real (plan.py, package.sh, fs-blueprint package module, rpm -qp)
         run: bash tests/module-probe/run.sh
 
+  # The release path dry run (workflow pin-kaskade, step "fix im Release-Weg"): fs-blueprint is built from EXACTLY the commit release.yml pins for _release-linux.yml (what the tag run builds
+  # from job.workflow_sha), packages a module that requires `person`, and `rpm -qp --requires` in a CONTAINER must show fs-module-person (13b680a was missing there).
+  requires-from-pin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: FreeSynergy-Net/fs-release/actions/setup-rust@d68860e120a69faef94254cf1e7e5cc41374304b
+        with:
+          toolchain: pinned
+          cache-key: requires-from-pin
+      - run: bash tests/module-probe/requires-from-pin.sh
+
   # The commands of the README run WORD FOR WORD (scripts/readme-run.sh reads the block after `<!-- readme-run -->`): install from the tag into a work
   # folder, copy examples/leer, `new` with the catalog that comes with the command (no --catalog), `check --repo`. A wrong README line or an invalid example is red.
   readme:

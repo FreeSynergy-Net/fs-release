@@ -46,9 +46,9 @@ pub(crate) fn findings(repo: &Path, start: &str) -> Vec<String> {
         .map(|f| format!("{FIXES_FILE}: `{f}` is not a full commit SHA"))
         .collect();
     let fixes: Vec<&str> = all.into_iter().filter(|f| is_sha(f)).collect();
-    let mut files = files_at(repo, start, ".github/workflows");
-    files.extend(files_at(repo, start, "actions"));
-    for f in files.iter().filter(|f| on_release_path(f)) {
+    let mut tree = files_at(repo, start, ".github/workflows");
+    tree.extend(files_at(repo, start, "actions"));
+    for f in tree.iter().filter(|f| on_release_path(f)) {
         let Some(text) = show(repo, start, f) else {
             continue;
         };
