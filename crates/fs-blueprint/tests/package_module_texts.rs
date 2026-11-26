@@ -31,6 +31,10 @@ fn module(name: &str, texts: &[(&str, &str)]) -> (PathBuf, PathBuf) {
     (d, bin)
 }
 
+fn has_ext(p: &str, ext: &str) -> bool {
+    Path::new(p).extension().is_some_and(|e| e == ext)
+}
+
 fn make(out: &Path, d: &Path, bin: &Path) -> (i32, String) {
     let (code, o, e) = cli(&[
         "package",
@@ -72,7 +76,7 @@ fn texts_are_packed_into_catalog_texts_without_dates() {
     for tag in ["en", "de"] {
         assert!(
             list.lines()
-                .any(|l| l.starts_with(&format!("{base}/{tag}.")) && l.ends_with(".mf2b")),
+                .any(|l| l.starts_with(&format!("{base}/{tag}.")) && has_ext(l, "mf2b")),
             "{tag}: {list}"
         );
     }
@@ -82,7 +86,7 @@ fn texts_are_packed_into_catalog_texts_without_dates() {
         "{list}"
     );
     assert!(
-        !list.lines().any(|l| l.ends_with(".mf2")),
+        !list.lines().any(|l| has_ext(l, "mf2")),
         "sources are not packaged: {list}"
     );
 }
