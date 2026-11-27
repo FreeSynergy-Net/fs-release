@@ -38,6 +38,12 @@ name = "planning"
 kind = "standard"
 tags = ["0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.0.5", "0.0.6", "0.0.8"]
 
+# Art 1 (standard): the person standard of the repo fs-modules-person (the module is called `person`, the RPM `fs-module-person`). Tags of the repo (git ls-remote 2026-11-27): v0.0.1 and v0.0.3; both are published as signed RPMs (Repository channel). Needed so that a program package (fs-people) gets `Requires: fs-module-person >= 0.0.3`.
+[[module]]
+name = "person"
+kind = "standard"
+tags = ["0.0.1", "0.0.3"]
+
 # Art 3 (components): crates of fs-components (tag v0.0.29): `task_card` in fs-components-widgets, the board in fs-components-kanban.
 [[module]]
 name = "task-card"
